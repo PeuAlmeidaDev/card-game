@@ -1,9 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import type { RolarD12 } from '@card-dungeon/motor';
-import type { ResultadoDuelo } from '@card-dungeon/shared';
+import type { ResultadoDuelo, Catalogo } from '@card-dungeon/shared';
 import { buildApp } from './app';
 
-/** Dado determinístico local: devolve as rolagens na ordem dada; lança se esgotar. */
 function filaDeDados(rolagens: readonly number[]): RolarD12 {
   let i = 0;
   return () => {
@@ -14,28 +13,58 @@ function filaDeDados(rolagens: readonly number[]): RolarD12 {
   };
 }
 
-describe('POST /duelo', () => {
-  it('resolve o duelo e devolve 200 com o desfecho (dado determinístico)', async () => {
-    const a = { forca: 6, vida: 20, habilidade: 8, agilidade: 9, level: 5 };
-    const b = { forca: 1, vida: 10, habilidade: 8, agilidade: 2, level: 1 };
-    // a tem +Agilidade → sem rolagem de iniciativa.
-    // T1 a→b: ataque 3 (≤8 acerto), esquiva 12 (>3 não esquiva) → dano 5+6=11 → vidaB -1 → vitória de a.
-    const app = buildApp({ rolar: filaDeDados([3, 12]) });
-    const res = await app.inject({ method: 'POST', url: '/duelo', payload: { a, b } });
+describe('GET /catalogo', () => {
+  it('devolve a tabela do domínio', async () => {
+    const app = buildApp();
+    const res = await app.inject({ method: 'GET', url: '/catalogo' });
+    expect(res.statusCode).toBe(200);
+    const catalogo = res.json<Catalogo>();
+    expect(catalogo.racas.map((r) => r.id)).toContain('elfo');
+    expect(catalogo.classes.map((c) => c.id)).toContain('guerreiro');
+    expect(catalogo.base.level).toBe(1);
+    await app.close();
+  });
+});
 
+describe('POST /duelo', () => {
+  it('monta o personagem das escolhas e duela (dado determinístico)', async () => {
+    // Elfo+Guerreiro+Espada => {forca:6, vida:15, hab:7, agi:7, level:1}, dano 7.
+    // Monstro {forca:4, vida:18, hab:7, agi:4, level:2}. Jogador (a) tem +Agilidade => começa, sem rolagem de iniciativa.
+    // T1 a: ataque 3 (<=7 acerto), esquiva 12 (não) -> 18-7=11
+    // T2 b: ataque 8 (>7 erro)
+    // T3 a: ataque 3 (acerto), esquiva 12 -> 11-7=4
+    // T4 b: ataque 8 (erro)
+    // T5 a: ataque 3 (acerto), esquiva 12 -> 4-7=-3 -> vitória de a, 5 turnos
+    const app = buildApp({ rolar: filaDeDados([3, 12, 8, 3, 12, 8, 3, 12]) });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/duelo',
+      payload: { racaId: 'elfo', classeId: 'guerreiro', itemIds: ['espada'] },
+    });
     expect(res.statusCode).toBe(200);
     const body = res.json<ResultadoDuelo>();
     expect(body.tipo).toBe('vitoria');
     if (body.tipo === 'vitoria') {
       expect(body.vencedor).toBe('a');
-      expect(body.turnos).toBe(1);
+      expect(body.turnos).toBe(5);
     }
     await app.close();
   });
 
   it('rejeita corpo inválido com 400', async () => {
-    const app = buildApp({ rolar: filaDeDados([3, 12]) });
-    const res = await app.inject({ method: 'POST', url: '/duelo', payload: { a: { forca: 1 } } });
+    const app = buildApp();
+    const res = await app.inject({ method: 'POST', url: '/duelo', payload: { racaId: 'elfo' } });
+    expect(res.statusCode).toBe(400);
+    await app.close();
+  });
+
+  it('rejeita id inexistente com 400', async () => {
+    const app = buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/duelo',
+      payload: { racaId: 'dragao', classeId: 'guerreiro', itemIds: [] },
+    });
     expect(res.statusCode).toBe(400);
     await app.close();
   });

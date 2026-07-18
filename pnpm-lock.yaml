@@ -51,6 +51,9 @@ importers:
       '@card-dungeon/motor':
         specifier: workspace:*
         version: link:../motor
+      '@card-dungeon/personagem':
+        specifier: workspace:*
+        version: link:../personagem
       '@card-dungeon/shared':
         specifier: workspace:*
         version: link:../shared

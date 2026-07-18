@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@card-dungeon/motor": "workspace:*",
+    "@card-dungeon/personagem": "workspace:*",
     "@card-dungeon/shared": "workspace:*",
     "fastify": "^5.10.0"
   },

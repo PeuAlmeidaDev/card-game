@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import { resolverDuelo, type RolarD12 } from '@card-dungeon/motor';
-import { dueloRequestSchema } from '@card-dungeon/shared';
+import { escolhasSchema } from '@card-dungeon/shared';
+import { CATALOGO, MONSTRO_PADRAO, resolverEscolhas, montarCombatente } from '@card-dungeon/personagem';
 import { criarDadoReal } from './dado';
 
 export interface OpcoesApp {
@@ -12,13 +13,21 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
   const rolar = opcoes.rolar ?? criarDadoReal();
   const app = Fastify();
 
+  app.get('/catalogo', () => CATALOGO);
+
   app.post('/duelo', (request, reply) => {
-    const parsed = dueloRequestSchema.safeParse(request.body);
+    const parsed = escolhasSchema.safeParse(request.body);
     if (!parsed.success) {
       reply.status(400);
-      return { erro: 'requisição inválida', detalhes: parsed.error.issues };
+      return { erro: 'escolhas inválidas', detalhes: parsed.error.issues };
     }
-    return resolverDuelo(parsed.data.a, parsed.data.b, rolar);
+    const resolvido = resolverEscolhas(CATALOGO, parsed.data);
+    if (!resolvido) {
+      reply.status(400);
+      return { erro: 'raça, classe ou item inexistente' };
+    }
+    const jogador = montarCombatente(resolvido.raca, resolvido.classe, resolvido.itens);
+    return resolverDuelo(jogador, MONSTRO_PADRAO, rolar);
   });
 
   return app;
