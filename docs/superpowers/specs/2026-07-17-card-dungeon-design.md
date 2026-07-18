@@ -91,7 +91,7 @@ web (React+Vite) ──REST──▶ server (Fastify+Zod) ──chama──▶ e
         (pacote `shared` = contrato HTTP; nasce só quando o server↔web for real)
 ```
 
-Monorepo pnpm workspaces, Node ≥ 20, TypeScript strict (+ `noUncheckedIndexedAccess`),
+Monorepo pnpm workspaces, Node ≥ 22.13 (dev em 24; exigido pelo `pnpm@11.9`), TypeScript strict (+ `noUncheckedIndexedAccess`),
 vitest, ESLint flat. O `engine` não importa Fastify nem React — roda no browser (feedback
 instantâneo) e no servidor (autoridade futura) sem reescrita.
 

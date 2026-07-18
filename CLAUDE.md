@@ -24,7 +24,7 @@ Nada foi scaffoldado ainda (sem package.json/tsconfig).
 
 ## Stack (alvo)
 
-Monorepo pnpm workspaces, Node ≥ 20, **TypeScript strict** (+ `noUncheckedIndexedAccess`).
+Monorepo pnpm workspaces, Node ≥ 22.13 (dev em 24; exigido pelo `pnpm@11.9`), **TypeScript strict** (+ `noUncheckedIndexedAccess`).
 `engine` = **TS puro** (dado injetado, zero framework). `server` = **Fastify + Zod + REST**.
 `web` = **React + Vite**. Testes: **vitest**. Lint: **ESLint flat**. Pacote `shared` (contrato
 HTTP) **adiado** até o server↔web existir de verdade.
