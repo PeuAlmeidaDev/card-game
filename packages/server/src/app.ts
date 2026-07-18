@@ -1,5 +1,5 @@
 import Fastify, { type FastifyInstance } from 'fastify';
-import { resolverDuelo, type RolarD12 } from '@card-dungeon/motor';
+import { resolverDuelo, type RolarD12, type Combatente } from '@card-dungeon/motor';
 import { escolhasSchema } from '@card-dungeon/shared';
 import { CATALOGO, MONSTRO_PADRAO, resolverEscolhas, montarCombatente } from '@card-dungeon/personagem';
 import { criarDadoReal } from './dado';
@@ -7,10 +7,13 @@ import { criarDadoReal } from './dado';
 export interface OpcoesApp {
   /** Fonte de rolagem injetada; default = dado real. Testes injetam um dado determinístico. */
   readonly rolar?: RolarD12;
+  /** Monstro adversário (lado b); default = MONSTRO_PADRAO. Testes injetam um monstro fixo. */
+  readonly monstro?: Combatente;
 }
 
 export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
   const rolar = opcoes.rolar ?? criarDadoReal();
+  const monstro = opcoes.monstro ?? MONSTRO_PADRAO;
   const app = Fastify();
 
   app.get('/catalogo', () => CATALOGO);
@@ -27,7 +30,7 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
       return { erro: 'raça, classe ou item inexistente' };
     }
     const jogador = montarCombatente(resolvido.raca, resolvido.classe, resolvido.itens);
-    return resolverDuelo(jogador, MONSTRO_PADRAO, rolar);
+    return resolverDuelo(jogador, monstro, rolar);
   });
 
   return app;

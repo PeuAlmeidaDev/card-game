@@ -28,14 +28,16 @@ describe('GET /catalogo', () => {
 
 describe('POST /duelo', () => {
   it('monta o personagem das escolhas e duela (dado determinístico)', async () => {
+    // Monstro FIXO injetado (desacopla do MONSTRO_PADRAO de produção, que pode ser tunado à vontade).
+    const monstro = { forca: 4, vida: 18, habilidade: 7, agilidade: 4, level: 2 };
     // Elfo+Guerreiro+Espada => {forca:6, vida:15, hab:7, agi:7, level:1}, dano 7.
-    // Monstro {forca:4, vida:18, hab:7, agi:4, level:2}. Jogador (a) tem +Agilidade => começa, sem rolagem de iniciativa.
+    // Monstro {vida:18}. Jogador (a) tem +Agilidade => começa, sem rolagem de iniciativa.
     // T1 a: ataque 3 (<=7 acerto), esquiva 12 (não) -> 18-7=11
     // T2 b: ataque 8 (>7 erro)
     // T3 a: ataque 3 (acerto), esquiva 12 -> 11-7=4
     // T4 b: ataque 8 (erro)
     // T5 a: ataque 3 (acerto), esquiva 12 -> 4-7=-3 -> vitória de a, 5 turnos
-    const app = buildApp({ rolar: filaDeDados([3, 12, 8, 3, 12, 8, 3, 12]) });
+    const app = buildApp({ rolar: filaDeDados([3, 12, 8, 3, 12, 8, 3, 12]), monstro });
     const res = await app.inject({
       method: 'POST',
       url: '/duelo',
