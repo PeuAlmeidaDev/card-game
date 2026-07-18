@@ -1,28 +1,22 @@
 import { describe, it, expect } from 'vitest';
-import { combatenteSchema, dueloRequestSchema } from './index';
+import { escolhasSchema } from './index';
 
-const valido = { forca: 6, vida: 20, habilidade: 8, agilidade: 9, level: 5 };
+const valido = { racaId: 'elfo', classeId: 'ladino', itemIds: ['espada'] };
 
-describe('combatenteSchema', () => {
-  it('valida um combatente com os 5 stats inteiros', () => {
-    expect(combatenteSchema.safeParse(valido).success).toBe(true);
+describe('escolhasSchema', () => {
+  it('valida escolhas com raça, classe e itens', () => {
+    expect(escolhasSchema.safeParse(valido).success).toBe(true);
   });
 
-  it('rejeita quando falta um stat', () => {
-    expect(combatenteSchema.safeParse({ forca: 6, vida: 20, habilidade: 8, agilidade: 9 }).success).toBe(false);
+  it('aceita lista de itens vazia', () => {
+    expect(escolhasSchema.safeParse({ ...valido, itemIds: [] }).success).toBe(true);
   });
 
-  it('rejeita stat não-inteiro', () => {
-    expect(combatenteSchema.safeParse({ ...valido, forca: 6.5 }).success).toBe(false);
-  });
-});
-
-describe('dueloRequestSchema', () => {
-  it('valida o corpo com a e b', () => {
-    expect(dueloRequestSchema.safeParse({ a: valido, b: valido }).success).toBe(true);
+  it('rejeita quando falta a raça', () => {
+    expect(escolhasSchema.safeParse({ classeId: 'ladino', itemIds: [] }).success).toBe(false);
   });
 
-  it('rejeita quando falta um lado', () => {
-    expect(dueloRequestSchema.safeParse({ a: valido }).success).toBe(false);
+  it('rejeita itemIds que não é lista de strings', () => {
+    expect(escolhasSchema.safeParse({ ...valido, itemIds: [1, 2] }).success).toBe(false);
   });
 });

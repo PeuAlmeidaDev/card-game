@@ -73,6 +73,9 @@ importers:
       '@card-dungeon/motor':
         specifier: workspace:*
         version: link:../motor
+      '@card-dungeon/personagem':
+        specifier: workspace:*
+        version: link:../personagem
       zod:
         specifier: ^4.4.3
         version: 4.4.3
