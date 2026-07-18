@@ -435,7 +435,14 @@ git commit -m "feat(server): expose POST /duelo validating input with zod and in
 - Consumes (type-only, apagado no build): `Combatente`, `ResultadoDuelo` de `@card-dungeon/shared`.
 - Produces: app web servida pelo Vite em `:5173`, fazendo `POST /duelo` (proxied para `:3000`).
 
-**Verificação:** manual, rodando o app (sem teste de UI). Este pacote **não tem** script `test` — `pnpm -r test` o ignora; tem `typecheck`.
+**Verificação:** teste de componente (Vitest + React Testing Library + jsdom, `fetch` mockado) + unitário da função pura `descrever`, **mais** verificação manual rodando o app.
+
+> **Adendo (scope change 2026-07-18, a pedido do Pedro):** o spike original deixava o `web` sem
+> teste automatizado; foi elevado. Arquivos extras nesta task: `src/setup-tests.ts`
+> (`import '@testing-library/jest-dom/vitest'`), bloco `test` no `vite.config.ts` (`environment:
+> 'jsdom'`, `setupFiles`), `src/App.test.tsx` (testa `descrever` + o clique→fetch→desfecho),
+> e `descrever` passa a ser **exportada** do `App.tsx`. devDeps: `vitest`, `jsdom`,
+> `@testing-library/{react,dom,user-event,jest-dom}`. Script `test`/`test:watch` no package.json.
 
 - [ ] **Step 1: Criar `packages/web/package.json`**
 
@@ -603,7 +610,7 @@ Expected: sem erros (`pnpm -r typecheck` cobre motor, shared, server, web).
 - [ ] **Step 3: Testes de tudo**
 
 Run: `pnpm test`
-Expected: motor (18) + shared (5) + server (2) verdes; web ignorado (sem script `test`).
+Expected: motor (18) + shared (5) + server (2) + web (4) verdes.
 
 - [ ] **Step 4 (opcional): Abrir PR**
 

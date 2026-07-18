@@ -28,7 +28,8 @@ eixo). Ver `../specs/2026-07-17-card-dungeon-design.md` (arquitetura-alvo) e a n
 - Formulário editável de stats (combatentes ficam **fixos no código** do `web`).
 - Cartas, habilidades, camada de encontro, lutar-ou-fugir, persistência.
 - Múltiplos endpoints, autenticação, CORS (usa proxy do Vite), CSS além do cru.
-- Teste de UI automatizado; validação Zod da **resposta** (ver Decisão 3).
+- Validação Zod da **resposta** (ver Decisão 3). *(Teste de UI automatizado saiu do YAGNI — ver
+  Verificação: agora o `web` tem teste de componente.)*
 - Migração para tRPC/ts-rest — **fatia futura deliberada** (ver Decisão 1).
 
 ## Arquitetura
@@ -108,8 +109,11 @@ CORS — evita uma dependência e configuração num spike.
 - **`server`:** teste `fastify.inject` — (a) POST válido + `filaDeDados` fixa → `200` com o
   desfecho esperado (aritmética traçada à mão, no estilo dos testes do `motor`); (b) POST inválido
   → `400`.
-- **`web`:** verificado **rodando de verdade** (subir server + web, clicar "Duelar" e ver o
-  desfecho) — sem teste de UI.
+- **`web`:** teste de componente com **Vitest + React Testing Library + jsdom** (clique no botão
+  → `fetch` mockado → desfecho na tela) + teste unitário da função pura `descrever`. Além disso,
+  verificado **rodando de verdade** (subir server + web, clicar "Duelar" e ver o desfecho).
+  *(Escopo elevado a pedido do Pedro em 2026-07-18: o spike originalmente deixava o `web` sem
+  teste automatizado; agora tem.)*
 - **CI:** os novos pacotes entram no `pnpm -r` (lint/typecheck/test) que já existe.
 
 ## Decisões de arquitetura (registro)
