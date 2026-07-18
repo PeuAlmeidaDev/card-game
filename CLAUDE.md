@@ -57,3 +57,22 @@ Seguir o `CLAUDE.md` global do Pedro **+** o spec. **TDD** (teste antes do códi
 fatias verticais finas, **commits granulares** (Conventional Commits, um por task), **CI verde**
 antes de commitar. `process.env` só na borda. Usar `grill-me` para decisões de design ainda
 abertas (ver "Pontos em aberto" no spec).
+
+### Mensagens de commit — em português (sobrescreve a preferência global)
+
+Diferente do `CLAUDE.md` global (que pede commits em inglês), **neste projeto** as mensagens de
+commit são em **português**, mantendo o padrão **Conventional Commits**:
+
+- **Tipo e escopo em inglês** (são keywords do padrão): `feat`, `fix`, `chore`, `docs`, `test`,
+  `refactor`, `perf`, `build`, `ci`, `style` — com escopo opcional, ex.: `feat(server): …`.
+- **Descrição e corpo em português**, no imperativo. Um commit por task, granular.
+- O trailer `Co-Authored-By` permanece como está.
+
+Exemplos:
+
+```
+feat(server): expõe POST /duelo validando a entrada com zod
+test(motor): cobre iniciativa de b, empate e vitória exata
+chore(pnpm): libera o build script do esbuild via allowBuilds
+docs: corrige o piso de Node para 22.13
+```
