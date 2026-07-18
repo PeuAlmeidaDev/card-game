@@ -24,7 +24,7 @@ describe('POST /duelo', () => {
     const res = await app.inject({ method: 'POST', url: '/duelo', payload: { a, b } });
 
     expect(res.statusCode).toBe(200);
-    const body = res.json() as ResultadoDuelo;
+    const body = res.json<ResultadoDuelo>();
     expect(body.tipo).toBe('vitoria');
     if (body.tipo === 'vitoria') {
       expect(body.vencedor).toBe('a');
