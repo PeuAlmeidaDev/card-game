@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { Combatente, ResultadoDuelo } from '@card-dungeon/shared';
 
 const A: Combatente = { forca: 6, vida: 20, habilidade: 8, agilidade: 9, level: 5 };
-const B: Combatente = { forca: 1, vida: 10, habilidade: 8, agilidade: 2, level: 1 };
+const B: Combatente = { forca: 6, vida: 20, habilidade: 8, agilidade: 2, level: 5 };
 
 export function descrever(r: ResultadoDuelo): string {
   if (r.tipo === 'vitoria') return `Vitória de '${r.vencedor}' em ${r.turnos} turnos`;
