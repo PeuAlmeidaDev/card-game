@@ -1,26 +1,25 @@
 import { z } from 'zod';
-import type { Combatente } from '@card-dungeon/motor';
+import type { EscolhasPersonagem } from '@card-dungeon/personagem';
 
 /**
- * Schema Zod de um Combatente, restrito ao tipo de domínio do `motor`.
- * O `satisfies z.ZodType<Combatente>` garante, em tempo de compilação, que o
- * schema não divirja do tipo — o `motor` continua a fonte única do tipo.
+ * Corpo do POST /duelo: as escolhas do jogador (ids). Restrito ao tipo de
+ * domínio via `satisfies` — o `personagem` continua a fonte única do tipo.
  */
-export const combatenteSchema = z.object({
-  forca: z.number().int(),
-  vida: z.number().int(),
-  habilidade: z.number().int(),
-  agilidade: z.number().int(),
-  level: z.number().int(),
-}) satisfies z.ZodType<Combatente>;
+export const escolhasSchema = z.object({
+  racaId: z.string(),
+  classeId: z.string(),
+  itemIds: z.array(z.string()),
+}) satisfies z.ZodType<EscolhasPersonagem>;
 
-/** Corpo do POST /duelo: os dois combatentes. */
-export const dueloRequestSchema = z.object({
-  a: combatenteSchema,
-  b: combatenteSchema,
-});
+export type Escolhas = z.infer<typeof escolhasSchema>;
 
-export type DueloRequest = z.infer<typeof dueloRequestSchema>;
-
-// Re-exporta os tipos de domínio → superfície de import única do contrato.
+// Superfície única do contrato: tipos de combate + de personagem.
 export type { Combatente, ResultadoDuelo } from '@card-dungeon/motor';
+export type {
+  ModificadoresDeStat,
+  Raca,
+  Classe,
+  Equipamento,
+  Catalogo,
+  EscolhasPersonagem,
+} from '@card-dungeon/personagem';

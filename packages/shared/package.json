@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@card-dungeon/motor": "workspace:*",
+    "@card-dungeon/personagem": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {
