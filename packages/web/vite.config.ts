@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
+      '/catalogo': 'http://localhost:3000',
       '/duelo': 'http://localhost:3000',
     },
   },
