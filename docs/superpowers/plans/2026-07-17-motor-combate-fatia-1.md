@@ -22,7 +22,7 @@
 ## Decisões desta fatia (confirmar antes de executar)
 
 1. **Iniciativa em empate de Agilidade → desempate por dado.** Em empate, rola **um** 1d12: `≤ 6` → o combatente `a` começa; senão `b`. Determinístico, justo (6 vs 6 num d12), sem abrir novo vetor de loop. *(Escolha do Pedro.)*
-2. **Fim forçado → desfecho neutro `fuga`.** Constante `MAX_TURNOS = 1000`. Se o duelo atingir o teto sem ninguém zerar a Vida (ex.: `habilidade` baixa → ninguém acerta), o resultado é `{ tipo: 'fuga' }`. O motor é **simétrico** (Decisão 4 do spec) e não sabe quem é "o monstro"; a narrativa *"o bicho fugiu"* nasce na camada de apresentação (fatia 2+). *(Escolha do Pedro; nome neutro é ajuste de arquitetura para não vazar tema no domínio.)*
+2. **Fim forçado → desfecho neutro `impasse`.** Constante `MAX_TURNOS = 1000`. Se o duelo atingir o teto sem ninguém zerar a Vida (ex.: `habilidade` baixa → ninguém acerta), o resultado é `{ tipo: 'impasse' }` — um *deadlock do algoritmo* (garante terminação), não uma jogada. O motor é **simétrico** (Decisão 4 do spec) e não sabe quem é "o monstro". **Nota de reserva de nome:** a palavra `fuga` fica reservada para a mecânica real do Munchkin. Sequência do encontro: revelado o monstro, há uma **fase de decisões/interferência** (jogadores jogam cartas — debuff no lutador, buff no monstro, ajuda de aliado); só **depois** que tudo isso resolve o jogador escolhe **lutar ou fugir** (se foge, rola o dado — escapa ou é pego e leva Bad Stuff). Toda essa sequência vive na **camada de encontro, acima do motor de duelo**: é ela que calcula os stats finais do `Combatente` (base ± buffs/debuffs) e, se a escolha for lutar, entrega esse snapshot imutável ao `resolverDuelo`. O motor nunca vê carta/buff/decisão — recebe combatentes prontos e resolve (por isso `Combatente` é `readonly` e o motor é puro). É fatia futura (provável `resolverFuga(...)` próprio) — **não** é este desfecho. *(Escolha do Pedro.)*
 3. **Esquiva pura não usa stat do defensor** (Decisão 9 do spec): `resolverAtaque` nem recebe os stats do defensor — só o rótulo do lado, para o evento.
 
 ---
@@ -303,7 +303,7 @@ git commit -m "chore: scaffold pnpm monorepo, motor package and CI pipeline"
   - `type RolarD12 = () => number` (inteiro 1..12)
   - `type Lado = 'a' | 'b'`
   - `type EventoCombate` (união discriminada por `tipo`: `iniciativa` | `ataque` | `esquiva` | `dano`)
-  - `type ResultadoDuelo` (união por `tipo`: `vitoria` | `fuga`)
+  - `type ResultadoDuelo` (união por `tipo`: `vitoria` | `impasse`)
   - `filaDeDados(rolagens: readonly number[]): RolarD12` — dado que devolve as rolagens em ordem e lança ao esgotar.
 
 - [ ] **Step 1: Criar os tipos de domínio**
@@ -333,7 +333,7 @@ export type EventoCombate =
 
 export type ResultadoDuelo =
   | { readonly tipo: 'vitoria'; readonly vencedor: Lado; readonly turnos: number; readonly log: readonly EventoCombate[] }
-  | { readonly tipo: 'fuga'; readonly turnos: number; readonly log: readonly EventoCombate[] };
+  | { readonly tipo: 'impasse'; readonly turnos: number; readonly log: readonly EventoCombate[] };
 ```
 
 - [ ] **Step 2: Escrever o teste do `filaDeDados` (falhando)**
@@ -681,14 +681,14 @@ describe('resolverDuelo', () => {
     }
   });
 
-  it('devolve fuga quando ninguém consegue causar dano (habilidade 0)', () => {
+  it('devolve impasse quando ninguém consegue causar dano (habilidade 0)', () => {
     const a: Combatente = { forca: 3, vida: 20, habilidade: 0, agilidade: 9, level: 1 };
     const b: Combatente = { forca: 3, vida: 20, habilidade: 0, agilidade: 2, level: 1 };
     // habilidade 0 → nenhuma rolagem 1..12 é ≤ 0 → ninguém acerta; cada turno gasta 1 rolagem (só o ataque).
     const rolagens = Array.from({ length: MAX_TURNOS }, () => 1);
     const r = resolverDuelo(a, b, filaDeDados(rolagens));
-    expect(r.tipo).toBe('fuga');
-    if (r.tipo === 'fuga') {
+    expect(r.tipo).toBe('impasse');
+    if (r.tipo === 'impasse') {
       expect(r.turnos).toBe(MAX_TURNOS);
     }
   });
@@ -744,7 +744,7 @@ export function resolverDuelo(a: Combatente, b: Combatente, rolar: RolarD12): Re
     ladoAtacante = ladoDefensor;
   }
 
-  return { tipo: 'fuga', turnos: MAX_TURNOS, log };
+  return { tipo: 'impasse', turnos: MAX_TURNOS, log };
 }
 ```
 
@@ -794,7 +794,7 @@ Expected: tudo verde.
 ```bash
 git add packages/motor/src/duelo.ts packages/motor/src/duelo.test.ts packages/motor/src/index.ts
 git rm packages/motor/src/estrutura.test.ts
-git commit -m "feat(motor): resolve full duel loop with rounds, victory and fuga cap"
+git commit -m "feat(motor): resolve full duel loop with rounds, victory and impasse cap"
 ```
 
 ---
@@ -811,7 +811,7 @@ git commit -m "feat(motor): resolve full duel loop with rounds, victory and fuga
 - Dado injetado (`resolverDuelo(a, b, rolar)`) → assinatura em toda parte. ✅
 - Vida reseta a cada combate (Decisão 2) → a função é pura, sem estado entre chamadas; cada duelo parte de `a.vida`/`b.vida`. ✅
 - Sem cartas/habilidades/HTTP/UI (fora de escopo da fatia 1) → nada disso aparece. ✅
-- Desfecho de não-terminação (`fuga`) — extensão defensiva acordada, não no spec original. ✅
+- Desfecho de não-terminação (`impasse`) — extensão defensiva acordada, não no spec original. ✅
 
 **2. Placeholder scan:** todos os steps de código têm o código completo; todos os comandos têm output esperado. `VERSAO_MOTOR` é um placeholder *intencional e temporário* (Task 1) removido na Task 5, não um TODO. Sem "TBD"/"handle edge cases"/"similar to Task N". ✅
 
