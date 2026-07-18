@@ -19,7 +19,7 @@ const ITENS: readonly Equipamento[] = [
 ];
 
 /** Monstro fixo (lado b do duelo). Montar monstro fica para uma fatia futura. */
-export const MONSTRO_PADRAO: Combatente = { forca: 4, vida: 18, habilidade: 7, agilidade: 4, level: 2 };
+export const MONSTRO_PADRAO: Combatente = { forca: 4, vida: 30, habilidade: 2, agilidade: 4, level: 5 };
 
 export const CATALOGO: Catalogo = { base: BASE, racas: RACAS, classes: CLASSES, itens: ITENS };
 
