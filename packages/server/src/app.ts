@@ -16,9 +16,9 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
   const monstro = opcoes.monstro ?? MONSTRO_PADRAO;
   const app = Fastify();
 
-  app.get('/catalogo', () => CATALOGO);
+  app.get('/api/catalogo', () => CATALOGO);
 
-  app.post('/duelo', (request, reply) => {
+  app.post('/api/duelo', (request, reply) => {
     const parsed = escolhasSchema.safeParse(request.body);
     if (!parsed.success) {
       reply.status(400);

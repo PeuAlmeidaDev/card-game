@@ -6,8 +6,8 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/catalogo': 'http://localhost:3000',
-      '/duelo': 'http://localhost:3000',
+      // Uma regra só: todas as rotas de API ficam sob /api → não precisa listar cada endpoint.
+      '/api': 'http://localhost:3000',
     },
   },
   test: {

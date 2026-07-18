@@ -25,7 +25,7 @@ function mockFetch(): void {
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string) =>
-      url === '/catalogo'
+      url === '/api/catalogo'
         ? Promise.resolve({ json: () => Promise.resolve(catalogo) })
         : Promise.resolve({ json: () => Promise.resolve(resultado) }),
     ),

@@ -27,7 +27,7 @@ export function App() {
 
   useEffect(() => {
     void (async () => {
-      const resposta = await fetch('/catalogo');
+      const resposta = await fetch('/api/catalogo');
       const c = (await resposta.json()) as Catalogo;
       setCatalogo(c);
       setRacaId(c.racas[0]?.id ?? '');
@@ -48,7 +48,7 @@ export function App() {
 
   async function duelar(): Promise<void> {
     setTexto('Rolando os dados…');
-    const resposta = await fetch('/duelo', {
+    const resposta = await fetch('/api/duelo', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ racaId, classeId, itemIds }),

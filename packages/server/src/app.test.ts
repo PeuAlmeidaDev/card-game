@@ -16,7 +16,7 @@ function filaDeDados(rolagens: readonly number[]): RolarD12 {
 describe('GET /catalogo', () => {
   it('devolve a tabela do domínio', async () => {
     const app = buildApp();
-    const res = await app.inject({ method: 'GET', url: '/catalogo' });
+    const res = await app.inject({ method: 'GET', url: '/api/catalogo' });
     expect(res.statusCode).toBe(200);
     const catalogo = res.json<Catalogo>();
     expect(catalogo.racas.map((r) => r.id)).toContain('elfo');
@@ -40,7 +40,7 @@ describe('POST /duelo', () => {
     const app = buildApp({ rolar: filaDeDados([3, 12, 8, 3, 12, 8, 3, 12]), monstro });
     const res = await app.inject({
       method: 'POST',
-      url: '/duelo',
+      url: '/api/duelo',
       payload: { racaId: 'elfo', classeId: 'guerreiro', itemIds: ['espada'] },
     });
     expect(res.statusCode).toBe(200);
@@ -55,7 +55,7 @@ describe('POST /duelo', () => {
 
   it('rejeita corpo inválido com 400', async () => {
     const app = buildApp();
-    const res = await app.inject({ method: 'POST', url: '/duelo', payload: { racaId: 'elfo' } });
+    const res = await app.inject({ method: 'POST', url: '/api/duelo', payload: { racaId: 'elfo' } });
     expect(res.statusCode).toBe(400);
     await app.close();
   });
@@ -64,7 +64,7 @@ describe('POST /duelo', () => {
     const app = buildApp();
     const res = await app.inject({
       method: 'POST',
-      url: '/duelo',
+      url: '/api/duelo',
       payload: { racaId: 'dragao', classeId: 'guerreiro', itemIds: [] },
     });
     expect(res.statusCode).toBe(400);
