@@ -1,7 +1,20 @@
 import { describe, it, expect } from 'vitest';
-import { escolhasSchema } from './index';
+import { escolhasSchema, contrato } from './index';
 
 const valido = { racaId: 'elfo', classeId: 'ladino', itemIds: ['espada'] };
+
+describe('contrato', () => {
+  it('expõe o catálogo como GET /api/catalogo', () => {
+    expect(contrato.catalogo.method).toBe('GET');
+    expect(contrato.catalogo.path).toBe('/api/catalogo');
+  });
+
+  it('expõe o duelo como POST /api/duelo com o escolhasSchema no body', () => {
+    expect(contrato.duelo.method).toBe('POST');
+    expect(contrato.duelo.path).toBe('/api/duelo');
+    expect(contrato.duelo.body).toBe(escolhasSchema);
+  });
+});
 
 describe('escolhasSchema', () => {
   it('valida escolhas com raça, classe e itens', () => {

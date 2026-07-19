@@ -21,13 +21,20 @@ const catalogo: Catalogo = {
 
 const resultado: ResultadoDuelo = { tipo: 'vitoria', vencedor: 'a', turnos: 3, log: [] };
 
+function json(data: unknown): Response {
+  return new Response(JSON.stringify(data), {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
+// O cliente ts-rest usa fetch por baixo e lê status + content-type do Response,
+// por isso o mock devolve um Response de verdade (não um objeto só com .json()).
 function mockFetch(): void {
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string) =>
-      url === '/api/catalogo'
-        ? Promise.resolve({ json: () => Promise.resolve(catalogo) })
-        : Promise.resolve({ json: () => Promise.resolve(resultado) }),
+      Promise.resolve(url.includes('/api/catalogo') ? json(catalogo) : json(resultado)),
     ),
   );
 }
