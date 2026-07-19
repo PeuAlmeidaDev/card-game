@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@card-dungeon/shared": "workspace:*",
+    "@ts-rest/core": "3.53.0-rc.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },

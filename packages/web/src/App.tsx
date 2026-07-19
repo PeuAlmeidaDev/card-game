@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react';
+import { initClient } from '@ts-rest/core';
+import { contrato } from '@card-dungeon/shared';
 import type { Catalogo, Combatente, ModificadoresDeStat, ResultadoDuelo } from '@card-dungeon/shared';
+
+// Cliente tipado do contrato. baseUrl '' → paths relativos (/api/...) → proxy do Vite.
+const api = initClient(contrato, { baseUrl: '', baseHeaders: {} });
 
 function calcularPreview(base: Combatente, mods: readonly ModificadoresDeStat[]): Combatente {
   const soma = (stat: 'forca' | 'vida' | 'habilidade' | 'agilidade'): number =>
@@ -27,8 +32,9 @@ export function App() {
 
   useEffect(() => {
     void (async () => {
-      const resposta = await fetch('/api/catalogo');
-      const c = (await resposta.json()) as Catalogo;
+      const resposta = await api.catalogo();
+      if (resposta.status !== 200) return;
+      const c = resposta.body;
       setCatalogo(c);
       setRacaId(c.racas[0]?.id ?? '');
       setClasseId(c.classes[0]?.id ?? '');
@@ -48,13 +54,12 @@ export function App() {
 
   async function duelar(): Promise<void> {
     setTexto('Rolando os dados…');
-    const resposta = await fetch('/api/duelo', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ racaId, classeId, itemIds }),
-    });
-    const resultado = (await resposta.json()) as ResultadoDuelo;
-    setTexto(descrever(resultado));
+    const resposta = await api.duelo({ body: { racaId, classeId, itemIds } });
+    if (resposta.status === 200) {
+      setTexto(descrever(resposta.body));
+    } else {
+      setTexto('Não foi possível duelar. Revise suas escolhas.');
+    }
   }
 
   return (
