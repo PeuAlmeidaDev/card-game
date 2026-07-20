@@ -67,6 +67,9 @@ importers:
       '@card-dungeon/personagem':
         specifier: workspace:*
         version: link:../personagem
+      '@card-dungeon/progressao':
+        specifier: workspace:*
+        version: link:../progressao
       '@card-dungeon/shared':
         specifier: workspace:*
         version: link:../shared

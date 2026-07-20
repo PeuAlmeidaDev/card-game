@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import type { RolarD12 } from '@card-dungeon/motor';
 import type { ResultadoDuelo, Catalogo } from '@card-dungeon/shared';
+import type { Embaralhar, EstadoRun } from '@card-dungeon/progressao';
 import { buildApp } from './app';
+
+const semEmbaralhar: Embaralhar = (itens) => [...itens];
 
 function filaDeDados(rolagens: readonly number[]): RolarD12 {
   let i = 0;
@@ -67,6 +70,59 @@ describe('POST /duelo', () => {
       url: '/api/duelo',
       payload: { racaId: 'dragao', classeId: 'guerreiro', itemIds: [] },
     });
+    expect(res.statusCode).toBe(400);
+    await app.close();
+  });
+});
+
+describe('POST /aventura e /porta', () => {
+  it('cria a aventura e chuta a primeira porta (monstro no topo, dado de vitória)', async () => {
+    // Monstro fraco injetado: habilidade 0 nunca acerta; jogador começa e mata em 1 acerto.
+    const monstro = { forca: 1, vida: 5, habilidade: 0, agilidade: 1, level: 1 };
+    const app = buildApp({ rolar: filaDeDados([3, 12]), embaralhar: semEmbaralhar, monstro });
+
+    const criada = await app.inject({
+      method: 'POST',
+      url: '/api/aventura',
+      payload: { racaId: 'elfo', classeId: 'guerreiro', itemIds: ['espada'] },
+    });
+    expect(criada.statusCode).toBe(200);
+    const estado = criada.json<EstadoRun>();
+    expect(estado.nivel).toBe(1);
+    expect(estado.desfecho).toBe('emAndamento');
+    expect(estado.monte).toHaveLength(8); // COMPOSICAO_PADRAO = 5 monstro + 3 sala
+    expect(estado.monte[0]).toEqual({ tipo: 'monstro' }); // sem embaralhar => monstro no topo
+
+    const passo = await app.inject({ method: 'POST', url: '/api/porta', payload: { estado } });
+    expect(passo.statusCode).toBe(200);
+    const corpo = passo.json<{ estado: EstadoRun; evento: { tipo: string } }>();
+    expect(corpo.estado.nivel).toBe(2);
+    expect(corpo.evento.tipo).toBe('combate');
+    await app.close();
+  });
+
+  it('rejeita escolhas inválidas na criação com 400', async () => {
+    const app = buildApp({ embaralhar: semEmbaralhar });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/aventura',
+      payload: { racaId: 'dragao', classeId: 'guerreiro', itemIds: [] },
+    });
+    expect(res.statusCode).toBe(400);
+    await app.close();
+  });
+
+  it('rejeita chutar a porta numa run já encerrada com 400', async () => {
+    const app = buildApp({ embaralhar: semEmbaralhar });
+    const estado: EstadoRun = {
+      jogadorBase: { forca: 6, vida: 15, habilidade: 7, agilidade: 7, level: 1 },
+      nivel: 3,
+      nivelAlvo: 3,
+      monte: [{ tipo: 'salaVazia' }],
+      cemiterio: [],
+      desfecho: 'vitoria',
+    };
+    const res = await app.inject({ method: 'POST', url: '/api/porta', payload: { estado } });
     expect(res.statusCode).toBe(400);
     await app.close();
   });
