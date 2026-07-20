@@ -1,6 +1,6 @@
 import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
-import type { Combatente, ResultadoDuelo } from '@card-dungeon/motor';
+import type { Combatente, ResultadoDuelo, EventoCombate, Lado } from '@card-dungeon/motor';
 import type { EstadoRun, CartaPorta, EventoPorta } from '@card-dungeon/progressao';
 import type {
   ModificadoresDeStat,
@@ -42,8 +42,10 @@ export const estadoRunSchema = z.object({
   jogadorBase: combatenteSchema,
   nivel: z.number(),
   nivelAlvo: z.number(),
-  monte: z.array(cartaPortaSchema),
-  cemiterio: z.array(cartaPortaSchema),
+  // `.readonly()` alinha o tipo inferido ao domínio (EstadoRun tem arrays readonly),
+  // para o corpo do /api/porta aceitar um EstadoRun sem cast na borda web↔server.
+  monte: z.array(cartaPortaSchema).readonly(),
+  cemiterio: z.array(cartaPortaSchema).readonly(),
   desfecho: z.union([z.literal('emAndamento'), z.literal('vitoria')]),
 }) satisfies z.ZodType<EstadoRun>;
 
@@ -103,6 +105,8 @@ export const contrato = c.router({
 export type {
   Combatente,
   ResultadoDuelo,
+  EventoCombate,
+  Lado,
   ModificadoresDeStat,
   Raca,
   Classe,
