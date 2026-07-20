@@ -46,6 +46,19 @@ importers:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@26.1.1)(jsdom@29.1.1)(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(tsx@4.23.1))
 
+  packages/progressao:
+    dependencies:
+      '@card-dungeon/motor':
+        specifier: workspace:*
+        version: link:../motor
+    devDependencies:
+      '@types/node':
+        specifier: ^26.1.1
+        version: 26.1.1
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@26.1.1)(jsdom@29.1.1)(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(tsx@4.23.1))
+
   packages/server:
     dependencies:
       '@card-dungeon/motor':
@@ -54,6 +67,9 @@ importers:
       '@card-dungeon/personagem':
         specifier: workspace:*
         version: link:../personagem
+      '@card-dungeon/progressao':
+        specifier: workspace:*
+        version: link:../progressao
       '@card-dungeon/shared':
         specifier: workspace:*
         version: link:../shared
@@ -85,6 +101,9 @@ importers:
       '@card-dungeon/personagem':
         specifier: workspace:*
         version: link:../personagem
+      '@card-dungeon/progressao':
+        specifier: workspace:*
+        version: link:../progressao
       '@ts-rest/core':
         specifier: 3.53.0-rc.1
         version: 3.53.0-rc.1(@types/node@26.1.1)

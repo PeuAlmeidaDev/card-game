@@ -1,6 +1,7 @@
 import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
-import type { Combatente, ResultadoDuelo } from '@card-dungeon/motor';
+import type { Combatente, ResultadoDuelo, EventoCombate, Lado } from '@card-dungeon/motor';
+import type { EstadoRun, CartaPorta, EventoPorta } from '@card-dungeon/progressao';
 import type {
   ModificadoresDeStat,
   Raca,
@@ -21,6 +22,32 @@ export const escolhasSchema = z.object({
 }) satisfies z.ZodType<EscolhasPersonagem>;
 
 export type Escolhas = z.infer<typeof escolhasSchema>;
+
+/** Espelho Zod do Combatente do motor (preso ao tipo de domínio por `satisfies`). */
+export const combatenteSchema = z.object({
+  forca: z.number(),
+  vida: z.number(),
+  habilidade: z.number(),
+  agilidade: z.number(),
+  level: z.number(),
+}) satisfies z.ZodType<Combatente>;
+
+export const cartaPortaSchema = z.discriminatedUnion('tipo', [
+  z.object({ tipo: z.literal('monstro') }),
+  z.object({ tipo: z.literal('salaVazia') }),
+]) satisfies z.ZodType<CartaPorta>;
+
+/** Corpo do POST /api/porta: o estado da run vem do cliente (dívida de segurança conhecida — ver spec). */
+export const estadoRunSchema = z.object({
+  jogadorBase: combatenteSchema,
+  nivel: z.number(),
+  nivelAlvo: z.number(),
+  // `.readonly()` alinha o tipo inferido ao domínio (EstadoRun tem arrays readonly),
+  // para o corpo do /api/porta aceitar um EstadoRun sem cast na borda web↔server.
+  monte: z.array(cartaPortaSchema).readonly(),
+  cemiterio: z.array(cartaPortaSchema).readonly(),
+  desfecho: z.union([z.literal('emAndamento'), z.literal('vitoria')]),
+}) satisfies z.ZodType<EstadoRun>;
 
 const c = initContract();
 
@@ -52,16 +79,41 @@ export const contrato = c.router({
     },
     summary: 'Monta o personagem das escolhas e resolve o duelo contra o monstro.',
   },
+  aventura: {
+    method: 'POST',
+    path: '/api/aventura',
+    body: escolhasSchema,
+    responses: {
+      200: c.type<EstadoRun>(),
+      400: c.type<{ erro: string }>(),
+    },
+    summary: 'Cria uma run: monta o personagem das escolhas e embaralha o baralho inicial.',
+  },
+  porta: {
+    method: 'POST',
+    path: '/api/porta',
+    body: z.object({ estado: estadoRunSchema }),
+    responses: {
+      200: c.type<{ estado: EstadoRun; evento: EventoPorta }>(),
+      400: c.type<{ erro: string }>(),
+    },
+    summary: 'Chuta a porta: avança um passo da run e devolve o próximo estado + o evento.',
+  },
 });
 
 // Superfície única do contrato: tipos de combate + de personagem.
 export type {
   Combatente,
   ResultadoDuelo,
+  EventoCombate,
+  Lado,
   ModificadoresDeStat,
   Raca,
   Classe,
   Equipamento,
   Catalogo,
   EscolhasPersonagem,
+  EstadoRun,
+  CartaPorta,
+  EventoPorta,
 };
