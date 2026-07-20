@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from './api';
-import type { Catalogo, Combatente, ModificadoresDeStat, ResultadoDuelo } from '@card-dungeon/shared';
+import { TelaRun } from './TelaRun';
+import type { Catalogo, Combatente, EstadoRun, ModificadoresDeStat, ResultadoDuelo } from '@card-dungeon/shared';
 
 function calcularPreview(base: Combatente, mods: readonly ModificadoresDeStat[]): Combatente {
   const soma = (stat: 'forca' | 'vida' | 'habilidade' | 'agilidade'): number =>
@@ -25,6 +26,7 @@ export function App() {
   const [classeId, setClasseId] = useState('');
   const [itemIds, setItemIds] = useState<string[]>([]);
   const [texto, setTexto] = useState('');
+  const [run, setRun] = useState<EstadoRun | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -38,6 +40,8 @@ export function App() {
   }, []);
 
   if (!catalogo) return <p>Carregando catálogo…</p>;
+
+  if (run) return <TelaRun estadoInicial={run} />;
 
   const raca = catalogo.racas.find((r) => r.id === racaId);
   const classe = catalogo.classes.find((c) => c.id === classeId);
@@ -56,6 +60,11 @@ export function App() {
     } else {
       setTexto('Não foi possível duelar. Revise suas escolhas.');
     }
+  }
+
+  async function comecarAventura(): Promise<void> {
+    const resposta = await api.aventura({ body: { racaId, classeId, itemIds } });
+    if (resposta.status === 200) setRun(resposta.body);
   }
 
   return (
@@ -102,6 +111,7 @@ export function App() {
       </p>
 
       <button onClick={() => void duelar()}>Duelar</button>
+      <button onClick={() => void comecarAventura()}>Começar aventura</button>
       <p>{texto}</p>
     </main>
   );
