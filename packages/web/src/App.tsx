@@ -1,10 +1,6 @@
 import { useEffect, useState } from 'react';
-import { initClient } from '@ts-rest/core';
-import { contrato } from '@card-dungeon/shared';
+import { api } from './api';
 import type { Catalogo, Combatente, ModificadoresDeStat, ResultadoDuelo } from '@card-dungeon/shared';
-
-// Cliente tipado do contrato. baseUrl '' → paths relativos (/api/...) → proxy do Vite.
-const api = initClient(contrato, { baseUrl: '', baseHeaders: {} });
 
 function calcularPreview(base: Combatente, mods: readonly ModificadoresDeStat[]): Combatente {
   const soma = (stat: 'forca' | 'vida' | 'habilidade' | 'agilidade'): number =>
