@@ -150,9 +150,9 @@ git commit -m "feat(motor): adiciona os tipos do combate interativo"
 
 ---
 
-### Task 2: Motor — helpers puros de acerto e dano
+### Task 2: Motor — helpers `acertou`/`danoDe` + `resolverAtaque` com modificadores
 
-Extrai as fórmulas de combate para o gancho de contra-ataque poder compô-las sem duplicar.
+Extrai as fórmulas para o contra-ataque compô-las, e generaliza `resolverAtaque` com modificadores de rolagem (opcionais, default 0) — **um único primitivo de ataque**, sem `atacarComModificador` duplicado. Os `= 0` mantêm todos os chamadores atuais (fatia 1, batch) intactos.
 
 **Files:**
 - Modify: `packages/motor/src/ataque.ts`
@@ -160,13 +160,16 @@ Extrai as fórmulas de combate para o gancho de contra-ataque poder compô-las s
 - Test: `packages/motor/src/ataque.test.ts`
 
 **Interfaces:**
-- Produces: `acertou(rolagem: number, atacante: Combatente): boolean`, `danoDe(atacante: Combatente): number`.
+- Produces:
+  - `acertou(rolagem: number, atacante: Combatente): boolean`
+  - `danoDe(atacante: Combatente): number`
+  - `resolverAtaque(atacante, ladoAtacante, ladoDefensor, rolar, modAtaque = 0, modEsquiva = 0): { dano; eventos }` (assinatura estendida; os 4 primeiros args inalterados).
 
 - [ ] **Step 1: Escrever os testes** — adicionar a `packages/motor/src/ataque.test.ts`
 
 ```ts
-import { acertou, danoDe } from './ataque';
-// ... dentro do arquivo, um novo describe:
+import { acertou, danoDe, resolverAtaque } from './ataque';
+// ... dentro do arquivo, novos describes:
 describe('helpers de regra', () => {
   const c: Combatente = { forca: 4, vida: 10, habilidade: 8, agilidade: 5, level: 3 };
   it('acertou: rolagem ≤ habilidade', () => {
@@ -177,16 +180,33 @@ describe('helpers de regra', () => {
     expect(danoDe(c)).toBe(7);
   });
 });
+
+describe('resolverAtaque com modificadores', () => {
+  const atacante: Combatente = { forca: 4, vida: 10, habilidade: 7, agilidade: 5, level: 1 };
+  const defensor: Combatente = { ...atacante };
+  it('modAtaque -2 transforma uma rolagem 9 (erro) em 7 (acerto)', () => {
+    // rolagem de ataque 9 → −2 → 7 ≤ 7 acerta; esquiva 12 → não esquiva → dano 5
+    const r = resolverAtaque(atacante, 'a', 'b', filaDeDados([9, 12]), -2, 0);
+    expect(r.dano).toBe(5);
+  });
+  it('modEsquiva -1 faz a esquiva 8 virar 7 e esquivar um ataque de rolagem 7', () => {
+    // ataque 7 ≤ 7 acerta; esquiva 8 → −1 → 7 ≤ 7 esquiva (empate favorece defensor) → dano 0
+    const r = resolverAtaque(atacante, 'a', 'b', filaDeDados([7, 8]), 0, -1);
+    expect(r.dano).toBe(0);
+  });
+});
 ```
 
-(Se o arquivo ainda não importa `Combatente`, adicione `import type { Combatente } from './tipos';` no topo.)
+(Se o arquivo ainda não importa `Combatente`/`filaDeDados`, adicione `import type { Combatente } from './tipos';` e `import { filaDeDados } from './testes/filaDeDados';` no topo.)
 
 - [ ] **Step 2: Rodar e ver falhar**
 
 Run: `pnpm --filter @card-dungeon/motor exec vitest run src/ataque.test.ts`
-Expected: FAIL — `acertou`/`danoDe` não exportados.
+Expected: FAIL — `acertou`/`danoDe` não exportados; `resolverAtaque` ainda não aceita modificadores.
 
-- [ ] **Step 3: Implementar em `packages/motor/src/ataque.ts`** (adicionar ao topo, e usar dentro de `resolverAtaque`)
+- [ ] **Step 3: Implementar em `packages/motor/src/ataque.ts`**
+
+Adicione os helpers e generalize `resolverAtaque` para aplicar os modificadores nas rolagens:
 
 ```ts
 export function acertou(rolagem: number, atacante: Combatente): boolean {
@@ -195,24 +215,43 @@ export function acertou(rolagem: number, atacante: Combatente): boolean {
 export function danoDe(atacante: Combatente): number {
   return atacante.level + atacante.forca;
 }
+
+export function resolverAtaque(
+  atacante: Combatente,
+  ladoAtacante: Lado,
+  ladoDefensor: Lado,
+  rolar: RolarD12,
+  modAtaque = 0,
+  modEsquiva = 0,
+): { readonly dano: number; readonly eventos: readonly EventoCombate[] } {
+  const rolagemAtaque = rolar() + modAtaque;
+  const acertouAtaque = acertou(rolagemAtaque, atacante);
+  const eventoAtaque: EventoCombate = { tipo: 'ataque', atacante: ladoAtacante, rolagem: rolagemAtaque, acertou: acertouAtaque };
+  if (!acertouAtaque) return { dano: 0, eventos: [eventoAtaque] };
+
+  const rolagemEsquiva = rolar() + modEsquiva;
+  const esquivou = rolagemEsquiva <= rolagemAtaque; // empate favorece o defensor
+  const eventoEsquiva: EventoCombate = { tipo: 'esquiva', defensor: ladoDefensor, rolagem: rolagemEsquiva, esquivou };
+  if (esquivou) return { dano: 0, eventos: [eventoAtaque, eventoEsquiva] };
+
+  return { dano: danoDe(atacante), eventos: [eventoAtaque, eventoEsquiva] };
+}
 ```
 
-Refatore `resolverAtaque` para usar os helpers (mantém o comportamento; os testes existentes provam):
-- `const acertouAtaque = acertou(rolagemAtaque, atacante);` (substitui `rolagemAtaque <= atacante.habilidade`)
-- `const dano = danoDe(atacante);` (substitui `atacante.level + atacante.forca`)
+(É o `resolverAtaque` de hoje + os dois parâmetros e os helpers. Comportamento com `modAtaque=modEsquiva=0` é idêntico ao atual — os testes da fatia 1 provam.)
 
 - [ ] **Step 4: Rodar e ver passar**
 
 Run: `pnpm --filter @card-dungeon/motor test`
-Expected: PASS (helpers novos + testes de `resolverAtaque` inalterados verdes).
+Expected: PASS (helpers + modificadores novos + testes de `resolverAtaque` da fatia 1 inalterados verdes).
 
 - [ ] **Step 5: Reexportar em `index.ts` e commit**
 
-Adicione `acertou, danoDe` ao `export { ... } from './ataque';` no `index.ts`.
+Adicione `acertou, danoDe` ao `export { ... } from './ataque';` no `index.ts` (`resolverAtaque` já é exportado).
 
 ```bash
 git add packages/motor/src/ataque.ts packages/motor/src/ataque.test.ts packages/motor/src/index.ts
-git commit -m "test(motor): extrai helpers acertou/danoDe e cobre as fórmulas"
+git commit -m "feat(motor): resolverAtaque aceita modificadores de rolagem + helpers acertou/danoDe"
 ```
 
 ---
@@ -300,7 +339,7 @@ import type {
   DecisaoPendente, RegistroHabilidades,
 } from './tipos';
 import { decidirIniciativa } from './iniciativa';
-import { resolverAtaque, acertou, danoDe } from './ataque';
+import { resolverAtaque } from './ataque';
 
 export const MAX_TURNOS_COMBATE = 1000;
 
@@ -392,7 +431,7 @@ function resolverTurnoMonstro(estado: EstadoCombate, _acao: AcaoJogador, deps: D
 }
 ```
 
-> **Nota de gancho A na esquiva:** `resolverTurnoMonstro` usa `resolverAtaque`, cuja esquiva é fixa. O modificador de esquiva do Ninja (Task 4) precisa influenciar a rolagem de esquiva — por isso a Task 4 troca a esquiva inline aqui por uma versão que aplica o gancho. Deixado para a Task 4 de propósito (concrete-first).
+> **Nota de gancho A (Task 4):** `resolverTurnoJogador`/`resolverTurnoMonstro` chamam `resolverAtaque` com `modAtaque=modEsquiva=0` aqui. A Task 4 só passa os modificadores das habilidades (`resolverAtaque(..., modAtaque, modEsquiva)`) — o primitivo já aceita, sem função nova. Deixado para a Task 4 de propósito (concrete-first).
 
 - [ ] **Step 4: Rodar e ver passar**
 
@@ -465,7 +504,7 @@ Expected: FAIL (a ativa hoje é ignorada; esquiva não aplica −1).
 
 - [ ] **Step 3: Implementar** — em `packages/motor/src/combate.ts`
 
-Substitua `resolverTurnoJogador` para tratar `usarAtiva` (modificador de ataque + cooldown) e escreva uma esquiva que aplica o gancho:
+Substitua `resolverTurnoJogador` para tratar `usarAtiva` (passa `modAtaque` ao `resolverAtaque` unificado + seta cooldown):
 
 ```ts
 function resolverTurnoJogador(estado: EstadoCombate, acao: AcaoJogador, deps: Deps): Resolucao {
@@ -480,7 +519,7 @@ function resolverTurnoJogador(estado: EstadoCombate, acao: AcaoJogador, deps: De
     cooldownAtiva = ativa.cooldown ?? 0;
   }
 
-  const { dano, eventos: evs } = atacarComModificador(estado.jogador, 'a', 'b', modAtaque, estado.monstro, deps.rolar);
+  const { dano, eventos: evs } = resolverAtaque(estado.jogador, 'a', 'b', deps.rolar, modAtaque, 0);
   eventos.push(...evs);
   let monstro = estado.monstro;
   if (dano > 0) {
@@ -492,34 +531,13 @@ function resolverTurnoJogador(estado: EstadoCombate, acao: AcaoJogador, deps: De
 }
 ```
 
-E uma resolução de ataque que aceita modificadores de rolagem nos dois lados (substitui o uso de `resolverAtaque` dentro da máquina; `resolverAtaque` continua existindo para o batch da fatia 1):
-
-```ts
-import { acertou, danoDe } from './ataque';
-
-/** Ataque com modificadores de rolagem (ataque e esquiva) — usado pela máquina interativa. */
-function atacarComModificador(
-  atacante: Combatente, ladoAtacante: 'a' | 'b', ladoDefensor: 'a' | 'b',
-  modAtaque: number, defensor: Combatente, rolar: RolarD12, modEsquiva = 0,
-): { dano: number; eventos: readonly EventoCombate[] } {
-  const rolagemAtaque = rolar() + modAtaque;
-  const acertouAtaque = acertou(rolagemAtaque, atacante);
-  const eventos: EventoCombate[] = [{ tipo: 'ataque', atacante: ladoAtacante, rolagem: rolagemAtaque, acertou: acertouAtaque }];
-  if (!acertouAtaque) return { dano: 0, eventos };
-  const rolagemEsquiva = rolar() + modEsquiva;
-  const esquivou = rolagemEsquiva <= rolagemAtaque; // empate favorece o defensor
-  eventos.push({ tipo: 'esquiva', defensor: ladoDefensor, rolagem: rolagemEsquiva, esquivou });
-  return esquivou ? { dano: 0, eventos } : { dano: danoDe(atacante), eventos };
-}
-```
-
-Atualize `resolverTurnoMonstro` para aplicar o modificador de esquiva do jogador (gancho A na defesa):
+Atualize `resolverTurnoMonstro` para passar o modificador de esquiva do jogador ao `resolverAtaque` (gancho A na defesa) — **sem função nova**:
 
 ```ts
 function resolverTurnoMonstro(estado: EstadoCombate, _acao: AcaoJogador, deps: Deps): Resolucao {
   const eventos: EventoCombate[] = [];
   const modEsquiva = habilidadesDe(estado, deps).passiva?.modificarRolagemEsquiva?.() ?? 0;
-  const { dano, eventos: evs } = atacarComModificador(estado.monstro, 'b', 'a', 0, estado.jogador, deps.rolar, modEsquiva);
+  const { dano, eventos: evs } = resolverAtaque(estado.monstro, 'b', 'a', deps.rolar, 0, modEsquiva);
   eventos.push(...evs);
   let jogador = estado.jogador;
   if (dano > 0) {
@@ -593,7 +611,7 @@ Substitua o trecho do ataque único por um loop guiado por `ataquesNoTurno`:
   let monstro = estado.monstro;
   let venceu = false;
   for (let i = 0; i < nAtaques && !venceu; i += 1) {
-    const { dano, eventos: evs } = atacarComModificador(estado.jogador, 'a', 'b', modAtaque, monstro, deps.rolar);
+    const { dano, eventos: evs } = resolverAtaque(estado.jogador, 'a', 'b', deps.rolar, modAtaque, 0);
     eventos.push(...evs);
     if (dano > 0) {
       monstro = { ...monstro, vida: monstro.vida - dano };
