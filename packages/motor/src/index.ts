@@ -7,4 +7,4 @@ export type {
 } from './tipos';
 export { resolverDuelo, MAX_TURNOS } from './duelo';
 export { decidirIniciativa } from './iniciativa';
-export { resolverAtaque } from './ataque';
+export { resolverAtaque, rolarAtaqueDe, rolarEsquivaContra, danoDe } from './ataque';
