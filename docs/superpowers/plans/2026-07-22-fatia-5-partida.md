@@ -951,6 +951,8 @@ git rm packages/web/src/TelaRun.tsx packages/web/src/TelaRun.test.tsx
 
 As rotas da mesa entram nas Tasks 13–15. Entre a Task 6 e a 13 o app fica **sem o loop de aventura** — é uma janela deliberada, com o repositório verde o tempo todo.
 
+> **Nota para quem revisar esta task:** remover o loop solo **é o objetivo**, não um descuido. A run de um jogador foi substituída pela mesa de N jogadores por decisão de design registrada no spec (§2, D1 e D7): manter os dois vivos criaria duas partes do código donas da regra "chutar a porta", que divergiriam. A substituição chega nas Tasks 13–15.
+
 ```bash
 git add -A packages/partida packages/server/package.json packages/shared/package.json pnpm-lock.yaml
 git commit -m "refactor(partida): renomeia o pacote progressao e reescreve tipos e baralho para a mesa"
@@ -1646,12 +1648,14 @@ Crie `packages/partida/src/projecao.test.ts`:
 ```ts
 import { describe, it, expect } from 'vitest';
 import { projetarPara } from './projecao';
-import { criarPartida } from './mesa';
+import { criarPartida, aplicarAcao } from './mesa';
 import { COMPOSICAO_POR_JOGADOR } from './baralho';
+import { filaDeDados } from './testes/dados';
 import type { EntradaJogador } from './tipos';
 import type { Combatente } from '@card-dungeon/motor';
 
 const base: Combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
+const monstroPadrao: Combatente = { forca: 2, vida: 10, habilidade: 6, agilidade: 1, level: 1 };
 const semEmbaralhar = <T,>(itens: readonly T[]): T[] => [...itens];
 const entradas: readonly EntradaJogador[] = [
   { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base },
@@ -1665,13 +1669,28 @@ describe('projetarPara', () => {
     { embaralhar: semEmbaralhar },
   );
 
-  it('não expõe as cartas do monte nem do cemitério, só as contagens', () => {
+  it('não expõe o monte nem o cemitério, só as contagens', () => {
     const vista = projetarPara('p1', partida);
 
+    // Asserção ESTRUTURAL: as chaves não existem na vista, ponto.
+    // (Não vale procurar a string 'monstro' no JSON: assim que uma porta for
+    // revelada, ela aparece no log de propósito — carta revelada é pública.)
+    expect('monte' in vista).toBe(false);
+    expect('cemiterio' in vista).toBe(false);
     expect(vista.cartasNoMonte).toBe(COMPOSICAO_POR_JOGADOR.length * 2);
     expect(vista.cartasNoCemiterio).toBe(0);
-    expect(JSON.stringify(vista)).not.toContain('salaVazia');
-    expect(JSON.stringify(vista)).not.toContain('monstro');
+  });
+
+  it('continua sem expor o monte depois de uma porta revelada', () => {
+    const depois = aplicarAcao(
+      partida,
+      { tipo: 'chutarPorta', jogadorId: 'p1' },
+      { rolar: filaDeDados([]), embaralhar: semEmbaralhar, monstro: monstroPadrao },
+    ).estado;
+    const vista = projetarPara('p1', depois);
+
+    expect('monte' in vista).toBe(false);
+    expect(vista.cartasNoMonte).toBe(COMPOSICAO_POR_JOGADOR.length * 2 - 1);
   });
 
   it('marca quem está vendo', () => {
@@ -1725,7 +1744,7 @@ export function projetarPara(jogadorId: string, estado: EstadoPartida): VistaDaP
 }
 ```
 
-⚠️ O teste `not.toContain('monstro')` só passa porque o log da partida recém-criada ainda não tem eventos de porta. Depois que uma porta é revelada, a carta **aparece** no log de propósito — carta revelada é informação pública. O que a projeção protege é a **ordem do que ainda não foi revelado**.
+⚠️ O que a projeção protege é **a ordem do que ainda não foi revelado**. Carta já revelada aparece no log de propósito — é informação pública da mesa. Por isso os testes afirmam a **estrutura** da vista (`'monte' in vista === false`), nunca a ausência de uma string no JSON.
 
 Acrescente a `packages/partida/src/index.ts`:
 
@@ -1902,8 +1921,11 @@ describe('partida completa', () => {
     let estado = criarPartida('m1', quatro, { patenteAlvo: 3, composicaoPorJogador: [{ tipo: 'monstro' }] },
       { embaralhar: semEmbaralhar });
 
+    // Guarda anti-loop: se a partida não terminar em MAX_VOLTAS, o teste falha
+    // na asserção de `terminada` em vez de travar a suíte para sempre.
+    const MAX_VOLTAS = 500;
     let voltas = 0;
-    while (estado.desfecho === 'emAndamento' && voltas < 500) {
+    while (estado.desfecho === 'emAndamento' && voltas < MAX_VOLTAS) {
       const acao = escolherAcao(projetarPara('p1', estado), 'p1');
       estado = aplicarAcao(estado, acao, dadosDeps).estado;
       estado = avancarBots(estado, dadosDeps).estado;
@@ -2263,7 +2285,11 @@ E os três handlers:
         repositorio.salvar(comBots.estado);
         return { status: 200 as const, body: projetarPara(body.jogadorId, comBots.estado) };
       } catch (erro) {
-        return { status: 400 as const, body: { erro: (erro as Error).message } };
+        // Traduz rejeição de domínio ("não é a vez de X") para 400. NÃO é engolir erro:
+        // a mensagem vai no corpo E no log — o servidor registra toda ação recusada.
+        const mensagem = (erro as Error).message;
+        app.log.warn({ partidaId: params.id, acao: body, erro: mensagem }, 'ação rejeitada');
+        return { status: 400 as const, body: { erro: mensagem } };
       }
     },
 
@@ -2512,6 +2538,9 @@ export function TelaMesa() {
         </div>
       )}
 
+      {/* O log é append-only: eventos nunca são removidos nem reordenados,
+          então o índice É uma identidade estável. Usar o índice como `key`
+          aqui é correto, não o anti-padrão de listas mutáveis. */}
       <ol>
         {vista.log.map((evento, i) => (
           <li key={i}>
