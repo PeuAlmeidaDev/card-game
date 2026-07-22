@@ -75,4 +75,11 @@ describe('gancho A — modificador de rolagem', () => {
     expect(() => proximoTurno(comCd, { tipo: 'usarAtiva' }, { rolar: filaDeDados([3, 12]), habilidades: regSamurai }))
       .toThrow(/cooldown/i);
   });
+
+  it('usarAtiva sem ativa na classe lança', () => {
+    const inicio = criarCombate(JOGADOR, MONSTRO, 'guerreiro', { rolar: filaDeDados([]), habilidades: regSamurai });
+    expect(() =>
+      proximoTurno(inicio.estado, { tipo: 'usarAtiva' }, { rolar: filaDeDados([3, 12]), habilidades: regSamurai }),
+    ).toThrow(/ativa|cooldown/i);
+  });
 });
