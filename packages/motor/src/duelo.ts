@@ -3,8 +3,8 @@ import type {
 } from './tipos';
 import { criarCombate, proximoTurno } from './combate';
 
-/** Teto de turnos: garante terminação quando ninguém consegue causar dano. */
-export const MAX_TURNOS = 1000;
+/** Teto de turnos: garante terminação quando ninguém consegue causar dano. Fonte única em combate.ts. */
+export { MAX_TURNOS_COMBATE as MAX_TURNOS } from './combate';
 const SEM_HABILIDADES: RegistroHabilidades = new Map();
 
 /**
