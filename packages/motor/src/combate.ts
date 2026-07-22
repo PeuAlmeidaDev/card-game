@@ -61,26 +61,31 @@ interface Resolucao { readonly estado: EstadoCombate; readonly eventos: readonly
 
 function resolverTurnoJogador(estado: EstadoCombate, acao: AcaoJogador, deps: Deps): Resolucao {
   const eventos: EventoCombate[] = [];
-  // Task 3: só 'atacar' (um ataque normal). 'usarAtiva' entra na Task 4/5.
-  const { dano, eventos: evs } = resolverAtaque(estado.jogador, 'a', 'b', deps.rolar);
+  const ativa = habilidadesDe(estado, deps).ativa;
+  let cooldownAtiva = estado.cooldownAtiva > 0 ? estado.cooldownAtiva - 1 : 0;
+
+  let modAtaque = 0;
+  if (acao.tipo === 'usarAtiva') {
+    if (!ativa || estado.cooldownAtiva > 0) throw new Error('usarAtiva: ativa indisponível (cooldown)');
+    modAtaque = ativa.modificarRolagemAtaque?.() ?? 0;
+    cooldownAtiva = ativa.cooldown ?? 0;
+  }
+
+  const { dano, eventos: evs } = resolverAtaque(estado.jogador, 'a', 'b', deps.rolar, modAtaque, 0);
   eventos.push(...evs);
   let monstro = estado.monstro;
   if (dano > 0) {
     monstro = { ...monstro, vida: monstro.vida - dano };
     eventos.push({ tipo: 'dano', alvo: 'b', quantidade: dano, vidaRestante: monstro.vida });
   }
-  const cooldownAtiva = estado.cooldownAtiva > 0 ? estado.cooldownAtiva - 1 : 0;
   const desfecho = monstro.vida <= 0 ? 'vitoriaJogador' : 'emAndamento';
-  return {
-    estado: { ...estado, monstro, cooldownAtiva, turno: estado.turno + 1, vez: 'monstro', desfecho },
-    eventos,
-  };
+  return { estado: { ...estado, monstro, cooldownAtiva, turno: estado.turno + 1, vez: 'monstro', desfecho }, eventos };
 }
 
 function resolverTurnoMonstro(estado: EstadoCombate, _acao: AcaoJogador, deps: Deps): Resolucao {
   const eventos: EventoCombate[] = [];
-  // Task 3: só 'esquivar' (defesa padrão). 'contraAtacar' entra na Task 6.
-  const { dano, eventos: evs } = resolverAtaque(estado.monstro, 'b', 'a', deps.rolar);
+  const modEsquiva = habilidadesDe(estado, deps).passiva?.modificarRolagemEsquiva?.() ?? 0;
+  const { dano, eventos: evs } = resolverAtaque(estado.monstro, 'b', 'a', deps.rolar, 0, modEsquiva);
   eventos.push(...evs);
   let jogador = estado.jogador;
   if (dano > 0) {
@@ -88,8 +93,5 @@ function resolverTurnoMonstro(estado: EstadoCombate, _acao: AcaoJogador, deps: D
     eventos.push({ tipo: 'dano', alvo: 'a', quantidade: dano, vidaRestante: jogador.vida });
   }
   const desfecho = jogador.vida <= 0 ? 'vitoriaMonstro' : 'emAndamento';
-  return {
-    estado: { ...estado, jogador, turno: estado.turno + 1, vez: 'jogador', desfecho },
-    eventos,
-  };
+  return { estado: { ...estado, jogador, turno: estado.turno + 1, vez: 'jogador', desfecho }, eventos };
 }
