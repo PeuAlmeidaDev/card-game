@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { criarCombate, proximoTurno } from './combate';
+import { acertou, danoDe } from './ataque';
 import { filaDeDados } from './testes/filaDeDados';
-import type { Combatente, RegistroHabilidades, Habilidade } from './tipos';
+import type {
+  Combatente, RegistroHabilidades, Habilidade, ContextoDefesa, ResultadoDefesa, EventoCombate,
+} from './tipos';
 
 const semHabilidades: RegistroHabilidades = new Map();
 const JOGADOR: Combatente = { forca: 4, vida: 10, habilidade: 7, agilidade: 8, level: 1 };
@@ -103,5 +106,53 @@ describe('gancho C — ataque duplo', () => {
     // 1 ataque: (3,12) → dano 31 > 5 → morre; fila só tem 2 rolagens → se rolasse de novo, filaDeDados lançaria
     const r = proximoTurno(inicio.estado, { tipo: 'usarAtiva' }, { rolar: filaDeDados([3, 12]), habilidades: regNinjaAtaque });
     expect(r.estado.desfecho).toBe('vitoriaJogador');
+  });
+});
+
+const CONTRA_ATAQUE: Habilidade = {
+  id: 'contra-ataque', nome: 'Contra-ataque', tipo: 'passiva',
+  substituirDefesa: (ctx: ContextoDefesa): ResultadoDefesa => {
+    const eventos: EventoCombate[] = [];
+    const rContra = ctx.rolar();
+    const acertouContra = acertou(rContra, ctx.defensor);
+    let danoAoMonstro = 0;
+    eventos.push({ tipo: 'ataque', atacante: 'a', rolagem: rContra, acertou: acertouContra });
+    if (acertouContra) danoAoMonstro = danoDe(ctx.defensor);
+    if (danoAoMonstro >= ctx.atacante.vida) return { danoAoMonstro, danoAoJogador: 0, eventos };
+    const rMonstro = ctx.rolar();
+    const acertouMonstro = acertou(rMonstro, ctx.atacante);
+    eventos.push({ tipo: 'ataque', atacante: 'b', rolagem: rMonstro, acertou: acertouMonstro });
+    const danoAoJogador = acertouMonstro ? danoDe(ctx.atacante) : 0;
+    return { danoAoMonstro, danoAoJogador, eventos };
+  },
+};
+const regSamuraiContra: RegistroHabilidades = new Map([['samurai', { passiva: CONTRA_ATAQUE }]]);
+
+describe('gancho B — contra-ataque', () => {
+  it('proximaDecisao vira "defesa" quando o jogador tem contra-ataque e é a vez do monstro', () => {
+    const monstroRapido: Combatente = { ...MONSTRO, agilidade: 9 };
+    const r = criarCombate(JOGADOR, monstroRapido, 'samurai', { rolar: filaDeDados([]), habilidades: regSamuraiContra });
+    expect(r.estado.vez).toBe('monstro');
+    expect(r.proximaDecisao).toBe('defesa');
+    expect(r.eventos.length).toBe(1); // só a iniciativa; não resolveu o ataque do monstro (esperando a decisão)
+  });
+
+  it('contra-ataque letal: mata o monstro e o jogador não toma dano', () => {
+    const monstroRapido: Combatente = { ...MONSTRO, agilidade: 9, vida: 5 };
+    const inicio = criarCombate({ ...JOGADOR, forca: 30, habilidade: 7 }, monstroRapido, 'samurai', { rolar: filaDeDados([]), habilidades: regSamuraiContra });
+    // contra: rolagem 3 (acerta ≤7) → dano 31 ≥ 5 → monstro morre; fila só com 1 rolagem prova que o monstro não golpeou
+    const r = proximoTurno(inicio.estado, { tipo: 'contraAtacar' }, { rolar: filaDeDados([3]), habilidades: regSamuraiContra });
+    expect(r.estado.desfecho).toBe('vitoriaJogador');
+    expect(r.estado.jogador.vida).toBe(JOGADOR.vida);
+  });
+
+  it('contra-ataque não-letal: monstro golpeia sem esquiva', () => {
+    const monstroRapido: Combatente = { ...MONSTRO, agilidade: 9, vida: 50, habilidade: 8, forca: 2, level: 1 };
+    const inicio = criarCombate({ ...JOGADOR, habilidade: 7 }, monstroRapido, 'samurai', { rolar: filaDeDados([]), habilidades: regSamuraiContra });
+    // contra: 3 (acerta, dano pequeno, não mata 50); monstro: 3 (acerta ≤8) → dano 3 no jogador, sem esquiva
+    const r = proximoTurno(inicio.estado, { tipo: 'contraAtacar' }, { rolar: filaDeDados([3, 3]), habilidades: regSamuraiContra });
+    expect(r.estado.jogador.vida).toBe(JOGADOR.vida - 3);
+    expect(r.estado.desfecho).toBe('emAndamento');
+    expect(r.proximaDecisao).toBe('ataque');
   });
 });

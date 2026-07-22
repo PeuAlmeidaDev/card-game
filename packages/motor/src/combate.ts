@@ -87,9 +87,28 @@ function resolverTurnoJogador(estado: EstadoCombate, acao: AcaoJogador, deps: De
   return { estado: { ...estado, monstro, cooldownAtiva, turno: estado.turno + 1, vez: 'monstro', desfecho }, eventos };
 }
 
-function resolverTurnoMonstro(estado: EstadoCombate, _acao: AcaoJogador, deps: Deps): Resolucao {
+function resolverTurnoMonstro(estado: EstadoCombate, acao: AcaoJogador, deps: Deps): Resolucao {
+  const passiva = habilidadesDe(estado, deps).passiva;
+  if (acao.tipo === 'contraAtacar') {
+    if (!passiva?.substituirDefesa) throw new Error('contraAtacar: classe sem contra-ataque');
+    const r = passiva.substituirDefesa({ defensor: estado.jogador, atacante: estado.monstro, rolar: deps.rolar });
+    const eventos: EventoCombate[] = [...r.eventos];
+    let monstro = estado.monstro;
+    let jogador = estado.jogador;
+    if (r.danoAoMonstro > 0) {
+      monstro = { ...monstro, vida: monstro.vida - r.danoAoMonstro };
+      eventos.push({ tipo: 'dano', alvo: 'b', quantidade: r.danoAoMonstro, vidaRestante: monstro.vida });
+    }
+    if (r.danoAoJogador > 0) {
+      jogador = { ...jogador, vida: jogador.vida - r.danoAoJogador };
+      eventos.push({ tipo: 'dano', alvo: 'a', quantidade: r.danoAoJogador, vidaRestante: jogador.vida });
+    }
+    const desfecho = monstro.vida <= 0 ? 'vitoriaJogador' : jogador.vida <= 0 ? 'vitoriaMonstro' : 'emAndamento';
+    return { estado: { ...estado, monstro, jogador, turno: estado.turno + 1, vez: 'jogador', desfecho }, eventos };
+  }
+
   const eventos: EventoCombate[] = [];
-  const modEsquiva = habilidadesDe(estado, deps).passiva?.modificarRolagemEsquiva?.() ?? 0;
+  const modEsquiva = passiva?.modificarRolagemEsquiva?.() ?? 0;
   const { dano, eventos: evs } = resolverAtaque(estado.monstro, 'b', 'a', deps.rolar, 0, modEsquiva);
   eventos.push(...evs);
   let jogador = estado.jogador;
