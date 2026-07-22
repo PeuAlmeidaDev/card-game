@@ -282,10 +282,18 @@ Mesma disciplina das fatias anteriores: **dado e embaralhamento injetados**, tud
 
 ## 10. Reaproveitamento
 
-- **`motor`** — combate 1d12 intacto. A decisão D3 (uma rolagem por clique) **ressuscita a máquina
-  de passos** (`criarCombate` + `proximoTurno(estado, acao, rolar)`) já construída e testada no
-  commit `bdebd03` da branch `feat/fatia-5-habilidades`. Traz-se **só a máquina de passos**; os
-  ganchos de habilidade (commits posteriores) ficam para a fatia 9.
+- **`motor`** — combate 1d12 intacto (`decidirIniciativa`, `resolverAtaque`, `resolverDuelo`).
+
+  ⚠️ **A máquina de passos da branch `feat/fatia-5-habilidades` (`bdebd03`) NÃO é reaproveitada.**
+  Inspeção do código mostrou dois bloqueios: (i) ela só interrompe para o jogador defender **se a
+  classe tiver uma passiva de substituição de defesa** — nos demais casos a esquiva resolve
+  sozinha, o que contradiz a decisão **D3** (o jogador sempre clica para esquivar); (ii) ela
+  carrega `classeIdJogador`, `cooldownAtiva` e `RegistroHabilidades`, que são conceitos da fatia 9.
+  Adaptá-la custaria mais que escrever a versão simples.
+
+  Escreve-se aqui uma máquina **sem habilidades**, cujos pontos de decisão são sempre `ataque` e
+  `esquiva`. O **formato** da da branch é reaproveitado como desenho (`Passo = { estado, eventos,
+  proximaDecisao }`), e a fatia 9 estende esta máquina em vez de ressuscitar aquela.
 - **`personagem`** — `montarCombatente`, catálogo e `resolverEscolhas` usados como estão.
 - **`progressao`** — renomeado para `partida`; reshuffle e composição do baralho são portados.
 - **`shared` / `server` / `web`** — o padrão ts-rest e o proxy do Vite continuam.
