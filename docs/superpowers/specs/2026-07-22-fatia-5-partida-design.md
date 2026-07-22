@@ -50,10 +50,15 @@ O desconhecido do projeto é a camada de socket. Isso se responde com um **spike
 (duas abas numa sala, uma cai e reconecta) — sem teste, fora do produto, jogado fora depois.
 Fatia entrega valor e **fica**; spike responde pergunta e **some**.
 
-### D3 — Turno atômico no protocolo, **agência no combate**
+### D3 — Uma rolagem por clique (o turno **não** é atômico)
 
-O turno não é uma cutscene. **Rolar o dado é o prazer do jogo** — o jogador clica e o servidor
-rola **naquele instante**.
+O turno não é uma cutscene, e o protocolo reflete isso: **o turno é várias chamadas**, uma por
+rolagem. **Rolar o dado é o prazer do jogo** — o jogador clica e o servidor rola **naquele
+instante**.
+
+(Uma versão anterior deste desenho propunha o turno atômico — uma chamada resolvendo porta,
+combate e patente, com o cliente animando o log. Foi **descartada**: ela transforma o jogador em
+espectador do próprio turno.)
 
 Isso não é só sensação, é **autoridade**: se o servidor pré-rolasse o combate inteiro, o
 resultado existiria no cliente antes de o jogador ver — cheat pronto num jogo ranqueado. Rolar
