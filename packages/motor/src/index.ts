@@ -4,6 +4,10 @@ export type {
   Lado,
   EventoCombate,
   ResultadoDuelo,
+  DecisaoPendente,
+  AcaoCombate,
+  EstadoCombate,
+  Passo,
 } from './tipos';
 export { resolverDuelo, MAX_TURNOS } from './duelo';
 export { decidirIniciativa } from './iniciativa';

@@ -21,3 +21,32 @@ export type EventoCombate =
 export type ResultadoDuelo =
   | { readonly tipo: 'vitoria'; readonly vencedor: Lado; readonly turnos: number; readonly log: readonly EventoCombate[] }
   | { readonly tipo: 'impasse'; readonly turnos: number; readonly log: readonly EventoCombate[] };
+
+/** O que o jogador precisa decidir agora. `null` = combate acabou. */
+export type DecisaoPendente = 'ataque' | 'esquiva' | null;
+
+export type AcaoCombate = { readonly tipo: 'atacar' } | { readonly tipo: 'esquivar' };
+
+/**
+ * Estado serializável de um combate em curso. O jogador é sempre o lado 'a'
+ * e o monstro o lado 'b'.
+ */
+export interface EstadoCombate {
+  readonly jogador: Combatente;
+  readonly monstro: Combatente;
+  readonly vez: 'jogador' | 'monstro';
+  readonly turno: number;
+  /**
+   * Preenchido quando o monstro ataca e ACERTA: guarda a rolagem contra a qual
+   * o jogador vai esquivar. Enquanto não for `null`, a decisão pendente é 'esquiva'.
+   */
+  readonly ataqueDoMonstro: { readonly rolagem: number } | null;
+  readonly desfecho: 'emAndamento' | 'vitoriaJogador' | 'vitoriaMonstro' | 'impasse';
+}
+
+/** Retorno de cada passo da máquina de combate. */
+export interface Passo {
+  readonly estado: EstadoCombate;
+  readonly eventos: readonly EventoCombate[];
+  readonly proximaDecisao: DecisaoPendente;
+}
