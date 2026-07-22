@@ -4,6 +4,7 @@ import { acertou, danoDe } from './ataque';
 import { filaDeDados } from './testes/filaDeDados';
 import type {
   Combatente, RegistroHabilidades, Habilidade, ContextoDefesa, ResultadoDefesa, EventoCombate,
+  EstadoCombate,
 } from './tipos';
 
 const semHabilidades: RegistroHabilidades = new Map();
@@ -154,5 +155,18 @@ describe('gancho B — contra-ataque', () => {
     expect(r.estado.jogador.vida).toBe(JOGADOR.vida - 3);
     expect(r.estado.desfecho).toBe('emAndamento');
     expect(r.proximaDecisao).toBe('ataque');
+  });
+
+  it('contraAtacar sem contra-ataque na classe lança', () => {
+    // Não dá pra chegar aqui via criarCombate: sem reação, `avancar` auto-resolve o
+    // turno do monstro e nunca para com vez:'monstro' aguardando decisão. Construímos
+    // o estado direto para exercitar o guard isoladamente.
+    const estado: EstadoCombate = {
+      jogador: JOGADOR, monstro: MONSTRO, classeIdJogador: 'guerreiro',
+      vez: 'monstro', cooldownAtiva: 0, turno: 0, desfecho: 'emAndamento',
+    };
+    expect(() =>
+      proximoTurno(estado, { tipo: 'contraAtacar' }, { rolar: filaDeDados([]), habilidades: new Map() }),
+    ).toThrow(/contra-ataque/i);
   });
 });
