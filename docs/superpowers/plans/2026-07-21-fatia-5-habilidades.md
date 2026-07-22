@@ -183,7 +183,6 @@ describe('helpers de regra', () => {
 
 describe('resolverAtaque com modificadores', () => {
   const atacante: Combatente = { forca: 4, vida: 10, habilidade: 7, agilidade: 5, level: 1 };
-  const defensor: Combatente = { ...atacante };
   it('modAtaque -2 transforma uma rolagem 9 (erro) em 7 (acerto)', () => {
     // rolagem de ataque 9 → −2 → 7 ≤ 7 acerta; esquiva 12 → não esquiva → dano 5
     const r = resolverAtaque(atacante, 'a', 'b', filaDeDados([9, 12]), -2, 0);
@@ -582,8 +581,10 @@ const regNinjaAtaque: RegistroHabilidades = new Map([['ninja', { ativa: ATAQUE_D
 describe('gancho C — ataque duplo', () => {
   it('dois ataques no mesmo turno acumulam dano', () => {
     const inicio = criarCombate({ ...JOGADOR, forca: 3, level: 1 }, { ...MONSTRO, vida: 20, habilidade: 0 }, 'ninja', { rolar: filaDeDados([]), habilidades: regNinjaAtaque });
-    // 2 ataques: (3, 12) acerta+não esquiva → 4 dano; (3, 12) idem → 4 dano; total 8
-    const r = proximoTurno(inicio.estado, { tipo: 'usarAtiva' }, { rolar: filaDeDados([3, 12, 3, 12]), habilidades: regNinjaAtaque });
+    // Jogador (usarAtiva) faz 2 ataques: (3,12) acerta+não esquiva → 4 dano; (3,12) idem → 4 dano; total 8 → monstro fica com 12.
+    // Depois `avancar` auto-resolve o turno do monstro (ninja aqui não tem passiva → sem pausa): 5º dado = ataque do monstro,
+    // que erra (habilidade 0) e não muda nada. Sem esse 5º dado a filaDeDados esgotaria.
+    const r = proximoTurno(inicio.estado, { tipo: 'usarAtiva' }, { rolar: filaDeDados([3, 12, 3, 12, 1]), habilidades: regNinjaAtaque });
     expect(r.estado.monstro.vida).toBe(12); // 20 - 8
     expect(r.estado.cooldownAtiva).toBe(3);
   });
