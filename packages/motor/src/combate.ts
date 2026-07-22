@@ -71,14 +71,19 @@ function resolverTurnoJogador(estado: EstadoCombate, acao: AcaoJogador, deps: De
     cooldownAtiva = ativa.cooldown ?? 0;
   }
 
-  const { dano, eventos: evs } = resolverAtaque(estado.jogador, 'a', 'b', deps.rolar, modAtaque, 0);
-  eventos.push(...evs);
+  const nAtaques = acao.tipo === 'usarAtiva' ? (ativa?.ataquesNoTurno?.() ?? 1) : 1;
   let monstro = estado.monstro;
-  if (dano > 0) {
-    monstro = { ...monstro, vida: monstro.vida - dano };
-    eventos.push({ tipo: 'dano', alvo: 'b', quantidade: dano, vidaRestante: monstro.vida });
+  let venceu = false;
+  for (let i = 0; i < nAtaques && !venceu; i += 1) {
+    const { dano, eventos: evs } = resolverAtaque(estado.jogador, 'a', 'b', deps.rolar, modAtaque, 0);
+    eventos.push(...evs);
+    if (dano > 0) {
+      monstro = { ...monstro, vida: monstro.vida - dano };
+      eventos.push({ tipo: 'dano', alvo: 'b', quantidade: dano, vidaRestante: monstro.vida });
+      if (monstro.vida <= 0) venceu = true;
+    }
   }
-  const desfecho = monstro.vida <= 0 ? 'vitoriaJogador' : 'emAndamento';
+  const desfecho = venceu ? 'vitoriaJogador' : 'emAndamento';
   return { estado: { ...estado, monstro, cooldownAtiva, turno: estado.turno + 1, vez: 'monstro', desfecho }, eventos };
 }
 

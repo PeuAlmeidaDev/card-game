@@ -83,3 +83,25 @@ describe('gancho A — modificador de rolagem', () => {
     ).toThrow(/ativa|cooldown/i);
   });
 });
+
+const ATAQUE_DUPLO: Habilidade = { id: 'ataque-duplo', nome: 'Ataque duplo', tipo: 'ativa', cooldown: 3, ataquesNoTurno: () => 2 };
+const regNinjaAtaque: RegistroHabilidades = new Map([['ninja', { ativa: ATAQUE_DUPLO }]]);
+
+describe('gancho C — ataque duplo', () => {
+  it('dois ataques no mesmo turno acumulam dano', () => {
+    const inicio = criarCombate({ ...JOGADOR, forca: 3, level: 1 }, { ...MONSTRO, vida: 20, habilidade: 0 }, 'ninja', { rolar: filaDeDados([]), habilidades: regNinjaAtaque });
+    // 2 ataques: (3, 12) acerta+não esquiva → 4 dano; (3, 12) idem → 4 dano; total 8
+    // 5º dado: turno do monstro auto-resolvido pelo avancar (jogador sem passiva/reação);
+    // habilidade: 0 garante erro independente do valor, mas o rolar() ainda é chamado.
+    const r = proximoTurno(inicio.estado, { tipo: 'usarAtiva' }, { rolar: filaDeDados([3, 12, 3, 12, 1]), habilidades: regNinjaAtaque });
+    expect(r.estado.monstro.vida).toBe(12); // 20 - 8
+    expect(r.estado.cooldownAtiva).toBe(3);
+  });
+
+  it('se o primeiro golpe mata, o segundo não rola', () => {
+    const inicio = criarCombate({ ...JOGADOR, forca: 30 }, { ...MONSTRO, vida: 5, habilidade: 0 }, 'ninja', { rolar: filaDeDados([]), habilidades: regNinjaAtaque });
+    // 1 ataque: (3,12) → dano 31 > 5 → morre; fila só tem 2 rolagens → se rolasse de novo, filaDeDados lançaria
+    const r = proximoTurno(inicio.estado, { tipo: 'usarAtiva' }, { rolar: filaDeDados([3, 12]), habilidades: regNinjaAtaque });
+    expect(r.estado.desfecho).toBe('vitoriaJogador');
+  });
+});
