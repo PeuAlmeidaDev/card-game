@@ -15,4 +15,4 @@ export type {
 } from './tipos';
 export { resolverDuelo, MAX_TURNOS } from './duelo';
 export { decidirIniciativa } from './iniciativa';
-export { resolverAtaque } from './ataque';
+export { acertou, danoDe, resolverAtaque } from './ataque';
