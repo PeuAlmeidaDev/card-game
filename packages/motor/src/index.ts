@@ -12,3 +12,4 @@ export type {
 export { resolverDuelo, MAX_TURNOS } from './duelo';
 export { decidirIniciativa } from './iniciativa';
 export { resolverAtaque, rolarAtaqueDe, rolarEsquivaContra, danoDe } from './ataque';
+export { criarCombate, MAX_TURNOS_COMBATE } from './combate';
