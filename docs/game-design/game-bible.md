@@ -20,6 +20,9 @@ Diferenciais deliberados (o "por que jogar isso e não Munchkin"):
 
 - ✅ **Tom sério, gerador de tensão.** Não é paródia.
 - ✅ **Combate por dado (1d12)** resolvido round a round, interativo — o coração mecânico.
+  **Quem rola o dado é o jogador**, não uma animação: ele clica para atacar, clica para esquivar,
+  e o servidor rola **naquele instante**. Rolar é o ritual do jogo, e rolar sob demanda também
+  impede que o resultado exista no cliente antes de ser revelado.
 - ✅ **Nasce online e competitivo**, com ranking. Não é jogo de mesa portado.
 - ✅ **O jogador sai com uma história.** Requisito de produto, não tom — ver §14.
 - ✅ **Monetização só cosmética** (skins de raça, classe, dado). Sem pay-to-win.
@@ -67,7 +70,7 @@ torna a mesa **civilizada por fora e cruel por dentro**, que é o "sério com te
 | Vitória | Primeiro a atingir a **patente-alvo** fecha o portal |
 | Patente-alvo | 🎚️ **10** em ranked · **4–5** em dev/playtest (já é configurável — pacote `progressao`) |
 | Resultado | **Classificação completa 1º–4º**, não winner-take-all |
-| Desempate | ⬜ a definir (candidato: patente → abates → itens equipados). **Precisa estar visível na UI durante a partida** |
+| Desempate | ✅ cadeia: **patente → combates vencidos sozinho → força total → menos derrotas → cartas na mão → empate**. **Precisa estar visível na UI durante a partida** |
 | 6 jogadores | **Futuro.** Primeiro como lobby privado; vira ranqueado só quando houver público |
 
 **Por que 4 e não 2:** a negociação/aliança é a alma do jogo e não existe em duelo.
@@ -231,8 +234,10 @@ criatividade dos acordos ao que o sistema modela. Acordo em texto livre seria in
 - Patente dá **só dano** e **posição na corrida**. Sem outros ganhos.
 - ✅ **A patente final só pode ser conquistada matando um monstro** — nunca por carta, venda ou
   efeito. (Ficcionalmente: a guilda só promove com abate verificado.)
-- ✅ **Vitória** = atingir a patente-alvo → fecha o portal.
-- ✅ **Resultado ranqueado** = classificação 1º–4º.
+- ✅ **Vitória** = atingir a patente-alvo → fecha o portal. **Não há relógio:** a partida acaba no
+  instante em que alguém chega ao alvo. A duração-alvo de §3 é meta de calibração, não regra.
+- ✅ **Resultado ranqueado** = classificação 1º–4º, pela cadeia de desempate de §3. **Empate real é
+  permitido** — quando o desempenho foi idêntico, posição compartilhada é o resultado correto.
 
 **Por que a regra do "abate final":** duração ≠ dificuldade. Uma partida longa não é
 automaticamente difícil — o que faz a vitória parecer **conquistada** é a **resistência**: a
@@ -315,6 +320,9 @@ resolve escrevendo lore — se resolve **devolvendo a história ao jogador**:
 - **Crônica da incursão** ao fim da partida: relato gerado do que aconteceu ("no 3º portal o dado
   te traiu; você comprou a ajuda de quem tinha acabado de te sabotar"). **Os dados para isso já
   existem** — o motor é uma máquina de passos e já registra round a round.
+- **Histórico de partidas** no perfil: a crônica **guardada**, para o jogador reler depois
+  ("partida de ontem: 2º lugar, patente 8"). Exige banco, então entra junto com contas — mas
+  **toda partida produz o log completo desde a fatia 5**, para que a persistência seja só salvar.
 - **Herói com nome próprio e identidade persistente** entre partidas (necessário de qualquer
   forma para ranking e cosmético).
 
@@ -368,35 +376,47 @@ Copiamos a *ideia mecânica*, nunca a *expressão*.
 
 **Ordem acordada:**
 
-> **Fatia 5 — A MESA (próxima).** Partida de N jogadores (N=4) **autoritativa no server**: sala,
-> ordem de turno, chutar a porta, combate usando o motor existente, +1 patente, primeiro a chegar
-> ao alvo vence, **classificação 1º–4º**. Sem interferência, sem itens novos, personagem ainda
-> simples. **Bot burro preenchendo assentos** para permitir teste solo.
+> **Fatia 5 — A MESA (próxima).** Pacote `partida`: reducer puro de **N jogadores** (N=4),
+> **rodando no servidor, autoritativo**, via HTTP request/response. Ordem de turno, baralho
+> compartilhado, chutar a porta, combate com o `motor` (**uma rolagem por clique do jogador**),
+> +1 patente, fim ao atingir o alvo, **classificação 1º–4º**. Os outros 3 assentos são **bots**.
+> Sem socket, sem cartas, sem interferência. Spec: `docs/superpowers/specs/2026-07-22-fatia-5-partida-design.md`.
 >
-> **Fatia 6 — Interferência.** Janela A + janela B + contratos executados pelo server + snapshot.
+> **Spike (descartável, fora do produto):** socket.io — duas abas numa sala, uma cai e reconecta.
 >
-> **Fatia 7 — Personagem dinâmico.** Zona em jogo, 5 slots, mochila aberta, capacidades mutáveis.
+> **Fatia 6 — Online.** socket.io + salas + humanos substituindo bots. **O domínio não muda** —
+> só o transporte e quem alimenta as ações.
 >
-> **Fatia 8 — Habilidades de classe.** (A fatia 5 antiga, já desenhada, entra aqui inteira.)
+> **Fatia 7 — Interferência.** Janela A + janela B + contratos executados pelo server + snapshot.
 >
-> **Fatia 9 — Contas, ranking e crônica da incursão.**
+> **Fatia 8 — Cartas e personagem dinâmico.** Mão de 7, zona em jogo, 5 slots, mochila,
+> maldições, cartas de raça/classe/item.
+>
+> **Fatia 9 — Habilidades de classe.** (A fatia 5 antiga, já desenhada, entra aqui inteira.)
+>
+> **Fatia 10 — Contas, ranking, crônica e histórico de partidas.**
 >
 > **Depois:** o meta-jogo de §15.
 
-**Por que "A Mesa" primeiro:**
+**Por que o jogo antes do tempo real:**
 
-1. **Ataca o maior risco desconhecido cedo.** Tudo até aqui foi função pura com dado injetado — a
-   parte confortável. Servidor autoritativo com 4 clientes, turnos e janelas com timer é uma
-   classe de problema ainda não enfrentada. Risco desconhecido se ataca cedo.
-2. **É a fatia vertical mais fina que atravessa o jogo real** (web → server → motor, com 4
-   pessoas). Akita puro.
-3. **Para o sangramento.** Cada fatia nova construída sobre o andaime solo com estado no cliente
-   encarece a troca de moldura.
-4. **Habilidades ficam melhores depois:** foram desenhadas para combate 1v1 isolado; com mesa,
-   aliado e sabotagem, os ganchos podem mudar.
+1. **O risco que mata projeto de jogo não é técnico.** Socket.io funciona. O risco real é
+   descobrir tarde que o loop não é divertido. Construir a regra com bot leva a "isso é
+   divertido?" em uma fatia; construir o online primeiro leva a "duas abas se enxergam", que não
+   responde nada sobre o jogo.
+2. **Reducer puro é agnóstico a transporte por construção.** Trocar quem alimenta as ações não é
+   retrabalho — desde que ele nasça para **N jogadores** e com **`projetarPara(jogadorId)`**, que
+   é a costura que impede o servidor de vazar informação oculta depois.
+3. **Risco técnico se retira com spike, não com fatia.** Fatia entrega valor e fica; spike
+   responde pergunta e some. Usar uma fatia para responder pergunta técnica é pagar caro.
+4. **Mas a autoridade não se adia.** O que dá para adiar sem custo é o *tempo real*; o que cobra
+   juros é *quem manda no estado*. Por isso o reducer roda no servidor desde o dia 1 — com bots,
+   push nem é necessário.
+5. **A interferência vem depois do online de propósito:** 4 pessoas agindo ao mesmo tempo com
+   timer correndo é mecânica **de rede**. Modelá-la só com bot seria projetar no escuro.
 
-⚠️ Custo aceito: adia a parte divertida (cartas, classes, habilidades) por uma fatia inteira de
-encanamento — e encanamento multiplayer é a coisa mais difícil deste projeto.
+⚠️ Custo aceito: a fatia 5 entrega um jogo **sem decisões** (o jogador clica "chutar a porta"), e
+por isso **não valida diversão** — valida **ritmo**, que é o risco aberto de §12.
 
 ---
 
@@ -405,7 +425,7 @@ encanamento — e encanamento multiplayer é a coisa mais difícil deste projeto
 | # | Pergunta | Seção |
 |---|---|---|
 | 1 | Título do jogo e nomes próprios (guilda, patentes, monstros, cartas) | §1, §2, §16 |
-| 2 | Critério exato de **desempate** da classificação, e como exibi-lo na UI | §3 |
+| 2 | ✅ **Resolvido:** cadeia de desempate definida (§3). ⬜ Falta só como exibi-la na UI | §3 |
 | 3 | Tamanho e composição dos baralhos no MVP; regra de reshuffle | §11 |
 | 4 | Quantas raças/classes/monstros/itens no MVP, e quais | §11 |
 | 5 | Existem outros tipos de carta de Portal além dos 5 conhecidos? | §6 |
@@ -438,3 +458,15 @@ turno, fase de ajuda/atrapalhar antes da batalha, mão de 7, sem ouro, morte sem
 | 11 | Ficção = **caçadores de portais em fantasia medieval**, sob uma guilda licenciadora |
 | 12 | Ficção fechada: crime matar colega · ajuda é subcontrato · patente por abate · patente máxima fecha o portal · morte = evacuação · crônica + herói persistente |
 | 13 | Próxima fatia = **A Mesa** (multiplayer autoritativo no server) |
+
+**Sessão 3 — 2026-07-22** (`brainstorming` da fatia 5) — decisões que também mudam o *jogo*:
+
+| # | Decisão |
+|---|---|
+| 14 | **Quem rola o dado é o jogador** (clica para atacar e para esquivar); o servidor rola no instante do clique. Os dados do monstro rolam sozinhos, visivelmente. ≈2 cliques por round |
+| 15 | **Não há relógio:** a partida acaba quando alguém atinge o alvo. A duração-alvo é meta de calibração |
+| 16 | **Cadeia de desempate** fechada; **empate real é permitido** |
+| 17 | **Todos assistem** o turno de quem está jogando (é o antídoto de tempo morto antes de a interferência existir — e a fatia 7 exige ver o combate alheio de qualquer forma) |
+| 18 | **Histórico de partidas** no perfil vira requisito; toda partida produz o log completo desde a fatia 5 |
+| 19 | **Ordem revista:** jogo com bots primeiro (fatia 5), online depois (fatia 6), interferência depois do online (fatia 7) — mas **autoridade no servidor desde o dia 1** |
+| 20 | Transporte do tempo real = **socket.io** (salas, reconexão, adapter Redis); mensagens validadas com Zod no `shared` |
