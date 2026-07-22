@@ -49,7 +49,6 @@ describe('resolverAtaque', () => {
 
 describe('resolverAtaque com modificadores', () => {
   const atacante: Combatente = { forca: 4, vida: 10, habilidade: 7, agilidade: 5, level: 1 };
-  const defensor: Combatente = { ...atacante };
   it('modAtaque -2 transforma uma rolagem 9 (erro) em 7 (acerto)', () => {
     // rolagem de ataque 9 → −2 → 7 ≤ 7 acerta; esquiva 12 → não esquiva → dano 5
     const r = resolverAtaque(atacante, 'a', 'b', filaDeDados([9, 12]), -2, 0);
