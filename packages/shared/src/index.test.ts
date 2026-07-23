@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { escolhasSchema, contrato } from './index';
+import { escolhasSchema, contrato, acaoDaMesaSchema, acaoRequisicaoSchema } from './index';
 
 const valido = { racaId: 'elfo', classeId: 'ladino', itemIds: ['espada'] };
 
@@ -34,5 +34,55 @@ describe('escolhasSchema', () => {
   });
 });
 
-// As rotas da run solo (`/api/aventura`, `/api/porta`) saíram junto com o pacote
-// `progressao`. As rotas da mesa entram na Task 13, já com os testes de forma.
+describe('rotas da mesa', () => {
+  it('cria a partida como POST /api/partida', () => {
+    expect(contrato.criarPartida.method).toBe('POST');
+    expect(contrato.criarPartida.path).toBe('/api/partida');
+    expect(contrato.criarPartida.body).toBe(escolhasSchema);
+  });
+
+  it('age como POST /api/partida/:id/acao com a requisição validada', () => {
+    expect(contrato.agir.method).toBe('POST');
+    expect(contrato.agir.path).toBe('/api/partida/:id/acao');
+    expect(contrato.agir.body).toBe(acaoRequisicaoSchema);
+  });
+
+  it('declara 409 no agir — versão velha é resposta prevista, não erro genérico', () => {
+    expect(Object.keys(contrato.agir.responses)).toContain('409');
+  });
+
+  it('relê a partida como GET /api/partida/:id', () => {
+    expect(contrato.lerPartida.method).toBe('GET');
+    expect(contrato.lerPartida.path).toBe('/api/partida/:id');
+  });
+});
+
+describe('acaoDaMesaSchema', () => {
+  it('aceita as três ações da mesa', () => {
+    expect(acaoDaMesaSchema.parse({ tipo: 'chutarPorta', jogadorId: 'p1' }).tipo).toBe('chutarPorta');
+    expect(acaoDaMesaSchema.parse({ tipo: 'atacar', jogadorId: 'p1' }).tipo).toBe('atacar');
+    expect(acaoDaMesaSchema.parse({ tipo: 'esquivar', jogadorId: 'p1' }).tipo).toBe('esquivar');
+  });
+
+  it('rejeita ação desconhecida', () => {
+    expect(() => acaoDaMesaSchema.parse({ tipo: 'trapacear', jogadorId: 'p1' })).toThrow();
+  });
+
+  it('rejeita ação sem jogadorId', () => {
+    expect(() => acaoDaMesaSchema.parse({ tipo: 'atacar' })).toThrow();
+  });
+});
+
+describe('acaoRequisicaoSchema', () => {
+  const acao = { tipo: 'atacar' as const, jogadorId: 'p1' };
+
+  it('exige a versão junto da ação', () => {
+    expect(acaoRequisicaoSchema.parse({ acao, versao: 3 }).versao).toBe(3);
+    expect(() => acaoRequisicaoSchema.parse({ acao })).toThrow();
+  });
+
+  it('rejeita versão negativa ou fracionária', () => {
+    expect(() => acaoRequisicaoSchema.parse({ acao, versao: -1 })).toThrow();
+    expect(() => acaoRequisicaoSchema.parse({ acao, versao: 1.5 })).toThrow();
+  });
+});
