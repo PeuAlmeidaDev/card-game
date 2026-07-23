@@ -4,3 +4,4 @@ export type {
 } from './tipos';
 export { montarComposicao, COMPOSICAO_POR_JOGADOR, comprarCarta } from './baralho';
 export { criarPartida } from './mesa';
+export { classificar } from './classificacao';
