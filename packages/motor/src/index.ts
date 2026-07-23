@@ -14,3 +14,5 @@ export { resolverDuelo } from './duelo';
 export { decidirIniciativa } from './iniciativa';
 export { resolverAtaque, rolarAtaqueDe, rolarEsquivaContra, danoDe } from './ataque';
 export { criarCombate, proximoPasso } from './combate';
+// Classe, não tipo: quem chama o motor precisa dela em runtime para o `instanceof`.
+export { AcaoIlegal } from './erros';

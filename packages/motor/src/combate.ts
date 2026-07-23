@@ -4,6 +4,7 @@ import type {
 import { decidirIniciativa } from './iniciativa';
 import { rolarAtaqueDe, rolarEsquivaContra, danoDe, resolverAtaque } from './ataque';
 import { MAX_TURNOS } from './limites';
+import { AcaoIlegal } from './erros';
 
 export function criarCombate(jogador: Combatente, monstro: Combatente, rolar: RolarD12): Passo {
   const ini = decidirIniciativa(jogador, monstro, rolar); // jogador = 'a', monstro = 'b'
@@ -68,18 +69,18 @@ export function avancar(
 
 export function proximoPasso(estado: EstadoCombate, acao: AcaoCombate, rolar: RolarD12): Passo {
   if (estado.desfecho !== 'emAndamento') {
-    throw new Error('proximoPasso: o combate já terminou');
+    throw new AcaoIlegal('proximoPasso: o combate já terminou');
   }
 
   if (acao.tipo === 'atacar') {
     if (estado.vez !== 'jogador' || estado.ataqueDoMonstro !== null) {
-      throw new Error('proximoPasso: não é a vez de atacar');
+      throw new AcaoIlegal('proximoPasso: não é a vez de atacar');
     }
     return atacar(estado, rolar);
   }
 
   if (estado.ataqueDoMonstro === null) {
-    throw new Error('proximoPasso: não há ataque do monstro para esquivar');
+    throw new AcaoIlegal('proximoPasso: não há ataque do monstro para esquivar');
   }
   return esquivar(estado, estado.ataqueDoMonstro.rolagem, rolar);
 }

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { criarCombate, proximoPasso, avancar } from './combate';
+import { AcaoIlegal } from './erros';
 import { MAX_TURNOS } from './limites';
 import { filaDeDados } from './testes/filaDeDados';
 import type { Combatente, EstadoCombate } from './tipos';
@@ -140,6 +141,40 @@ describe('proximoPasso — esquiva do jogador', () => {
 
     expect(() => proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([1])))
       .toThrow('proximoPasso: não é a vez de atacar');
+  });
+});
+
+describe('classe das recusas do proximoPasso', () => {
+  // As três recusas são de DOMÍNIO: o jogador clicou no botão errado. Quem chama
+  // o motor precisa distingui-las de um bug interno para não classificar erro do
+  // servidor como culpa do cliente. `instanceof` é o contrato — por isso a classe
+  // sai do barrel, e por isso ela é testada aqui e não só pela mensagem.
+  const rapido: Combatente = { ...monstro, agilidade: 12 };
+
+  it('atacar fora da vez é AcaoIlegal', () => {
+    const inicio = criarCombate(jogador, rapido, filaDeDados([5]));
+    expect(() => proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([])))
+      .toThrow(AcaoIlegal);
+  });
+
+  it('esquivar sem ataque pendente é AcaoIlegal', () => {
+    const inicio = criarCombate(jogador, monstro, filaDeDados([]));
+    expect(() => proximoPasso(inicio.estado, { tipo: 'esquivar' }, filaDeDados([])))
+      .toThrow(AcaoIlegal);
+  });
+
+  it('agir com o combate encerrado é AcaoIlegal', () => {
+    const fraco: Combatente = { ...monstro, vida: 3 };
+    const inicio = criarCombate(jogador, fraco, filaDeDados([]));
+    const fim = proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([4, 9]));
+    expect(() => proximoPasso(fim.estado, { tipo: 'atacar' }, filaDeDados([])))
+      .toThrow(AcaoIlegal);
+  });
+
+  it('continua sendo um Error — quem só faz catch genérico não quebra', () => {
+    const inicio = criarCombate(jogador, rapido, filaDeDados([5]));
+    expect(() => proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([])))
+      .toThrow(Error);
   });
 });
 
