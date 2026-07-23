@@ -102,3 +102,84 @@ describe('aplicarAcao — chutarPorta', () => {
       .toThrow(AcaoInvalida);
   });
 });
+
+describe('aplicarAcao — combate', () => {
+  const soMonstro = { ...config, composicaoPorJogador: [{ tipo: 'monstro' as const }] };
+
+  const abrirCombate = (dados: readonly number[]) => {
+    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    return aplicarAcao(p, { tipo: 'chutarPorta', jogadorId: 'p1' }, deps(dados)).estado;
+  };
+
+  it('vencer o combate sobe a patente e passa a vez', () => {
+    const comCombate = abrirCombate([]);
+    // ataque do jogador = 4 (acerta, habilidade 8); esquiva do monstro = 12 (falha)
+    // dano = patente 1 + forca 3 = 4 ... precisa de 3 golpes para tirar 10 de vida
+    // 3o dado = contra-ataque do monstro (12 > habilidade 6 => erra). Ver a
+    // "regra do orçamento de dados" no topo do plano.
+    let estado = comCombate;
+    for (let i = 0; i < 3; i += 1) {
+      estado = aplicarAcao(estado, { tipo: 'atacar', jogadorId: 'p1' }, deps([4, 12, 12])).estado;
+    }
+
+    expect(estado.combate).toBeNull();
+    expect(estado.jogadores.find((j) => j.id === 'p1')?.patente).toBe(2);
+    expect(estado.vezDe).toBe('p2');
+    expect(estado.log).toContainEqual({ tipo: 'patente', jogadorId: 'p1', patente: 2 });
+  });
+
+  it('atingir a patente-alvo termina a partida e preenche a classificação', () => {
+    const alvo2 = { ...soMonstro, patenteAlvo: 2 };
+    const p = criarPartida('m1', entradas, alvo2, { embaralhar: semEmbaralhar });
+    let estado = aplicarAcao(p, { tipo: 'chutarPorta', jogadorId: 'p1' }, deps([])).estado;
+    for (let i = 0; i < 3; i += 1) {
+      estado = aplicarAcao(estado, { tipo: 'atacar', jogadorId: 'p1' }, deps([4, 12, 12])).estado;
+    }
+
+    expect(estado.desfecho).toBe('terminada');
+    expect(estado.classificacao).toEqual([
+      { jogadorId: 'p1', posicao: 1 },
+      { jogadorId: 'p2', posicao: 2 },
+    ]);
+  });
+
+  it('perder o combate conta derrota e passa a vez', () => {
+    const forte: Combatente = { forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1 };
+    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const depsForte = (dados: readonly number[]) =>
+      ({ rolar: filaDeDados(dados), embaralhar: semEmbaralhar, monstro: forte });
+
+    // monstro mais ágil ataca primeiro e acerta (rolagem 1 <= habilidade 12)
+    const comCombate = aplicarAcao(p, { tipo: 'chutarPorta', jogadorId: 'p1' }, depsForte([1])).estado;
+    expect(comCombate.combate?.proximaDecisao).toBe('esquiva');
+
+    // esquiva do jogador = 2 > 1 => falha. dano = 1 + 30 = 31 > vida 20 => morre
+    const estado = aplicarAcao(comCombate, { tipo: 'esquivar', jogadorId: 'p1' }, depsForte([2])).estado;
+
+    expect(estado.combate).toBeNull();
+    expect(estado.jogadores.find((j) => j.id === 'p1')?.derrotas).toBe(1);
+    expect(estado.jogadores.find((j) => j.id === 'p1')?.patente).toBe(1);
+    expect(estado.vezDe).toBe('p2');
+  });
+
+  it('rejeita atacar quando não há combate', () => {
+    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    expect(() => aplicarAcao(p, { tipo: 'atacar', jogadorId: 'p1' }, deps([])))
+      .toThrow('aplicarAcao: não há combate em curso');
+  });
+
+  it('traduz a recusa do motor em AcaoInvalida, preservando a mensagem', () => {
+    // O motor recusa `atacar` quando a máquina está pedindo a esquiva. Sem a
+    // tradução, esse Error cru viraria 500 na Task 14 em vez do 400 que é.
+    const forte: Combatente = { forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1 };
+    const depsForte = (dados: readonly number[]) =>
+      ({ rolar: filaDeDados(dados), embaralhar: semEmbaralhar, monstro: forte });
+    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const pedindoEsquiva = aplicarAcao(p, { tipo: 'chutarPorta', jogadorId: 'p1' }, depsForte([1])).estado;
+
+    expect(() => aplicarAcao(pedindoEsquiva, { tipo: 'atacar', jogadorId: 'p1' }, depsForte([1])))
+      .toThrow(AcaoInvalida);
+    expect(() => aplicarAcao(pedindoEsquiva, { tipo: 'atacar', jogadorId: 'p1' }, depsForte([1])))
+      .toThrow('proximoPasso: não é a vez de atacar');
+  });
+});
