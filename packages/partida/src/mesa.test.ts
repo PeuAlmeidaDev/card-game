@@ -182,4 +182,21 @@ describe('aplicarAcao — combate', () => {
     expect(() => aplicarAcao(pedindoEsquiva, { tipo: 'atacar', jogadorId: 'p1' }, depsForte([1])))
       .toThrow('proximoPasso: não é a vez de atacar');
   });
+
+  it('deixa bug interno subir cru, sem virar AcaoInvalida', () => {
+    // A tradução acima captura por TIPO, não por localização. Um erro qualquer
+    // vindo de dentro do motor (estado corrompido, dado que explode) é bug NOSSO:
+    // precisa chegar à borda como 500 e a mensagem NÃO pode vazar para o cliente.
+    // Traduzir tudo o que passa pelo try diria "culpa sua" para falha do servidor.
+    const comCombate = abrirCombate([]);
+    const rolarQuebrado = () => {
+      throw new TypeError('detalhe interno do servidor');
+    };
+    const depsQuebradas = { rolar: rolarQuebrado, embaralhar: semEmbaralhar, monstro: monstroPadrao };
+
+    expect(() => aplicarAcao(comCombate, { tipo: 'atacar', jogadorId: 'p1' }, depsQuebradas))
+      .toThrow(TypeError);
+    expect(() => aplicarAcao(comCombate, { tipo: 'atacar', jogadorId: 'p1' }, depsQuebradas))
+      .not.toThrow(AcaoInvalida);
+  });
 });

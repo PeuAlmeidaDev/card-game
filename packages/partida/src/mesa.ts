@@ -1,5 +1,5 @@
 import type { Combatente, Passo, RolarD12 } from '@card-dungeon/motor';
-import { criarCombate, proximoPasso } from '@card-dungeon/motor';
+import { AcaoIlegal, criarCombate, proximoPasso } from '@card-dungeon/motor';
 import type {
   AcaoDaMesa, ConfigPartida, EntradaJogador, Embaralhar, EstadoPartida, EventoDaMesa, JogadorNaMesa,
 } from './tipos';
@@ -135,17 +135,23 @@ function agirNoCombate(estado: EstadoPartida, acao: AcaoDeCombate, deps: DepsMes
     throw new AcaoInvalida('aplicarAcao: não há combate em curso');
   }
 
-  // O motor lança `Error` cru nas três recusas dele ("não é a vez de atacar",
-  // "não há ataque do monstro para esquivar", "o combate já terminou"). São
-  // rejeições de DOMÍNIO — o cliente clicou no botão errado — e precisam chegar
-  // à borda como 400, não como 500. O motor não conhece a mesa, então a tradução
-  // é aqui. Só o `proximoPasso` fica dentro do try: envolver mais do que isso
-  // reclassificaria bug nosso como culpa do cliente.
+  // As três recusas do motor ("não é a vez de atacar", "não há ataque do monstro
+  // para esquivar", "o combate já terminou") são rejeições de DOMÍNIO — o cliente
+  // clicou no botão errado — e precisam chegar à borda como 400. O motor não
+  // conhece a mesa, então quem traduz é aqui.
+  //
+  // A captura é por TIPO, não por localização: qualquer outro erro vindo de dentro
+  // do `proximoPasso` (estado corrompido, dado que explode) é bug NOSSO e sobe cru,
+  // para virar 500 sem vazar a mensagem interna. Um `catch` que traduzisse tudo
+  // devolveria "culpa sua" — com um pedaço da nossa implementação junto.
   let passo: Passo;
   try {
     passo = proximoPasso(combate.estado, { tipo: acao.tipo }, deps.rolar);
   } catch (erro) {
-    throw new AcaoInvalida(erro instanceof Error ? erro.message : 'ação de combate inválida');
+    if (erro instanceof AcaoIlegal) {
+      throw new AcaoInvalida(erro.message);
+    }
+    throw erro;
   }
 
   const eventos: EventoDaMesa[] = [
