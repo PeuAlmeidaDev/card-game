@@ -71,6 +71,15 @@ export function criarPartida(
   };
 }
 
+/**
+ * Fecha a ação: grava os eventos no log e devolve o resultado. É o ÚNICO ponto
+ * que escreve em `log` — antes cada retorno repetia o append à mão, e esquecer
+ * um deles não quebrava nenhum teste, só deixava a crônica incompleta.
+ */
+function registrar(estado: EstadoPartida, eventos: readonly EventoDaMesa[]): ResultadoAcao {
+  return { estado: { ...estado, log: [...estado.log, ...eventos] }, eventos };
+}
+
 /** Próximo assento, circular. */
 function proximoJogador(estado: EstadoPartida): JogadorNaMesa {
   const indice = estado.jogadores.findIndex((j) => j.id === estado.vezDe);
@@ -117,8 +126,7 @@ function chutarPorta(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): 
   if (compra.carta.tipo === 'salaVazia') {
     const seguinte = proximoJogador(base);
     eventos.push({ tipo: 'vez', jogadorId: seguinte.id });
-    const proximo: EstadoPartida = { ...base, vezDe: seguinte.id, log: [...base.log, ...eventos] };
-    return { estado: proximo, eventos };
+    return registrar({ ...base, vezDe: seguinte.id }, eventos);
   }
 
   const jogador = base.jogadores.find((j) => j.id === jogadorId);
@@ -131,12 +139,10 @@ function chutarPorta(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): 
   const passo = criarCombate(combatente, deps.monstro, deps.rolar);
   eventos.push({ tipo: 'combate', jogadorId, eventos: passo.eventos });
 
-  const proximo: EstadoPartida = {
-    ...base,
-    combate: { estado: passo.estado, proximaDecisao: passo.proximaDecisao },
-    log: [...base.log, ...eventos],
-  };
-  return { estado: proximo, eventos };
+  return registrar(
+    { ...base, combate: { estado: passo.estado, proximaDecisao: passo.proximaDecisao } },
+    eventos,
+  );
 }
 
 function agirNoCombate(estado: EstadoPartida, acao: AcaoDeCombate, deps: DepsMesa): ResultadoAcao {
@@ -169,12 +175,10 @@ function agirNoCombate(estado: EstadoPartida, acao: AcaoDeCombate, deps: DepsMes
   ];
 
   if (passo.estado.desfecho === 'emAndamento') {
-    const proximo: EstadoPartida = {
-      ...estado,
-      combate: { estado: passo.estado, proximaDecisao: passo.proximaDecisao },
-      log: [...estado.log, ...eventos],
-    };
-    return { estado: proximo, eventos };
+    return registrar(
+      { ...estado, combate: { estado: passo.estado, proximaDecisao: passo.proximaDecisao } },
+      eventos,
+    );
   }
 
   return fecharCombate(estado, acao.jogadorId, passo.estado.desfecho === 'vitoriaJogador', eventos);
@@ -187,45 +191,32 @@ function fecharCombate(
   venceu: boolean,
   eventosAcumulados: readonly EventoDaMesa[],
 ): ResultadoAcao {
-  const eventos: EventoDaMesa[] = [...eventosAcumulados];
-
-  const jogadores = estado.jogadores.map((j) => {
-    if (j.id !== jogadorId) return j;
-    return venceu
-      ? { ...j, patente: j.patente + 1 }
-      : { ...j, derrotas: j.derrotas + 1 };
-  });
-
-  const atualizado = jogadores.find((j) => j.id === jogadorId);
-  if (atualizado === undefined) {
+  const anterior = estado.jogadores.find((j) => j.id === jogadorId);
+  if (anterior === undefined) {
     throw new Error(`fecharCombate: jogador ${jogadorId} não está na mesa`);
   }
-  eventos.push(
+
+  const atualizado: JogadorNaMesa = venceu
+    ? { ...anterior, patente: anterior.patente + 1 }
+    : { ...anterior, derrotas: anterior.derrotas + 1 };
+  const jogadores = estado.jogadores.map((j) => (j.id === jogadorId ? atualizado : j));
+
+  const eventos: EventoDaMesa[] = [
+    ...eventosAcumulados,
     venceu
       ? { tipo: 'patente', jogadorId, patente: atualizado.patente }
       : { tipo: 'derrota', jogadorId, derrotas: atualizado.derrotas },
-  );
+  ];
 
   const semCombate: EstadoPartida = { ...estado, jogadores, combate: null };
 
   if (atualizado.patente >= estado.patenteAlvo) {
     const classificacao = classificar(jogadores);
     eventos.push({ tipo: 'fim', classificacao });
-    return {
-      estado: {
-        ...semCombate,
-        desfecho: 'terminada',
-        classificacao,
-        log: [...estado.log, ...eventos],
-      },
-      eventos,
-    };
+    return registrar({ ...semCombate, desfecho: 'terminada', classificacao }, eventos);
   }
 
   const seguinte = proximoJogador(semCombate);
   eventos.push({ tipo: 'vez', jogadorId: seguinte.id });
-  return {
-    estado: { ...semCombate, vezDe: seguinte.id, log: [...estado.log, ...eventos] },
-    eventos,
-  };
+  return registrar({ ...semCombate, vezDe: seguinte.id }, eventos);
 }

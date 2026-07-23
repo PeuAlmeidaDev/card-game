@@ -86,6 +86,22 @@ describe('aplicarAcao — chutarPorta', () => {
     ]);
   });
 
+  it('o log acumula os eventos de cada ação, na ordem', () => {
+    // `eventos` é o delta da ação; `log` é a crônica inteira. Sem esta asserção,
+    // esquecer de gravar no log passaria despercebido — todo o resto do estado
+    // continuaria certo e nenhum outro teste falharia.
+    const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'salaVazia' }] },
+      { embaralhar: semEmbaralhar });
+    const r1 = aplicarAcao(p, { tipo: 'chutarPorta', jogadorId: 'p1' }, deps([]));
+    const r2 = aplicarAcao(r1.estado, { tipo: 'chutarPorta', jogadorId: 'p2' }, deps([]));
+
+    expect(r2.estado.log).toEqual([
+      { tipo: 'vez', jogadorId: 'p1' },
+      ...r1.eventos,
+      ...r2.eventos,
+    ]);
+  });
+
   it('monstro abre o combate e para no ataque do jogador', () => {
     const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'monstro' }] },
       { embaralhar: semEmbaralhar });
