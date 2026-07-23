@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { criarPartida, aplicarAcao } from './mesa';
+import { criarPartida, aplicarAcao, avancarBots } from './mesa';
 import { COMPOSICAO_POR_JOGADOR } from './baralho';
+import { escolherAcao } from './bot';
+import { projetarPara } from './projecao';
 import { AcaoInvalida } from './erros';
-import { filaDeDados } from './testes/dados';
+import { filaDeDados, criarDadoCiclico } from './testes/dados';
 import type { EntradaJogador } from './tipos';
 import type { Combatente } from '@card-dungeon/motor';
 
@@ -242,5 +244,40 @@ describe('aplicarAcao — combate', () => {
       .toThrow(TypeError);
     expect(() => aplicarAcao(comCombate, { tipo: 'atacar', jogadorId: 'p1' }, depsQuebradas))
       .not.toThrow(AcaoInvalida);
+  });
+});
+
+describe('partida completa', () => {
+  it('roda do início ao fim e produz classificação com todos os jogadores', () => {
+    const quatro: readonly EntradaJogador[] = [
+      { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base },
+      { id: 'p2', nome: 'Bot 1', ehBot: true, combatenteBase: base },
+      { id: 'p3', nome: 'Bot 2', ehBot: true, combatenteBase: base },
+      { id: 'p4', nome: 'Bot 3', ehBot: true, combatenteBase: base },
+    ];
+    const dadosDeps = {
+      rolar: criarDadoCiclico([4, 12]), // sempre acerta e o defensor nunca esquiva
+      embaralhar: semEmbaralhar,
+      monstro: monstroPadrao,
+    };
+
+    let estado = criarPartida('m1', quatro, { patenteAlvo: 3, composicaoPorJogador: [{ tipo: 'monstro' }] },
+      { embaralhar: semEmbaralhar });
+
+    // Guarda anti-loop: se a partida não terminar em MAX_VOLTAS, o teste falha
+    // na asserção de `terminada` em vez de travar a suíte para sempre.
+    const MAX_VOLTAS = 500;
+    let voltas = 0;
+    while (estado.desfecho === 'emAndamento' && voltas < MAX_VOLTAS) {
+      const acao = escolherAcao(projetarPara('p1', estado), 'p1');
+      estado = aplicarAcao(estado, acao, dadosDeps).estado;
+      estado = avancarBots(estado, dadosDeps).estado;
+      voltas += 1;
+    }
+
+    expect(estado.desfecho).toBe('terminada');
+    expect(estado.classificacao).toHaveLength(4);
+    expect(estado.classificacao?.[0]?.posicao).toBe(1);
+    expect(estado.log.at(-1)?.tipo).toBe('fim');
   });
 });

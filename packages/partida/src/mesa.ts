@@ -4,8 +4,10 @@ import type {
   AcaoDaMesa, ConfigPartida, EntradaJogador, Embaralhar, EstadoPartida, EventoDaMesa, JogadorNaMesa,
 } from './tipos';
 import { comprarCarta } from './baralho';
+import { escolherAcao } from './bot';
 import { classificar } from './classificacao';
 import { AcaoInvalida } from './erros';
+import { projetarPara } from './projecao';
 
 /** As ações que só fazem sentido com um combate aberto. */
 type AcaoDeCombate = Extract<AcaoDaMesa, { readonly tipo: 'atacar' | 'esquivar' }>;
@@ -219,4 +221,27 @@ function fecharCombate(
   const seguinte = proximoJogador(semCombate);
   eventos.push({ tipo: 'vez', jogadorId: seguinte.id });
   return registrar({ ...semCombate, vezDe: seguinte.id }, eventos);
+}
+
+/**
+ * Roda os turnos dos bots até a vez voltar a um humano (ou a partida acabar).
+ * Todos os eventos gerados entram no mesmo log, para o cliente animar de uma vez.
+ */
+export function avancarBots(estado: EstadoPartida, deps: DepsMesa): ResultadoAcao {
+  let atual = estado;
+  const eventos: EventoDaMesa[] = [];
+
+  for (;;) {
+    if (atual.desfecho !== 'emAndamento') break;
+
+    const daVez = atual.jogadores.find((j) => j.id === atual.vezDe);
+    if (daVez === undefined || !daVez.ehBot) break;
+
+    const acao = escolherAcao(projetarPara(daVez.id, atual), daVez.id);
+    const passo = aplicarAcao(atual, acao, deps);
+    eventos.push(...passo.eventos);
+    atual = passo.estado;
+  }
+
+  return { estado: atual, eventos };
 }
