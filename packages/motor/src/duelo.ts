@@ -1,9 +1,7 @@
 import type { Combatente, RolarD12, Lado, EventoCombate, ResultadoDuelo } from './tipos';
 import { decidirIniciativa } from './iniciativa';
 import { resolverAtaque } from './ataque';
-
-/** Teto de turnos: garante terminação quando ninguém consegue causar dano. */
-export const MAX_TURNOS = 1000;
+import { MAX_TURNOS } from './limites';
 
 export function resolverDuelo(a: Combatente, b: Combatente, rolar: RolarD12): ResultadoDuelo {
   const log: EventoCombate[] = [];

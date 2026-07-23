@@ -3,9 +3,7 @@ import type {
 } from './tipos';
 import { decidirIniciativa } from './iniciativa';
 import { rolarAtaqueDe, rolarEsquivaContra, danoDe, resolverAtaque } from './ataque';
-
-/** Trava de terminação: combate que passa disto vira `impasse`. */
-export const MAX_TURNOS_COMBATE = 1000;
+import { MAX_TURNOS } from './limites';
 
 export function criarCombate(jogador: Combatente, monstro: Combatente, rolar: RolarD12): Passo {
   const ini = decidirIniciativa(jogador, monstro, rolar); // jogador = 'a', monstro = 'b'
@@ -24,6 +22,12 @@ export function criarCombate(jogador: Combatente, monstro: Combatente, rolar: Ro
  * Avança o combate até o próximo ponto que exige um clique do jogador.
  * O ataque do monstro é automático; a máquina só para quando ele ACERTA
  * (aí o jogador precisa clicar para esquivar) ou quando é a vez do jogador atacar.
+ *
+ * Termina sempre: cada volta ou retorna, ou deixa o estado num caso que retorna
+ * na volta seguinte (acertou → pede esquiva; errou → devolve a vez ao jogador).
+ * Teto real de uma chamada: 2 voltas e 1 rolagem.
+ *
+ * @internal Exportado só para o teste da trava de terminação — não vai ao barrel.
  */
 export function avancar(
   estado: EstadoCombate,
@@ -37,8 +41,14 @@ export function avancar(
     if (atual.desfecho !== 'emAndamento') {
       return { estado: atual, eventos, proximaDecisao: null };
     }
-    if (atual.turno >= MAX_TURNOS_COMBATE) {
-      return { estado: { ...atual, desfecho: 'impasse' }, eventos, proximaDecisao: null };
+    if (atual.turno >= MAX_TURNOS) {
+      // `ataqueDoMonstro` volta a null: estado terminal não pode sair daqui
+      // anunciando uma esquiva pendente que ninguém mais pode responder.
+      return {
+        estado: { ...atual, ataqueDoMonstro: null, desfecho: 'impasse' },
+        eventos,
+        proximaDecisao: null,
+      };
     }
     if (atual.vez === 'jogador') {
       return { estado: atual, eventos, proximaDecisao: 'ataque' };
@@ -74,7 +84,12 @@ export function proximoPasso(estado: EstadoCombate, acao: AcaoCombate, rolar: Ro
   return esquivar(estado, estado.ataqueDoMonstro.rolagem, rolar);
 }
 
-/** O jogador ataca; se acertar, o monstro rola a esquiva dele sozinho. */
+/**
+ * O jogador ataca; se acertar, o monstro rola a esquiva dele NA MESMA chamada —
+ * dado de monstro não é clique de ninguém (D3 do spec). Por isso aqui vale o
+ * composto `resolverAtaque`, enquanto `esquivar` usa as primitivas: lá o ataque
+ * já foi rolado num passo anterior, esperando o clique do jogador.
+ */
 function atacar(estado: EstadoCombate, rolar: RolarD12): Passo {
   const { dano, eventos } = resolverAtaque(estado.jogador, 'a', 'b', rolar);
   const log: EventoCombate[] = [...eventos];

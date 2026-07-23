@@ -9,7 +9,8 @@ export type {
   EstadoCombate,
   Passo,
 } from './tipos';
-export { resolverDuelo, MAX_TURNOS } from './duelo';
+export { MAX_TURNOS } from './limites';
+export { resolverDuelo } from './duelo';
 export { decidirIniciativa } from './iniciativa';
 export { resolverAtaque, rolarAtaqueDe, rolarEsquivaContra, danoDe } from './ataque';
-export { criarCombate, proximoPasso, MAX_TURNOS_COMBATE } from './combate';
+export { criarCombate, proximoPasso } from './combate';

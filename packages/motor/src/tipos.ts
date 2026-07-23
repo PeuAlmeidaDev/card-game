@@ -35,6 +35,11 @@ export interface EstadoCombate {
   readonly jogador: Combatente;
   readonly monstro: Combatente;
   readonly vez: 'jogador' | 'monstro';
+  /**
+   * Contagem de TURNOS, não de rodadas: cada lado que age incrementa uma vez.
+   * Uma rodada completa (jogador + monstro) vale 2, e o teto de `MAX_TURNOS`
+   * equivale a ~500 rodadas. Mesma unidade do `turnos` de `ResultadoDuelo`.
+   */
   readonly turno: number;
   /**
    * Preenchido quando o monstro ataca e ACERTA: guarda a rolagem contra a qual
