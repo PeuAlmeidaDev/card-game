@@ -42,6 +42,14 @@ duas. Se um teste falhar com `filaDeDados esgotada`, suspeite disto antes de mex
 2. **Builds dos bots:** **sorteadas** do catálogo usando o `embaralhar` **injetado** — variedade em produção, determinismo em teste.
 3. **Nomes:** fixos nesta fatia (`Você`, `Bot 1`, `Bot 2`, `Bot 3`). Nome próprio entra na fatia 10, com contas.
 4. **`salaVazia`:** gera evento visível no log (`{ tipo: 'porta', carta: { tipo: 'salaVazia' } }`) e a UI mostra "A sala está vazia."
+5. **Erro do cliente ≠ erro do servidor** (incorporado após o code-review do motor): o `partida`
+   exporta `AcaoInvalida`; a borda HTTP traduz `instanceof AcaoInvalida` em **400** com a
+   mensagem, e qualquer outro erro em **500** com log completo e sem vazar a mensagem interna.
+   Detalhe e justificativa na Task 9.
+6. **Ação idempotente por versão** (mesma origem): a vista carrega `versao` (= `log.length`), o
+   cliente devolve essa versão junto da ação e o servidor recusa com **409** se não bater —
+   descartando o segundo clique **antes** de rolar qualquer dado. Detalhe na Task 11 (o campo) e
+   na Task 14 (a guarda).
 
 ---
 
@@ -1250,13 +1258,52 @@ git commit -m "feat(partida): classificar ordena a mesa por patente e derrotas, 
 ## Task 9: `aplicarAcao` — chutar a porta
 
 **Files:**
+- Create: `packages/partida/src/erros.ts`
 - Modify: `packages/partida/src/mesa.ts`, `packages/partida/src/mesa.test.ts`, `packages/partida/src/index.ts`
 
 **Interfaces:**
 - Consumes: `comprarCarta` (Task 6), `criarCombate` (`@card-dungeon/motor`)
-- Produces: `aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsMesa): { estado: EstadoPartida; eventos: readonly EventoDaMesa[] }` e `interface DepsMesa { readonly rolar: RolarD12; readonly embaralhar: Embaralhar; readonly monstro: Combatente }`
+- Produces: `class AcaoInvalida extends Error`; `aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsMesa): { estado: EstadoPartida; eventos: readonly EventoDaMesa[] }` e `interface DepsMesa { readonly rolar: RolarD12; readonly embaralhar: Embaralhar; readonly monstro: Combatente }`
 
 **Regra:** só quem tem a vez age. `salaVazia` → evento + passa a vez. `monstro` → abre o combate (que já para no primeiro clique).
+
+### Duas classes de erro, não uma (achado do code-review do motor)
+
+O reducer lança por dois motivos **diferentes**, e a rota da Task 14 precisa distingui-los:
+
+- **`AcaoInvalida`** — o cliente pediu algo que as regras não permitem: agiu fora da vez, chutou
+  a porta com combate aberto, atacou numa partida encerrada. É **culpa do cliente** → HTTP 400,
+  com a mensagem no corpo. Faz parte do contrato.
+- **`Error` cru** — invariante do servidor quebrada: `proximoJogador: mesa vazia`,
+  `jogador X não está na mesa` depois de `vezDe` já ter sido validado, `comprarCarta: baralho
+  vazio`. Isso é **bug nosso** → HTTP 500, log de erro, e a mensagem **não** vai para o cliente.
+
+Sem essa separação, o `catch` da rota devolveria 400 (“culpa sua”) para um `TypeError` do
+servidor **e** vazaria a mensagem interna para um cliente hostil, num jogo que o bible quer
+ranqueado. Um `catch (unknown) → 400` também é exatamente o “try/catch genérico engolindo erro”
+que o `CLAUDE.md` recusa.
+
+Crie `packages/partida/src/erros.ts`:
+
+```ts
+/**
+ * Ação que as regras da mesa recusam — culpa do cliente, não do servidor.
+ * A borda HTTP traduz isto em 400 e devolve a mensagem; qualquer outro erro é
+ * invariante quebrada (bug nosso) e vira 500 sem vazar mensagem interna.
+ */
+export class AcaoInvalida extends Error {
+  constructor(mensagem: string) {
+    super(mensagem);
+    this.name = 'AcaoInvalida';
+  }
+}
+```
+
+Nos trechos de código desta task e das seguintes, **todo `throw new Error(...)` cujo texto começa
+com `aplicarAcao:`, `chutarPorta:` (o guard de combate em curso) ou `projetarPara:` vira
+`throw new AcaoInvalida(...)`**. Os que descrevem invariante interna (`proximoJogador: mesa
+vazia`, `jogador ... não está na mesa`, `criarPartida: a mesa precisa de pelo menos 2 jogadores`)
+continuam `Error` cru — eles nunca deveriam acontecer com uma requisição bem formada.
 
 - [ ] **Step 1: Escrever os testes que falham**
 
@@ -1312,8 +1359,19 @@ describe('aplicarAcao — chutarPorta', () => {
     expect(() => aplicarAcao(comCombate, { tipo: 'chutarPorta', jogadorId: 'p1' }, deps([])))
       .toThrow('aplicarAcao: há um combate em curso');
   });
+
+  it('recusa a ação como AcaoInvalida, não como Error genérico', () => {
+    // A borda HTTP (Task 14) distingue os dois por `instanceof`: AcaoInvalida = 400,
+    // qualquer outro erro = 500. Sem este teste, a rota classificaria bug de servidor
+    // como culpa do cliente.
+    const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
+    expect(() => aplicarAcao(p, { tipo: 'chutarPorta', jogadorId: 'p2' }, deps([])))
+      .toThrow(AcaoInvalida);
+  });
 });
 ```
+
+Acrescente `AcaoInvalida` ao import de `./erros` no topo do arquivo de teste.
 
 Crie também o helper local `packages/partida/src/testes/dados.ts` — o projeto **não** exporta helper de teste pelo barrel; o `server` já mantém a própria cópia de `filaDeDados` em `app.test.ts`. Seguir o padrão existente:
 
@@ -1387,22 +1445,22 @@ function proximoJogador(estado: EstadoPartida): JogadorNaMesa {
 
 export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsMesa): ResultadoAcao {
   if (estado.desfecho !== 'emAndamento') {
-    throw new Error('aplicarAcao: a partida já terminou');
+    throw new AcaoInvalida('aplicarAcao: a partida já terminou');
   }
   if (acao.jogadorId !== estado.vezDe) {
-    throw new Error(`aplicarAcao: não é a vez de ${acao.jogadorId}`);
+    throw new AcaoInvalida(`aplicarAcao: não é a vez de ${acao.jogadorId}`);
   }
 
   if (acao.tipo === 'chutarPorta') {
     return chutarPorta(estado, acao.jogadorId, deps);
   }
 
-  throw new Error(`aplicarAcao: ação não suportada: ${acao.tipo}`);
+  throw new AcaoInvalida(`aplicarAcao: ação não suportada: ${acao.tipo}`);
 }
 
 function chutarPorta(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): ResultadoAcao {
   if (estado.combate !== null) {
-    throw new Error('aplicarAcao: há um combate em curso');
+    throw new AcaoInvalida('aplicarAcao: há um combate em curso');
   }
 
   const compra = comprarCarta(estado.monte, estado.cemiterio, deps.embaralhar);
@@ -1440,7 +1498,11 @@ Acrescente a `packages/partida/src/index.ts`:
 ```ts
 export { criarPartida, aplicarAcao } from './mesa';
 export type { DepsMesa, ResultadoAcao } from './mesa';
+export { AcaoInvalida } from './erros';
 ```
+
+`AcaoInvalida` **precisa** sair pelo barrel: a rota da Task 14 faz `instanceof` nela. É uma
+classe, não um tipo — `export`, não `export type`, senão o `instanceof` não existe em runtime.
 
 - [ ] **Step 4: Rodar e ver passar**
 
@@ -1539,6 +1601,21 @@ describe('aplicarAcao — combate', () => {
     expect(() => aplicarAcao(p, { tipo: 'atacar', jogadorId: 'p1' }, deps([])))
       .toThrow('aplicarAcao: não há combate em curso');
   });
+
+  it('traduz a recusa do motor em AcaoInvalida, preservando a mensagem', () => {
+    // O motor recusa `atacar` quando a máquina está pedindo a esquiva. Sem a
+    // tradução, esse Error cru viraria 500 na Task 14 em vez do 400 que é.
+    const forte: Combatente = { forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1 };
+    const depsForte = (dados: readonly number[]) =>
+      ({ rolar: filaDeDados(dados), embaralhar: semEmbaralhar, monstro: forte });
+    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const pedindoEsquiva = aplicarAcao(p, { tipo: 'chutarPorta', jogadorId: 'p1' }, depsForte([1])).estado;
+
+    expect(() => aplicarAcao(pedindoEsquiva, { tipo: 'atacar', jogadorId: 'p1' }, depsForte([1])))
+      .toThrow(AcaoInvalida);
+    expect(() => aplicarAcao(pedindoEsquiva, { tipo: 'atacar', jogadorId: 'p1' }, depsForte([1])))
+      .toThrow('proximoPasso: não é a vez de atacar');
+  });
 });
 ```
 
@@ -1565,14 +1642,26 @@ import { classificar } from './classificacao';
 function agirNoCombate(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsMesa): ResultadoAcao {
   const combate = estado.combate;
   if (combate === null) {
-    throw new Error('aplicarAcao: não há combate em curso');
+    throw new AcaoInvalida('aplicarAcao: não há combate em curso');
   }
 
-  const passo = proximoPasso(
-    combate.estado,
-    acao.tipo === 'atacar' ? { tipo: 'atacar' } : { tipo: 'esquivar' },
-    deps.rolar,
-  );
+  // O motor lança `Error` cru nas três recusas dele ("não é a vez de atacar",
+  // "não há ataque do monstro para esquivar", "o combate já terminou"). São
+  // rejeições de DOMÍNIO — o cliente clicou no botão errado — e precisam chegar
+  // à borda como 400, não como 500. O motor não conhece a mesa, então a tradução
+  // é aqui. Só o `proximoPasso` fica dentro do try: envolver mais do que isso
+  // reclassificaria bug nosso como culpa do cliente.
+  let passo;
+  try {
+    passo = proximoPasso(
+      combate.estado,
+      acao.tipo === 'atacar' ? { tipo: 'atacar' } : { tipo: 'esquivar' },
+      deps.rolar,
+    );
+  } catch (erro) {
+    throw new AcaoInvalida(erro instanceof Error ? erro.message : 'ação de combate inválida');
+  }
+
   const eventos: EventoDaMesa[] = [
     { tipo: 'combate', jogadorId: acao.jogadorId, eventos: passo.eventos },
   ];
@@ -1665,6 +1754,33 @@ git commit -m "feat(partida): resolve atacar e esquivar, aplica patente/derrota 
 
 **Interfaces:**
 - Produces: `projetarPara(jogadorId: string, estado: EstadoPartida): VistaDaPartida`
+- Modifica: acrescenta `readonly versao: number` a `VistaDaPartida` em `packages/partida/src/tipos.ts`
+
+### `versao`: a defesa contra a ação duplicada (achado do code-review do motor)
+
+Sem isto, um duplo-clique em "Atacar" — ou um retry de rede — manda duas requisições e o
+servidor **rola o dado duas vezes**. Num jogo em que rolar o dado é o prazer (D3), é uma rolagem
+que o jogador nunca vê acontecer, e no modo ranqueado é resultado alterado por lag.
+
+A defesa é barata: a vista carrega uma `versao` monotônica, o cliente devolve a versão que ele
+acredita estar vendo, e o servidor recusa com **409** se não bater (Task 14). O segundo clique
+chega com a versão velha e é descartado **sem rolar nada**.
+
+`versao` é `log.length` — o log é append-only e toda ação empurra pelo menos um evento. É um
+campo próprio, e não "o cliente que conte o log", por duas razões: o contrato fica auto-descritivo
+(o cliente não precisa saber que o log é append-only) e o dia em que a crônica for paginada ou
+truncada, `log.length` deixa de ser a versão e o campo sobrevive.
+
+Acrescente a `VistaDaPartida` em `packages/partida/src/tipos.ts`:
+
+```ts
+  /**
+   * Versão do estado (= `log.length`, que só cresce). O cliente devolve isto na
+   * ação; o servidor recusa com 409 se não bater — é o que mata a ação duplicada
+   * por duplo-clique ou retry de rede.
+   */
+  readonly versao: number;
+```
 
 - [ ] **Step 1: Escrever o teste que falha**
 
@@ -1722,6 +1838,18 @@ describe('projetarPara', () => {
     expect(projetarPara('p2', partida).voce).toBe('p2');
   });
 
+  it('a versão acompanha o log e cresce a cada ação', () => {
+    expect(projetarPara('p1', partida).versao).toBe(partida.log.length);
+
+    const depois = aplicarAcao(
+      partida,
+      { tipo: 'chutarPorta', jogadorId: 'p1' },
+      { rolar: filaDeDados([]), embaralhar: semEmbaralhar, monstro: monstroPadrao },
+    ).estado;
+
+    expect(projetarPara('p1', depois).versao).toBeGreaterThan(projetarPara('p1', partida).versao);
+  });
+
   it('lança para quem não está na mesa', () => {
     expect(() => projetarPara('intruso', partida))
       .toThrow('projetarPara: jogador intruso não está na mesa');
@@ -1750,12 +1878,15 @@ import type { EstadoPartida, VistaDaPartida } from './tipos';
  */
 export function projetarPara(jogadorId: string, estado: EstadoPartida): VistaDaPartida {
   if (!estado.jogadores.some((j) => j.id === jogadorId)) {
-    throw new Error(`projetarPara: jogador ${jogadorId} não está na mesa`);
+    throw new AcaoInvalida(`projetarPara: jogador ${jogadorId} não está na mesa`);
   }
 
   return {
     id: estado.id,
     voce: jogadorId,
+    // Fonte única da versão: derivada do estado aqui, nunca guardada em paralelo
+    // (campo duplicado é campo que diverge).
+    versao: estado.log.length,
     jogadores: estado.jogadores,
     vezDe: estado.vezDe,
     patenteAlvo: estado.patenteAlvo,
@@ -2014,7 +2145,23 @@ describe('acaoDaMesaSchema', () => {
     expect(() => acaoDaMesaSchema.parse({ tipo: 'atacar' })).toThrow();
   });
 });
+
+describe('acaoRequisicaoSchema', () => {
+  const acao = { tipo: 'atacar' as const, jogadorId: 'p1' };
+
+  it('exige a versão junto da ação', () => {
+    expect(acaoRequisicaoSchema.parse({ acao, versao: 3 }).versao).toBe(3);
+    expect(() => acaoRequisicaoSchema.parse({ acao })).toThrow();
+  });
+
+  it('rejeita versão negativa ou fracionária', () => {
+    expect(() => acaoRequisicaoSchema.parse({ acao, versao: -1 })).toThrow();
+    expect(() => acaoRequisicaoSchema.parse({ acao, versao: 1.5 })).toThrow();
+  });
+});
 ```
+
+Acrescente `acaoRequisicaoSchema` ao import de `./index` no topo do arquivo.
 
 - [ ] **Step 2: Rodar e ver falhar**
 
@@ -2030,12 +2177,25 @@ Em `packages/shared/src/index.ts`: remova as rotas `aventura` e `porta`, o `esta
 ```ts
 import type { AcaoDaMesa, VistaDaPartida } from '@card-dungeon/partida';
 
-/** Corpo do POST /api/partida/:id/acao. União discriminada validada na borda. */
+/** A ação em si, do domínio. União discriminada validada na borda. */
 export const acaoDaMesaSchema = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('chutarPorta'), jogadorId: z.string() }),
   z.object({ tipo: z.literal('atacar'), jogadorId: z.string() }),
   z.object({ tipo: z.literal('esquivar'), jogadorId: z.string() }),
 ]) satisfies z.ZodType<AcaoDaMesa>;
+
+/**
+ * Corpo do POST /api/partida/:id/acao: a ação MAIS a versão do estado que o
+ * cliente acredita estar vendo. O servidor recusa com 409 se não bater — é o que
+ * impede que um duplo-clique ou um retry de rede role o dado duas vezes.
+ *
+ * `versao` fica FORA de `AcaoDaMesa` de propósito: é protocolo de transporte, não
+ * regra de jogo. O reducer do `partida` não sabe que ela existe.
+ */
+export const acaoRequisicaoSchema = z.object({
+  acao: acaoDaMesaSchema,
+  versao: z.number().int().nonnegative(),
+});
 ```
 
 E, dentro de `c.router({...})`, no lugar de `aventura` e `porta`:
@@ -2054,11 +2214,14 @@ E, dentro de `c.router({...})`, no lugar de `aventura` e `porta`:
   agir: {
     method: 'POST',
     path: '/api/partida/:id/acao',
-    body: acaoDaMesaSchema,
+    body: acaoRequisicaoSchema,
     responses: {
       200: c.type<VistaDaPartida>(),
       400: c.type<{ erro: string }>(),
       404: c.type<{ erro: string }>(),
+      // 409 = versão velha: a ação já foi aplicada (duplo-clique/retry). O corpo
+      // devolve a vista ATUAL, para o cliente se ressincronizar sem um GET extra.
+      409: c.type<VistaDaPartida>(),
     },
     summary: 'Aplica uma ação do jogador, roda os turnos dos bots e devolve a vista atualizada.',
   },
@@ -2213,7 +2376,7 @@ describe('mesa', () => {
 
     const res = await app.inject({
       method: 'POST', url: `/api/partida/${vista.id}/acao`,
-      payload: { tipo: 'chutarPorta', jogadorId: outro },
+      payload: { acao: { tipo: 'chutarPorta', jogadorId: outro }, versao: vista.versao },
     });
     expect(res.statusCode).toBe(400);
   });
@@ -2232,10 +2395,33 @@ describe('mesa', () => {
 
     const res = await app.inject({
       method: 'POST', url: `/api/partida/${vista.id}/acao`,
-      payload: { tipo: 'chutarPorta', jogadorId: vista.voce },
+      payload: { acao: { tipo: 'chutarPorta', jogadorId: vista.voce }, versao: vista.versao },
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().log.length).toBeGreaterThan(vista.log.length);
+  });
+
+  it('descarta a ação repetida com 409 sem rolar o dado de novo', async () => {
+    // Simula o duplo-clique: duas requisições com a MESMA versão. A segunda não
+    // pode avançar a partida — senão o jogador perde uma rolagem que nunca viu.
+    const app = buildApp({
+      rolar: criarDadoCiclico([4, 12]),
+      embaralhar: (itens) => [...itens],
+    });
+    const criada = await app.inject({ method: 'POST', url: '/api/partida', payload: escolhas });
+    const vista = criada.json();
+    const payload = { acao: { tipo: 'chutarPorta', jogadorId: vista.voce }, versao: vista.versao };
+    const url = `/api/partida/${vista.id}/acao`;
+
+    const primeira = await app.inject({ method: 'POST', url, payload });
+    expect(primeira.statusCode).toBe(200);
+
+    const repetida = await app.inject({ method: 'POST', url, payload });
+    expect(repetida.statusCode).toBe(409);
+    // O 409 devolve a vista ATUAL, idêntica à que a primeira requisição produziu:
+    // nada avançou, nenhum dado foi consumido.
+    expect(repetida.json().versao).toBe(primeira.json().versao);
+    expect(repetida.json().log).toEqual(primeira.json().log);
   });
 });
 ```
@@ -2308,17 +2494,37 @@ E os três handlers:
       if (atual === undefined) {
         return { status: 404 as const, body: { erro: 'partida não encontrada' } };
       }
+
+      // Guarda de versão ANTES de qualquer rolagem: o segundo clique de um
+      // duplo-clique chega com a versão velha e é descartado sem gastar dado.
+      // Devolve a vista atual para o cliente se ressincronizar direto.
+      if (body.versao !== atual.log.length) {
+        app.log.info(
+          { partidaId: params.id, recebida: body.versao, atual: atual.log.length },
+          'ação com versão velha descartada',
+        );
+        return { status: 409 as const, body: projetarPara(body.acao.jogadorId, atual) };
+      }
+
       try {
-        const depois = aplicarAcao(atual, body, { rolar, embaralhar, monstro });
+        const depois = aplicarAcao(atual, body.acao, { rolar, embaralhar, monstro });
         const comBots = avancarBots(depois.estado, { rolar, embaralhar, monstro });
         repositorio.salvar(comBots.estado);
-        return { status: 200 as const, body: projetarPara(body.jogadorId, comBots.estado) };
+        return { status: 200 as const, body: projetarPara(body.acao.jogadorId, comBots.estado) };
       } catch (erro) {
-        // Traduz rejeição de domínio ("não é a vez de X") para 400. NÃO é engolir erro:
-        // a mensagem vai no corpo E no log — o servidor registra toda ação recusada.
-        const mensagem = (erro as Error).message;
-        app.log.warn({ partidaId: params.id, acao: body, erro: mensagem }, 'ação rejeitada');
-        return { status: 400 as const, body: { erro: mensagem } };
+        // DUAS classes de erro, dois destinos (ver Task 9):
+        // - AcaoInvalida = as regras recusaram o pedido do cliente => 400 com a
+        //   mensagem, que faz parte do contrato. Registrada em warn.
+        // - qualquer outro = invariante nossa quebrada => erro logado inteiro e
+        //   REPROPAGADO (500 pelo Fastify). A mensagem interna não vai ao cliente.
+        // Um `catch (unknown) => 400` classificaria bug de servidor como culpa do
+        // cliente e vazaria interno — é o try/catch genérico que o CLAUDE.md recusa.
+        if (erro instanceof AcaoInvalida) {
+          app.log.warn({ partidaId: params.id, acao: body.acao, erro: erro.message }, 'ação rejeitada');
+          return { status: 400 as const, body: { erro: erro.message } };
+        }
+        app.log.error({ partidaId: params.id, acao: body.acao, erro }, 'falha ao aplicar a ação');
+        throw erro;
       }
     },
 
@@ -2335,8 +2541,13 @@ E os três handlers:
     },
 ```
 
-> O `try/catch` aqui **não** é genérico-engolindo-erro: ele traduz a rejeição de domínio
-> ("não é a vez de X") para 400, e a mensagem vai no corpo. Nenhuma exceção é silenciada.
+Acrescente `AcaoInvalida` ao import de `@card-dungeon/partida` (é **classe**, não tipo — precisa
+existir em runtime para o `instanceof`).
+
+> O `try/catch` aqui **não** é genérico-engolindo-erro: ele **classifica**. Rejeição de domínio
+> (`AcaoInvalida`) vira 400 com a mensagem no corpo; qualquer outro erro é logado inteiro e
+> repropagado como 500. Nenhuma exceção é silenciada, e bug de servidor nunca se disfarça de
+> culpa do cliente.
 
 Em `packages/server/package.json`, troque a dependência `@card-dungeon/progressao` por `@card-dungeon/partida`.
 
@@ -2498,9 +2709,16 @@ export function TelaMesa() {
     definirErro(null);
     const resposta = await api.agir({
       params: { id: vista.id },
-      body: { tipo, jogadorId: vista.voce } as AcaoDaMesa,
+      // A versão que ESTA tela está vendo. Se o servidor já avançou (duplo-clique,
+      // retry), ele responde 409 sem rolar dado e devolve a vista atual.
+      body: { acao: { tipo, jogadorId: vista.voce } as AcaoDaMesa, versao: vista.versao },
     });
     if (resposta.status === 200) {
+      definirVista(resposta.body);
+      return;
+    }
+    if (resposta.status === 409) {
+      // Não é erro para o jogador: a ação dele já valeu. Só ressincroniza a tela.
       definirVista(resposta.body);
       return;
     }
