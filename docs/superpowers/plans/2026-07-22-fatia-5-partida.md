@@ -19,6 +19,23 @@
 - **ts-rest pinado em `3.53.0-rc.1` exato** — não trocar por `^`.
 - Identificadores e nomes de arquivo em **inglês para convenção de ecossistema** (`src/`, `.test.ts`), **semântica em português** (`partida`, `chutarPorta`, `patente`).
 
+## Regra do orçamento de dados nos testes (ler antes de escrever qualquer teste de combate)
+
+`filaDeDados` é **estrita**: lança ao ser consumida além do fim. Isso é proposital — transforma
+descuido em falha explícita. Mas obriga a contar os dados de **todos** os turnos que a máquina
+resolve sozinha, não só os do jogador.
+
+A regra, em uma frase: **toda ação do jogador que não encerra o combate custa +1 dado do
+contra-ataque do monstro; se esse contra-ataque acertar, custa +0 e a máquina para pedindo a
+esquiva.**
+
+Pela mesma razão, `EstadoCombate.turno` conta **turnos de um lado**, não rodadas: uma rodada
+completa (jogador + monstro) vale 2. Um ataque do jogador que não mata leva `turno` de 0 a 2,
+não a 1.
+
+Este erro já apareceu duas vezes na redação deste plano (Task 4 e Task 10) e foi corrigido nas
+duas. Se um teste falhar com `filaDeDados esgotada`, suspeite disto antes de mexer no código.
+
 ## Decisões que este plano fecha (eram perguntas abertas do spec)
 
 1. **Composição do baralho:** `5 monstros + 3 salas vazias **por jogador**` → mesa de 4 = 20 monstros + 12 salas. Escala com a mesa e mantém a proporção calibrada na fatia 4.
@@ -298,6 +315,12 @@ git commit -m "feat(motor): adiciona os tipos do combate por passos (sem habilid
 **Interfaces:**
 - Consumes: `decidirIniciativa` (`./iniciativa`), `rolarAtaqueDe`, `rolarEsquivaContra`, `danoDe` (`./ataque`), tipos da Task 2
 - Produces: `criarCombate(jogador: Combatente, monstro: Combatente, rolar: RolarD12): Passo` e `MAX_TURNOS_COMBATE = 1000`
+
+> **Correção pós-review (aplicada no commit `db2d65b`):** `MAX_TURNOS_COMBATE` duplicava o
+> `MAX_TURNOS` de `duelo.ts` — mesmo valor, mesma unidade, duas fontes de verdade. A constante
+> passou a morar sozinha em `packages/motor/src/limites.ts` com o nome **`MAX_TURNOS`**, e é o
+> único nome exportado pelo barrel. Onde as Tasks 3 e 4 dizem `MAX_TURNOS_COMBATE`, leia
+> `MAX_TURNOS` importado de `./limites`.
 
 **Regra que esta task implementa:** o jogador ataca por clique; o monstro ataca sozinho. Se o monstro **erra**, o turno passa sem parar. Se o monstro **acerta**, a máquina para e pede `esquiva`.
 
@@ -1464,9 +1487,11 @@ describe('aplicarAcao — combate', () => {
     const comCombate = abrirCombate([]);
     // ataque do jogador = 4 (acerta, habilidade 8); esquiva do monstro = 12 (falha)
     // dano = patente 1 + forca 3 = 4 ... precisa de 3 golpes para tirar 10 de vida
+    // 3o dado = contra-ataque do monstro (12 > habilidade 6 => erra). Ver a
+    // "regra do orçamento de dados" no topo deste plano.
     let estado = comCombate;
     for (let i = 0; i < 3; i += 1) {
-      estado = aplicarAcao(estado, { tipo: 'atacar', jogadorId: 'p1' }, deps([4, 12])).estado;
+      estado = aplicarAcao(estado, { tipo: 'atacar', jogadorId: 'p1' }, deps([4, 12, 12])).estado;
     }
 
     expect(estado.combate).toBeNull();
@@ -1480,7 +1505,7 @@ describe('aplicarAcao — combate', () => {
     const p = criarPartida('m1', entradas, alvo2, { embaralhar: semEmbaralhar });
     let estado = aplicarAcao(p, { tipo: 'chutarPorta', jogadorId: 'p1' }, deps([])).estado;
     for (let i = 0; i < 3; i += 1) {
-      estado = aplicarAcao(estado, { tipo: 'atacar', jogadorId: 'p1' }, deps([4, 12])).estado;
+      estado = aplicarAcao(estado, { tipo: 'atacar', jogadorId: 'p1' }, deps([4, 12, 12])).estado;
     }
 
     expect(estado.desfecho).toBe('terminada');
@@ -2194,8 +2219,12 @@ describe('mesa', () => {
   });
 
   it('aplica a ação e devolve a vista atualizada', async () => {
+    // Dado CÍCLICO, não `filaDeDados` de 200 uns: com o dado sempre 1 o atacante
+    // sempre acerta E o defensor sempre esquiva (empate favorece o defensor), então
+    // ninguém toma dano e o combate só termina no teto de MAX_TURNOS — ~2000 rolagens
+    // dentro de uma requisição. `[4, 12]` faz o combate progredir de verdade.
     const app = buildApp({
-      rolar: filaDeDados(Array.from({ length: 200 }, () => 1)),
+      rolar: criarDadoCiclico([4, 12]),
       embaralhar: (itens) => [...itens],
     });
     const criada = await app.inject({ method: 'POST', url: '/api/partida', payload: escolhas });
