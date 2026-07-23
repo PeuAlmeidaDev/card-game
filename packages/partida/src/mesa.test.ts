@@ -44,6 +44,19 @@ describe('criarPartida', () => {
     expect(() => criarPartida('m1', [entradas[0]!], config, { embaralhar: semEmbaralhar }))
       .toThrow('criarPartida: a mesa precisa de pelo menos 2 jogadores');
   });
+
+  it('lança com ids repetidos', () => {
+    // O id é a chave de TUDO na mesa (vez, patente, classificação) e a mesa
+    // resolve jogador por `find`. Com id repetido o `find` sempre acha o primeiro:
+    // a vez nunca sairia do assento 0 e a classificação teria duas linhas do mesmo
+    // jogador. Zod na borda valida a forma de cada entrada, não a unicidade entre elas.
+    const repetido: readonly EntradaJogador[] = [
+      { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base },
+      { id: 'p1', nome: 'Bot 1', ehBot: true, combatenteBase: base },
+    ];
+    expect(() => criarPartida('m1', repetido, config, { embaralhar: semEmbaralhar }))
+      .toThrow('criarPartida: ids de jogador repetidos');
+  });
 });
 
 const monstroPadrao: Combatente = { forca: 2, vida: 10, habilidade: 6, agilidade: 1, level: 1 };
@@ -160,6 +173,21 @@ describe('aplicarAcao — combate', () => {
     expect(estado.jogadores.find((j) => j.id === 'p1')?.derrotas).toBe(1);
     expect(estado.jogadores.find((j) => j.id === 'p1')?.patente).toBe(1);
     expect(estado.vezDe).toBe('p2');
+  });
+
+  it('lança Error cru se a vez apontar para fora da mesa', () => {
+    // Invariante NOSSA, não do cliente: `findIndex` devolveria -1 e o assento
+    // seguinte cairia em (-1+1)%n = 0, passando a vez para o primeiro jogador em
+    // silêncio. Estado corrompido tem que ser barulhento — e é 500, não 400.
+    const p = criarPartida('m1', entradas,
+      { ...config, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
+      { embaralhar: semEmbaralhar });
+    const corrompido = { ...p, vezDe: 'fantasma' };
+
+    expect(() => aplicarAcao(corrompido, { tipo: 'chutarPorta', jogadorId: 'fantasma' }, deps([])))
+      .toThrow('proximoJogador: a vez aponta para um jogador fora da mesa');
+    expect(() => aplicarAcao(corrompido, { tipo: 'chutarPorta', jogadorId: 'fantasma' }, deps([])))
+      .not.toThrow(AcaoInvalida);
   });
 
   it('rejeita atacar quando não há combate', () => {

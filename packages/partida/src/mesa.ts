@@ -30,6 +30,11 @@ export function criarPartida(
   if (entradas.length < 2) {
     throw new Error('criarPartida: a mesa precisa de pelo menos 2 jogadores');
   }
+  // O id é a chave de tudo na mesa e é resolvido por `find`: repetido, a vez
+  // nunca sairia do primeiro assento e a classificação duplicaria o jogador.
+  if (new Set(entradas.map((e) => e.id)).size !== entradas.length) {
+    throw new Error('criarPartida: ids de jogador repetidos');
+  }
 
   const jogadores: readonly JogadorNaMesa[] = entradas.map((e) => ({
     id: e.id,
@@ -69,6 +74,11 @@ export function criarPartida(
 /** Próximo assento, circular. */
 function proximoJogador(estado: EstadoPartida): JogadorNaMesa {
   const indice = estado.jogadores.findIndex((j) => j.id === estado.vezDe);
+  if (indice === -1) {
+    // Sem este guard o -1 vira índice 0 e a vez passa para o primeiro assento
+    // sem ninguém notar. É invariante nossa quebrada, não pedido inválido.
+    throw new Error('proximoJogador: a vez aponta para um jogador fora da mesa');
+  }
   const proximo = estado.jogadores[(indice + 1) % estado.jogadores.length];
   if (proximo === undefined) {
     throw new Error('proximoJogador: mesa vazia');
