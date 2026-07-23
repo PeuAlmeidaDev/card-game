@@ -281,3 +281,34 @@ describe('partida completa', () => {
     expect(estado.log.at(-1)?.tipo).toBe('fim');
   });
 });
+
+describe('avancarBots — teto de ações automáticas', () => {
+  it('lança em vez de travar quando a vez nunca volta a um humano', () => {
+    // Mesa só de bots + baralho sem monstro: ninguém sobe de patente, a partida
+    // nunca termina, e o laço não acha humano para parar. Sem o teto isto
+    // congela o processo inteiro — Node é single-threaded, então o servidor
+    // todo para, não só esta requisição.
+    const soBots: readonly EntradaJogador[] = [
+      { id: 'b1', nome: 'Bot 1', ehBot: true, combatenteBase: base },
+      { id: 'b2', nome: 'Bot 2', ehBot: true, combatenteBase: base },
+    ];
+    const p = criarPartida('m1', soBots,
+      { patenteAlvo: 3, composicaoPorJogador: [{ tipo: 'salaVazia' }] },
+      { embaralhar: semEmbaralhar });
+
+    expect(() => avancarBots(p, {
+      rolar: criarDadoCiclico([4, 12]), embaralhar: semEmbaralhar, monstro: monstroPadrao,
+    })).toThrow('avancarBots: teto de ações automáticas atingido');
+  });
+
+  it('não dispara numa rodada normal de bots', () => {
+    const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'salaVazia' }] },
+      { embaralhar: semEmbaralhar });
+    // passa a vez para o bot p2; avancarBots roda o turno dele e devolve a vez a p1
+    const vezDoBot = aplicarAcao(p, { tipo: 'chutarPorta', jogadorId: 'p1' }, deps([])).estado;
+    const r = avancarBots(vezDoBot, deps([]));
+
+    expect(r.estado.vezDe).toBe('p1');
+    expect(r.eventos.length).toBeGreaterThan(0);
+  });
+});

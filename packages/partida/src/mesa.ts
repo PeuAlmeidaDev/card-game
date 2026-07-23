@@ -7,6 +7,7 @@ import { comprarCarta } from './baralho';
 import { escolherAcao } from './bot';
 import { classificar } from './classificacao';
 import { AcaoInvalida } from './erros';
+import { MAX_ACOES_AUTOMATICAS } from './limites';
 import { projetarPara } from './projecao';
 
 /** As ações que só fazem sentido com um combate aberto. */
@@ -231,7 +232,12 @@ export function avancarBots(estado: EstadoPartida, deps: DepsMesa): ResultadoAca
   let atual = estado;
   const eventos: EventoDaMesa[] = [];
 
-  for (;;) {
+  for (let acoes = 0; ; acoes += 1) {
+    if (acoes >= MAX_ACOES_AUTOMATICAS) {
+      // Invariante nossa, não pedido inválido: `Error` cru => 500 e alerta.
+      // Erro alto é preferível ao congelamento silencioso do processo.
+      throw new Error('avancarBots: teto de ações automáticas atingido');
+    }
     if (atual.desfecho !== 'emAndamento') break;
 
     const daVez = atual.jogadores.find((j) => j.id === atual.vezDe);
