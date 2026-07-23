@@ -39,12 +39,37 @@ export const combatenteSchema = z.object({
   level: z.number(),
 }) satisfies z.ZodType<Combatente>;
 
-/** A ação em si, do domínio. União discriminada validada na borda. */
+/**
+ * A ação como ela viaja no fio: **só a intenção**. `jogadorId` NÃO vem do corpo —
+ * a borda deriva quem está agindo de quem abriu a conexão e monta a `AcaoDaMesa`
+ * do domínio (`{ ...acao, jogadorId: <da sessão> }`).
+ *
+ * Se o id viesse daqui, um cliente poderia agir no lugar de outro jogador sempre
+ * que fosse a vez dele — o domínio não tem como recusar, porque para ele "é a vez
+ * de p2" é simplesmente verdade. Tirando o campo do fio, a personificação vira
+ * impossível por construção, em vez de depender de uma checagem na rota.
+ */
 export const acaoDaMesaSchema = z.discriminatedUnion('tipo', [
-  z.object({ tipo: z.literal('chutarPorta'), jogadorId: z.string() }),
-  z.object({ tipo: z.literal('atacar'), jogadorId: z.string() }),
-  z.object({ tipo: z.literal('esquivar'), jogadorId: z.string() }),
-]) satisfies z.ZodType<AcaoDaMesa>;
+  z.object({ tipo: z.literal('chutarPorta') }),
+  z.object({ tipo: z.literal('atacar') }),
+  z.object({ tipo: z.literal('esquivar') }),
+]) satisfies z.ZodType<{ tipo: AcaoDaMesa['tipo'] }>;
+
+/** A intenção validada. A rota completa com o `jogadorId` da sessão. */
+export type AcaoNoFio = z.infer<typeof acaoDaMesaSchema>;
+
+/**
+ * Trava a direção que o `satisfies` acima NÃO cobre. `z.ZodType` é covariante na
+ * saída: um schema mais estreito que o alvo passa limpo, então o `satisfies`
+ * sozinho não percebe o domínio crescendo além do schema — uma ação nova ficaria
+ * sem rota, levando 400, sem erro de compilação.
+ *
+ * A tupla é obrigatória: `A | B extends X` DISTRIBUI sobre a união e vira
+ * `true | true | never` = `true`, ou seja, a checagem se auto-satisfaz.
+ */
+type _CoberturaAcao = [AcaoDaMesa['tipo']] extends [AcaoNoFio['tipo']] ? true : never;
+const _coberturaAcao: _CoberturaAcao = true;
+void _coberturaAcao;
 
 /**
  * Corpo do POST /api/partida/:id/acao: a ação MAIS a versão do estado que o

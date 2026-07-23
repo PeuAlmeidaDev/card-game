@@ -58,23 +58,28 @@ describe('rotas da mesa', () => {
 });
 
 describe('acaoDaMesaSchema', () => {
-  it('aceita as três ações da mesa', () => {
-    expect(acaoDaMesaSchema.parse({ tipo: 'chutarPorta', jogadorId: 'p1' }).tipo).toBe('chutarPorta');
-    expect(acaoDaMesaSchema.parse({ tipo: 'atacar', jogadorId: 'p1' }).tipo).toBe('atacar');
-    expect(acaoDaMesaSchema.parse({ tipo: 'esquivar', jogadorId: 'p1' }).tipo).toBe('esquivar');
+  it('aceita as três ações da mesa, só com o tipo', () => {
+    expect(acaoDaMesaSchema.parse({ tipo: 'chutarPorta' }).tipo).toBe('chutarPorta');
+    expect(acaoDaMesaSchema.parse({ tipo: 'atacar' }).tipo).toBe('atacar');
+    expect(acaoDaMesaSchema.parse({ tipo: 'esquivar' }).tipo).toBe('esquivar');
   });
 
   it('rejeita ação desconhecida', () => {
-    expect(() => acaoDaMesaSchema.parse({ tipo: 'trapacear', jogadorId: 'p1' })).toThrow();
+    expect(() => acaoDaMesaSchema.parse({ tipo: 'trapacear' })).toThrow();
   });
 
-  it('rejeita ação sem jogadorId', () => {
-    expect(() => acaoDaMesaSchema.parse({ tipo: 'atacar' })).toThrow();
+  it('descarta o jogadorId que o cliente mandar', () => {
+    // QUEM age não vem do corpo — vem de quem abriu a conexão. Se viesse daqui,
+    // um cliente poderia agir no lugar de outro jogador sempre que fosse a vez
+    // dele. Fora do fio, a personificação é impossível por construção, e não
+    // depende de um `if` na rota que alguém pode esquecer de escrever.
+    expect(acaoDaMesaSchema.parse({ tipo: 'atacar', jogadorId: 'vitima' }))
+      .toEqual({ tipo: 'atacar' });
   });
 });
 
 describe('acaoRequisicaoSchema', () => {
-  const acao = { tipo: 'atacar' as const, jogadorId: 'p1' };
+  const acao = { tipo: 'atacar' as const };
 
   it('exige a versão junto da ação', () => {
     expect(acaoRequisicaoSchema.parse({ acao, versao: 3 }).versao).toBe(3);
