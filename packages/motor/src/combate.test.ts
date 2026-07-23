@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { criarCombate } from './combate';
+import { criarCombate, proximoPasso } from './combate';
 import { filaDeDados } from './testes/filaDeDados';
 import type { Combatente } from './tipos';
 
@@ -45,5 +45,49 @@ describe('criarCombate', () => {
       { tipo: 'iniciativa', primeiro: 'b', porAgilidade: true },
       { tipo: 'ataque', atacante: 'b', rolagem: 5, acertou: true },
     ]);
+  });
+});
+
+describe('proximoPasso — turno do jogador', () => {
+  it('ataque que acerta e não é esquivado tira vida do monstro', () => {
+    const inicio = criarCombate(jogador, monstro, filaDeDados([]));
+    // dado 1: ataque do jogador = 4 <= habilidade 8 => acerta
+    // dado 2: esquiva do monstro = 9 > 4 => não esquiva
+    // dano = level 1 + forca 3 = 4  =>  vida 10 - 4 = 6
+    // dado 3: ataque do monstro = 12 > habilidade 6 => erra (turno dele resolve sozinho)
+    const passo = proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([4, 9, 12]));
+
+    expect(passo.estado.monstro.vida).toBe(6);
+    expect(passo.estado.turno).toBe(2);
+    expect(passo.proximaDecisao).toBe('ataque');
+    expect(passo.eventos).toEqual([
+      { tipo: 'ataque', atacante: 'a', rolagem: 4, acertou: true },
+      { tipo: 'esquiva', defensor: 'b', rolagem: 9, esquivou: false },
+      { tipo: 'dano', alvo: 'b', quantidade: 4, vidaRestante: 6 },
+      { tipo: 'ataque', atacante: 'b', rolagem: 12, acertou: false },
+    ]);
+  });
+
+  it('ataque que mata o monstro encerra o combate com vitória do jogador', () => {
+    const fraco: Combatente = { ...monstro, vida: 3 };
+    const inicio = criarCombate(jogador, fraco, filaDeDados([]));
+    const passo = proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([4, 9]));
+
+    expect(passo.estado.desfecho).toBe('vitoriaJogador');
+    expect(passo.proximaDecisao).toBeNull();
+  });
+
+  it('rejeita esquivar quando não há ataque do monstro pendente', () => {
+    const inicio = criarCombate(jogador, monstro, filaDeDados([]));
+    expect(() => proximoPasso(inicio.estado, { tipo: 'esquivar' }, filaDeDados([1])))
+      .toThrow('proximoPasso: não há ataque do monstro para esquivar');
+  });
+
+  it('rejeita agir depois do fim do combate', () => {
+    const fraco: Combatente = { ...monstro, vida: 3 };
+    const inicio = criarCombate(jogador, fraco, filaDeDados([]));
+    const fim = proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([4, 9]));
+    expect(() => proximoPasso(fim.estado, { tipo: 'atacar' }, filaDeDados([1])))
+      .toThrow('proximoPasso: o combate já terminou');
   });
 });
