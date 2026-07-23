@@ -3,3 +3,4 @@ export type {
   CombateNaMesa, EstadoPartida, VistaDaPartida, ConfigPartida, EntradaJogador,
 } from './tipos';
 export { montarComposicao, COMPOSICAO_POR_JOGADOR, comprarCarta } from './baralho';
+export { criarPartida } from './mesa';
