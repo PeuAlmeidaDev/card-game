@@ -91,3 +91,45 @@ describe('proximoPasso — turno do jogador', () => {
       .toThrow('proximoPasso: o combate já terminou');
   });
 });
+
+describe('proximoPasso — esquiva do jogador', () => {
+  const rapido: Combatente = { ...monstro, agilidade: 12 };
+
+  it('esquiva bem-sucedida não tira vida e devolve a vez ao jogador', () => {
+    // ataque do monstro = 5 (acerta, habilidade 6)
+    const inicio = criarCombate(jogador, rapido, filaDeDados([5]));
+    expect(inicio.proximaDecisao).toBe('esquiva');
+
+    // esquiva do jogador = 5 <= 5 => esquiva (empate favorece o defensor)
+    const passo = proximoPasso(inicio.estado, { tipo: 'esquivar' }, filaDeDados([5]));
+
+    expect(passo.estado.jogador.vida).toBe(20);
+    expect(passo.estado.ataqueDoMonstro).toBeNull();
+    expect(passo.estado.turno).toBe(1);
+    expect(passo.proximaDecisao).toBe('ataque');
+    expect(passo.eventos).toEqual([
+      { tipo: 'esquiva', defensor: 'a', rolagem: 5, esquivou: true },
+    ]);
+  });
+
+  it('esquiva falha e o jogador leva dano', () => {
+    const inicio = criarCombate(jogador, rapido, filaDeDados([5]));
+    // esquiva = 6 > 5 => não esquiva. dano = level 1 + forca 2 = 3 => 20 - 3 = 17
+    const passo = proximoPasso(inicio.estado, { tipo: 'esquivar' }, filaDeDados([6]));
+
+    expect(passo.estado.jogador.vida).toBe(17);
+    expect(passo.eventos).toEqual([
+      { tipo: 'esquiva', defensor: 'a', rolagem: 6, esquivou: false },
+      { tipo: 'dano', alvo: 'a', quantidade: 3, vidaRestante: 17 },
+    ]);
+  });
+
+  it('esquiva falha e mata o jogador: vitória do monstro', () => {
+    const quaseMorto: Combatente = { ...jogador, vida: 2, agilidade: 1 };
+    const inicio = criarCombate(quaseMorto, rapido, filaDeDados([5]));
+    const passo = proximoPasso(inicio.estado, { tipo: 'esquivar' }, filaDeDados([6]));
+
+    expect(passo.estado.desfecho).toBe('vitoriaMonstro');
+    expect(passo.proximaDecisao).toBeNull();
+  });
+});

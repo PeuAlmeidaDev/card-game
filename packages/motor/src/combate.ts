@@ -2,7 +2,7 @@ import type {
   Combatente, RolarD12, EventoCombate, EstadoCombate, AcaoCombate, Passo,
 } from './tipos';
 import { decidirIniciativa } from './iniciativa';
-import { rolarAtaqueDe, resolverAtaque } from './ataque';
+import { rolarAtaqueDe, rolarEsquivaContra, danoDe, resolverAtaque } from './ataque';
 
 /** Trava de terminação: combate que passa disto vira `impasse`. */
 export const MAX_TURNOS_COMBATE = 1000;
@@ -71,7 +71,7 @@ export function proximoPasso(estado: EstadoCombate, acao: AcaoCombate, rolar: Ro
   if (estado.ataqueDoMonstro === null) {
     throw new Error('proximoPasso: não há ataque do monstro para esquivar');
   }
-  throw new Error('proximoPasso: esquiva do jogador ainda não implementada');
+  return esquivar(estado, estado.ataqueDoMonstro.rolagem, rolar);
 }
 
 /** O jogador ataca; se acertar, o monstro rola a esquiva dele sozinho. */
@@ -91,6 +91,29 @@ function atacar(estado: EstadoCombate, rolar: RolarD12): Passo {
     turno: estado.turno + 1,
     vez: 'monstro',
     desfecho: monstro.vida <= 0 ? 'vitoriaJogador' : 'emAndamento',
+  };
+  return avancar(proximo, log, rolar);
+}
+
+/** O jogador rola a esquiva contra a rolagem que o monstro já fez. */
+function esquivar(estado: EstadoCombate, rolagemAtaque: number, rolar: RolarD12): Passo {
+  const esquiva = rolarEsquivaContra(rolagemAtaque, 'a', rolar);
+  const log: EventoCombate[] = [esquiva.evento];
+
+  let jogador = estado.jogador;
+  if (!esquiva.esquivou) {
+    const dano = danoDe(estado.monstro);
+    jogador = { ...jogador, vida: jogador.vida - dano };
+    log.push({ tipo: 'dano', alvo: 'a', quantidade: dano, vidaRestante: jogador.vida });
+  }
+
+  const proximo: EstadoCombate = {
+    ...estado,
+    jogador,
+    ataqueDoMonstro: null,
+    turno: estado.turno + 1,
+    vez: 'jogador',
+    desfecho: jogador.vida <= 0 ? 'vitoriaMonstro' : 'emAndamento',
   };
   return avancar(proximo, log, rolar);
 }
