@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { criarPartida } from './mesa';
+import { criarPartida, aplicarAcao } from './mesa';
 import { COMPOSICAO_POR_JOGADOR } from './baralho';
+import { AcaoInvalida } from './erros';
+import { filaDeDados } from './testes/dados';
 import type { EntradaJogador } from './tipos';
 import type { Combatente } from '@card-dungeon/motor';
 
@@ -41,5 +43,62 @@ describe('criarPartida', () => {
   it('lança com menos de dois jogadores', () => {
     expect(() => criarPartida('m1', [entradas[0]!], config, { embaralhar: semEmbaralhar }))
       .toThrow('criarPartida: a mesa precisa de pelo menos 2 jogadores');
+  });
+});
+
+const monstroPadrao: Combatente = { forca: 2, vida: 10, habilidade: 6, agilidade: 1, level: 1 };
+const deps = (dados: readonly number[]) => ({
+  rolar: filaDeDados(dados),
+  embaralhar: semEmbaralhar,
+  monstro: monstroPadrao,
+});
+
+describe('aplicarAcao — chutarPorta', () => {
+  it('rejeita ação de quem não tem a vez', () => {
+    const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
+    expect(() => aplicarAcao(p, { tipo: 'chutarPorta', jogadorId: 'p2' }, deps([])))
+      .toThrow('aplicarAcao: não é a vez de p2');
+  });
+
+  it('sala vazia registra o evento e passa a vez', () => {
+    const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'salaVazia' }] },
+      { embaralhar: semEmbaralhar });
+    const r = aplicarAcao(p, { tipo: 'chutarPorta', jogadorId: 'p1' }, deps([]));
+
+    expect(r.estado.vezDe).toBe('p2');
+    expect(r.estado.combate).toBeNull();
+    expect(r.eventos).toEqual([
+      { tipo: 'porta', jogadorId: 'p1', carta: { tipo: 'salaVazia' } },
+      { tipo: 'vez', jogadorId: 'p2' },
+    ]);
+  });
+
+  it('monstro abre o combate e para no ataque do jogador', () => {
+    const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'monstro' }] },
+      { embaralhar: semEmbaralhar });
+    // agilidade do jogador (5) > do monstro (1) => sem rolagem de iniciativa
+    const r = aplicarAcao(p, { tipo: 'chutarPorta', jogadorId: 'p1' }, deps([]));
+
+    expect(r.estado.combate?.proximaDecisao).toBe('ataque');
+    expect(r.estado.vezDe).toBe('p1');
+    expect(r.estado.combate?.estado.jogador.vida).toBe(20);
+  });
+
+  it('rejeita chutar a porta com um combate em curso', () => {
+    const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'monstro' }] },
+      { embaralhar: semEmbaralhar });
+    const comCombate = aplicarAcao(p, { tipo: 'chutarPorta', jogadorId: 'p1' }, deps([])).estado;
+
+    expect(() => aplicarAcao(comCombate, { tipo: 'chutarPorta', jogadorId: 'p1' }, deps([])))
+      .toThrow('aplicarAcao: há um combate em curso');
+  });
+
+  it('recusa a ação como AcaoInvalida, não como Error genérico', () => {
+    // A borda HTTP (Task 14) distingue os dois por `instanceof`: AcaoInvalida = 400,
+    // qualquer outro erro = 500. Sem este teste, a rota classificaria bug de servidor
+    // como culpa do cliente.
+    const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
+    expect(() => aplicarAcao(p, { tipo: 'chutarPorta', jogadorId: 'p2' }, deps([])))
+      .toThrow(AcaoInvalida);
   });
 });

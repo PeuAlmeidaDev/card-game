@@ -1,6 +1,21 @@
+import type { Combatente, RolarD12 } from '@card-dungeon/motor';
+import { criarCombate } from '@card-dungeon/motor';
 import type {
-  ConfigPartida, EntradaJogador, Embaralhar, EstadoPartida, EventoDaMesa, JogadorNaMesa,
+  AcaoDaMesa, ConfigPartida, EntradaJogador, Embaralhar, EstadoPartida, EventoDaMesa, JogadorNaMesa,
 } from './tipos';
+import { comprarCarta } from './baralho';
+import { AcaoInvalida } from './erros';
+
+export interface DepsMesa {
+  readonly rolar: RolarD12;
+  readonly embaralhar: Embaralhar;
+  readonly monstro: Combatente;
+}
+
+export interface ResultadoAcao {
+  readonly estado: EstadoPartida;
+  readonly eventos: readonly EventoDaMesa[];
+}
 
 export function criarPartida(
   id: string,
@@ -45,4 +60,67 @@ export function criarPartida(
     classificacao: null,
     log: [abertura],
   };
+}
+
+/** Próximo assento, circular. */
+function proximoJogador(estado: EstadoPartida): JogadorNaMesa {
+  const indice = estado.jogadores.findIndex((j) => j.id === estado.vezDe);
+  const proximo = estado.jogadores[(indice + 1) % estado.jogadores.length];
+  if (proximo === undefined) {
+    throw new Error('proximoJogador: mesa vazia');
+  }
+  return proximo;
+}
+
+/**
+ * Reducer autoritativo da mesa. Recusa do cliente sai como `AcaoInvalida` (a borda
+ * traduz em 400); invariante nossa quebrada sai como `Error` cru (500, sem vazar).
+ */
+export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsMesa): ResultadoAcao {
+  if (estado.desfecho !== 'emAndamento') {
+    throw new AcaoInvalida('aplicarAcao: a partida já terminou');
+  }
+  if (acao.jogadorId !== estado.vezDe) {
+    throw new AcaoInvalida(`aplicarAcao: não é a vez de ${acao.jogadorId}`);
+  }
+
+  if (acao.tipo === 'chutarPorta') {
+    return chutarPorta(estado, acao.jogadorId, deps);
+  }
+
+  throw new AcaoInvalida(`aplicarAcao: ação não suportada: ${acao.tipo}`);
+}
+
+function chutarPorta(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): ResultadoAcao {
+  if (estado.combate !== null) {
+    throw new AcaoInvalida('aplicarAcao: há um combate em curso');
+  }
+
+  const compra = comprarCarta(estado.monte, estado.cemiterio, deps.embaralhar);
+  const eventos: EventoDaMesa[] = [{ tipo: 'porta', jogadorId, carta: compra.carta }];
+  const base: EstadoPartida = { ...estado, monte: compra.monte, cemiterio: compra.cemiterio };
+
+  if (compra.carta.tipo === 'salaVazia') {
+    const seguinte = proximoJogador(base);
+    eventos.push({ tipo: 'vez', jogadorId: seguinte.id });
+    const proximo: EstadoPartida = { ...base, vezDe: seguinte.id, log: [...base.log, ...eventos] };
+    return { estado: proximo, eventos };
+  }
+
+  const jogador = base.jogadores.find((j) => j.id === jogadorId);
+  if (jogador === undefined) {
+    throw new Error(`chutarPorta: jogador ${jogadorId} não está na mesa`);
+  }
+
+  // Vida sempre reseta: o combatente entra no combate com a statline base na patente atual.
+  const combatente: Combatente = { ...jogador.combatenteBase, level: jogador.patente };
+  const passo = criarCombate(combatente, deps.monstro, deps.rolar);
+  eventos.push({ tipo: 'combate', jogadorId, eventos: passo.eventos });
+
+  const proximo: EstadoPartida = {
+    ...base,
+    combate: { estado: passo.estado, proximaDecisao: passo.proximaDecisao },
+    log: [...base.log, ...eventos],
+  };
+  return { estado: proximo, eventos };
 }
