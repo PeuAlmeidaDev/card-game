@@ -95,7 +95,10 @@ function criarDadoCiclico(valores: readonly number[]): RolarD12 {
 }
 
 describe('mesa', () => {
-  const escolhas = { racaId: 'elfo', classeId: 'guerreiro', itemIds: [] };
+  // Raça BASELINE (sem passiva) para os testes genéricos da mesa: o Elfo espia o
+  // topo, então com ele um `vasculhar` não resolve porta nenhuma.
+  const escolhas = { racaId: 'humano', classeId: 'guerreiro', itemIds: [] };
+  const escolhasVidente = { racaId: 'elfo', classeId: 'guerreiro', itemIds: [] };
   const semEmbaralhar: Embaralhar = (itens) => [...itens];
   // `[4, 12]` faz o combate progredir: o atacante acerta e o defensor falha a
   // esquiva. Com o dado sempre 1 o defensor SEMPRE esquiva (empate favorece o
@@ -242,6 +245,83 @@ describe('mesa', () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.json<VistaDaPartida>().combate?.estado.jogador.vida).toBe(12);
+    await app.close();
+  });
+
+  it('o Elfo espia o topo em vez de resolver a porta', async () => {
+    const app = appDeJogo();
+    const vista = await criar(app, escolhasVidente);
+
+    const res = await app.inject({
+      method: 'POST', url: `/api/partida/${vista.id}/acao`,
+      payload: { acao: { tipo: 'vasculhar' }, versao: vista.versao },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const depois = res.json<VistaDaPartida>();
+    expect(depois.espiada).not.toBeNull();
+    expect(depois.espiada?.jogadorId).toBe(vista.voce);
+    // O topo é segredo: nenhum evento público foi emitido...
+    expect(depois.log).toEqual(vista.log);
+    // ...mas a versão andou, senão o retry escaparia do guard de 409.
+    expect(depois.versao).toBe(vista.versao + 1);
+    // e a vez continua com o vidente
+    expect(depois.vezDe).toBe(vista.voce);
+    await app.close();
+  });
+
+  it('encarar a carta espiada resolve a porta', async () => {
+    const app = appDeJogo();
+    const vista = await criar(app, escolhasVidente);
+    const espiou = await app.inject({
+      method: 'POST', url: `/api/partida/${vista.id}/acao`,
+      payload: { acao: { tipo: 'vasculhar' }, versao: vista.versao },
+    });
+    const comEspiada = espiou.json<VistaDaPartida>();
+
+    const res = await app.inject({
+      method: 'POST', url: `/api/partida/${vista.id}/acao`,
+      payload: { acao: { tipo: 'manterCarta' }, versao: comEspiada.versao },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const depois = res.json<VistaDaPartida>();
+    expect(depois.espiada).toBeNull();
+    expect(depois.log.some((e) => e.tipo === 'porta')).toBe(true);
+    await app.close();
+  });
+
+  it('o retry do vasculhar com espiada pendente devolve 409, não 400', async () => {
+    // O achado A3 do review: a espiada não loga, então sem `versaoDe` a versão
+    // ficava parada, o guard não disparava e o reducer respondia 400 — a única
+    // ação da mesa que puniria um duplo-clique com erro vermelho.
+    const app = appDeJogo();
+    const vista = await criar(app, escolhasVidente);
+    const url = `/api/partida/${vista.id}/acao`;
+    const payload = { acao: { tipo: 'vasculhar' }, versao: vista.versao };
+
+    const primeira = await app.inject({ method: 'POST', url, payload });
+    expect(primeira.statusCode).toBe(200);
+
+    const repetida = await app.inject({ method: 'POST', url, payload });
+    expect(repetida.statusCode).toBe(409);
+    // e o 409 devolve a vista atual COM a espiada, para a tela se ressincronizar
+    expect(repetida.json<VistaDaPartida>().espiada).not.toBeNull();
+    await app.close();
+  });
+
+  it('raça não-vidente continua resolvendo a porta de uma vez', async () => {
+    const app = appDeJogo();
+    const vista = await criar(app);  // humano, baseline
+
+    const res = await app.inject({
+      method: 'POST', url: `/api/partida/${vista.id}/acao`,
+      payload: { acao: { tipo: 'vasculhar' }, versao: vista.versao },
+    });
+
+    const depois = res.json<VistaDaPartida>();
+    expect(depois.espiada).toBeNull();
+    expect(depois.log.some((e) => e.tipo === 'porta')).toBe(true);
     await app.close();
   });
 });

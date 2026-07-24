@@ -47,7 +47,13 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
   const repositorio = criarRepositorio();
   const resolverPassiva = (racaId: string | undefined) =>
     racaId ? (obterRaca(racaId)?.passivaCombate ?? undefined) : undefined;
-  const deps = { rolar, embaralhar, monstro, resolverPassiva };
+  // Duas passivas, dois resolvedores injetados: a de combate vai ao motor, a
+  // Presciência é consultada pela mesa antes de comprar. Nos dois casos o server
+  // RESOLVE (pergunta à carta), nunca DECIDE (`racaId === 'elfo'` seria regra de
+  // jogo morando na borda).
+  const temPresciencia = (racaId: string | undefined) =>
+    racaId !== undefined && (obterRaca(racaId)?.espiaTopo ?? false);
+  const deps = { rolar, embaralhar, monstro, resolverPassiva, temPresciencia };
 
   const montarBots = (): readonly EntradaJogador[] => {
     const classes = embaralhar(CATALOGO.classes);
