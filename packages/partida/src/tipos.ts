@@ -87,7 +87,7 @@ export interface VistaDaPartida {
   readonly cartasNoMonte: number;
   readonly cartasNoCemiterio: number;
   readonly combate: CombateNaMesa | null;
-  /** A carta espiada, presente SÓ na vista de quem está na vez. `null` para os outros. */
+  /** A carta espiada, presente SÓ na vista do dono da espiada. `null` para os outros. */
   readonly espiada: EspiadaPendente | null;
   readonly desfecho: 'emAndamento' | 'terminada';
   readonly classificacao: readonly PosicaoFinal[] | null;

@@ -345,10 +345,12 @@ describe('aplicarAcao — espiada (Presciência)', () => {
     const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
     expect(() => aplicarAcao(p, { tipo: 'empurrarCarta', jogadorId: 'p1' }, deps([])))
       .toThrow(AcaoInvalida);
+    expect(() => aplicarAcao(p, { tipo: 'empurrarCarta', jogadorId: 'p1' }, deps([])))
+      .toThrow('aplicarAcao: não há espiada para resolver');
   });
 
   it('com Presciência, vasculhar ESPIA o topo em vez de resolver (sem evento, sem gastar a vez)', () => {
-    // monte (semEmbaralhar) = [salaVazia] para 2 jogadores.
+    // composicaoPorJogador = [salaVazia] → monte = [salaVazia, salaVazia] (× 2 jogadores)
     const p = criarPartida('m1', entradas,
       { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
       { embaralhar: semEmbaralhar });
@@ -402,6 +404,22 @@ describe('aplicarAcao — espiada (Presciência)', () => {
     expect(r.estado.combate).not.toBeNull(); // a PRÓXIMA (monstro) foi comprada às cegas e abriu combate
     // a salaVazia empurrada NÃO foi revelada: não está no cemitério (foi pro fundo do monte)
     expect(r.estado.cemiterio).not.toContainEqual({ tipo: 'salaVazia' });
+  });
+
+  it('empurrar com o monte vazio reembaralha o cemitério ANTES (a empurrada não volta pública)', () => {
+    const p0 = criarPartida('m1', entradas,
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
+      { embaralhar: semEmbaralhar });
+    // Estado forjado: monte com só 1 carta (salaVazia); cemitério com 1 monstro já revelado.
+    const p = { ...p0, monte: [{ tipo: 'salaVazia' as const }], cemiterio: [{ tipo: 'monstro' as const }] };
+    const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])).estado;
+    expect(comEspiada.monte).toEqual([]);                      // tirarDoTopo esvaziou o monte
+    expect(comEspiada.espiada?.carta).toEqual({ tipo: 'salaVazia' });
+
+    const r = aplicarAcao(comEspiada, { tipo: 'empurrarCarta', jogadorId: 'p1' }, depsVidente([1])).estado;
+    expect(r.combate).not.toBeNull();                          // a próxima às cegas foi o monstro
+    expect(r.cemiterio).not.toContainEqual({ tipo: 'salaVazia' }); // a empurrada NÃO virou pública
+    expect(r.cemiterio).toContainEqual({ tipo: 'monstro' });
   });
 
   it('recusa vasculhar de novo enquanto há espiada pendente', () => {

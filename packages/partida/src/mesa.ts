@@ -155,6 +155,7 @@ function resolverCarta(
   if (jogador === undefined) {
     throw new Error(`resolverCarta: jogador ${jogadorId} não está na mesa`);
   }
+  // Vida sempre reseta: o combatente entra no combate com a statline base na patente atual.
   const combatente: Combatente = { ...jogador.combatenteBase, level: jogador.patente };
   const passiva = passivaDoLutador(deps, jogador);
   const passo = criarCombate(combatente, deps.monstro, deps.rolar, passiva);
@@ -211,18 +212,24 @@ function resolverEspiada(estado: EstadoPartida, acao: AcaoDeEspiada, deps: DepsM
       espiada: null,
       cemiterio: [...estado.cemiterio, espiada.carta],
     };
-    return resolverCarta(base, acao.jogadorId, espiada.carta, deps);
+    return resolverCarta(base, espiada.jogadorId, espiada.carta, deps);
   }
 
-  const monteComEmpurrada: readonly CartaPorta[] = [...estado.monte, espiada.carta];
-  const compra = comprarCarta(monteComEmpurrada, estado.cemiterio, deps.embaralhar);
+  // Se a espiada esvaziou o monte, reembaralha o cemitério ANTES de empurrar — senão
+  // a carta empurrada seria a única no monte e voltaria (revelada) na compra às cegas,
+  // violando "a empurrada nunca se torna pública".
+  const precisaReembaralhar = estado.monte.length === 0;
+  const monteBase = precisaReembaralhar ? deps.embaralhar(estado.cemiterio) : estado.monte;
+  const cemiterioBase = precisaReembaralhar ? [] : estado.cemiterio;
+  const monteComEmpurrada: readonly CartaPorta[] = [...monteBase, espiada.carta];
+  const compra = comprarCarta(monteComEmpurrada, cemiterioBase, deps.embaralhar);
   const base: EstadoPartida = {
     ...estado,
     espiada: null,
     monte: compra.monte,
     cemiterio: compra.cemiterio,
   };
-  return resolverCarta(base, acao.jogadorId, compra.carta, deps);
+  return resolverCarta(base, espiada.jogadorId, compra.carta, deps);
 }
 
 function agirNoCombate(estado: EstadoPartida, acao: AcaoDeCombate, deps: DepsMesa): ResultadoAcao {
