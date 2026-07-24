@@ -59,7 +59,7 @@ describe('rotas da mesa', () => {
 
 describe('acaoDaMesaSchema', () => {
   it('aceita as três ações da mesa, só com o tipo', () => {
-    expect(acaoDaMesaSchema.parse({ tipo: 'chutarPorta' }).tipo).toBe('chutarPorta');
+    expect(acaoDaMesaSchema.parse({ tipo: 'vasculhar' }).tipo).toBe('vasculhar');
     expect(acaoDaMesaSchema.parse({ tipo: 'atacar' }).tipo).toBe('atacar');
     expect(acaoDaMesaSchema.parse({ tipo: 'esquivar' }).tipo).toBe('esquivar');
   });

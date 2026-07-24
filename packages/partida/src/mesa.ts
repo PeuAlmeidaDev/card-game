@@ -118,14 +118,14 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
     throw new AcaoInvalida(`aplicarAcao: não é a vez de ${acao.jogadorId}`);
   }
 
-  if (acao.tipo === 'chutarPorta') {
-    return chutarPorta(estado, acao.jogadorId, deps);
+  if (acao.tipo === 'vasculhar') {
+    return vasculhar(estado, acao.jogadorId, deps);
   }
 
   return agirNoCombate(estado, acao, deps);
 }
 
-function chutarPorta(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): ResultadoAcao {
+function vasculhar(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): ResultadoAcao {
   if (estado.combate !== null) {
     throw new AcaoInvalida('aplicarAcao: há um combate em curso');
   }
@@ -142,7 +142,7 @@ function chutarPorta(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): 
 
   const jogador = base.jogadores.find((j) => j.id === jogadorId);
   if (jogador === undefined) {
-    throw new Error(`chutarPorta: jogador ${jogadorId} não está na mesa`);
+    throw new Error(`vasculhar: jogador ${jogadorId} não está na mesa`);
   }
 
   // Vida sempre reseta: o combatente entra no combate com a statline base na patente atual.

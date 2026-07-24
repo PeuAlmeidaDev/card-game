@@ -49,7 +49,7 @@ export const combatenteSchema = z.object({
  * impossível por construção, em vez de depender de uma checagem na rota.
  */
 export const acaoDaMesaSchema = z.discriminatedUnion('tipo', [
-  z.object({ tipo: z.literal('chutarPorta') }),
+  z.object({ tipo: z.literal('vasculhar') }),
   z.object({ tipo: z.literal('atacar') }),
   z.object({ tipo: z.literal('esquivar') }),
 ]) satisfies z.ZodType<{ tipo: AcaoDaMesa['tipo'] }>;

@@ -155,7 +155,7 @@ describe('mesa', () => {
 
     const res = await app.inject({
       method: 'POST', url: `/api/partida/${vista.id}/acao`,
-      payload: { acao: { tipo: 'chutarPorta' }, versao: vista.versao },
+      payload: { acao: { tipo: 'vasculhar' }, versao: vista.versao },
     });
     expect(res.statusCode).toBe(200);
     expect(res.json<VistaDaPartida>().log.length).toBeGreaterThan(vista.log.length);
@@ -172,7 +172,7 @@ describe('mesa', () => {
 
     const res = await app.inject({
       method: 'POST', url: `/api/partida/${vista.id}/acao`,
-      payload: { acao: { tipo: 'chutarPorta', jogadorId: bot?.id }, versao: vista.versao },
+      payload: { acao: { tipo: 'vasculhar', jogadorId: bot?.id }, versao: vista.versao },
     });
 
     expect(res.statusCode).toBe(200);
@@ -202,7 +202,7 @@ describe('mesa', () => {
     // pode avançar a partida — senão o jogador perde uma rolagem que nunca viu.
     const app = appDeJogo();
     const vista = await criar(app);
-    const payload = { acao: { tipo: 'chutarPorta' }, versao: vista.versao };
+    const payload = { acao: { tipo: 'vasculhar' }, versao: vista.versao };
     const url = `/api/partida/${vista.id}/acao`;
 
     const primeira = await app.inject({ method: 'POST', url, payload });
@@ -231,7 +231,7 @@ describe('mesa', () => {
     const vista = await criar(app, { racaId: 'anao', classeId: 'guerreiro', itemIds: [] });
     const abrePorta = await app.inject({
       method: 'POST', url: `/api/partida/${vista.id}/acao`,
-      payload: { acao: { tipo: 'chutarPorta' }, versao: vista.versao },
+      payload: { acao: { tipo: 'vasculhar' }, versao: vista.versao },
     });
     const aposPorta = abrePorta.json<VistaDaPartida>();
 

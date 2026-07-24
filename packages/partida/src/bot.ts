@@ -7,7 +7,7 @@ import type { AcaoDaMesa, VistaDaPartida } from './tipos';
  */
 export function escolherAcao(vista: VistaDaPartida, jogadorId: string): AcaoDaMesa {
   if (vista.combate === null) {
-    return { tipo: 'chutarPorta', jogadorId };
+    return { tipo: 'vasculhar', jogadorId };
   }
   return vista.combate.proximaDecisao === 'esquiva'
     ? { tipo: 'esquivar', jogadorId }

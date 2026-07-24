@@ -34,7 +34,7 @@ export type EventoDaMesa =
   | { readonly tipo: 'fim'; readonly classificacao: readonly PosicaoFinal[] };
 
 export type AcaoDaMesa =
-  | { readonly tipo: 'chutarPorta'; readonly jogadorId: string }
+  | { readonly tipo: 'vasculhar'; readonly jogadorId: string }
   | { readonly tipo: 'atacar'; readonly jogadorId: string }
   | { readonly tipo: 'esquivar'; readonly jogadorId: string };
 

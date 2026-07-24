@@ -37,7 +37,7 @@ describe('projetarPara', () => {
   it('continua sem expor o monte depois de uma porta revelada', () => {
     const depois = aplicarAcao(
       partida,
-      { tipo: 'chutarPorta', jogadorId: 'p1' },
+      { tipo: 'vasculhar', jogadorId: 'p1' },
       { rolar: filaDeDados([]), embaralhar: semEmbaralhar, monstro: monstroPadrao },
     ).estado;
     const vista = projetarPara('p1', depois);
@@ -55,7 +55,7 @@ describe('projetarPara', () => {
 
     const depois = aplicarAcao(
       partida,
-      { tipo: 'chutarPorta', jogadorId: 'p1' },
+      { tipo: 'vasculhar', jogadorId: 'p1' },
       { rolar: filaDeDados([]), embaralhar: semEmbaralhar, monstro: monstroPadrao },
     ).estado;
 

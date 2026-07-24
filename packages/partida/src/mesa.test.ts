@@ -68,17 +68,17 @@ const deps = (dados: readonly number[]) => ({
   monstro: monstroPadrao,
 });
 
-describe('aplicarAcao — chutarPorta', () => {
+describe('aplicarAcao — vasculhar', () => {
   it('rejeita ação de quem não tem a vez', () => {
     const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
-    expect(() => aplicarAcao(p, { tipo: 'chutarPorta', jogadorId: 'p2' }, deps([])))
+    expect(() => aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p2' }, deps([])))
       .toThrow('aplicarAcao: não é a vez de p2');
   });
 
   it('sala vazia registra o evento e passa a vez', () => {
     const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'salaVazia' }] },
       { embaralhar: semEmbaralhar });
-    const r = aplicarAcao(p, { tipo: 'chutarPorta', jogadorId: 'p1' }, deps([]));
+    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
 
     expect(r.estado.vezDe).toBe('p2');
     expect(r.estado.combate).toBeNull();
@@ -94,8 +94,8 @@ describe('aplicarAcao — chutarPorta', () => {
     // continuaria certo e nenhum outro teste falharia.
     const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'salaVazia' }] },
       { embaralhar: semEmbaralhar });
-    const r1 = aplicarAcao(p, { tipo: 'chutarPorta', jogadorId: 'p1' }, deps([]));
-    const r2 = aplicarAcao(r1.estado, { tipo: 'chutarPorta', jogadorId: 'p2' }, deps([]));
+    const r1 = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
+    const r2 = aplicarAcao(r1.estado, { tipo: 'vasculhar', jogadorId: 'p2' }, deps([]));
 
     expect(r2.estado.log).toEqual([
       { tipo: 'vez', jogadorId: 'p1' },
@@ -108,19 +108,19 @@ describe('aplicarAcao — chutarPorta', () => {
     const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'monstro' }] },
       { embaralhar: semEmbaralhar });
     // agilidade do jogador (5) > do monstro (1) => sem rolagem de iniciativa
-    const r = aplicarAcao(p, { tipo: 'chutarPorta', jogadorId: 'p1' }, deps([]));
+    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
 
     expect(r.estado.combate?.proximaDecisao).toBe('ataque');
     expect(r.estado.vezDe).toBe('p1');
     expect(r.estado.combate?.estado.jogador.vida).toBe(20);
   });
 
-  it('rejeita chutar a porta com um combate em curso', () => {
+  it('rejeita vasculhar local com um combate em curso', () => {
     const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'monstro' }] },
       { embaralhar: semEmbaralhar });
-    const comCombate = aplicarAcao(p, { tipo: 'chutarPorta', jogadorId: 'p1' }, deps([])).estado;
+    const comCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
 
-    expect(() => aplicarAcao(comCombate, { tipo: 'chutarPorta', jogadorId: 'p1' }, deps([])))
+    expect(() => aplicarAcao(comCombate, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])))
       .toThrow('aplicarAcao: há um combate em curso');
   });
 
@@ -129,7 +129,7 @@ describe('aplicarAcao — chutarPorta', () => {
     // qualquer outro erro = 500. Sem este teste, a rota classificaria bug de servidor
     // como culpa do cliente.
     const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
-    expect(() => aplicarAcao(p, { tipo: 'chutarPorta', jogadorId: 'p2' }, deps([])))
+    expect(() => aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p2' }, deps([])))
       .toThrow(AcaoInvalida);
   });
 });
@@ -139,7 +139,7 @@ describe('aplicarAcao — combate', () => {
 
   const abrirCombate = (dados: readonly number[]) => {
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
-    return aplicarAcao(p, { tipo: 'chutarPorta', jogadorId: 'p1' }, deps(dados)).estado;
+    return aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps(dados)).estado;
   };
 
   it('vencer o combate sobe a patente e passa a vez', () => {
@@ -162,7 +162,7 @@ describe('aplicarAcao — combate', () => {
   it('atingir a patente-alvo termina a partida e preenche a classificação', () => {
     const alvo2 = { ...soMonstro, patenteAlvo: 2 };
     const p = criarPartida('m1', entradas, alvo2, { embaralhar: semEmbaralhar });
-    let estado = aplicarAcao(p, { tipo: 'chutarPorta', jogadorId: 'p1' }, deps([])).estado;
+    let estado = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
     for (let i = 0; i < 3; i += 1) {
       estado = aplicarAcao(estado, { tipo: 'atacar', jogadorId: 'p1' }, deps([4, 12, 12])).estado;
     }
@@ -181,7 +181,7 @@ describe('aplicarAcao — combate', () => {
       ({ rolar: filaDeDados(dados), embaralhar: semEmbaralhar, monstro: forte });
 
     // monstro mais ágil ataca primeiro e acerta (rolagem 1 <= habilidade 12)
-    const comCombate = aplicarAcao(p, { tipo: 'chutarPorta', jogadorId: 'p1' }, depsForte([1])).estado;
+    const comCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsForte([1])).estado;
     expect(comCombate.combate?.proximaDecisao).toBe('esquiva');
 
     // esquiva do jogador = 2 > 1 => falha. dano = 1 + 30 = 31 > vida 20 => morre
@@ -202,9 +202,9 @@ describe('aplicarAcao — combate', () => {
       { embaralhar: semEmbaralhar });
     const corrompido = { ...p, vezDe: 'fantasma' };
 
-    expect(() => aplicarAcao(corrompido, { tipo: 'chutarPorta', jogadorId: 'fantasma' }, deps([])))
+    expect(() => aplicarAcao(corrompido, { tipo: 'vasculhar', jogadorId: 'fantasma' }, deps([])))
       .toThrow('proximoJogador: a vez aponta para um jogador fora da mesa');
-    expect(() => aplicarAcao(corrompido, { tipo: 'chutarPorta', jogadorId: 'fantasma' }, deps([])))
+    expect(() => aplicarAcao(corrompido, { tipo: 'vasculhar', jogadorId: 'fantasma' }, deps([])))
       .not.toThrow(AcaoInvalida);
   });
 
@@ -221,7 +221,7 @@ describe('aplicarAcao — combate', () => {
     const depsForte = (dados: readonly number[]) =>
       ({ rolar: filaDeDados(dados), embaralhar: semEmbaralhar, monstro: forte });
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
-    const pedindoEsquiva = aplicarAcao(p, { tipo: 'chutarPorta', jogadorId: 'p1' }, depsForte([1])).estado;
+    const pedindoEsquiva = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsForte([1])).estado;
 
     expect(() => aplicarAcao(pedindoEsquiva, { tipo: 'atacar', jogadorId: 'p1' }, depsForte([1])))
       .toThrow(AcaoInvalida);
@@ -316,7 +316,7 @@ describe('passiva da raça no combate da Mesa', () => {
     };
 
     let estado = criarPartida('m1', [humano, bot], { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' }] }, { embaralhar: deps.embaralhar });
-    estado = aplicarAcao(estado, { tipo: 'chutarPorta', jogadorId: 'p1' }, deps).estado;
+    estado = aplicarAcao(estado, { tipo: 'vasculhar', jogadorId: 'p1' }, deps).estado;
     const depois = aplicarAcao(estado, { tipo: 'esquivar', jogadorId: 'p1' }, deps).estado;
 
     expect(depois.combate?.estado.jogador.vida).toBe(17);
@@ -346,7 +346,7 @@ describe('avancarBots — teto de ações automáticas', () => {
     const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'salaVazia' }] },
       { embaralhar: semEmbaralhar });
     // passa a vez para o bot p2; avancarBots roda o turno dele e devolve a vez a p1
-    const vezDoBot = aplicarAcao(p, { tipo: 'chutarPorta', jogadorId: 'p1' }, deps([])).estado;
+    const vezDoBot = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
     const r = avancarBots(vezDoBot, deps([]));
 
     expect(r.estado.vezDe).toBe('p1');

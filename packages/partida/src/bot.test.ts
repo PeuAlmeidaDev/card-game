@@ -18,12 +18,12 @@ const soMonstro = { patenteAlvo: 5, composicaoPorJogador: [{ tipo: 'monstro' as 
 describe('escolherAcao', () => {
   it('sem combate em curso, chuta a porta', () => {
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
-    expect(escolherAcao(projetarPara('p1', p), 'p1')).toEqual({ tipo: 'chutarPorta', jogadorId: 'p1' });
+    expect(escolherAcao(projetarPara('p1', p), 'p1')).toEqual({ tipo: 'vasculhar', jogadorId: 'p1' });
   });
 
   it('com decisão de ataque pendente, ataca', () => {
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
-    const comCombate = aplicarAcao(p, { tipo: 'chutarPorta', jogadorId: 'p1' },
+    const comCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' },
       { rolar: filaDeDados([]), embaralhar: semEmbaralhar, monstro }).estado;
 
     expect(escolherAcao(projetarPara('p1', comCombate), 'p1')).toEqual({ tipo: 'atacar', jogadorId: 'p1' });
@@ -33,7 +33,7 @@ describe('escolherAcao', () => {
     // monstro mais ágil ataca primeiro e acerta => a máquina para pedindo a esquiva
     const rapido: Combatente = { ...monstro, agilidade: 12 };
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
-    const pedindoEsquiva = aplicarAcao(p, { tipo: 'chutarPorta', jogadorId: 'p1' },
+    const pedindoEsquiva = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' },
       { rolar: filaDeDados([1]), embaralhar: semEmbaralhar, monstro: rapido }).estado;
     expect(pedindoEsquiva.combate?.proximaDecisao).toBe('esquiva');
 
