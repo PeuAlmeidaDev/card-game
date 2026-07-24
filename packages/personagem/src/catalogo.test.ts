@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { RACAS } from '@card-dungeon/cartas';
+import { RACAS_PUBLICAS } from '@card-dungeon/cartas';
 import { CATALOGO, resolverEscolhas } from './catalogo';
 
 describe('CATALOGO', () => {
-  it('o catálogo lista as 5 raças-carta', () => {
-    expect(CATALOGO.racas).toBe(RACAS);
+  it('o catálogo entrega a projeção pública das raças (sem passivaCombate)', () => {
+    expect(CATALOGO.racas).toBe(RACAS_PUBLICAS);
+    expect(CATALOGO.racas[0]).not.toHaveProperty('passivaCombate');
+    expect(CATALOGO.racas).toHaveLength(5);
   });
 
   it('tem as classes e itens semente + a base', () => {

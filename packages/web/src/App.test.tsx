@@ -12,8 +12,8 @@ afterEach(() => {
 const catalogo: Catalogo = {
   base: { forca: 3, vida: 10, habilidade: 6, agilidade: 5, level: 1 },
   racas: [
-    { id: 'anao', nome: 'Anão', texto: 'Casca de Pedra: o primeiro golpe mal o arranha.', passivaCombate: null },
-    { id: 'orc', nome: 'Orc', texto: 'Sangue de Guerra: ferido, golpeia com mais fúria.', passivaCombate: null },
+    { id: 'anao', nome: 'Anão', texto: 'Casca de Pedra: o primeiro golpe do combate mal o arranha.' },
+    { id: 'orc', nome: 'Orc', texto: 'Sangue de Guerra: ferido, golpeia com mais fúria.' },
   ],
   classes: [{ id: 'guerreiro', nome: 'Guerreiro', modificadores: { forca: 1, vida: 5 } }],
   itens: [{ id: 'espada', nome: 'Espada', modificadores: { forca: 2 } }],

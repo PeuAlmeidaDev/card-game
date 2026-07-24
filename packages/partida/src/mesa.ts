@@ -21,6 +21,11 @@ export interface DepsMesa {
   readonly resolverPassiva?: (racaId: string | undefined) => PassivaCombate | undefined;
 }
 
+/** Resolve a passiva de combate de um jogador (via o resolvedor injetado). Central para não repetir a chamada. */
+function passivaDoLutador(deps: DepsMesa, jogador: JogadorNaMesa | undefined): PassivaCombate | undefined {
+  return deps.resolverPassiva?.(jogador?.racaId);
+}
+
 export interface ResultadoAcao {
   readonly estado: EstadoPartida;
   readonly eventos: readonly EventoDaMesa[];
@@ -142,7 +147,7 @@ function chutarPorta(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): 
 
   // Vida sempre reseta: o combatente entra no combate com a statline base na patente atual.
   const combatente: Combatente = { ...jogador.combatenteBase, level: jogador.patente };
-  const passiva = deps.resolverPassiva?.(jogador.racaId);
+  const passiva = passivaDoLutador(deps, jogador);
   const passo = criarCombate(combatente, deps.monstro, deps.rolar, passiva);
   eventos.push({ tipo: 'combate', jogadorId, eventos: passo.eventos });
 
@@ -168,7 +173,7 @@ function agirNoCombate(estado: EstadoPartida, acao: AcaoDeCombate, deps: DepsMes
   // para virar 500 sem vazar a mensagem interna. Um `catch` que traduzisse tudo
   // devolveria "culpa sua" — com um pedaço da nossa implementação junto.
   const lutador = estado.jogadores.find((j) => j.id === acao.jogadorId);
-  const passiva = deps.resolverPassiva?.(lutador?.racaId);
+  const passiva = passivaDoLutador(deps, lutador);
   let passo: Passo;
   try {
     passo = proximoPasso(combate.estado, { tipo: acao.tipo }, deps.rolar, passiva);
