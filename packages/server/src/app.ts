@@ -6,7 +6,7 @@ import { CATALOGO, MONSTRO_PADRAO, resolverEscolhas, montarCombatente } from '@c
 import { obterRaca } from '@card-dungeon/cartas';
 import {
   AcaoInvalida, COMPOSICAO_POR_JOGADOR, aplicarAcao, avancarBots, criarPartida, projetarPara,
-  type Embaralhar, type EntradaJogador, type EstadoPartida,
+  versaoDe, type Embaralhar, type EntradaJogador, type EstadoPartida,
 } from '@card-dungeon/partida';
 import { initServer } from '@ts-rest/fastify';
 import { criarDadoReal } from './dado';
@@ -47,7 +47,13 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
   const repositorio = criarRepositorio();
   const resolverPassiva = (racaId: string | undefined) =>
     racaId ? (obterRaca(racaId)?.passivaCombate ?? undefined) : undefined;
-  const deps = { rolar, embaralhar, monstro, resolverPassiva };
+  // Duas passivas, dois resolvedores injetados: a de combate vai ao motor, a
+  // Presciência é consultada pela mesa antes de comprar. Nos dois casos o server
+  // RESOLVE (pergunta à carta), nunca DECIDE (`racaId === 'elfo'` seria regra de
+  // jogo morando na borda).
+  const temPresciencia = (racaId: string | undefined) =>
+    racaId !== undefined && (obterRaca(racaId)?.espiaTopo ?? false);
+  const deps = { rolar, embaralhar, monstro, resolverPassiva, temPresciencia };
 
   const montarBots = (): readonly EntradaJogador[] => {
     const classes = embaralhar(CATALOGO.classes);
@@ -118,10 +124,12 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
 
       // Guarda de versão ANTES de qualquer rolagem: o segundo clique de um
       // duplo-clique chega com a versão velha e é descartado sem gastar dado.
-      // Devolve a vista atual para o cliente se ressincronizar direto.
-      if (body.versao !== atual.log.length) {
+      // A derivação é a MESMA que a vista publicou (`versaoDe`) — comparar com
+      // `log.length` aqui deixaria a espiada, que não loga, escapar do guard.
+      const versaoAtual = versaoDe(atual);
+      if (body.versao !== versaoAtual) {
         app.log.info(
-          { partidaId: params.id, recebida: body.versao, atual: atual.log.length },
+          { partidaId: params.id, recebida: body.versao, atual: versaoAtual },
           'ação com versão velha descartada',
         );
         return { status: 409 as const, body: projetarPara(jogadorId, atual) };

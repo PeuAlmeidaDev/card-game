@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { api } from './api';
-import { narrarCombate } from './narrarCombate';
+import { PainelLog } from './PainelLog';
 import type { AcaoDaMesa, Escolhas, VistaDaPartida } from '@card-dungeon/shared';
 
 /**
@@ -62,6 +62,9 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO }: { escolhas?: Escolhas }
 
   const minhaVez = vista.vezDe === vista.voce;
   const decisao = vista.combate?.proximaDecisao ?? null;
+  // Segredo do vidente: a projeção já entrega `espiada` SÓ para o dono dela.
+  // A tela não precisa checar de quem é — se veio, é sua.
+  const espiada = vista.espiada;
   const nomeDe = (id: string): string => vista.jogadores.find((j) => j.id === id)?.nome ?? id;
   // A vida máxima do jogador é a do combatente base — a patente muda o dano, não a vida.
   // Do monstro só temos o valor corrente: a vista não carrega o máximo dele.
@@ -102,64 +105,57 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO }: { escolhas?: Escolhas }
           ))}
         </ol>
       ) : (
-        <div>
-          <button
-            type="button"
-            disabled={!minhaVez || vista.combate !== null}
-            onClick={() => void agir('vasculhar')}
-          >
-            Vasculhar local
-          </button>
-          <button
-            type="button"
-            disabled={!minhaVez || decisao !== 'ataque'}
-            onClick={() => void agir('atacar')}
-          >
-            Atacar
-          </button>
-          <button
-            type="button"
-            disabled={!minhaVez || decisao !== 'esquiva'}
-            onClick={() => void agir('esquivar')}
-          >
-            Esquivar
-          </button>
-        </div>
+        <>
+          {espiada !== null && (
+            <p>
+              Você pressente {espiada.carta.tipo === 'monstro' ? 'um monstro' : 'uma sala vazia'} adiante.
+            </p>
+          )}
+
+          <div>
+            <button
+              type="button"
+              disabled={!minhaVez || vista.combate !== null || espiada !== null}
+              onClick={() => void agir('vasculhar')}
+            >
+              Vasculhar local
+            </button>
+            {/* "Encarar"/"Empurrar" falam a língua do jogo; as AÇÕES continuam
+                `manterCarta`/`empurrarCarta` (a língua do domínio). A tradução
+                mora aqui, na borda de apresentação. */}
+            <button
+              type="button"
+              disabled={!minhaVez || espiada === null}
+              onClick={() => void agir('manterCarta')}
+            >
+              Encarar
+            </button>
+            <button
+              type="button"
+              disabled={!minhaVez || espiada === null}
+              onClick={() => void agir('empurrarCarta')}
+            >
+              Empurrar
+            </button>
+            <button
+              type="button"
+              disabled={!minhaVez || decisao !== 'ataque'}
+              onClick={() => void agir('atacar')}
+            >
+              Atacar
+            </button>
+            <button
+              type="button"
+              disabled={!minhaVez || decisao !== 'esquiva'}
+              onClick={() => void agir('esquivar')}
+            >
+              Esquivar
+            </button>
+          </div>
+        </>
       )}
 
-      {/* O log é append-only: eventos nunca são removidos nem reordenados, então
-          o índice É uma identidade estável. Usar o índice como `key` aqui é
-          correto, não o anti-padrão de listas mutáveis. */}
-      <ol>
-        {vista.log.map((evento, i) => (
-          <li key={i}>
-            {evento.tipo === 'porta' && evento.carta.tipo === 'salaVazia' && 'A sala está vazia.'}
-            {evento.tipo === 'porta' && evento.carta.tipo === 'monstro' && 'Um monstro apareceu!'}
-            {evento.tipo === 'patente' && `${nomeDe(evento.jogadorId)} subiu para a patente ${evento.patente}.`}
-            {evento.tipo === 'derrota' && `${nomeDe(evento.jogadorId)} foi evacuado.`}
-            {evento.tipo === 'vez' && `Vez de ${nomeDe(evento.jogadorId)}.`}
-            {evento.tipo === 'fim' && 'A partida terminou.'}
-            {/* Cada lance vira uma linha COM a rolagem. O resumo mudo que havia
-                aqui ("N lance(s)") escondia exatamente o que o jogador precisa
-                ver para entender o resultado: o número que saiu no dado. */}
-            {evento.tipo === 'combate' && (
-              <>
-                {evento.jogadorId === vista.voce
-                  ? 'Seu combate:'
-                  : `Combate de ${nomeDe(evento.jogadorId)}:`}
-                <ul>
-                  {narrarCombate(
-                    evento.eventos,
-                    evento.jogadorId === vista.voce ? 'Você' : nomeDe(evento.jogadorId),
-                  ).map((linha, j) => (
-                    <li key={j}>{linha}</li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </li>
-        ))}
-      </ol>
+      <PainelLog log={vista.log} jogadores={vista.jogadores} voce={vista.voce} />
 
       {erro !== null && <p role="alert">{erro}</p>}
     </section>
