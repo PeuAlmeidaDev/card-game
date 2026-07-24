@@ -1,7 +1,6 @@
 import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 import type { Combatente, ResultadoDuelo, EventoCombate, Lado } from '@card-dungeon/motor';
-import type { EstadoRun, CartaPorta, EventoPorta } from '@card-dungeon/progressao';
 import type {
   ModificadoresDeStat,
   Raca,
@@ -10,6 +9,14 @@ import type {
   Catalogo,
   EscolhasPersonagem,
 } from '@card-dungeon/personagem';
+import type {
+  AcaoDaMesa,
+  CartaPorta,
+  EventoDaMesa,
+  JogadorNaMesa,
+  PosicaoFinal,
+  VistaDaPartida,
+} from '@card-dungeon/partida';
 
 /**
  * Corpo do POST /api/duelo: as escolhas do jogador (ids). Restrito ao tipo de
@@ -32,22 +39,50 @@ export const combatenteSchema = z.object({
   level: z.number(),
 }) satisfies z.ZodType<Combatente>;
 
-export const cartaPortaSchema = z.discriminatedUnion('tipo', [
-  z.object({ tipo: z.literal('monstro') }),
-  z.object({ tipo: z.literal('salaVazia') }),
-]) satisfies z.ZodType<CartaPorta>;
+/**
+ * A ação como ela viaja no fio: **só a intenção**. `jogadorId` NÃO vem do corpo —
+ * a borda deriva quem está agindo de quem abriu a conexão e monta a `AcaoDaMesa`
+ * do domínio (`{ ...acao, jogadorId: <da sessão> }`).
+ *
+ * Se o id viesse daqui, um cliente poderia agir no lugar de outro jogador sempre
+ * que fosse a vez dele — o domínio não tem como recusar, porque para ele "é a vez
+ * de p2" é simplesmente verdade. Tirando o campo do fio, a personificação vira
+ * impossível por construção, em vez de depender de uma checagem na rota.
+ */
+export const acaoDaMesaSchema = z.discriminatedUnion('tipo', [
+  z.object({ tipo: z.literal('chutarPorta') }),
+  z.object({ tipo: z.literal('atacar') }),
+  z.object({ tipo: z.literal('esquivar') }),
+]) satisfies z.ZodType<{ tipo: AcaoDaMesa['tipo'] }>;
 
-/** Corpo do POST /api/porta: o estado da run vem do cliente (dívida de segurança conhecida — ver spec). */
-export const estadoRunSchema = z.object({
-  jogadorBase: combatenteSchema,
-  nivel: z.number(),
-  nivelAlvo: z.number(),
-  // `.readonly()` alinha o tipo inferido ao domínio (EstadoRun tem arrays readonly),
-  // para o corpo do /api/porta aceitar um EstadoRun sem cast na borda web↔server.
-  monte: z.array(cartaPortaSchema).readonly(),
-  cemiterio: z.array(cartaPortaSchema).readonly(),
-  desfecho: z.union([z.literal('emAndamento'), z.literal('vitoria')]),
-}) satisfies z.ZodType<EstadoRun>;
+/** A intenção validada. A rota completa com o `jogadorId` da sessão. */
+export type AcaoNoFio = z.infer<typeof acaoDaMesaSchema>;
+
+/**
+ * Trava a direção que o `satisfies` acima NÃO cobre. `z.ZodType` é covariante na
+ * saída: um schema mais estreito que o alvo passa limpo, então o `satisfies`
+ * sozinho não percebe o domínio crescendo além do schema — uma ação nova ficaria
+ * sem rota, levando 400, sem erro de compilação.
+ *
+ * A tupla é obrigatória: `A | B extends X` DISTRIBUI sobre a união e vira
+ * `true | true | never` = `true`, ou seja, a checagem se auto-satisfaz.
+ */
+type _CoberturaAcao = [AcaoDaMesa['tipo']] extends [AcaoNoFio['tipo']] ? true : never;
+const _coberturaAcao: _CoberturaAcao = true;
+void _coberturaAcao;
+
+/**
+ * Corpo do POST /api/partida/:id/acao: a ação MAIS a versão do estado que o
+ * cliente acredita estar vendo. O servidor recusa com 409 se não bater — é o que
+ * impede que um duplo-clique ou um retry de rede role o dado duas vezes.
+ *
+ * `versao` fica FORA de `AcaoDaMesa` de propósito: é protocolo de transporte, não
+ * regra de jogo. O reducer do `partida` não sabe que ela existe.
+ */
+export const acaoRequisicaoSchema = z.object({
+  acao: acaoDaMesaSchema,
+  versao: z.number().int().nonnegative(),
+});
 
 const c = initContract();
 
@@ -79,29 +114,42 @@ export const contrato = c.router({
     },
     summary: 'Monta o personagem das escolhas e resolve o duelo contra o monstro.',
   },
-  aventura: {
+  criarPartida: {
     method: 'POST',
-    path: '/api/aventura',
+    path: '/api/partida',
     body: escolhasSchema,
     responses: {
-      200: c.type<EstadoRun>(),
+      200: c.type<VistaDaPartida>(),
       400: c.type<{ erro: string }>(),
     },
-    summary: 'Cria uma run: monta o personagem das escolhas e embaralha o baralho inicial.',
+    summary: 'Cria a mesa com o humano (das escolhas) mais 3 bots e devolve a vista dele.',
   },
-  porta: {
+  agir: {
     method: 'POST',
-    path: '/api/porta',
-    body: z.object({ estado: estadoRunSchema }),
+    path: '/api/partida/:id/acao',
+    body: acaoRequisicaoSchema,
     responses: {
-      200: c.type<{ estado: EstadoRun; evento: EventoPorta }>(),
+      200: c.type<VistaDaPartida>(),
       400: c.type<{ erro: string }>(),
+      404: c.type<{ erro: string }>(),
+      // 409 = versão velha: a ação já foi aplicada (duplo-clique/retry). O corpo
+      // devolve a vista ATUAL, para o cliente se ressincronizar sem um GET extra.
+      409: c.type<VistaDaPartida>(),
     },
-    summary: 'Chuta a porta: avança um passo da run e devolve o próximo estado + o evento.',
+    summary: 'Aplica uma ação do jogador, roda os turnos dos bots e devolve a vista atualizada.',
+  },
+  lerPartida: {
+    method: 'GET',
+    path: '/api/partida/:id',
+    responses: {
+      200: c.type<VistaDaPartida>(),
+      404: c.type<{ erro: string }>(),
+    },
+    summary: 'Relê a vista da partida (recuperação após refresh).',
   },
 });
 
-// Superfície única do contrato: tipos de combate + de personagem.
+// Superfície única do contrato: tipos de combate, de personagem e da mesa.
 export type {
   Combatente,
   ResultadoDuelo,
@@ -113,7 +161,10 @@ export type {
   Equipamento,
   Catalogo,
   EscolhasPersonagem,
-  EstadoRun,
+  VistaDaPartida,
+  AcaoDaMesa,
+  JogadorNaMesa,
+  EventoDaMesa,
+  PosicaoFinal,
   CartaPorta,
-  EventoPorta,
 };

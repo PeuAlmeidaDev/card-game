@@ -1,17 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { escolhasSchema, contrato, estadoRunSchema } from './index';
-import type { EstadoRun } from './index';
+import { escolhasSchema, contrato, acaoDaMesaSchema, acaoRequisicaoSchema } from './index';
 
 const valido = { racaId: 'elfo', classeId: 'ladino', itemIds: ['espada'] };
-
-const estadoValido: EstadoRun = {
-  jogadorBase: { forca: 6, vida: 15, habilidade: 7, agilidade: 7, level: 1 },
-  nivel: 1,
-  nivelAlvo: 10,
-  monte: [{ tipo: 'monstro' }, { tipo: 'salaVazia' }],
-  cemiterio: [],
-  desfecho: 'emAndamento',
-};
 
 describe('contrato', () => {
   it('expõe o catálogo como GET /api/catalogo', () => {
@@ -44,31 +34,60 @@ describe('escolhasSchema', () => {
   });
 });
 
-describe('contrato — rotas da run', () => {
-  it('expõe a criação de aventura como POST /api/aventura', () => {
-    expect(contrato.aventura.method).toBe('POST');
-    expect(contrato.aventura.path).toBe('/api/aventura');
-    expect(contrato.aventura.body).toBe(escolhasSchema);
+describe('rotas da mesa', () => {
+  it('cria a partida como POST /api/partida', () => {
+    expect(contrato.criarPartida.method).toBe('POST');
+    expect(contrato.criarPartida.path).toBe('/api/partida');
+    expect(contrato.criarPartida.body).toBe(escolhasSchema);
   });
 
-  it('expõe chutar a porta como POST /api/porta', () => {
-    expect(contrato.porta.method).toBe('POST');
-    expect(contrato.porta.path).toBe('/api/porta');
+  it('age como POST /api/partida/:id/acao com a requisição validada', () => {
+    expect(contrato.agir.method).toBe('POST');
+    expect(contrato.agir.path).toBe('/api/partida/:id/acao');
+    expect(contrato.agir.body).toBe(acaoRequisicaoSchema);
+  });
+
+  it('declara 409 no agir — versão velha é resposta prevista, não erro genérico', () => {
+    expect(Object.keys(contrato.agir.responses)).toContain('409');
+  });
+
+  it('relê a partida como GET /api/partida/:id', () => {
+    expect(contrato.lerPartida.method).toBe('GET');
+    expect(contrato.lerPartida.path).toBe('/api/partida/:id');
   });
 });
 
-describe('estadoRunSchema', () => {
-  it('valida um estado de run bem formado', () => {
-    expect(estadoRunSchema.safeParse(estadoValido).success).toBe(true);
+describe('acaoDaMesaSchema', () => {
+  it('aceita as três ações da mesa, só com o tipo', () => {
+    expect(acaoDaMesaSchema.parse({ tipo: 'chutarPorta' }).tipo).toBe('chutarPorta');
+    expect(acaoDaMesaSchema.parse({ tipo: 'atacar' }).tipo).toBe('atacar');
+    expect(acaoDaMesaSchema.parse({ tipo: 'esquivar' }).tipo).toBe('esquivar');
   });
 
-  it('rejeita carta de tipo desconhecido', () => {
-    const ruim = { ...estadoValido, monte: [{ tipo: 'dragao' }] };
-    expect(estadoRunSchema.safeParse(ruim).success).toBe(false);
+  it('rejeita ação desconhecida', () => {
+    expect(() => acaoDaMesaSchema.parse({ tipo: 'trapacear' })).toThrow();
   });
 
-  it('rejeita desfecho fora do conjunto', () => {
-    const ruim = { ...estadoValido, desfecho: 'derrota' };
-    expect(estadoRunSchema.safeParse(ruim).success).toBe(false);
+  it('descarta o jogadorId que o cliente mandar', () => {
+    // QUEM age não vem do corpo — vem de quem abriu a conexão. Se viesse daqui,
+    // um cliente poderia agir no lugar de outro jogador sempre que fosse a vez
+    // dele. Fora do fio, a personificação é impossível por construção, e não
+    // depende de um `if` na rota que alguém pode esquecer de escrever.
+    expect(acaoDaMesaSchema.parse({ tipo: 'atacar', jogadorId: 'vitima' }))
+      .toEqual({ tipo: 'atacar' });
+  });
+});
+
+describe('acaoRequisicaoSchema', () => {
+  const acao = { tipo: 'atacar' as const };
+
+  it('exige a versão junto da ação', () => {
+    expect(acaoRequisicaoSchema.parse({ acao, versao: 3 }).versao).toBe(3);
+    expect(() => acaoRequisicaoSchema.parse({ acao })).toThrow();
+  });
+
+  it('rejeita versão negativa ou fracionária', () => {
+    expect(() => acaoRequisicaoSchema.parse({ acao, versao: -1 })).toThrow();
+    expect(() => acaoRequisicaoSchema.parse({ acao, versao: 1.5 })).toThrow();
   });
 });

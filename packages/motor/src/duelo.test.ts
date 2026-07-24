@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { resolverDuelo, MAX_TURNOS } from './duelo';
+import { resolverDuelo } from './duelo';
+import { MAX_TURNOS } from './limites';
 import { filaDeDados } from './testes/filaDeDados';
 import type { Combatente } from './tipos';
 

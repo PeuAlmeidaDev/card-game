@@ -1,4 +1,4 @@
-import type { Embaralhar } from '@card-dungeon/progressao';
+import type { Embaralhar } from '@card-dungeon/partida';
 
 /** Embaralhamento real de Fisher-Yates (aleatoriedade na borda, fora do reducer puro). */
 export const criarEmbaralhamentoReal = (): Embaralhar => (itens) => {

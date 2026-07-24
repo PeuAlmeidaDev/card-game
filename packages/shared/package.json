@@ -13,7 +13,7 @@
   "dependencies": {
     "@card-dungeon/motor": "workspace:*",
     "@card-dungeon/personagem": "workspace:*",
-    "@card-dungeon/progressao": "workspace:*",
+    "@card-dungeon/partida": "workspace:*",
     "@ts-rest/core": "3.53.0-rc.1",
     "zod": "^4.4.3"
   },

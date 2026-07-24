@@ -1,10 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import type { RolarD12 } from '@card-dungeon/motor';
-import type { ResultadoDuelo, Catalogo } from '@card-dungeon/shared';
-import type { Embaralhar, EstadoRun } from '@card-dungeon/progressao';
+import type { ResultadoDuelo, Catalogo, VistaDaPartida } from '@card-dungeon/shared';
+import type { Embaralhar } from '@card-dungeon/partida';
 import { buildApp } from './app';
-
-const semEmbaralhar: Embaralhar = (itens) => [...itens];
 
 function filaDeDados(rolagens: readonly number[]): RolarD12 {
   let i = 0;
@@ -75,55 +73,137 @@ describe('POST /duelo', () => {
   });
 });
 
-describe('POST /aventura e /porta', () => {
-  it('cria a aventura e chuta a primeira porta (monstro no topo, dado de vitória)', async () => {
-    // Monstro fraco injetado: habilidade 0 nunca acerta; jogador começa e mata em 1 acerto.
-    const monstro = { forca: 1, vida: 5, habilidade: 0, agilidade: 1, level: 1 };
-    const app = buildApp({ rolar: filaDeDados([3, 12]), embaralhar: semEmbaralhar, monstro });
+/** Repete a sequência para sempre. Partida inteira esgotaria uma fila fixa. */
+function criarDadoCiclico(valores: readonly number[]): RolarD12 {
+  let i = 0;
+  return () => {
+    const valor = valores[i % valores.length];
+    if (valor === undefined) throw new Error('sequência vazia');
+    i += 1;
+    return valor;
+  };
+}
 
-    const criada = await app.inject({
-      method: 'POST',
-      url: '/api/aventura',
-      payload: { racaId: 'elfo', classeId: 'guerreiro', itemIds: ['espada'] },
-    });
-    expect(criada.statusCode).toBe(200);
-    const estado = criada.json<EstadoRun>();
-    expect(estado.nivel).toBe(1);
-    expect(estado.desfecho).toBe('emAndamento');
-    expect(estado.monte).toHaveLength(8); // COMPOSICAO_PADRAO = 5 monstro + 3 sala
-    expect(estado.monte[0]).toEqual({ tipo: 'monstro' }); // sem embaralhar => monstro no topo
+describe('mesa', () => {
+  const escolhas = { racaId: 'elfo', classeId: 'guerreiro', itemIds: [] };
+  const semEmbaralhar: Embaralhar = (itens) => [...itens];
+  // `[4, 12]` faz o combate progredir: o atacante acerta e o defensor falha a
+  // esquiva. Com o dado sempre 1 o defensor SEMPRE esquiva (empate favorece o
+  // defensor), ninguém toma dano e o combate só para no teto de MAX_TURNOS —
+  // ~2000 rolagens dentro de uma requisição.
+  const appDeJogo = () => buildApp({ rolar: criarDadoCiclico([4, 12]), embaralhar: semEmbaralhar });
 
-    const passo = await app.inject({ method: 'POST', url: '/api/porta', payload: { estado } });
-    expect(passo.statusCode).toBe(200);
-    const corpo = passo.json<{ estado: EstadoRun; evento: { tipo: string } }>();
-    expect(corpo.estado.nivel).toBe(2);
-    expect(corpo.evento.tipo).toBe('combate');
+  const criar = async (app: ReturnType<typeof buildApp>) => {
+    const res = await app.inject({ method: 'POST', url: '/api/partida', payload: escolhas });
+    return res.json<VistaDaPartida>();
+  };
+
+  it('cria a partida com 4 jogadores e devolve a vista do humano', async () => {
+    const app = buildApp({ embaralhar: semEmbaralhar });
+    const res = await app.inject({ method: 'POST', url: '/api/partida', payload: escolhas });
+
+    expect(res.statusCode).toBe(200);
+    const vista = res.json<VistaDaPartida>();
+    expect(vista.jogadores).toHaveLength(4);
+    expect(vista.jogadores.filter((j) => j.ehBot)).toHaveLength(3);
+    expect(vista.voce).toBe(vista.jogadores[0]?.id);
+    expect('monte' in vista).toBe(false);
+    expect(vista.cartasNoMonte).toBeGreaterThan(0);
     await app.close();
   });
 
-  it('rejeita escolhas inválidas na criação com 400', async () => {
-    const app = buildApp({ embaralhar: semEmbaralhar });
+  it('rejeita escolhas inválidas com 400', async () => {
+    const app = buildApp();
     const res = await app.inject({
-      method: 'POST',
-      url: '/api/aventura',
-      payload: { racaId: 'dragao', classeId: 'guerreiro', itemIds: [] },
+      method: 'POST', url: '/api/partida',
+      payload: { racaId: 'nao-existe', classeId: 'guerreiro', itemIds: [] },
     });
     expect(res.statusCode).toBe(400);
     await app.close();
   });
 
-  it('rejeita chutar a porta numa run já encerrada com 400', async () => {
-    const app = buildApp({ embaralhar: semEmbaralhar });
-    const estado: EstadoRun = {
-      jogadorBase: { forca: 6, vida: 15, habilidade: 7, agilidade: 7, level: 1 },
-      nivel: 3,
-      nivelAlvo: 3,
-      monte: [{ tipo: 'salaVazia' }],
-      cemiterio: [],
-      desfecho: 'vitoria',
-    };
-    const res = await app.inject({ method: 'POST', url: '/api/porta', payload: { estado } });
+  it('devolve 404 para partida inexistente', async () => {
+    const app = buildApp();
+    const res = await app.inject({ method: 'GET', url: '/api/partida/nao-existe' });
+    expect(res.statusCode).toBe(404);
+    await app.close();
+  });
+
+  it('relê a partida pelo id', async () => {
+    const app = appDeJogo();
+    const vista = await criar(app);
+    const res = await app.inject({ method: 'GET', url: `/api/partida/${vista.id}` });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json<VistaDaPartida>().versao).toBe(vista.versao);
+    await app.close();
+  });
+
+  it('aplica a ação e devolve a vista atualizada', async () => {
+    const app = appDeJogo();
+    const vista = await criar(app);
+
+    const res = await app.inject({
+      method: 'POST', url: `/api/partida/${vista.id}/acao`,
+      payload: { acao: { tipo: 'chutarPorta' }, versao: vista.versao },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json<VistaDaPartida>().log.length).toBeGreaterThan(vista.log.length);
+    await app.close();
+  });
+
+  it('ignora o jogadorId que o cliente tentar mandar no corpo', async () => {
+    // QUEM age vem do servidor, nunca do payload. Se o campo forjado tivesse
+    // efeito, um cliente jogaria no lugar de outro jogador. Aqui ele é descartado
+    // no schema e a ação sai registrada com o id do humano da mesa.
+    const app = appDeJogo();
+    const vista = await criar(app);
+    const bot = vista.jogadores.find((j) => j.ehBot);
+
+    const res = await app.inject({
+      method: 'POST', url: `/api/partida/${vista.id}/acao`,
+      payload: { acao: { tipo: 'chutarPorta', jogadorId: bot?.id }, versao: vista.versao },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const porta = res.json<VistaDaPartida>().log.find((e) => e.tipo === 'porta');
+    expect(porta).toMatchObject({ jogadorId: vista.voce });
+    await app.close();
+  });
+
+  it('rejeita ação ilegal com 400 e a mensagem do domínio', async () => {
+    // Atacar sem combate aberto: recusa de REGRA, culpa do cliente => 400 com a
+    // mensagem no corpo. Bug de servidor viraria 500 sem vazar mensagem.
+    const app = appDeJogo();
+    const vista = await criar(app);
+
+    const res = await app.inject({
+      method: 'POST', url: `/api/partida/${vista.id}/acao`,
+      payload: { acao: { tipo: 'atacar' }, versao: vista.versao },
+    });
+
     expect(res.statusCode).toBe(400);
+    expect(res.json<{ erro: string }>().erro).toContain('não há combate em curso');
+    await app.close();
+  });
+
+  it('descarta a ação repetida com 409 sem rolar o dado de novo', async () => {
+    // Simula o duplo-clique: duas requisições com a MESMA versão. A segunda não
+    // pode avançar a partida — senão o jogador perde uma rolagem que nunca viu.
+    const app = appDeJogo();
+    const vista = await criar(app);
+    const payload = { acao: { tipo: 'chutarPorta' }, versao: vista.versao };
+    const url = `/api/partida/${vista.id}/acao`;
+
+    const primeira = await app.inject({ method: 'POST', url, payload });
+    expect(primeira.statusCode).toBe(200);
+
+    const repetida = await app.inject({ method: 'POST', url, payload });
+    expect(repetida.statusCode).toBe(409);
+    // O 409 devolve a vista ATUAL, idêntica à que a primeira requisição produziu:
+    // nada avançou, nenhum dado foi consumido.
+    expect(repetida.json<VistaDaPartida>().versao).toBe(primeira.json<VistaDaPartida>().versao);
+    expect(repetida.json<VistaDaPartida>().log).toEqual(primeira.json<VistaDaPartida>().log);
     await app.close();
   });
 });

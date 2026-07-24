@@ -1,121 +1,135 @@
 import type {
-  Combatente, RolarD12, EventoCombate, EstadoCombate, AcaoJogador,
-  DecisaoPendente, RegistroHabilidades,
+  Combatente, RolarD12, EventoCombate, EstadoCombate, AcaoCombate, Passo,
 } from './tipos';
 import { decidirIniciativa } from './iniciativa';
-import { resolverAtaque } from './ataque';
+import { rolarAtaqueDe, rolarEsquivaContra, danoDe, resolverAtaque } from './ataque';
+import { MAX_TURNOS } from './limites';
+import { AcaoIlegal } from './erros';
 
-export const MAX_TURNOS_COMBATE = 1000;
-
-interface Deps { readonly rolar: RolarD12; readonly habilidades: RegistroHabilidades; }
-interface Passo { readonly estado: EstadoCombate; readonly eventos: readonly EventoCombate[]; readonly proximaDecisao: DecisaoPendente; }
-
-function habilidadesDe(estado: EstadoCombate, deps: Deps) {
-  return deps.habilidades.get(estado.classeIdJogador) ?? {};
-}
-function jogadorTemReacao(estado: EstadoCombate, deps: Deps): boolean {
-  return habilidadesDe(estado, deps).passiva?.substituirDefesa !== undefined;
-}
-
-export function criarCombate(
-  jogador: Combatente, monstro: Combatente, classeId: string, deps: Deps,
-): Passo {
-  const ini = decidirIniciativa(jogador, monstro, deps.rolar); // jogador='a', monstro='b'
+export function criarCombate(jogador: Combatente, monstro: Combatente, rolar: RolarD12): Passo {
+  const ini = decidirIniciativa(jogador, monstro, rolar); // jogador = 'a', monstro = 'b'
   const estado: EstadoCombate = {
-    jogador, monstro, classeIdJogador: classeId,
+    jogador,
+    monstro,
     vez: ini.primeiro === 'a' ? 'jogador' : 'monstro',
-    cooldownAtiva: 0, turno: 0, desfecho: 'emAndamento',
+    turno: 0,
+    ataqueDoMonstro: null,
+    desfecho: 'emAndamento',
   };
-  return avancar(estado, [ini.evento], deps);
+  return avancar(estado, [ini.evento], rolar);
 }
 
-export function proximoTurno(estado: EstadoCombate, acao: AcaoJogador, deps: Deps): Passo {
-  if (estado.desfecho !== 'emAndamento') {
-    throw new Error('proximoTurno: o combate já terminou');
-  }
-  const resolvido = estado.vez === 'jogador'
-    ? resolverTurnoJogador(estado, acao, deps)
-    : resolverTurnoMonstro(estado, acao, deps);
-  return avancar(resolvido.estado, resolvido.eventos, deps);
-}
+/**
+ * Avança o combate até o próximo ponto que exige um clique do jogador.
+ * O ataque do monstro é automático; a máquina só para quando ele ACERTA
+ * (aí o jogador precisa clicar para esquivar) ou quando é a vez do jogador atacar.
+ *
+ * Termina sempre: cada volta ou retorna, ou deixa o estado num caso que retorna
+ * na volta seguinte (acertou → pede esquiva; errou → devolve a vez ao jogador).
+ * Teto real de uma chamada: 2 voltas e 1 rolagem.
+ *
+ * @internal Exportado só para o teste da trava de terminação — não vai ao barrel.
+ */
+export function avancar(
+  estado: EstadoCombate,
+  eventosAcumulados: readonly EventoCombate[],
+  rolar: RolarD12,
+): Passo {
+  let atual = estado;
+  const eventos: EventoCombate[] = [...eventosAcumulados];
 
-/** Auto-resolve turnos sem decisão do jogador até um ponto de decisão ou o fim. */
-function avancar(estado: EstadoCombate, eventos: readonly EventoCombate[], deps: Deps): Passo {
-  let e = estado;
-  const log: EventoCombate[] = [...eventos];
   for (;;) {
-    if (e.desfecho !== 'emAndamento') return { estado: e, eventos: log, proximaDecisao: null };
-    if (e.turno >= MAX_TURNOS_COMBATE) {
-      return { estado: { ...e, desfecho: 'impasse' }, eventos: log, proximaDecisao: null };
+    if (atual.desfecho !== 'emAndamento') {
+      return { estado: atual, eventos, proximaDecisao: null };
     }
-    if (e.vez === 'jogador') return { estado: e, eventos: log, proximaDecisao: 'ataque' };
-    if (jogadorTemReacao(e, deps)) return { estado: e, eventos: log, proximaDecisao: 'defesa' };
-    // monstro ataca e o jogador não tem reação → esquiva padrão, sem parar
-    const passo = resolverTurnoMonstro(e, { tipo: 'esquivar' }, deps);
-    log.push(...passo.eventos);
-    e = passo.estado;
+    if (atual.turno >= MAX_TURNOS) {
+      // `ataqueDoMonstro` volta a null: estado terminal não pode sair daqui
+      // anunciando uma esquiva pendente que ninguém mais pode responder.
+      return {
+        estado: { ...atual, ataqueDoMonstro: null, desfecho: 'impasse' },
+        eventos,
+        proximaDecisao: null,
+      };
+    }
+    if (atual.vez === 'jogador') {
+      return { estado: atual, eventos, proximaDecisao: 'ataque' };
+    }
+    if (atual.ataqueDoMonstro !== null) {
+      return { estado: atual, eventos, proximaDecisao: 'esquiva' };
+    }
+
+    // Vez do monstro e nenhum ataque pendente: ele ataca sozinho.
+    const ataque = rolarAtaqueDe(atual.monstro, 'b', rolar);
+    eventos.push(ataque.evento);
+    atual = ataque.acertou
+      ? { ...atual, ataqueDoMonstro: { rolagem: ataque.rolagem } }
+      : { ...atual, turno: atual.turno + 1, vez: 'jogador' };
   }
 }
 
-interface Resolucao { readonly estado: EstadoCombate; readonly eventos: readonly EventoCombate[]; }
-
-function resolverTurnoJogador(estado: EstadoCombate, acao: AcaoJogador, deps: Deps): Resolucao {
-  const eventos: EventoCombate[] = [];
-  const ativa = habilidadesDe(estado, deps).ativa;
-  let cooldownAtiva = estado.cooldownAtiva > 0 ? estado.cooldownAtiva - 1 : 0;
-
-  let modAtaque = 0;
-  if (acao.tipo === 'usarAtiva') {
-    if (!ativa || estado.cooldownAtiva > 0) throw new Error('usarAtiva: ativa indisponível (cooldown)');
-    modAtaque = ativa.modificarRolagemAtaque?.() ?? 0;
-    cooldownAtiva = ativa.cooldown ?? 0;
+export function proximoPasso(estado: EstadoCombate, acao: AcaoCombate, rolar: RolarD12): Passo {
+  if (estado.desfecho !== 'emAndamento') {
+    throw new AcaoIlegal('proximoPasso: o combate já terminou');
   }
 
-  const nAtaques = acao.tipo === 'usarAtiva' ? (ativa?.ataquesNoTurno?.() ?? 1) : 1;
+  if (acao.tipo === 'atacar') {
+    if (estado.vez !== 'jogador' || estado.ataqueDoMonstro !== null) {
+      throw new AcaoIlegal('proximoPasso: não é a vez de atacar');
+    }
+    return atacar(estado, rolar);
+  }
+
+  if (estado.ataqueDoMonstro === null) {
+    throw new AcaoIlegal('proximoPasso: não há ataque do monstro para esquivar');
+  }
+  return esquivar(estado, estado.ataqueDoMonstro.rolagem, rolar);
+}
+
+/**
+ * O jogador ataca; se acertar, o monstro rola a esquiva dele NA MESMA chamada —
+ * dado de monstro não é clique de ninguém (D3 do spec). Por isso aqui vale o
+ * composto `resolverAtaque`, enquanto `esquivar` usa as primitivas: lá o ataque
+ * já foi rolado num passo anterior, esperando o clique do jogador.
+ */
+function atacar(estado: EstadoCombate, rolar: RolarD12): Passo {
+  const { dano, eventos } = resolverAtaque(estado.jogador, 'a', 'b', rolar);
+  const log: EventoCombate[] = [...eventos];
+
   let monstro = estado.monstro;
-  let venceu = false;
-  for (let i = 0; i < nAtaques && !venceu; i += 1) {
-    const { dano, eventos: evs } = resolverAtaque(estado.jogador, 'a', 'b', deps.rolar, modAtaque, 0);
-    eventos.push(...evs);
-    if (dano > 0) {
-      monstro = { ...monstro, vida: monstro.vida - dano };
-      eventos.push({ tipo: 'dano', alvo: 'b', quantidade: dano, vidaRestante: monstro.vida });
-      if (monstro.vida <= 0) venceu = true;
-    }
+  if (dano > 0) {
+    monstro = { ...monstro, vida: monstro.vida - dano };
+    log.push({ tipo: 'dano', alvo: 'b', quantidade: dano, vidaRestante: monstro.vida });
   }
-  const desfecho = venceu ? 'vitoriaJogador' : 'emAndamento';
-  return { estado: { ...estado, monstro, cooldownAtiva, turno: estado.turno + 1, vez: 'monstro', desfecho }, eventos };
+
+  const proximo: EstadoCombate = {
+    ...estado,
+    monstro,
+    turno: estado.turno + 1,
+    vez: 'monstro',
+    desfecho: monstro.vida <= 0 ? 'vitoriaJogador' : 'emAndamento',
+  };
+  return avancar(proximo, log, rolar);
 }
 
-function resolverTurnoMonstro(estado: EstadoCombate, acao: AcaoJogador, deps: Deps): Resolucao {
-  const passiva = habilidadesDe(estado, deps).passiva;
-  if (acao.tipo === 'contraAtacar') {
-    if (!passiva?.substituirDefesa) throw new Error('contraAtacar: classe sem contra-ataque');
-    const r = passiva.substituirDefesa({ defensor: estado.jogador, atacante: estado.monstro, rolar: deps.rolar });
-    const eventos: EventoCombate[] = [...r.eventos];
-    let monstro = estado.monstro;
-    let jogador = estado.jogador;
-    if (r.danoAoMonstro > 0) {
-      monstro = { ...monstro, vida: monstro.vida - r.danoAoMonstro };
-      eventos.push({ tipo: 'dano', alvo: 'b', quantidade: r.danoAoMonstro, vidaRestante: monstro.vida });
-    }
-    if (r.danoAoJogador > 0) {
-      jogador = { ...jogador, vida: jogador.vida - r.danoAoJogador };
-      eventos.push({ tipo: 'dano', alvo: 'a', quantidade: r.danoAoJogador, vidaRestante: jogador.vida });
-    }
-    const desfecho = monstro.vida <= 0 ? 'vitoriaJogador' : jogador.vida <= 0 ? 'vitoriaMonstro' : 'emAndamento';
-    return { estado: { ...estado, monstro, jogador, turno: estado.turno + 1, vez: 'jogador', desfecho }, eventos };
+/** O jogador rola a esquiva contra a rolagem que o monstro já fez. */
+function esquivar(estado: EstadoCombate, rolagemAtaque: number, rolar: RolarD12): Passo {
+  const esquiva = rolarEsquivaContra(rolagemAtaque, 'a', rolar);
+  const log: EventoCombate[] = [esquiva.evento];
+
+  let jogador = estado.jogador;
+  if (!esquiva.esquivou) {
+    const dano = danoDe(estado.monstro);
+    jogador = { ...jogador, vida: jogador.vida - dano };
+    log.push({ tipo: 'dano', alvo: 'a', quantidade: dano, vidaRestante: jogador.vida });
   }
 
-  const eventos: EventoCombate[] = [];
-  const modEsquiva = passiva?.modificarRolagemEsquiva?.() ?? 0;
-  const { dano, eventos: evs } = resolverAtaque(estado.monstro, 'b', 'a', deps.rolar, 0, modEsquiva);
-  eventos.push(...evs);
-  let jogador = estado.jogador;
-  if (dano > 0) {
-    jogador = { ...jogador, vida: jogador.vida - dano };
-    eventos.push({ tipo: 'dano', alvo: 'a', quantidade: dano, vidaRestante: jogador.vida });
-  }
-  const desfecho = jogador.vida <= 0 ? 'vitoriaMonstro' : 'emAndamento';
-  return { estado: { ...estado, jogador, turno: estado.turno + 1, vez: 'jogador', desfecho }, eventos };
+  const proximo: EstadoCombate = {
+    ...estado,
+    jogador,
+    ataqueDoMonstro: null,
+    turno: estado.turno + 1,
+    vez: 'jogador',
+    desfecho: jogador.vida <= 0 ? 'vitoriaMonstro' : 'emAndamento',
+  };
+  return avancar(proximo, log, rolar);
 }

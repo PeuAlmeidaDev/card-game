@@ -1,5 +1,5 @@
 {
-  "name": "@card-dungeon/progressao",
+  "name": "@card-dungeon/partida",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@card-dungeon/motor": "workspace:*"
+    "@card-dungeon/motor": "workspace:*",
+    "@card-dungeon/personagem": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",

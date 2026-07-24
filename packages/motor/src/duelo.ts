@@ -1,35 +1,39 @@
-import type {
-  Combatente, RolarD12, EventoCombate, ResultadoDuelo, RegistroHabilidades, AcaoJogador,
-} from './tipos';
-import { criarCombate, proximoTurno } from './combate';
+import type { Combatente, RolarD12, Lado, EventoCombate, ResultadoDuelo } from './tipos';
+import { decidirIniciativa } from './iniciativa';
+import { resolverAtaque } from './ataque';
+import { MAX_TURNOS } from './limites';
 
-/** Teto de turnos: garante terminação quando ninguém consegue causar dano. Fonte única em combate.ts. */
-export { MAX_TURNOS_COMBATE as MAX_TURNOS } from './combate';
-const SEM_HABILIDADES: RegistroHabilidades = new Map();
-
-/**
- * Combate-base sem habilidades: wrapper fino sobre a máquina de passos (criarCombate +
- * proximoTurno), rodando com um RegistroHabilidades vazio e uma política automática
- * (sempre ataca no seu turno; a esquiva-padrão do monstro já é resolvida internamente pela
- * máquina, já que sem habilidades o jogador nunca tem reação). Prova que o duelo em lote
- * (fatia 1) é o caso degenerado da máquina interativa (fatia 5).
- */
 export function resolverDuelo(a: Combatente, b: Combatente, rolar: RolarD12): ResultadoDuelo {
-  const deps = { rolar, habilidades: SEM_HABILIDADES };
-  let passo = criarCombate(a, b, '__batch__', deps);
-  const log: EventoCombate[] = [...passo.eventos];
+  const log: EventoCombate[] = [];
+  let vidaA = a.vida;
+  let vidaB = b.vida;
 
-  while (passo.proximaDecisao !== null) {
-    // política automática: ataca no seu turno, esquiva na defesa
-    // (sem habilidades → jogadorTemReacao é sempre false, então 'defesa' nunca ocorre aqui,
-    // mas o mapeamento é mantido por robustez caso a política precise lidar com ele).
-    const acao: AcaoJogador = passo.proximaDecisao === 'ataque' ? { tipo: 'atacar' } : { tipo: 'esquivar' };
-    passo = proximoTurno(passo.estado, acao, deps);
-    log.push(...passo.eventos);
+  const iniciativa = decidirIniciativa(a, b, rolar);
+  log.push(iniciativa.evento);
+  let ladoAtacante: Lado = iniciativa.primeiro;
+
+  for (let turnos = 1; turnos <= MAX_TURNOS; turnos += 1) {
+    const ladoDefensor: Lado = ladoAtacante === 'a' ? 'b' : 'a';
+    const atacante = ladoAtacante === 'a' ? a : b;
+
+    const { dano, eventos } = resolverAtaque(atacante, ladoAtacante, ladoDefensor, rolar);
+    log.push(...eventos);
+
+    if (dano > 0) {
+      if (ladoDefensor === 'a') {
+        vidaA -= dano;
+      } else {
+        vidaB -= dano;
+      }
+      const vidaRestante = ladoDefensor === 'a' ? vidaA : vidaB;
+      log.push({ tipo: 'dano', alvo: ladoDefensor, quantidade: dano, vidaRestante });
+      if (vidaRestante <= 0) {
+        return { tipo: 'vitoria', vencedor: ladoAtacante, turnos, log };
+      }
+    }
+
+    ladoAtacante = ladoDefensor;
   }
 
-  const e = passo.estado;
-  if (e.desfecho === 'vitoriaJogador') return { tipo: 'vitoria', vencedor: 'a', turnos: e.turno, log };
-  if (e.desfecho === 'vitoriaMonstro') return { tipo: 'vitoria', vencedor: 'b', turnos: e.turno, log };
-  return { tipo: 'impasse', turnos: e.turno, log };
+  return { tipo: 'impasse', turnos: MAX_TURNOS, log };
 }

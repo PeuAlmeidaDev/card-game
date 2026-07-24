@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { Catalogo, ResultadoDuelo, EstadoRun } from '@card-dungeon/shared';
+import type { Catalogo, ResultadoDuelo } from '@card-dungeon/shared';
 import { App } from './App';
 
 afterEach(() => {
@@ -57,33 +57,5 @@ describe('App', () => {
   });
 });
 
-const estadoRun: EstadoRun = {
-  jogadorBase: { forca: 6, vida: 15, habilidade: 7, agilidade: 7, level: 1 },
-  nivel: 1,
-  nivelAlvo: 10,
-  monte: [{ tipo: 'monstro' }],
-  cemiterio: [],
-  desfecho: 'emAndamento',
-};
-
-function mockFetchComAventura(): void {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((url: string) => {
-      if (url.includes('/api/catalogo')) return Promise.resolve(json(catalogo));
-      if (url.includes('/api/aventura')) return Promise.resolve(json(estadoRun));
-      return Promise.resolve(json(resultado));
-    }),
-  );
-}
-
-describe('App — começar aventura', () => {
-  it('ao clicar em Começar aventura, entra na tela de run', async () => {
-    mockFetchComAventura();
-    render(<App />);
-    await screen.findByText(/Força/); // espera o catálogo
-    await userEvent.click(screen.getByRole('button', { name: 'Começar aventura' }));
-    expect(await screen.findByText(/card-dungeon — aventura/)).toBeInTheDocument();
-    expect(screen.getByText(/Nível 1 \/ 10/)).toBeInTheDocument();
-  });
-});
+// A `TelaRun` (run solo) saiu junto com o pacote `progressao`. A `TelaMesa` — e os
+// testes dela — entram na Task 15.

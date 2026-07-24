@@ -22,55 +22,36 @@ export type ResultadoDuelo =
   | { readonly tipo: 'vitoria'; readonly vencedor: Lado; readonly turnos: number; readonly log: readonly EventoCombate[] }
   | { readonly tipo: 'impasse'; readonly turnos: number; readonly log: readonly EventoCombate[] };
 
+/** O que o jogador precisa decidir agora. `null` = combate acabou. */
+export type DecisaoPendente = 'ataque' | 'esquiva' | null;
+
+export type AcaoCombate = { readonly tipo: 'atacar' } | { readonly tipo: 'esquivar' };
+
+/**
+ * Estado serializável de um combate em curso. O jogador é sempre o lado 'a'
+ * e o monstro o lado 'b'.
+ */
 export interface EstadoCombate {
-  readonly jogador: Combatente;        // vida corrente
-  readonly monstro: Combatente;        // vida corrente
-  readonly classeIdJogador: string;    // costura: re-hidrata as habilidades do jogador
+  readonly jogador: Combatente;
+  readonly monstro: Combatente;
   readonly vez: 'jogador' | 'monstro';
-  readonly cooldownAtiva: number;      // turnos até a ativa ficar pronta (0 = pronta)
-  readonly turno: number;              // guarda de terminação
+  /**
+   * Contagem de TURNOS, não de rodadas: cada lado que age incrementa uma vez.
+   * Uma rodada completa (jogador + monstro) vale 2, e o teto de `MAX_TURNOS`
+   * equivale a ~500 rodadas. Mesma unidade do `turnos` de `ResultadoDuelo`.
+   */
+  readonly turno: number;
+  /**
+   * Preenchido quando o monstro ataca e ACERTA: guarda a rolagem contra a qual
+   * o jogador vai esquivar. Enquanto não for `null`, a decisão pendente é 'esquiva'.
+   */
+  readonly ataqueDoMonstro: { readonly rolagem: number } | null;
   readonly desfecho: 'emAndamento' | 'vitoriaJogador' | 'vitoriaMonstro' | 'impasse';
 }
 
-export type AcaoJogador =
-  | { readonly tipo: 'atacar' }
-  | { readonly tipo: 'usarAtiva' }
-  | { readonly tipo: 'esquivar' }
-  | { readonly tipo: 'contraAtacar' };
-
-/** O que o cliente deve pedir a seguir; null quando o combate acabou. */
-export type DecisaoPendente = 'ataque' | 'defesa' | null;
-
-/** Contexto entregue ao gancho de substituição de defesa (contra-ataque). */
-export interface ContextoDefesa {
-  readonly defensor: Combatente; // o jogador
-  readonly atacante: Combatente; // o monstro
-  readonly rolar: RolarD12;
-}
-
-/** Resultado de um turno defensivo: dano em cada lado + os eventos gerados. */
-export interface ResultadoDefesa {
-  readonly danoAoMonstro: number;
-  readonly danoAoJogador: number;
+/** Retorno de cada passo da máquina de combate. */
+export interface Passo {
+  readonly estado: EstadoCombate;
   readonly eventos: readonly EventoCombate[];
+  readonly proximaDecisao: DecisaoPendente;
 }
-
-/** Habilidade = comportamento em código. Cada gancho é opcional. */
-export interface Habilidade {
-  readonly id: string;
-  readonly nome: string;
-  readonly tipo: 'ativa' | 'passiva';
-  readonly cooldown?: number;
-  modificarRolagemAtaque?(): number;             // gancho A (ataque)
-  modificarRolagemEsquiva?(): number;             // gancho A (esquiva)
-  ataquesNoTurno?(): number;                       // gancho C
-  substituirDefesa?(ctx: ContextoDefesa): ResultadoDefesa; // gancho B
-}
-
-export interface HabilidadesDaClasse {
-  readonly ativa?: Habilidade;
-  readonly passiva?: Habilidade;
-}
-
-/** Keyed por classeId (refina o esboço do spec): a máquina resolve classeId → habilidades. */
-export type RegistroHabilidades = ReadonlyMap<string, HabilidadesDaClasse>;
