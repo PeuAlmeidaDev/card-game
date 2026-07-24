@@ -32,3 +32,26 @@ describe('gancho aoCausarDano', () => {
     expect(passo.estado.monstro.vida).toBe(6);
   });
 });
+
+const metadeNoPrimeiro: PassivaCombate = {
+  id: 'fake-metade',
+  aoSofrerDano: (base, ctx) =>
+    ctx.estado.usos >= 1
+      ? { dano: base, estado: ctx.estado }
+      : { dano: Math.floor(base / 2), estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } },
+};
+
+describe('gancho aoSofrerDano', () => {
+  it('reduz o primeiro acerto sofrido e consome o uso', () => {
+    const rapido: Combatente = { ...monstro, agilidade: 12 }; // ataca primeiro
+    // dado 1 (criar): ataque do monstro = 5 <= 6 => acerta, pede esquiva
+    const inicio = criarCombate(jogador, rapido, filaDeDados([5]), metadeNoPrimeiro);
+    expect(inicio.proximaDecisao).toBe('esquiva');
+    // dado 1 (esquivar): esquiva do jogador = 6 > 5 => falha
+    // dano base = level 1 + forca 2 = 3; metade floor = 1; vida 20 - 1 = 19
+    const passo = proximoPasso(inicio.estado, { tipo: 'esquivar' }, filaDeDados([6]), metadeNoPrimeiro);
+
+    expect(passo.estado.jogador.vida).toBe(19);
+    expect(passo.estado.passiva).toEqual({ id: 'fake-metade', usos: 1 });
+  });
+});

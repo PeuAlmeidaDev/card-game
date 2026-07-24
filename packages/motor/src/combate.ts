@@ -1,7 +1,7 @@
 import type {
   Combatente, RolarD12, EventoCombate, EstadoCombate, AcaoCombate, Passo,
 } from './tipos';
-import type { PassivaCombate } from './passiva';
+import type { PassivaCombate, EstadoPassiva } from './passiva';
 import { decidirIniciativa } from './iniciativa';
 import { rolarAtaqueDe, rolarEsquivaContra, danoDe, resolverAtaque } from './ataque';
 import { MAX_TURNOS } from './limites';
@@ -139,13 +139,24 @@ function esquivar(
   rolar: RolarD12,
   passiva?: PassivaCombate,
 ): Passo {
-  void passiva; // usado a partir da Task 2
+  const log: EventoCombate[] = [];
+  let scratch: EstadoPassiva | null = estado.passiva;
+
   const esquiva = rolarEsquivaContra(rolagemAtaque, 'a', rolar);
-  const log: EventoCombate[] = [esquiva.evento];
+  log.push(esquiva.evento);
 
   let jogador = estado.jogador;
   if (!esquiva.esquivou) {
-    const dano = danoDe(estado.monstro);
+    let dano = danoDe(estado.monstro);
+    if (passiva?.aoSofrerDano && scratch) {
+      const r = passiva.aoSofrerDano(dano, {
+        portador: estado.jogador,
+        vidaInicial: estado.vidaInicialJogador,
+        estado: scratch,
+      });
+      dano = r.dano;
+      scratch = r.estado;
+    }
     jogador = { ...jogador, vida: jogador.vida - dano };
     log.push({ tipo: 'dano', alvo: 'a', quantidade: dano, vidaRestante: jogador.vida });
   }
@@ -153,6 +164,7 @@ function esquivar(
   const proximo: EstadoCombate = {
     ...estado,
     jogador,
+    passiva: scratch,
     ataqueDoMonstro: null,
     turno: estado.turno + 1,
     vez: 'jogador',
