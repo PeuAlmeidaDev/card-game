@@ -187,6 +187,8 @@ describe('trava de terminação', () => {
       turno: MAX_TURNOS,
       ataqueDoMonstro: null,
       desfecho: 'emAndamento',
+      vidaInicialJogador: jogador.vida,
+      passiva: null,
     };
     // filaDeDados vazia: se a trava rolasse qualquer dado, o teste explodiria.
     const passo = avancar(travado, [], filaDeDados([]));
@@ -203,6 +205,8 @@ describe('trava de terminação', () => {
       turno: MAX_TURNOS,
       ataqueDoMonstro: { rolagem: 5 },
       desfecho: 'emAndamento',
+      vidaInicialJogador: jogador.vida,
+      passiva: null,
     };
     const passo = avancar(travado, [], filaDeDados([]));
 

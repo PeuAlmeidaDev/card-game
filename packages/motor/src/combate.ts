@@ -1,12 +1,18 @@
 import type {
   Combatente, RolarD12, EventoCombate, EstadoCombate, AcaoCombate, Passo,
 } from './tipos';
+import type { PassivaCombate } from './passiva';
 import { decidirIniciativa } from './iniciativa';
 import { rolarAtaqueDe, rolarEsquivaContra, danoDe, resolverAtaque } from './ataque';
 import { MAX_TURNOS } from './limites';
 import { AcaoIlegal } from './erros';
 
-export function criarCombate(jogador: Combatente, monstro: Combatente, rolar: RolarD12): Passo {
+export function criarCombate(
+  jogador: Combatente,
+  monstro: Combatente,
+  rolar: RolarD12,
+  passiva?: PassivaCombate,
+): Passo {
   const ini = decidirIniciativa(jogador, monstro, rolar); // jogador = 'a', monstro = 'b'
   const estado: EstadoCombate = {
     jogador,
@@ -15,6 +21,8 @@ export function criarCombate(jogador: Combatente, monstro: Combatente, rolar: Ro
     turno: 0,
     ataqueDoMonstro: null,
     desfecho: 'emAndamento',
+    vidaInicialJogador: jogador.vida,
+    passiva: passiva ? { id: passiva.id, usos: 0 } : null,
   };
   return avancar(estado, [ini.evento], rolar);
 }
@@ -67,7 +75,12 @@ export function avancar(
   }
 }
 
-export function proximoPasso(estado: EstadoCombate, acao: AcaoCombate, rolar: RolarD12): Passo {
+export function proximoPasso(
+  estado: EstadoCombate,
+  acao: AcaoCombate,
+  rolar: RolarD12,
+  passiva?: PassivaCombate,
+): Passo {
   if (estado.desfecho !== 'emAndamento') {
     throw new AcaoIlegal('proximoPasso: o combate já terminou');
   }
@@ -76,13 +89,13 @@ export function proximoPasso(estado: EstadoCombate, acao: AcaoCombate, rolar: Ro
     if (estado.vez !== 'jogador' || estado.ataqueDoMonstro !== null) {
       throw new AcaoIlegal('proximoPasso: não é a vez de atacar');
     }
-    return atacar(estado, rolar);
+    return atacar(estado, rolar, passiva);
   }
 
   if (estado.ataqueDoMonstro === null) {
     throw new AcaoIlegal('proximoPasso: não há ataque do monstro para esquivar');
   }
-  return esquivar(estado, estado.ataqueDoMonstro.rolagem, rolar);
+  return esquivar(estado, estado.ataqueDoMonstro.rolagem, rolar, passiva);
 }
 
 /**
@@ -91,9 +104,17 @@ export function proximoPasso(estado: EstadoCombate, acao: AcaoCombate, rolar: Ro
  * composto `resolverAtaque`, enquanto `esquivar` usa as primitivas: lá o ataque
  * já foi rolado num passo anterior, esperando o clique do jogador.
  */
-function atacar(estado: EstadoCombate, rolar: RolarD12): Passo {
-  const { dano, eventos } = resolverAtaque(estado.jogador, 'a', 'b', rolar);
+function atacar(estado: EstadoCombate, rolar: RolarD12, passiva?: PassivaCombate): Passo {
+  const { dano: base, eventos } = resolverAtaque(estado.jogador, 'a', 'b', rolar);
   const log: EventoCombate[] = [...eventos];
+
+  const dano = base > 0 && passiva?.aoCausarDano
+    ? passiva.aoCausarDano(base, {
+        portador: estado.jogador,
+        vidaInicial: estado.vidaInicialJogador,
+        estado: estado.passiva ?? { id: passiva.id, usos: 0 },
+      })
+    : base;
 
   let monstro = estado.monstro;
   if (dano > 0) {
@@ -112,7 +133,13 @@ function atacar(estado: EstadoCombate, rolar: RolarD12): Passo {
 }
 
 /** O jogador rola a esquiva contra a rolagem que o monstro já fez. */
-function esquivar(estado: EstadoCombate, rolagemAtaque: number, rolar: RolarD12): Passo {
+function esquivar(
+  estado: EstadoCombate,
+  rolagemAtaque: number,
+  rolar: RolarD12,
+  passiva?: PassivaCombate,
+): Passo {
+  void passiva; // usado a partir da Task 2
   const esquiva = rolarEsquivaContra(rolagemAtaque, 'a', rolar);
   const log: EventoCombate[] = [esquiva.evento];
 
