@@ -1,5 +1,5 @@
 import type { Combatente } from '@card-dungeon/motor';
-import type { RacaCarta } from '@card-dungeon/cartas';
+import type { RacaResumo } from '@card-dungeon/cartas';
 
 /** Modificadores parciais dos 4 stats de combate. `level` nunca é modificado. */
 export interface ModificadoresDeStat {
@@ -24,7 +24,7 @@ export interface Equipamento {
 /** O que o `GET /catalogo` entrega: raças (carta), classes, itens + a base para o preview. */
 export interface Catalogo {
   readonly base: Combatente;
-  readonly racas: readonly RacaCarta[];
+  readonly racas: readonly RacaResumo[];
   readonly classes: readonly Classe[];
   readonly itens: readonly Equipamento[];
 }

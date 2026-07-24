@@ -26,3 +26,16 @@ export const RACAS: readonly RacaCarta[] = [
 export function obterRaca(id: string): RacaCarta | undefined {
   return RACAS.find((r) => r.id === id);
 }
+
+/**
+ * Projeção **serializável** de uma raça para o catálogo/cliente: só identidade e
+ * texto, SEM `passivaCombate` (que é código e não sobrevive ao JSON do `/catalogo`).
+ * A passiva é resolvida server-side por `obterRaca(racaId)`.
+ */
+export interface RacaResumo {
+  readonly id: string;
+  readonly nome: string;
+  readonly texto: string;
+}
+
+export const RACAS_PUBLICAS: readonly RacaResumo[] = RACAS.map(({ id, nome, texto }) => ({ id, nome, texto }));
