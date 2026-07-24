@@ -18,12 +18,12 @@ const soMonstro = { patenteAlvo: 5, composicaoPorJogador: [{ tipo: 'monstro' as 
 describe('escolherAcao', () => {
   it('sem combate em curso, chuta a porta', () => {
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
-    expect(escolherAcao(projetarPara('p1', p), 'p1')).toEqual({ tipo: 'chutarPorta', jogadorId: 'p1' });
+    expect(escolherAcao(projetarPara('p1', p), 'p1')).toEqual({ tipo: 'vasculhar', jogadorId: 'p1' });
   });
 
   it('com decisão de ataque pendente, ataca', () => {
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
-    const comCombate = aplicarAcao(p, { tipo: 'chutarPorta', jogadorId: 'p1' },
+    const comCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' },
       { rolar: filaDeDados([]), embaralhar: semEmbaralhar, monstro }).estado;
 
     expect(escolherAcao(projetarPara('p1', comCombate), 'p1')).toEqual({ tipo: 'atacar', jogadorId: 'p1' });
@@ -33,12 +33,26 @@ describe('escolherAcao', () => {
     // monstro mais ágil ataca primeiro e acerta => a máquina para pedindo a esquiva
     const rapido: Combatente = { ...monstro, agilidade: 12 };
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
-    const pedindoEsquiva = aplicarAcao(p, { tipo: 'chutarPorta', jogadorId: 'p1' },
+    const pedindoEsquiva = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' },
       { rolar: filaDeDados([1]), embaralhar: semEmbaralhar, monstro: rapido }).estado;
     expect(pedindoEsquiva.combate?.proximaDecisao).toBe('esquiva');
 
     expect(escolherAcao(projetarPara('p1', pedindoEsquiva), 'p1'))
       .toEqual({ tipo: 'esquivar', jogadorId: 'p1' });
+  });
+
+  it('com espiada pendente, MANTÉM a carta (não tenta vasculhar de novo)', () => {
+    // Sem esta política o bot vidente trava a mesa: ele vasculha, fica com a
+    // espiada pendente, a vez não passa, e a próxima escolha seria `vasculhar`
+    // de novo — que o reducer recusa ("há uma espiada pendente"). Bot burro não
+    // blefa: mantém sempre, igual já faz com atacar/esquivar.
+    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' },
+      { rolar: filaDeDados([]), embaralhar: semEmbaralhar, monstro, temPresciencia: () => true }).estado;
+    expect(comEspiada.espiada).not.toBeNull();
+
+    expect(escolherAcao(projetarPara('p1', comEspiada), 'p1'))
+      .toEqual({ tipo: 'manterCarta', jogadorId: 'p1' });
   });
 
   it('não tem como ver o monte pela vista', () => {

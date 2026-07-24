@@ -106,9 +106,9 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO }: { escolhas?: Escolhas }
           <button
             type="button"
             disabled={!minhaVez || vista.combate !== null}
-            onClick={() => void agir('chutarPorta')}
+            onClick={() => void agir('vasculhar')}
           >
-            Chutar a porta
+            Vasculhar local
           </button>
           <button
             type="button"

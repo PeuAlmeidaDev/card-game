@@ -1,9 +1,9 @@
 import type { Combatente, Passo, RolarD12, PassivaCombate } from '@card-dungeon/motor';
 import { AcaoIlegal, criarCombate, proximoPasso } from '@card-dungeon/motor';
 import type {
-  AcaoDaMesa, ConfigPartida, EntradaJogador, Embaralhar, EstadoPartida, EventoDaMesa, JogadorNaMesa,
+  AcaoDaMesa, CartaPorta, ConfigPartida, EntradaJogador, Embaralhar, EstadoPartida, EventoDaMesa, JogadorNaMesa,
 } from './tipos';
-import { comprarCarta } from './baralho';
+import { comprarCarta, tirarDoTopo } from './baralho';
 import { escolherAcao } from './bot';
 import { classificar } from './classificacao';
 import { AcaoInvalida } from './erros';
@@ -19,6 +19,8 @@ export interface DepsMesa {
   readonly monstro: Combatente;
   /** Resolve a passiva de combate de um jogador pelo id da raça. Ausente/undefined = sem passiva. */
   readonly resolverPassiva?: (racaId: string | undefined) => PassivaCombate | undefined;
+  /** Resolve se a raça de um jogador tem Presciência (espia o topo). Ausente/undefined = não tem. */
+  readonly temPresciencia?: (racaId: string | undefined) => boolean;
 }
 
 /** Resolve a passiva de combate de um jogador (via o resolvedor injetado). Central para não repetir a chamada. */
@@ -76,6 +78,7 @@ export function criarPartida(
     monte: deps.embaralhar(composicao),
     cemiterio: [],
     combate: null,
+    espiada: null,
     desfecho: 'emAndamento',
     classificacao: null,
     log: [abertura],
@@ -118,23 +121,31 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
     throw new AcaoInvalida(`aplicarAcao: não é a vez de ${acao.jogadorId}`);
   }
 
-  if (acao.tipo === 'chutarPorta') {
-    return chutarPorta(estado, acao.jogadorId, deps);
+  if (acao.tipo === 'vasculhar') {
+    return vasculhar(estado, acao.jogadorId, deps);
+  }
+
+  if (acao.tipo === 'manterCarta' || acao.tipo === 'empurrarCarta') {
+    return resolverEspiada(estado, acao, deps);
   }
 
   return agirNoCombate(estado, acao, deps);
 }
 
-function chutarPorta(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): ResultadoAcao {
-  if (estado.combate !== null) {
-    throw new AcaoInvalida('aplicarAcao: há um combate em curso');
-  }
+/**
+ * Resolve uma carta JÁ comprada (o baralho em `base` já reflete a compra): emite
+ * o evento `porta` e bifurca — `salaVazia` passa a vez, `monstro` abre combate.
+ * É o núcleo compartilhado do vasculhar atômico e da resolução da espiada.
+ */
+function resolverCarta(
+  base: EstadoPartida,
+  jogadorId: string,
+  carta: CartaPorta,
+  deps: DepsMesa,
+): ResultadoAcao {
+  const eventos: EventoDaMesa[] = [{ tipo: 'porta', jogadorId, carta }];
 
-  const compra = comprarCarta(estado.monte, estado.cemiterio, deps.embaralhar);
-  const eventos: EventoDaMesa[] = [{ tipo: 'porta', jogadorId, carta: compra.carta }];
-  const base: EstadoPartida = { ...estado, monte: compra.monte, cemiterio: compra.cemiterio };
-
-  if (compra.carta.tipo === 'salaVazia') {
+  if (carta.tipo === 'salaVazia') {
     const seguinte = proximoJogador(base);
     eventos.push({ tipo: 'vez', jogadorId: seguinte.id });
     return registrar({ ...base, vezDe: seguinte.id }, eventos);
@@ -142,19 +153,91 @@ function chutarPorta(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): 
 
   const jogador = base.jogadores.find((j) => j.id === jogadorId);
   if (jogador === undefined) {
-    throw new Error(`chutarPorta: jogador ${jogadorId} não está na mesa`);
+    throw new Error(`resolverCarta: jogador ${jogadorId} não está na mesa`);
   }
-
   // Vida sempre reseta: o combatente entra no combate com a statline base na patente atual.
   const combatente: Combatente = { ...jogador.combatenteBase, level: jogador.patente };
   const passiva = passivaDoLutador(deps, jogador);
   const passo = criarCombate(combatente, deps.monstro, deps.rolar, passiva);
   eventos.push({ tipo: 'combate', jogadorId, eventos: passo.eventos });
-
   return registrar(
     { ...base, combate: { estado: passo.estado, proximaDecisao: passo.proximaDecisao } },
     eventos,
   );
+}
+
+function vasculhar(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): ResultadoAcao {
+  if (estado.combate !== null) {
+    throw new AcaoInvalida('aplicarAcao: há um combate em curso');
+  }
+  if (estado.espiada !== null) {
+    throw new AcaoInvalida('aplicarAcao: há uma espiada pendente');
+  }
+
+  const jogador = estado.jogadores.find((j) => j.id === jogadorId);
+  const temPresciencia = deps.temPresciencia?.(jogador?.racaId) ?? false;
+
+  if (temPresciencia) {
+    // Presciência: espia o topo SEM revelar. Nenhum evento público (o topo é
+    // segredo do vidente); manter/empurrar resolvem depois. A vez não passa.
+    const t = tirarDoTopo(estado.monte, estado.cemiterio, deps.embaralhar);
+    return registrar(
+      { ...estado, monte: t.monte, cemiterio: t.cemiterio, espiada: { jogadorId, carta: t.carta } },
+      [],
+    );
+  }
+
+  const compra = comprarCarta(estado.monte, estado.cemiterio, deps.embaralhar);
+  const base: EstadoPartida = { ...estado, monte: compra.monte, cemiterio: compra.cemiterio };
+  return resolverCarta(base, jogadorId, compra.carta, deps);
+}
+
+/** As ações que só fazem sentido com uma espiada pendente. */
+type AcaoDeEspiada = Extract<AcaoDaMesa, { readonly tipo: 'manterCarta' | 'empurrarCarta' }>;
+
+/**
+ * Resolve a espiada pendente. `manterCarta`: o topo se revela (vai ao cemitério) e
+ * resolve. `empurrarCarta`: o topo vai pro FUNDO do monte (nunca revelado) e a
+ * próxima é comprada às cegas e resolvida. Ambas reusam `resolverCarta`.
+ */
+function resolverEspiada(estado: EstadoPartida, acao: AcaoDeEspiada, deps: DepsMesa): ResultadoAcao {
+  const espiada = estado.espiada;
+  if (espiada === null) {
+    throw new AcaoInvalida('aplicarAcao: não há espiada para resolver');
+  }
+
+  if (acao.tipo === 'manterCarta') {
+    const base: EstadoPartida = {
+      ...estado,
+      espiada: null,
+      cemiterio: [...estado.cemiterio, espiada.carta],
+    };
+    return resolverCarta(base, espiada.jogadorId, espiada.carta, deps);
+  }
+
+  // Sem NENHUMA outra carta (monte e cemitério vazios), empurrar seria teatro: a
+  // empurrada voltaria como única do monte e sairia revelada na compra às cegas.
+  // Recusar é o único desfecho que preserva "a empurrada nunca se torna pública" —
+  // o vidente ainda tem `manterCarta` como saída legal.
+  if (estado.monte.length === 0 && estado.cemiterio.length === 0) {
+    throw new AcaoInvalida('aplicarAcao: não há outra carta para comprar — a espiada tem que ser mantida');
+  }
+
+  // Se a espiada esvaziou o monte, reembaralha o cemitério ANTES de empurrar — senão
+  // a carta empurrada seria a única no monte e voltaria (revelada) na compra às cegas,
+  // violando "a empurrada nunca se torna pública".
+  const precisaReembaralhar = estado.monte.length === 0;
+  const monteBase = precisaReembaralhar ? deps.embaralhar(estado.cemiterio) : estado.monte;
+  const cemiterioBase = precisaReembaralhar ? [] : estado.cemiterio;
+  const monteComEmpurrada: readonly CartaPorta[] = [...monteBase, espiada.carta];
+  const compra = comprarCarta(monteComEmpurrada, cemiterioBase, deps.embaralhar);
+  const base: EstadoPartida = {
+    ...estado,
+    espiada: null,
+    monte: compra.monte,
+    cemiterio: compra.cemiterio,
+  };
+  return resolverCarta(base, espiada.jogadorId, compra.carta, deps);
 }
 
 function agirNoCombate(estado: EstadoPartida, acao: AcaoDeCombate, deps: DepsMesa): ResultadoAcao {

@@ -11,10 +11,11 @@ export function montarComposicao(nMonstros: number, nSalasVazias: number): Carta
 export const COMPOSICAO_POR_JOGADOR: readonly CartaPorta[] = montarComposicao(5, 3);
 
 /**
- * Compra a carta do topo. Se o monte estiver vazio, embaralha o cemitério de volta antes.
- * A carta comprada já sai no cemitério (ela foi revelada).
+ * Tira a carta do topo (reshuffle do cemitério se o monte estiver vazio) SEM
+ * revelá-la — a carta NÃO vai para o cemitério. É o núcleo da espiada (o topo é
+ * segredo até o vidente decidir) e de `comprarCarta`.
  */
-export function comprarCarta(
+export function tirarDoTopo(
   monte: readonly CartaPorta[],
   cemiterio: readonly CartaPorta[],
   embaralhar: Embaralhar,
@@ -29,8 +30,28 @@ export function comprarCarta(
 
   const carta = restante[0];
   if (carta === undefined) {
-    throw new Error('comprarCarta: baralho vazio');
+    throw new Error('tirarDoTopo: baralho vazio');
   }
 
-  return { carta, monte: restante.slice(1), cemiterio: [...descarte, carta] };
+  return { carta, monte: restante.slice(1), cemiterio: descarte };
+}
+
+/**
+ * Compra a carta do topo e a REVELA (vai para o cemitério). É `tirarDoTopo`
+ * seguido do descarte da carta revelada.
+ */
+export function comprarCarta(
+  monte: readonly CartaPorta[],
+  cemiterio: readonly CartaPorta[],
+  embaralhar: Embaralhar,
+): { readonly carta: CartaPorta; readonly monte: readonly CartaPorta[]; readonly cemiterio: readonly CartaPorta[] } {
+  try {
+    const { carta, monte: restante, cemiterio: descarte } = tirarDoTopo(monte, cemiterio, embaralhar);
+    return { carta, monte: restante, cemiterio: [...descarte, carta] };
+  } catch (erro) {
+    if (erro instanceof Error && erro.message === 'tirarDoTopo: baralho vazio') {
+      throw new Error('comprarCarta: baralho vazio', { cause: erro });
+    }
+    throw erro;
+  }
 }

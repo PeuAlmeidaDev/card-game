@@ -20,6 +20,7 @@ const vistaBase: VistaDaPartida = {
   cartasNoMonte: 16,
   cartasNoCemiterio: 0,
   combate: null,
+  espiada: null,
   desfecho: 'emAndamento',
   classificacao: null,
   log: [],
@@ -46,11 +47,11 @@ describe('TelaMesa', () => {
     expect(screen.getByText('Bot 1')).toBeInTheDocument();
   });
 
-  it('habilita chutar a porta quando é a vez do jogador', async () => {
+  it('habilita vasculhar local quando é a vez do jogador', async () => {
     await abrirMesa(vistaBase);
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /chutar a porta/i })).toBeEnabled();
+      expect(screen.getByRole('button', { name: /vasculhar local/i })).toBeEnabled();
     });
   });
 
@@ -58,7 +59,7 @@ describe('TelaMesa', () => {
     await abrirMesa({ ...vistaBase, vezDe: 'p2' });
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /chutar a porta/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /vasculhar local/i })).toBeDisabled();
     });
   });
 
@@ -69,11 +70,11 @@ describe('TelaMesa', () => {
       .mockResolvedValue({ status: 200, body: { ...vistaBase, versao: 3 } } as never);
     await abrirMesa({ ...vistaBase, versao: 7 });
 
-    await userEvent.click(await screen.findByRole('button', { name: /chutar a porta/i }));
+    await userEvent.click(await screen.findByRole('button', { name: /vasculhar local/i }));
 
     expect(agir).toHaveBeenCalledWith({
       params: { id: 'm1' },
-      body: { acao: { tipo: 'chutarPorta' }, versao: 7 },
+      body: { acao: { tipo: 'vasculhar' }, versao: 7 },
     });
   });
 
@@ -84,7 +85,7 @@ describe('TelaMesa', () => {
       .mockResolvedValue({ status: 409, body: { ...vistaBase, versao: 42 } } as never);
     await abrirMesa(vistaBase);
 
-    await userEvent.click(await screen.findByRole('button', { name: /chutar a porta/i }));
+    await userEvent.click(await screen.findByRole('button', { name: /vasculhar local/i }));
 
     await waitFor(() => {
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -96,7 +97,7 @@ describe('TelaMesa', () => {
       .mockResolvedValue({ status: 400, body: { erro: 'aplicarAcao: há um combate em curso' } } as never);
     await abrirMesa(vistaBase);
 
-    await userEvent.click(await screen.findByRole('button', { name: /chutar a porta/i }));
+    await userEvent.click(await screen.findByRole('button', { name: /vasculhar local/i }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/combate em curso/i);
   });
@@ -163,6 +164,6 @@ describe('TelaMesa', () => {
     });
     expect(screen.getByText(/2º/)).toBeInTheDocument();
     // com a partida encerrada não há mais o que clicar
-    expect(screen.queryByRole('button', { name: /chutar a porta/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /vasculhar local/i })).not.toBeInTheDocument();
   });
 });

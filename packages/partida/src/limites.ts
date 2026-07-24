@@ -5,7 +5,7 @@
  * vitória. Sem ele o laço trava o processo inteiro (Node é single-threaded), e
  * um servidor congelado é pior que um erro alto.
  *
- * A unidade é **uma ação de bot** (chutar a porta, atacar, esquivar). Nesta fatia
+ * A unidade é **uma ação de bot** (vasculhar local, atacar, esquivar). Nesta fatia
  * a mesa é 1 humano + 3 bots e o laço para ao chegar no humano, então o pior caso
  * legítimo é 3 × (1 compra + `MAX_TURNOS` do motor) ≈ 3 mil. O teto fica bem acima
  * disso: é rede contra laço fugitivo, não limite de partida.
