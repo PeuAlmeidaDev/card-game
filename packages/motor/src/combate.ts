@@ -112,6 +112,9 @@ function atacar(estado: EstadoCombate, rolar: RolarD12, passiva?: PassivaCombate
     ? passiva.aoCausarDano(base, {
         portador: estado.jogador,
         vidaInicial: estado.vidaInicialJogador,
+        // `estado.passiva` está sempre semeado quando `passiva` foi injetada
+        // (criarCombate o inicializa); o fallback é inalcançável sob esse
+        // contrato de injeção — existe só para o tipo fechar sem asserção.
         estado: estado.passiva ?? { id: passiva.id, usos: 0 },
       })
     : base;
@@ -145,7 +148,7 @@ function esquivar(
   let esquiva = rolarEsquivaContra(rolagemAtaque, 'a', rolar);
   log.push(esquiva.evento);
 
-  // Aquático: re-rola uma esquiva falha, consumindo um uso.
+  // Gancho de re-rolagem: a passiva pode refazer uma esquiva falha, gastando um uso.
   if (!esquiva.esquivou && passiva?.aoFalharEsquiva && scratch) {
     const r = passiva.aoFalharEsquiva({
       portador: estado.jogador,
