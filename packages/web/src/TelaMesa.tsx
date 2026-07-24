@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { api } from './api';
-import { narrarCombate } from './narrarCombate';
+import { PainelLog } from './PainelLog';
 import type { AcaoDaMesa, Escolhas, VistaDaPartida } from '@card-dungeon/shared';
 
 /**
@@ -155,39 +155,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO }: { escolhas?: Escolhas }
         </>
       )}
 
-      {/* O log é append-only: eventos nunca são removidos nem reordenados, então
-          o índice É uma identidade estável. Usar o índice como `key` aqui é
-          correto, não o anti-padrão de listas mutáveis. */}
-      <ol>
-        {vista.log.map((evento, i) => (
-          <li key={i}>
-            {evento.tipo === 'porta' && evento.carta.tipo === 'salaVazia' && 'A sala está vazia.'}
-            {evento.tipo === 'porta' && evento.carta.tipo === 'monstro' && 'Um monstro apareceu!'}
-            {evento.tipo === 'patente' && `${nomeDe(evento.jogadorId)} subiu para a patente ${evento.patente}.`}
-            {evento.tipo === 'derrota' && `${nomeDe(evento.jogadorId)} foi evacuado.`}
-            {evento.tipo === 'vez' && `Vez de ${nomeDe(evento.jogadorId)}.`}
-            {evento.tipo === 'fim' && 'A partida terminou.'}
-            {/* Cada lance vira uma linha COM a rolagem. O resumo mudo que havia
-                aqui ("N lance(s)") escondia exatamente o que o jogador precisa
-                ver para entender o resultado: o número que saiu no dado. */}
-            {evento.tipo === 'combate' && (
-              <>
-                {evento.jogadorId === vista.voce
-                  ? 'Seu combate:'
-                  : `Combate de ${nomeDe(evento.jogadorId)}:`}
-                <ul>
-                  {narrarCombate(
-                    evento.eventos,
-                    evento.jogadorId === vista.voce ? 'Você' : nomeDe(evento.jogadorId),
-                  ).map((linha, j) => (
-                    <li key={j}>{linha}</li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </li>
-        ))}
-      </ol>
+      <PainelLog log={vista.log} jogadores={vista.jogadores} voce={vista.voce} />
 
       {erro !== null && <p role="alert">{erro}</p>}
     </section>
