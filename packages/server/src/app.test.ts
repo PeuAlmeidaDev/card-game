@@ -319,6 +319,7 @@ describe('mesa', () => {
       payload: { acao: { tipo: 'vasculhar' }, versao: vista.versao },
     });
 
+    expect(res.statusCode).toBe(200);
     const depois = res.json<VistaDaPartida>();
     expect(depois.espiada).toBeNull();
     expect(depois.log.some((e) => e.tipo === 'porta')).toBe(true);

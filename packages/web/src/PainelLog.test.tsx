@@ -124,5 +124,20 @@ describe('PainelLog — filtro e cauda', () => {
     );
 
     expect(rolou).toHaveBeenCalled();
+
+    // Um `useEffect` sem array de dependências também passaria na asserção
+    // acima (ele rola em TODO render). Isto aqui é o que prova que a
+    // dependência é `[log.length, filtro]`: re-renderizar com o MESMO log e
+    // as mesmas props não deve disparar scroll de novo.
+    rolou.mockClear();
+    rerender(
+      <PainelLog
+        log={[...log, { tipo: 'vez', jogadorId: 'p1' }]}
+        jogadores={jogadores}
+        voce="p1"
+      />,
+    );
+
+    expect(rolou).not.toHaveBeenCalled();
   });
 });

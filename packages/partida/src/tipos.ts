@@ -76,9 +76,10 @@ export interface VistaDaPartida {
   readonly id: string;
   readonly voce: string;
   /**
-   * Versão do estado (= `log.length`, que só cresce). O cliente devolve isto na
-   * ação; o servidor recusa com 409 se não bater — é o que mata a ação duplicada
-   * por duplo-clique ou retry de rede.
+   * Versão do estado, derivada por `versaoDe` (`log.length` mais a espiada
+   * pendente) e estritamente crescente. O cliente devolve isto na ação; o
+   * servidor recusa com 409 se não bater — é o que mata a ação duplicada por
+   * duplo-clique ou retry de rede.
    */
   readonly versao: number;
   readonly jogadores: readonly JogadorNaMesa[];
