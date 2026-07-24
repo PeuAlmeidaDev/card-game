@@ -41,6 +41,20 @@ describe('escolherAcao', () => {
       .toEqual({ tipo: 'esquivar', jogadorId: 'p1' });
   });
 
+  it('com espiada pendente, MANTÉM a carta (não tenta vasculhar de novo)', () => {
+    // Sem esta política o bot vidente trava a mesa: ele vasculha, fica com a
+    // espiada pendente, a vez não passa, e a próxima escolha seria `vasculhar`
+    // de novo — que o reducer recusa ("há uma espiada pendente"). Bot burro não
+    // blefa: mantém sempre, igual já faz com atacar/esquivar.
+    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' },
+      { rolar: filaDeDados([]), embaralhar: semEmbaralhar, monstro, temPresciencia: () => true }).estado;
+    expect(comEspiada.espiada).not.toBeNull();
+
+    expect(escolherAcao(projetarPara('p1', comEspiada), 'p1'))
+      .toEqual({ tipo: 'manterCarta', jogadorId: 'p1' });
+  });
+
   it('não tem como ver o monte pela vista', () => {
     // O bot joga pela MESMA projeção que um humano. Se ele pudesse ver o monte,
     // a projeção viraria decoração: bastaria um bot esperto para provar que o

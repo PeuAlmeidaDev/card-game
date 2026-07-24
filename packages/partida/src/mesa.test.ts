@@ -461,6 +461,22 @@ describe('avancarBots — teto de ações automáticas', () => {
     })).toThrow('avancarBots: teto de ações automáticas atingido');
   });
 
+  it('não trava quando o bot da vez tem Presciência', () => {
+    // A espiada não passa a vez: se o bot não soubesse resolvê-la, o laço
+    // repetiria `vasculhar` e o reducer recusaria — o erro subiria pelo `agir`
+    // do server como 400 CULPANDO O HUMANO, com a partida morta (a espiada é do
+    // bot, a vez é do bot, o humano não tem ação legal).
+    const p0 = criarPartida('m1', entradas,
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
+      { embaralhar: semEmbaralhar });
+    const vezDoBot = { ...p0, vezDe: 'p2' };
+
+    const r = avancarBots(vezDoBot, depsVidente([]));
+
+    expect(r.estado.vezDe).toBe('p1');       // o bot resolveu e devolveu a vez
+    expect(r.estado.espiada).toBeNull();     // nada pendente preso no bot
+  });
+
   it('não dispara numa rodada normal de bots', () => {
     const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'salaVazia' }] },
       { embaralhar: semEmbaralhar });
