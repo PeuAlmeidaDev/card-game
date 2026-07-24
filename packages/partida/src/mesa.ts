@@ -1,7 +1,8 @@
 import type { Combatente, Passo, RolarD12, PassivaCombate } from '@card-dungeon/motor';
 import { AcaoIlegal, criarCombate, proximoPasso } from '@card-dungeon/motor';
 import type {
-  AcaoDaMesa, CartaPorta, ConfigPartida, EntradaJogador, Embaralhar, EstadoPartida, EventoDaMesa, JogadorNaMesa,
+  AcaoDaMesa, CartaPorta, ConfigPartida, EntradaJogador, Embaralhar, EstadoPartida, EventoDaMesa, InfoRaca,
+  JogadorNaMesa,
 } from './tipos';
 import { comprarCarta, tirarDoTopo } from './baralho';
 import { escolherAcao } from './bot';
@@ -17,15 +18,18 @@ export interface DepsMesa {
   readonly rolar: RolarD12;
   readonly embaralhar: Embaralhar;
   readonly monstro: Combatente;
-  /** Resolve a passiva de combate de um jogador pelo id da raça. Ausente/undefined = sem passiva. */
-  readonly resolverPassiva?: (racaId: string | undefined) => PassivaCombate | undefined;
-  /** Resolve se a raça de um jogador tem Presciência (espia o topo). Ausente/undefined = não tem. */
-  readonly temPresciencia?: (racaId: string | undefined) => boolean;
+  /** Resolve o que a raça de um jogador confere. Ausente/undefined = sem raça (baseline). */
+  readonly resolverRaca?: (racaId: string | undefined) => InfoRaca | undefined;
 }
 
-/** Resolve a passiva de combate de um jogador (via o resolvedor injetado). Central para não repetir a chamada. */
+/** Resolve a raça de um jogador (via o resolvedor injetado). Central para não repetir a chamada. */
+function racaDoLutador(deps: DepsMesa, jogador: JogadorNaMesa | undefined): InfoRaca | undefined {
+  return deps.resolverRaca?.(jogador?.racaId);
+}
+
+/** A passiva de combate do jogador, `undefined` quando não há raça ou a raça não tem passiva. */
 function passivaDoLutador(deps: DepsMesa, jogador: JogadorNaMesa | undefined): PassivaCombate | undefined {
-  return deps.resolverPassiva?.(jogador?.racaId);
+  return racaDoLutador(deps, jogador)?.passivaCombate ?? undefined;
 }
 
 export interface ResultadoAcao {
@@ -175,7 +179,7 @@ function vasculhar(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): Re
   }
 
   const jogador = estado.jogadores.find((j) => j.id === jogadorId);
-  const temPresciencia = deps.temPresciencia?.(jogador?.racaId) ?? false;
+  const temPresciencia = racaDoLutador(deps, jogador)?.espiaTopo ?? false;
 
   if (temPresciencia) {
     // Presciência: espia o topo SEM revelar. Nenhum evento público (o topo é

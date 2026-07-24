@@ -45,15 +45,12 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
   const app = Fastify();
   const s = initServer();
   const repositorio = criarRepositorio();
-  const resolverPassiva = (racaId: string | undefined) =>
-    racaId ? (obterRaca(racaId)?.passivaCombate ?? undefined) : undefined;
-  // Duas passivas, dois resolvedores injetados: a de combate vai ao motor, a
-  // Presciência é consultada pela mesa antes de comprar. Nos dois casos o server
-  // RESOLVE (pergunta à carta), nunca DECIDE (`racaId === 'elfo'` seria regra de
-  // jogo morando na borda).
-  const temPresciencia = (racaId: string | undefined) =>
-    racaId !== undefined && (obterRaca(racaId)?.espiaTopo ?? false);
-  const deps = { rolar, embaralhar, monstro, resolverPassiva, temPresciencia };
+  // UM resolvedor para tudo que a raça confere. O server RESOLVE (pergunta à
+  // carta), nunca DECIDE (`racaId === 'elfo'` seria regra de jogo na borda).
+  // `RacaCarta` satisfaz `InfoRaca` estruturalmente, então não há tradução aqui.
+  const resolverRaca = (racaId: string | undefined) =>
+    racaId === undefined ? undefined : obterRaca(racaId);
+  const deps = { rolar, embaralhar, monstro, resolverRaca };
 
   const montarBots = (): readonly EntradaJogador[] => {
     const classes = embaralhar(CATALOGO.classes);

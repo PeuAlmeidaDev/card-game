@@ -84,7 +84,7 @@ describe('versaoDe — a versão anda quando a espiada abre', () => {
     rolar: () => 1,
     embaralhar: semEmbaralhar,
     monstro: { forca: 1, vida: 1, habilidade: 0, agilidade: 0, level: 1 },
-    temPresciencia: () => true,
+    resolverRaca: () => ({ passivaCombate: null, espiaTopo: true }),
   };
   const criar = () => criarPartida('m1', entradas,
     { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },

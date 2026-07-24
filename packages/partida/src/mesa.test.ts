@@ -292,8 +292,8 @@ describe('passiva da raça no combate da Mesa', () => {
           ? { dano: base, estado: ctx.estado }
           : { dano: Math.floor(base / 2), estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } },
     };
-    const resolverPassiva = (racaId: string | undefined): PassivaCombate | undefined =>
-      racaId === 'anao' ? metade : undefined;
+    const resolverRaca = (racaId: string | undefined) =>
+      racaId === 'anao' ? { passivaCombate: metade, espiaTopo: false } : undefined;
 
     const humano: EntradaJogador = {
       id: 'p1', nome: 'Você', ehBot: false, racaId: 'anao',
@@ -312,7 +312,7 @@ describe('passiva da raça no combate da Mesa', () => {
       rolar: filaDeDados([1, 12]),
       embaralhar: <T,>(x: readonly T[]) => [...x],
       monstro,
-      resolverPassiva,
+      resolverRaca,
     };
 
     let estado = criarPartida('m1', [humano, bot], { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' }] }, { embaralhar: deps.embaralhar });
@@ -329,10 +329,33 @@ const depsVidente = (dados: readonly number[]) => ({
   rolar: filaDeDados(dados),
   embaralhar: semEmbaralhar,
   monstro: monstroFraco,
-  temPresciencia: () => true,
+  resolverRaca: () => ({ passivaCombate: null, espiaTopo: true }),
 });
 
 describe('aplicarAcao — espiada (Presciência)', () => {
+  it('um resolvedor só responde pela passiva de combate E pela Presciência', () => {
+    // Duas perguntas sobre a MESMA carta não devem viajar em dois resolvedores:
+    // cada passiva fora-de-combate nova acrescentaria mais um campo em DepsMesa.
+    const chamadas: (string | undefined)[] = [];
+    const deps1 = {
+      rolar: filaDeDados([]),
+      embaralhar: semEmbaralhar,
+      monstro: monstroFraco,
+      resolverRaca: (racaId: string | undefined) => {
+        chamadas.push(racaId);
+        return { passivaCombate: null, espiaTopo: true };
+      },
+    };
+    const p = criarPartida('m1', entradas,
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
+      { embaralhar: semEmbaralhar });
+
+    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps1);
+
+    expect(r.estado.espiada).not.toBeNull();   // espiaTopo veio do resolvedor único
+    expect(chamadas).toContain(undefined);      // p1 não tem racaId nesta mesa
+  });
+
   it('recusa manterCarta quando não há espiada pendente', () => {
     const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
     expect(() => aplicarAcao(p, { tipo: 'manterCarta', jogadorId: 'p1' }, deps([])))
@@ -458,7 +481,7 @@ describe('aplicarAcao — espiada (Presciência)', () => {
     const p = criarPartida('m1', entradas,
       { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
       { embaralhar: semEmbaralhar });
-    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])); // deps() sem temPresciencia
+    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])); // deps() sem resolverRaca
     expect(r.estado.espiada).toBeNull();
     expect(r.estado.vezDe).toBe('p2'); // resolveu na hora
   });

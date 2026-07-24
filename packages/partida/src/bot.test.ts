@@ -48,7 +48,7 @@ describe('escolherAcao', () => {
     // blefa: mantém sempre, igual já faz com atacar/esquivar.
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' },
-      { rolar: filaDeDados([]), embaralhar: semEmbaralhar, monstro, temPresciencia: () => true }).estado;
+      { rolar: filaDeDados([]), embaralhar: semEmbaralhar, monstro, resolverRaca: () => ({ passivaCombate: null, espiaTopo: true }) }).estado;
     expect(comEspiada.espiada).not.toBeNull();
 
     expect(escolherAcao(projetarPara('p1', comEspiada), 'p1'))

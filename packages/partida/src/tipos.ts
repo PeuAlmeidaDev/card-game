@@ -1,4 +1,4 @@
-import type { Combatente, EstadoCombate, EventoCombate, DecisaoPendente } from '@card-dungeon/motor';
+import type { Combatente, EstadoCombate, EventoCombate, DecisaoPendente, PassivaCombate } from '@card-dungeon/motor';
 
 /** Carta do baralho de Portais. União ABERTA: `maldicao`/`raca`/`classe`/`item` entram na fatia 8. */
 export type CartaPorta =
@@ -18,6 +18,18 @@ export interface JogadorNaMesa {
   readonly derrotas: number;
   /** Id da raça escolhida — resolve a passiva de combate. Ausente = sem raça (bots). */
   readonly racaId?: string;
+}
+
+/**
+ * O que a raça de um jogador confere. UM resolvedor injetado responde tudo:
+ * duas perguntas sobre a mesma carta em dois resolvedores fazem `DepsMesa`
+ * crescer um campo por passiva. `RacaCarta` (pacote `cartas`) satisfaz este
+ * contrato estruturalmente — por isso `partida` nunca precisa importar `cartas`.
+ */
+export interface InfoRaca {
+  readonly passivaCombate: PassivaCombate | null;
+  /** A raça espia o topo do baralho antes de resolver (Presciência do Elfo). */
+  readonly espiaTopo: boolean;
 }
 
 export interface PosicaoFinal {
