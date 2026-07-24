@@ -323,6 +323,15 @@ describe('passiva da raça no combate da Mesa', () => {
   });
 });
 
+const monstroFraco: Combatente = { forca: 1, vida: 1, habilidade: 0, agilidade: 0, level: 1 };
+// deps com Presciência ligada e um monstro fraco para o combate resolver rápido.
+const depsVidente = (dados: readonly number[]) => ({
+  rolar: filaDeDados(dados),
+  embaralhar: semEmbaralhar,
+  monstro: monstroFraco,
+  temPresciencia: () => true,
+});
+
 describe('aplicarAcao — espiada (Presciência)', () => {
   it('recusa manterCarta quando não há espiada pendente', () => {
     const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
@@ -336,6 +345,82 @@ describe('aplicarAcao — espiada (Presciência)', () => {
     const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
     expect(() => aplicarAcao(p, { tipo: 'empurrarCarta', jogadorId: 'p1' }, deps([])))
       .toThrow(AcaoInvalida);
+  });
+
+  it('com Presciência, vasculhar ESPIA o topo em vez de resolver (sem evento, sem gastar a vez)', () => {
+    // monte (semEmbaralhar) = [salaVazia] para 2 jogadores.
+    const p = criarPartida('m1', entradas,
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
+      { embaralhar: semEmbaralhar });
+    const antesVersao = p.log.length;
+
+    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([]));
+
+    expect(r.estado.espiada).toEqual({ jogadorId: 'p1', carta: { tipo: 'salaVazia' } });
+    expect(r.estado.combate).toBeNull();
+    expect(r.estado.vezDe).toBe('p1');            // a vez NÃO passou
+    expect(r.estado.log.length).toBe(antesVersao); // nenhum evento público
+    expect(r.eventos).toEqual([]);
+  });
+
+  it('a projeção mostra a carta espiada só a quem está na vez', () => {
+    const p = criarPartida('m1', entradas,
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const }] },
+      { embaralhar: semEmbaralhar });
+    const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])).estado;
+
+    expect(projetarPara('p1', comEspiada).espiada).toEqual({ jogadorId: 'p1', carta: { tipo: 'monstro' } });
+    expect(projetarPara('p2', comEspiada).espiada).toBeNull();
+  });
+
+  it('manterCarta revela e resolve o topo espiado (salaVazia passa a vez)', () => {
+    const p = criarPartida('m1', entradas,
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
+      { embaralhar: semEmbaralhar });
+    const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])).estado;
+
+    const r = aplicarAcao(comEspiada, { tipo: 'manterCarta', jogadorId: 'p1' }, depsVidente([]));
+
+    expect(r.estado.espiada).toBeNull();
+    expect(r.estado.vezDe).toBe('p2');            // salaVazia resolvida → vez passou
+    expect(r.estado.cemiterio).toEqual([{ tipo: 'salaVazia' }]); // a mantida foi revelada
+    expect(r.eventos.some((e) => e.tipo === 'porta')).toBe(true);
+  });
+
+  it('empurrarCarta manda o topo pro fundo e resolve a próxima às cegas', () => {
+    // monte (semEmbaralhar) = [salaVazia, monstro] (composicao construída para o
+    // topo ser salaVazia e a próxima monstro).
+    const p = criarPartida('m1', entradas,
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }, { tipo: 'monstro' as const }] },
+      { embaralhar: semEmbaralhar });
+    const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])).estado;
+    expect(comEspiada.espiada?.carta).toEqual({ tipo: 'salaVazia' }); // topo espiado
+
+    const r = aplicarAcao(comEspiada, { tipo: 'empurrarCarta', jogadorId: 'p1' }, depsVidente([1]));
+
+    expect(r.estado.espiada).toBeNull();
+    expect(r.estado.combate).not.toBeNull(); // a PRÓXIMA (monstro) foi comprada às cegas e abriu combate
+    // a salaVazia empurrada NÃO foi revelada: não está no cemitério (foi pro fundo do monte)
+    expect(r.estado.cemiterio).not.toContainEqual({ tipo: 'salaVazia' });
+  });
+
+  it('recusa vasculhar de novo enquanto há espiada pendente', () => {
+    const p = criarPartida('m1', entradas,
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
+      { embaralhar: semEmbaralhar });
+    const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])).estado;
+
+    expect(() => aplicarAcao(comEspiada, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])))
+      .toThrow(AcaoInvalida);
+  });
+
+  it('SEM Presciência, vasculhar continua atômico (nenhuma espiada)', () => {
+    const p = criarPartida('m1', entradas,
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
+      { embaralhar: semEmbaralhar });
+    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])); // deps() sem temPresciencia
+    expect(r.estado.espiada).toBeNull();
+    expect(r.estado.vezDe).toBe('p2'); // resolveu na hora
   });
 });
 

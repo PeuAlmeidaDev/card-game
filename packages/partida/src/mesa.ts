@@ -3,7 +3,7 @@ import { AcaoIlegal, criarCombate, proximoPasso } from '@card-dungeon/motor';
 import type {
   AcaoDaMesa, CartaPorta, ConfigPartida, EntradaJogador, Embaralhar, EstadoPartida, EventoDaMesa, JogadorNaMesa,
 } from './tipos';
-import { comprarCarta } from './baralho';
+import { comprarCarta, tirarDoTopo } from './baralho';
 import { escolherAcao } from './bot';
 import { classificar } from './classificacao';
 import { AcaoInvalida } from './erros';
@@ -19,6 +19,8 @@ export interface DepsMesa {
   readonly monstro: Combatente;
   /** Resolve a passiva de combate de um jogador pelo id da raça. Ausente/undefined = sem passiva. */
   readonly resolverPassiva?: (racaId: string | undefined) => PassivaCombate | undefined;
+  /** Resolve se a raça de um jogador tem Presciência (espia o topo). Ausente/undefined = não tem. */
+  readonly temPresciencia?: (racaId: string | undefined) => boolean;
 }
 
 /** Resolve a passiva de combate de um jogador (via o resolvedor injetado). Central para não repetir a chamada. */
@@ -124,9 +126,7 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   }
 
   if (acao.tipo === 'manterCarta' || acao.tipo === 'empurrarCarta') {
-    // Sem espiada pendente, resolver é pedido inválido. A Task 5 dá a esta ação a
-    // resolução de verdade (quando a Presciência passa a CRIAR a espiada).
-    throw new AcaoInvalida('aplicarAcao: não há espiada para resolver');
+    return resolverEspiada(estado, acao, deps);
   }
 
   return agirNoCombate(estado, acao, deps);
@@ -169,10 +169,60 @@ function vasculhar(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): Re
   if (estado.combate !== null) {
     throw new AcaoInvalida('aplicarAcao: há um combate em curso');
   }
+  if (estado.espiada !== null) {
+    throw new AcaoInvalida('aplicarAcao: há uma espiada pendente');
+  }
+
+  const jogador = estado.jogadores.find((j) => j.id === jogadorId);
+  const temPresciencia = deps.temPresciencia?.(jogador?.racaId) ?? false;
+
+  if (temPresciencia) {
+    // Presciência: espia o topo SEM revelar. Nenhum evento público (o topo é
+    // segredo do vidente); manter/empurrar resolvem depois. A vez não passa.
+    const t = tirarDoTopo(estado.monte, estado.cemiterio, deps.embaralhar);
+    return registrar(
+      { ...estado, monte: t.monte, cemiterio: t.cemiterio, espiada: { jogadorId, carta: t.carta } },
+      [],
+    );
+  }
 
   const compra = comprarCarta(estado.monte, estado.cemiterio, deps.embaralhar);
   const base: EstadoPartida = { ...estado, monte: compra.monte, cemiterio: compra.cemiterio };
   return resolverCarta(base, jogadorId, compra.carta, deps);
+}
+
+/** As ações que só fazem sentido com uma espiada pendente. */
+type AcaoDeEspiada = Extract<AcaoDaMesa, { readonly tipo: 'manterCarta' | 'empurrarCarta' }>;
+
+/**
+ * Resolve a espiada pendente. `manterCarta`: o topo se revela (vai ao cemitério) e
+ * resolve. `empurrarCarta`: o topo vai pro FUNDO do monte (nunca revelado) e a
+ * próxima é comprada às cegas e resolvida. Ambas reusam `resolverCarta`.
+ */
+function resolverEspiada(estado: EstadoPartida, acao: AcaoDeEspiada, deps: DepsMesa): ResultadoAcao {
+  const espiada = estado.espiada;
+  if (espiada === null) {
+    throw new AcaoInvalida('aplicarAcao: não há espiada para resolver');
+  }
+
+  if (acao.tipo === 'manterCarta') {
+    const base: EstadoPartida = {
+      ...estado,
+      espiada: null,
+      cemiterio: [...estado.cemiterio, espiada.carta],
+    };
+    return resolverCarta(base, acao.jogadorId, espiada.carta, deps);
+  }
+
+  const monteComEmpurrada: readonly CartaPorta[] = [...estado.monte, espiada.carta];
+  const compra = comprarCarta(monteComEmpurrada, estado.cemiterio, deps.embaralhar);
+  const base: EstadoPartida = {
+    ...estado,
+    espiada: null,
+    monte: compra.monte,
+    cemiterio: compra.cemiterio,
+  };
+  return resolverCarta(base, acao.jogadorId, compra.carta, deps);
 }
 
 function agirNoCombate(estado: EstadoPartida, acao: AcaoDeCombate, deps: DepsMesa): ResultadoAcao {
