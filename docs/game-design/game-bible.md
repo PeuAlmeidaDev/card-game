@@ -378,12 +378,14 @@ Copiamos a *ideia mecânica*, nunca a *expressão*.
 
 **Ordem acordada:**
 
-> ⚠️ **Revisão 2026-07-24:** a fatia 5 (A Mesa) **foi entregue e mergeada** (PR #9). A ordem
-> abaixo (Online → Interferência → Cartas → Habilidades) foi **reordenada**: a próxima fatia
-> passou a ser **Cartas (raças primeiro), em hotseat**, puxando parte da infra de habilidades
-> junto — para validar a *mecânica das cartas* antes do transporte online. Design em
-> `docs/game-design/mecanica-cartas.md`. As fatias abaixo seguem válidas como destino; só a
-> **sequência** mudou.
+> ⚠️ **Revisão 2026-07-24 — a numeração abaixo é HISTÓRICA (pré-reordenação); vale esta:**
+> a fatia 5 (A Mesa) **foi entregue e mergeada** (PR #9). A próxima fatia passou a ser
+> **Cartas (raças primeiro), em hotseat**, puxando parte da infra de habilidades junto — para
+> validar a *mecânica das cartas* antes do transporte online. **Nova sequência:** Cartas
+> (hotseat) → Online → Interferência → Personagem dinâmico → Habilidades → Contas. Design em
+> `docs/game-design/mecanica-cartas.md`; o trabalho em curso usa o rótulo de branch
+> `feat/fatia-6-cartas-racas`. O bloco numerado abaixo descreve o **escopo** de cada fatia (ainda
+> válido como destino); ignore os **números**, que são da ordem antiga.
 
 > **Fatia 5 — A MESA (próxima).** Pacote `partida`: reducer puro de **N jogadores** (N=4),
 > **rodando no servidor, autoritativo**, via HTTP request/response. Ordem de turno, baralho
