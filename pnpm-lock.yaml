@@ -64,6 +64,9 @@ importers:
 
   packages/personagem:
     dependencies:
+      '@card-dungeon/cartas':
+        specifier: workspace:*
+        version: link:../cartas
       '@card-dungeon/motor':
         specifier: workspace:*
         version: link:../motor
