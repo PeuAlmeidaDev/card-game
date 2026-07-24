@@ -1,3 +1,5 @@
+import type { EstadoPassiva } from './passiva';
+
 export interface Combatente {
   readonly forca: number;
   readonly vida: number;
@@ -47,6 +49,10 @@ export interface EstadoCombate {
    */
   readonly ataqueDoMonstro: { readonly rolagem: number } | null;
   readonly desfecho: 'emAndamento' | 'vitoriaJogador' | 'vitoriaMonstro' | 'impasse';
+  /** Vida do jogador no início do combate — referência para passivas tipo "≤ metade". */
+  readonly vidaInicialJogador: number;
+  /** Scratch serializável da passiva do jogador. `null` = sem passiva. */
+  readonly passiva: EstadoPassiva | null;
 }
 
 /** Retorno de cada passo da máquina de combate. */
