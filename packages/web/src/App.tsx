@@ -40,11 +40,9 @@ export function App() {
 
   if (!catalogo) return <p>Carregando catálogo…</p>;
 
-  const raca = catalogo.racas.find((r) => r.id === racaId);
   const classe = catalogo.classes.find((c) => c.id === classeId);
   const itens = catalogo.itens.filter((i) => itemIds.includes(i.id));
   const mods: ModificadoresDeStat[] = [];
-  if (raca) mods.push(raca.modificadores);
   if (classe) mods.push(classe.modificadores);
   for (const item of itens) mods.push(item.modificadores);
   const stats = calcularPreview(catalogo.base, mods);
@@ -71,6 +69,7 @@ export function App() {
           ))}
         </select>
       </label>
+      <p>{catalogo.racas.find((r) => r.id === racaId)?.texto}</p>
 
       <label>
         Classe{' '}

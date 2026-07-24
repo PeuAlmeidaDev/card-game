@@ -12,8 +12,8 @@ afterEach(() => {
 const catalogo: Catalogo = {
   base: { forca: 3, vida: 10, habilidade: 6, agilidade: 5, level: 1 },
   racas: [
-    { id: 'anao', nome: 'Anão', modificadores: { forca: 2, agilidade: -1 } },
-    { id: 'humano', nome: 'Humano', modificadores: {} },
+    { id: 'anao', nome: 'Anão', texto: 'Casca de Pedra: o primeiro golpe mal o arranha.', passivaCombate: null },
+    { id: 'orc', nome: 'Orc', texto: 'Sangue de Guerra: ferido, golpeia com mais fúria.', passivaCombate: null },
   ],
   classes: [{ id: 'guerreiro', nome: 'Guerreiro', modificadores: { forca: 1, vida: 5 } }],
   itens: [{ id: 'espada', nome: 'Espada', modificadores: { forca: 2 } }],
@@ -43,9 +43,15 @@ describe('App', () => {
   it('carrega o catálogo e mostra o preview do primeiro personagem', async () => {
     mockFetch();
     render(<App />);
-    // Anão (forca+2) + Guerreiro (forca+1, vida+5) => forca 6, vida 15
-    expect(await screen.findByText(/Força 6/)).toBeInTheDocument();
+    // A raça não soma stat (é passiva): preview = base + Guerreiro (forca+1, vida+5) => forca 4, vida 15
+    expect(await screen.findByText(/Força 4/)).toBeInTheDocument();
     expect(screen.getByText(/Vida 15/)).toBeInTheDocument();
+  });
+
+  it('mostra o texto da passiva da raça selecionada', async () => {
+    mockFetch();
+    render(<App />);
+    expect(await screen.findByText(/Casca de Pedra/i)).toBeInTheDocument();
   });
 
   it('ao clicar em Duelar mostra o desfecho', async () => {
