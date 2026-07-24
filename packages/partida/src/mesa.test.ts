@@ -337,23 +337,44 @@ describe('aplicarAcao — espiada (Presciência)', () => {
     // Duas perguntas sobre a MESMA carta não devem viajar em dois resolvedores:
     // cada passiva fora-de-combate nova acrescentaria mais um campo em DepsMesa.
     const chamadas: (string | undefined)[] = [];
+    // A MESMA resposta do resolvedor carrega as duas metades: `espiaTopo` (usada
+    // pelo vasculhar abaixo) e `passivaCombate` (só consultada quando a espiada é
+    // mantida e o combate abre — ver a segunda parte do teste).
+    const metade: PassivaCombate = {
+      id: 'fake-metade',
+      aoSofrerDano: (base, ctx) =>
+        ctx.estado.usos >= 1
+          ? { dano: base, estado: ctx.estado }
+          : { dano: Math.floor(base / 2), estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } },
+    };
+    // monstro rápido (ataca primeiro) e forte, para o 1º golpe cair no humano —
+    // mesmo cálculo do teste "aplica a passiva do lutador ao criar o combate".
+    const monstroForte = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 };
     const deps1 = {
-      rolar: filaDeDados([]),
+      rolar: filaDeDados([1, 12]),
       embaralhar: semEmbaralhar,
-      monstro: monstroFraco,
+      monstro: monstroForte,
       resolverRaca: (racaId: string | undefined) => {
         chamadas.push(racaId);
-        return { passivaCombate: null, espiaTopo: true };
+        return { passivaCombate: metade, espiaTopo: true };
       },
     };
     const p = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const }] },
       { embaralhar: semEmbaralhar });
 
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps1);
 
     expect(r.estado.espiada).not.toBeNull();   // espiaTopo veio do resolvedor único
     expect(chamadas).toContain(undefined);      // p1 não tem racaId nesta mesa
+
+    // Mantém a espiada (abre o combate) e resolve a esquiva: se `passivaCombate`
+    // não tivesse viajado pelo mesmo resolvedor, o dano seria 6, não 3.
+    // criar: monstro ataca (dado 1 acerta) -> pede esquiva; esquivar (dado 12 falha)
+    // dano base 6; com a passiva -> 3; vida 20 - 3 = 17
+    const comCombate = aplicarAcao(r.estado, { tipo: 'manterCarta', jogadorId: 'p1' }, deps1).estado;
+    const depoisDaEsquiva = aplicarAcao(comCombate, { tipo: 'esquivar', jogadorId: 'p1' }, deps1).estado;
+    expect(depoisDaEsquiva.combate?.estado.jogador.vida).toBe(17);
   });
 
   it('recusa manterCarta quando não há espiada pendente', () => {
