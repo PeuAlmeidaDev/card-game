@@ -215,6 +215,14 @@ function resolverEspiada(estado: EstadoPartida, acao: AcaoDeEspiada, deps: DepsM
     return resolverCarta(base, espiada.jogadorId, espiada.carta, deps);
   }
 
+  // Sem NENHUMA outra carta (monte e cemitério vazios), empurrar seria teatro: a
+  // empurrada voltaria como única do monte e sairia revelada na compra às cegas.
+  // Recusar é o único desfecho que preserva "a empurrada nunca se torna pública" —
+  // o vidente ainda tem `manterCarta` como saída legal.
+  if (estado.monte.length === 0 && estado.cemiterio.length === 0) {
+    throw new AcaoInvalida('aplicarAcao: não há outra carta para comprar — a espiada tem que ser mantida');
+  }
+
   // Se a espiada esvaziou o monte, reembaralha o cemitério ANTES de empurrar — senão
   // a carta empurrada seria a única no monte e voltaria (revelada) na compra às cegas,
   // violando "a empurrada nunca se torna pública".

@@ -422,6 +422,28 @@ describe('aplicarAcao — espiada (Presciência)', () => {
     expect(r.cemiterio).toContainEqual({ tipo: 'monstro' });
   });
 
+  it('recusa empurrar quando não há OUTRA carta para comprar', () => {
+    // Monte e cemitério vazios: a empurrada seria a única carta do monte e
+    // voltaria na compra "às cegas" — revelada, no cemitério. Isso quebra a
+    // invariante "a empurrada nunca se torna pública". Hoje o caso é
+    // inalcançável só porque as cartas se conservam; a mão de 7 da fatia 8
+    // (cartas saem do baralho para as mãos) o torna real.
+    const p0 = criarPartida('m1', entradas,
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
+      { embaralhar: semEmbaralhar });
+    const p = { ...p0, monte: [{ tipo: 'salaVazia' as const }], cemiterio: [] };
+    const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])).estado;
+    expect(comEspiada.monte).toEqual([]);
+    expect(comEspiada.cemiterio).toEqual([]);
+
+    expect(() => aplicarAcao(comEspiada, { tipo: 'empurrarCarta', jogadorId: 'p1' }, depsVidente([1])))
+      .toThrow(AcaoInvalida);
+    expect(() => aplicarAcao(comEspiada, { tipo: 'empurrarCarta', jogadorId: 'p1' }, depsVidente([1])))
+      .toThrow('aplicarAcao: não há outra carta para comprar — a espiada tem que ser mantida');
+    // e a espiada continua lá, resolvível por manterCarta
+    expect(comEspiada.espiada?.carta).toEqual({ tipo: 'salaVazia' });
+  });
+
   it('recusa vasculhar de novo enquanto há espiada pendente', () => {
     const p = criarPartida('m1', entradas,
       { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
