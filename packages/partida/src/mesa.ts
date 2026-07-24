@@ -1,7 +1,7 @@
 import type { Combatente, Passo, RolarD12, PassivaCombate } from '@card-dungeon/motor';
 import { AcaoIlegal, criarCombate, proximoPasso } from '@card-dungeon/motor';
 import type {
-  AcaoDaMesa, ConfigPartida, EntradaJogador, Embaralhar, EstadoPartida, EventoDaMesa, JogadorNaMesa,
+  AcaoDaMesa, CartaPorta, ConfigPartida, EntradaJogador, Embaralhar, EstadoPartida, EventoDaMesa, JogadorNaMesa,
 } from './tipos';
 import { comprarCarta } from './baralho';
 import { escolherAcao } from './bot';
@@ -125,16 +125,20 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   return agirNoCombate(estado, acao, deps);
 }
 
-function vasculhar(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): ResultadoAcao {
-  if (estado.combate !== null) {
-    throw new AcaoInvalida('aplicarAcao: há um combate em curso');
-  }
+/**
+ * Resolve uma carta JÁ comprada (o baralho em `base` já reflete a compra): emite
+ * o evento `porta` e bifurca — `salaVazia` passa a vez, `monstro` abre combate.
+ * É o núcleo compartilhado do vasculhar atômico e da resolução da espiada.
+ */
+function resolverCarta(
+  base: EstadoPartida,
+  jogadorId: string,
+  carta: CartaPorta,
+  deps: DepsMesa,
+): ResultadoAcao {
+  const eventos: EventoDaMesa[] = [{ tipo: 'porta', jogadorId, carta }];
 
-  const compra = comprarCarta(estado.monte, estado.cemiterio, deps.embaralhar);
-  const eventos: EventoDaMesa[] = [{ tipo: 'porta', jogadorId, carta: compra.carta }];
-  const base: EstadoPartida = { ...estado, monte: compra.monte, cemiterio: compra.cemiterio };
-
-  if (compra.carta.tipo === 'salaVazia') {
+  if (carta.tipo === 'salaVazia') {
     const seguinte = proximoJogador(base);
     eventos.push({ tipo: 'vez', jogadorId: seguinte.id });
     return registrar({ ...base, vezDe: seguinte.id }, eventos);
@@ -142,19 +146,26 @@ function vasculhar(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): Re
 
   const jogador = base.jogadores.find((j) => j.id === jogadorId);
   if (jogador === undefined) {
-    throw new Error(`vasculhar: jogador ${jogadorId} não está na mesa`);
+    throw new Error(`resolverCarta: jogador ${jogadorId} não está na mesa`);
   }
-
-  // Vida sempre reseta: o combatente entra no combate com a statline base na patente atual.
   const combatente: Combatente = { ...jogador.combatenteBase, level: jogador.patente };
   const passiva = passivaDoLutador(deps, jogador);
   const passo = criarCombate(combatente, deps.monstro, deps.rolar, passiva);
   eventos.push({ tipo: 'combate', jogadorId, eventos: passo.eventos });
-
   return registrar(
     { ...base, combate: { estado: passo.estado, proximaDecisao: passo.proximaDecisao } },
     eventos,
   );
+}
+
+function vasculhar(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): ResultadoAcao {
+  if (estado.combate !== null) {
+    throw new AcaoInvalida('aplicarAcao: há um combate em curso');
+  }
+
+  const compra = comprarCarta(estado.monte, estado.cemiterio, deps.embaralhar);
+  const base: EstadoPartida = { ...estado, monte: compra.monte, cemiterio: compra.cemiterio };
+  return resolverCarta(base, jogadorId, compra.carta, deps);
 }
 
 function agirNoCombate(estado: EstadoPartida, acao: AcaoDeCombate, deps: DepsMesa): ResultadoAcao {
