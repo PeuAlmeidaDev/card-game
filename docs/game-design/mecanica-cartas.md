@@ -220,11 +220,11 @@ nem componente de UI** (bible/CLAUDE).
 
 - 🎚️ Anão: primeiro acerto → dano pela metade **ou** zero (calibrar).
 - 🎚️ Orc: limiar "vida ≤ metade" e o `+dano` (calibrar).
-- 🎚️ Humano: mão 8 vs 7 (o `+1` pode virar outro número).
+- 🎚️ Humano: mão 8 vs 7 (o `+1` pode virar outro número) — **adiada** (ver §10).
 - ⬜ Nome autoral da raça aquática e nomes das passivas.
 - ⬜ Nome do baralho após "vasculhar local".
-- ⬜ Forma exata dos ganchos do motor (fecha no plano/TDD).
-- ⬜ `cartas` como pacote novo vs. dentro de `personagem`.
+- ✅ Forma do gancho da Presciência: **resolvedor injetado** `temPresciencia(racaId)` no `deps` da mesa (nunca `racaId==='elfo'` no domínio) — decidido no plano do Plano 3.
+- ⬜ `cartas` como pacote novo vs. dentro de `personagem` → **resolvido**: pacote novo `cartas` (Plano 1).
 
 ---
 
@@ -244,3 +244,22 @@ nem componente de UI** (bible/CLAUDE).
 | 10 | Aquático = **Escorregadio** (combate); "Canto de Sereia" guardado pra fatia 7 |
 | 11 | **Puxar a infra de ganchos** (metade da fatia 9) pra agora; passiva = automática, habilidade ativa = clique |
 | 12 | **"chutar a porta" → "vasculhar local"** (já estamos dentro do portal); corrige bible §2/§6 |
+
+---
+
+## 10. Decisões — sessão 2026-07-24 (`grilling` do escopo da mão/Presciência)
+
+Grelhado o "quanto da mão construir" para as passivas fora-de-combate (Adaptável/Presciência), já que o `mecanica-cartas` §1 adiou a "mão de 7 completa". A fatia de cartas fecha em **Planos 1–4**: 1 (pacote `cartas` + 3 ganchos de combate) ✅, 2 (migração raça→passiva) ✅, quitação de débitos ✅, **3 (Presciência no domínio + rename)**, **4 (ligar + web)**.
+
+| # | Decisão | Porquê |
+|---|---|---|
+| 1 | **Adaptável (Humano, mão de 8) ADIADA** para a fatia da mão | Não há mão nem cartas que se seguram nesta fatia; "mão de 8" seria contêiner vazio com limite sem consequência. "Constrói para o presente". O Humano segue jogável como baseline. |
+| 2 | **Presciência = decisão pendente em 2 etapas**, no nível-partida (molde do combate): campo `espiada`, ações `manterCarta`/`empurrarCarta`; não-Elfo vasculha atômico | Reusa o padrão que a mesa já tem (pausa → 2º clique), servidor autoritativo com `versao`/409, e projeta "só o vidente viu" de forma limpa. |
+| 3 | **Resolução:** `manter` revela o topo e resolve; `empurrar` manda o topo pro **fundo do monte**, compra a **próxima às cegas** e resolve — sem 2ª espiada | "Empurrar dá 2ª espiada" mataria o trade-off (Elfo veria até gostar → dominância, rejeitada em §5.1). Fundo do monte preserva o risco. Ambas reusam a resolução `salaVazia`/`monstro`. |
+| 4 | **Segredo:** carta espiada só na vista de quem está na vez; **sem evento de log** na espiada; a carta **empurrada nunca vira pública** | Logar a espiada vazaria o segredo no próprio mecanismo que o protege. Projection-correct de graça (a projeção já tira segredos), a fatia online herda o sigilo. |
+| 5 | **Bots-com-raça FORA da fatia** | Raça deve ser *sacada* (carta da mão), não colada no bot na criação — qualquer atribuição agora (fixa ou aleatória) é placeholder artificial/engessado. Nasce inteiro quando raça virar carta sacável. O humano já vive a passiva; sem bot-Elfo a espiada nunca entra no `avancarBots` (some o risco de deadlock). |
+| 6 | **Painel-chat de log (web, Plano 4):** cauda + auto-scroll com histórico; filtro por jogador (padrão Todos); globais (`fim`) sempre visíveis; **cores por jogador** (log + botões de filtro); combate como bloco legível; `vez` discreto | Resolve a dor real do playtest ("não sei como foi cada luta"; parede de texto). Puro `web` — os eventos já carregam `jogadorId`, sem tocar `shared`/`server`. |
+| 7 | **Rename `chutarPorta` → `vasculhar` no código** (só a ação; evento `porta`/`CartaPorta`/"Portais" ficam) | Já estamos editando a união de ações e o schema pra encaixar a espiada — renomear agora é quase de graça e o código passa a falar a língua do jogo. Nomes de baralho/carta ficam pra sessão de nomenclatura (§2). |
+| 8 | **Presciência construída no Plano 3 mas NÃO ligada em produção** (server injeta `temPresciencia` + `cartas` marca o Elfo só no Plano 4) | O humano padrão é Elfo (`TelaMesa`); ligar sem os botões manter/empurrar travaria o app. O Plano 3 deixa a máquina testada por unidade e desligada; o app segue tão jogável quanto hoje; a Presciência acende no Plano 4 com sua UI. |
+
+**Planos:** `docs/superpowers/plans/2026-07-24-fatia-6-cartas-plano-3-presciencia.md`.
