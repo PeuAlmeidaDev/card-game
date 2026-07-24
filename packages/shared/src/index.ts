@@ -3,7 +3,6 @@ import { z } from 'zod';
 import type { Combatente, ResultadoDuelo, EventoCombate, Lado } from '@card-dungeon/motor';
 import type {
   ModificadoresDeStat,
-  Raca,
   Classe,
   Equipamento,
   Catalogo,
@@ -156,7 +155,6 @@ export type {
   EventoCombate,
   Lado,
   ModificadoresDeStat,
-  Raca,
   Classe,
   Equipamento,
   Catalogo,

@@ -1,12 +1,7 @@
 import type { Combatente } from '@card-dungeon/motor';
-import type { Raca, Classe, Equipamento, Catalogo, EscolhasPersonagem } from './tipos';
+import { RACAS } from '@card-dungeon/cartas';
+import type { Classe, Equipamento, Catalogo, EscolhasPersonagem } from './tipos';
 import { BASE } from './montar';
-
-const RACAS: readonly Raca[] = [
-  { id: 'anao', nome: 'Anão', modificadores: { forca: 2, agilidade: -1 } },
-  { id: 'elfo', nome: 'Elfo', modificadores: { agilidade: 2, habilidade: 1 } },
-  { id: 'humano', nome: 'Humano', modificadores: {} },
-];
 
 const CLASSES: readonly Classe[] = [
   { id: 'guerreiro', nome: 'Guerreiro', modificadores: { forca: 1, vida: 5 } },
@@ -18,16 +13,16 @@ const ITENS: readonly Equipamento[] = [
   { id: 'escudo', nome: 'Escudo', modificadores: { vida: 3 } },
 ];
 
-/** Monstro fixo (lado b do duelo). Montar monstro fica para uma fatia futura. */
+/** Monstro fixo (lado b). Montar monstro fica para uma fatia futura. */
 export const MONSTRO_PADRAO: Combatente = { forca: 4, vida: 20, habilidade: 2, agilidade: 4, level: 1 };
 
 export const CATALOGO: Catalogo = { base: BASE, racas: RACAS, classes: CLASSES, itens: ITENS };
 
-/** Resolve os ids das escolhas nos objetos do catálogo. Null se algum id não existe. */
+/** Valida os ids das escolhas. Devolve o racaId (para a passiva) + classe + itens (para os stats). */
 export function resolverEscolhas(
   catalogo: Catalogo,
   escolhas: EscolhasPersonagem,
-): { raca: Raca; classe: Classe; itens: Equipamento[] } | null {
+): { racaId: string; classe: Classe; itens: Equipamento[] } | null {
   const raca = catalogo.racas.find((r) => r.id === escolhas.racaId);
   const classe = catalogo.classes.find((c) => c.id === escolhas.classeId);
   if (!raca || !classe) return null;
@@ -38,5 +33,5 @@ export function resolverEscolhas(
     if (!item) return null;
     itens.push(item);
   }
-  return { raca, classe, itens };
+  return { racaId: raca.id, classe, itens };
 }
