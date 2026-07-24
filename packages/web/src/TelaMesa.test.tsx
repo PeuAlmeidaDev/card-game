@@ -115,6 +115,8 @@ describe('TelaMesa', () => {
           turno: 3,
           ataqueDoMonstro: null,
           desfecho: 'emAndamento',
+          vidaInicialJogador: combatente.vida,
+          passiva: null,
         },
       },
     });
