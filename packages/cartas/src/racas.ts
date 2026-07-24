@@ -13,14 +13,20 @@ export interface RacaCarta {
   readonly nome: string;
   readonly texto: string;
   readonly passivaCombate: PassivaCombate | null;
+  /**
+   * A raça espia o topo do baralho antes de resolver (Presciência)? É passiva
+   * FORA do combate, por isso não cabe em `passivaCombate` — o motor não é
+   * consultado. O server traduz este bool no resolvedor `temPresciencia` da Mesa.
+   */
+  readonly espiaTopo: boolean;
 }
 
 export const RACAS: readonly RacaCarta[] = [
-  { id: 'humano', nome: 'Humano', texto: 'Adaptável: sem especialização, mais opções na mão.', passivaCombate: null },
-  { id: 'elfo', nome: 'Elfo', texto: 'Presciência: vê o perigo antes de encará-lo.', passivaCombate: null },
-  { id: 'anao', nome: 'Anão', texto: 'Casca de Pedra: o primeiro golpe do combate mal o arranha.', passivaCombate: cascaDePedra },
-  { id: 'aquatico', nome: 'Aquático', texto: 'Escorregadio: uma vez por combate, escapa de um golpe certo.', passivaCombate: escorregadio },
-  { id: 'orc', nome: 'Orc', texto: 'Sangue de Guerra: ferido, golpeia com mais fúria.', passivaCombate: sangueDeGuerra },
+  { id: 'humano', nome: 'Humano', texto: 'Adaptável: sem especialização, mais opções na mão.', passivaCombate: null, espiaTopo: false },
+  { id: 'elfo', nome: 'Elfo', texto: 'Presciência: vê o perigo antes de encará-lo.', passivaCombate: null, espiaTopo: true },
+  { id: 'anao', nome: 'Anão', texto: 'Casca de Pedra: o primeiro golpe do combate mal o arranha.', passivaCombate: cascaDePedra, espiaTopo: false },
+  { id: 'aquatico', nome: 'Aquático', texto: 'Escorregadio: uma vez por combate, escapa de um golpe certo.', passivaCombate: escorregadio, espiaTopo: false },
+  { id: 'orc', nome: 'Orc', texto: 'Sangue de Guerra: ferido, golpeia com mais fúria.', passivaCombate: sangueDeGuerra, espiaTopo: false },
 ];
 
 export function obterRaca(id: string): RacaCarta | undefined {
