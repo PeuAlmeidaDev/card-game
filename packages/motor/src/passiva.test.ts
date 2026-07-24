@@ -55,3 +55,34 @@ describe('gancho aoSofrerDano', () => {
     expect(passo.estado.passiva).toEqual({ id: 'fake-metade', usos: 1 });
   });
 });
+
+const reRolaUma: PassivaCombate = {
+  id: 'fake-rerola',
+  aoFalharEsquiva: (ctx) =>
+    ctx.estado.usos >= 1
+      ? { reRolar: false, estado: ctx.estado }
+      : { reRolar: true, estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } },
+};
+
+describe('gancho aoFalharEsquiva', () => {
+  it('re-rola uma esquiva falha e, se passar, não toma dano', () => {
+    const rapido: Combatente = { ...monstro, agilidade: 12 };
+    const inicio = criarCombate(jogador, rapido, filaDeDados([5]), reRolaUma); // ataque do monstro 5 acerta
+    // esquiva 1: dado = 6 > 5 => falha; re-rola => esquiva 2: dado = 5 <= 5 => esquiva (empate favorece o defensor)
+    const passo = proximoPasso(inicio.estado, { tipo: 'esquivar' }, filaDeDados([6, 5]), reRolaUma);
+
+    expect(passo.estado.jogador.vida).toBe(20); // não tomou dano
+    expect(passo.eventos.filter((e) => e.tipo === 'esquiva')).toHaveLength(2);
+    expect(passo.estado.passiva).toEqual({ id: 'fake-rerola', usos: 1 });
+  });
+
+  it('re-rola só uma vez: a segunda falha aplica dano', () => {
+    const rapido: Combatente = { ...monstro, agilidade: 12 };
+    const inicio = criarCombate(jogador, rapido, filaDeDados([5]), reRolaUma);
+    // esquiva 1: 6 > 5 falha; re-rola => esquiva 2: 7 > 5 falha; dano = 3; vida 20 - 3 = 17
+    const passo = proximoPasso(inicio.estado, { tipo: 'esquivar' }, filaDeDados([6, 7]), reRolaUma);
+
+    expect(passo.estado.jogador.vida).toBe(17);
+    expect(passo.estado.passiva).toEqual({ id: 'fake-rerola', usos: 1 });
+  });
+});

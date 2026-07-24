@@ -142,8 +142,22 @@ function esquivar(
   const log: EventoCombate[] = [];
   let scratch: EstadoPassiva | null = estado.passiva;
 
-  const esquiva = rolarEsquivaContra(rolagemAtaque, 'a', rolar);
+  let esquiva = rolarEsquivaContra(rolagemAtaque, 'a', rolar);
   log.push(esquiva.evento);
+
+  // Aquático: re-rola uma esquiva falha, consumindo um uso.
+  if (!esquiva.esquivou && passiva?.aoFalharEsquiva && scratch) {
+    const r = passiva.aoFalharEsquiva({
+      portador: estado.jogador,
+      vidaInicial: estado.vidaInicialJogador,
+      estado: scratch,
+    });
+    scratch = r.estado;
+    if (r.reRolar) {
+      esquiva = rolarEsquivaContra(rolagemAtaque, 'a', rolar);
+      log.push(esquiva.evento);
+    }
+  }
 
   let jogador = estado.jogador;
   if (!esquiva.esquivou) {
