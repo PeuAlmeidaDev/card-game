@@ -127,4 +127,12 @@ describe('resolverDuelo', () => {
       { tipo: 'dano', alvo: 'b', quantidade: 11, vidaRestante: -1 },
     ]);
   });
+
+  it('wrapper: jogador vence em 1 turno com dado determinístico (equivalência batch)', () => {
+    const a: Combatente = { forca: 6, vida: 15, habilidade: 7, agilidade: 7, level: 1 };
+    const b: Combatente = { forca: 1, vida: 5, habilidade: 0, agilidade: 1, level: 1 };
+    const r = resolverDuelo(a, b, filaDeDados([3, 12]));
+    expect(r.tipo).toBe('vitoria');
+    if (r.tipo === 'vitoria') expect(r.vencedor).toBe('a');
+  });
 });
