@@ -40,7 +40,7 @@ export function PainelLog({ log, jogadores, voce }: {
   );
 
   useEffect(() => {
-    cauda.current?.scrollIntoView({ block: 'end' });
+    cauda.current?.scrollIntoView({ block: 'nearest' });
   }, [log.length, filtro]);
 
   return (
@@ -65,10 +65,11 @@ export function PainelLog({ log, jogadores, voce }: {
           </button>
         ))}
       </div>
-      {/* O log é append-only: eventos nunca são removidos nem reordenados, então o
-          índice É uma identidade estável. Usar o índice como `key` aqui é correto,
-          não o anti-padrão de listas mutáveis. */}
-      <ol>
+      {/* O índice de `visiveis` (não de `log`) muda quando o filtro muda, mas os
+          `<li>` não carregam estado nem input próprio — são puramente derivados
+          do evento que renderizam — então reindexar ao trocar de filtro não
+          produz o anti-padrão de listas mutáveis (perda de estado/foco). */}
+      <ol style={{ maxHeight: '20rem', overflowY: 'auto' }}>
         {visiveis.map((evento, i) => {
           const cor = 'jogadorId' in evento ? corDoJogador(jogadores, evento.jogadorId) : CINZA;
           return (
@@ -95,7 +96,7 @@ export function PainelLog({ log, jogadores, voce }: {
             </li>
           );
         })}
-        <li ref={cauda} aria-hidden="true" />
+        <li ref={cauda} aria-hidden="true" style={{ listStyle: 'none' }} />
       </ol>
     </>
   );
