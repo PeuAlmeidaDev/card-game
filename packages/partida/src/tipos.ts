@@ -35,12 +35,24 @@ export type EventoDaMesa =
 
 export type AcaoDaMesa =
   | { readonly tipo: 'vasculhar'; readonly jogadorId: string }
+  | { readonly tipo: 'manterCarta'; readonly jogadorId: string }
+  | { readonly tipo: 'empurrarCarta'; readonly jogadorId: string }
   | { readonly tipo: 'atacar'; readonly jogadorId: string }
   | { readonly tipo: 'esquivar'; readonly jogadorId: string };
 
 export interface CombateNaMesa {
   readonly estado: EstadoCombate;
   readonly proximaDecisao: DecisaoPendente;
+}
+
+/**
+ * Topo do baralho revelado APENAS ao vidente (Presciência do Elfo), aguardando a
+ * decisão manter/empurrar. `jogadorId` = de quem é a espiada (sempre o da vez);
+ * explícito para a projeção mostrar a carta só a ele.
+ */
+export interface EspiadaPendente {
+  readonly jogadorId: string;
+  readonly carta: CartaPorta;
 }
 
 /** Estado autoritativo da partida. Vive no servidor e NUNCA sai inteiro — ver `projetarPara`. */
@@ -53,6 +65,7 @@ export interface EstadoPartida {
   readonly monte: readonly CartaPorta[];
   readonly cemiterio: readonly CartaPorta[];
   readonly combate: CombateNaMesa | null;
+  readonly espiada: EspiadaPendente | null;
   readonly desfecho: 'emAndamento' | 'terminada';
   readonly classificacao: readonly PosicaoFinal[] | null;
   readonly log: readonly EventoDaMesa[];
@@ -74,6 +87,8 @@ export interface VistaDaPartida {
   readonly cartasNoMonte: number;
   readonly cartasNoCemiterio: number;
   readonly combate: CombateNaMesa | null;
+  /** A carta espiada, presente SÓ na vista de quem está na vez. `null` para os outros. */
+  readonly espiada: EspiadaPendente | null;
   readonly desfecho: 'emAndamento' | 'terminada';
   readonly classificacao: readonly PosicaoFinal[] | null;
   readonly log: readonly EventoDaMesa[];

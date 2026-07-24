@@ -76,6 +76,7 @@ export function criarPartida(
     monte: deps.embaralhar(composicao),
     cemiterio: [],
     combate: null,
+    espiada: null,
     desfecho: 'emAndamento',
     classificacao: null,
     log: [abertura],
@@ -120,6 +121,12 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
 
   if (acao.tipo === 'vasculhar') {
     return vasculhar(estado, acao.jogadorId, deps);
+  }
+
+  if (acao.tipo === 'manterCarta' || acao.tipo === 'empurrarCarta') {
+    // Sem espiada pendente, resolver é pedido inválido. A Task 5 dá a esta ação a
+    // resolução de verdade (quando a Presciência passa a CRIAR a espiada).
+    throw new AcaoInvalida('aplicarAcao: não há espiada para resolver');
   }
 
   return agirNoCombate(estado, acao, deps);

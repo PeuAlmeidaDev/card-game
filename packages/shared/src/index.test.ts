@@ -62,6 +62,8 @@ describe('acaoDaMesaSchema', () => {
     expect(acaoDaMesaSchema.parse({ tipo: 'vasculhar' }).tipo).toBe('vasculhar');
     expect(acaoDaMesaSchema.parse({ tipo: 'atacar' }).tipo).toBe('atacar');
     expect(acaoDaMesaSchema.parse({ tipo: 'esquivar' }).tipo).toBe('esquivar');
+    expect(acaoDaMesaSchema.parse({ tipo: 'manterCarta' }).tipo).toBe('manterCarta');
+    expect(acaoDaMesaSchema.parse({ tipo: 'empurrarCarta' }).tipo).toBe('empurrarCarta');
   });
 
   it('rejeita ação desconhecida', () => {

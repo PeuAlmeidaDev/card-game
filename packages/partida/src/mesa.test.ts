@@ -323,6 +323,22 @@ describe('passiva da raça no combate da Mesa', () => {
   });
 });
 
+describe('aplicarAcao — espiada (Presciência)', () => {
+  it('recusa manterCarta quando não há espiada pendente', () => {
+    const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
+    expect(() => aplicarAcao(p, { tipo: 'manterCarta', jogadorId: 'p1' }, deps([])))
+      .toThrow(AcaoInvalida);
+    expect(() => aplicarAcao(p, { tipo: 'manterCarta', jogadorId: 'p1' }, deps([])))
+      .toThrow('aplicarAcao: não há espiada para resolver');
+  });
+
+  it('recusa empurrarCarta quando não há espiada pendente', () => {
+    const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
+    expect(() => aplicarAcao(p, { tipo: 'empurrarCarta', jogadorId: 'p1' }, deps([])))
+      .toThrow(AcaoInvalida);
+  });
+});
+
 describe('avancarBots — teto de ações automáticas', () => {
   it('lança em vez de travar quando a vez nunca volta a um humano', () => {
     // Mesa só de bots + baralho sem monstro: ninguém sobe de patente, a partida

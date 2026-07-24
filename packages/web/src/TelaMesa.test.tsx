@@ -20,6 +20,7 @@ const vistaBase: VistaDaPartida = {
   cartasNoMonte: 16,
   cartasNoCemiterio: 0,
   combate: null,
+  espiada: null,
   desfecho: 'emAndamento',
   classificacao: null,
   log: [],
