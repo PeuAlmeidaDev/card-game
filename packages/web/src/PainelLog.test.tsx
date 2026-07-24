@@ -1,5 +1,6 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { PainelLog, corDoJogador } from './PainelLog';
 import type { EventoDaMesa, JogadorNaMesa } from '@card-dungeon/shared';
 
@@ -61,5 +62,67 @@ describe('PainelLog', () => {
     // `vez` é ruído de ritmo: precisa existir para o jogador acompanhar, mas não
     // pode competir visualmente com o que aconteceu de fato.
     expect(screen.getByText(/Vez de Bot 1/).tagName).toBe('SMALL');
+  });
+});
+
+describe('PainelLog — filtro e cauda', () => {
+  const log: readonly EventoDaMesa[] = [
+    { tipo: 'patente', jogadorId: 'p1', patente: 2 },
+    { tipo: 'derrota', jogadorId: 'p2', derrotas: 1 },
+    { tipo: 'fim', classificacao: [{ jogadorId: 'p1', posicao: 1 }, { jogadorId: 'p2', posicao: 2 }] },
+  ];
+
+  it('começa mostrando todos os jogadores', () => {
+    render(<PainelLog log={log} jogadores={jogadores} voce="p1" />);
+
+    expect(screen.getByText(/subiu para a patente 2/)).toBeInTheDocument();
+    expect(screen.getByText(/foi evacuado/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /todos/i })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('filtrando por um jogador, esconde a história dos outros', async () => {
+    render(<PainelLog log={log} jogadores={jogadores} voce="p1" />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Bot 1' }));
+
+    expect(screen.queryByText(/subiu para a patente 2/)).not.toBeInTheDocument();
+    expect(screen.getByText(/foi evacuado/)).toBeInTheDocument();
+  });
+
+  it('eventos globais aparecem em qualquer filtro', async () => {
+    // O `fim` não tem dono. Escondê-lo num filtro sumiria com o desfecho da
+    // partida — o único evento que interessa a todo mundo.
+    render(<PainelLog log={log} jogadores={jogadores} voce="p1" />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Bot 1' }));
+
+    expect(screen.getByText(/A partida terminou/)).toBeInTheDocument();
+  });
+
+  it('volta a mostrar tudo ao clicar em Todos', async () => {
+    render(<PainelLog log={log} jogadores={jogadores} voce="p1" />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Bot 1' }));
+    await userEvent.click(screen.getByRole('button', { name: /todos/i }));
+
+    expect(screen.getByText(/subiu para a patente 2/)).toBeInTheDocument();
+  });
+
+  it('rola para a cauda quando o log cresce', () => {
+    // A rodada dos bots despeja vários eventos de uma vez; sem auto-scroll o
+    // jogador tem que arrastar a barra a cada turno para ver o que houve.
+    const rolou = vi.spyOn(Element.prototype, 'scrollIntoView');
+    const { rerender } = render(<PainelLog log={log} jogadores={jogadores} voce="p1" />);
+    rolou.mockClear();
+
+    rerender(
+      <PainelLog
+        log={[...log, { tipo: 'vez', jogadorId: 'p1' }]}
+        jogadores={jogadores}
+        voce="p1"
+      />,
+    );
+
+    expect(rolou).toHaveBeenCalled();
   });
 });

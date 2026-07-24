@@ -98,10 +98,12 @@ describe('TelaMesa', () => {
   it('mostra os jogadores e as patentes depois de criar a partida', async () => {
     await abrirMesa(vistaBase);
 
+    // `selector: 'strong'` porque, desde a task 6, o painel de log também tem um
+    // botão de filtro com o nome de cada jogador — sem escopo o nome vira ambíguo.
     await waitFor(() => {
-      expect(screen.getByText('Você')).toBeInTheDocument();
+      expect(screen.getByText('Você', { selector: 'strong' })).toBeInTheDocument();
     });
-    expect(screen.getByText('Bot 1')).toBeInTheDocument();
+    expect(screen.getByText('Bot 1', { selector: 'strong' })).toBeInTheDocument();
   });
 
   it('habilita vasculhar local quando é a vez do jogador', async () => {

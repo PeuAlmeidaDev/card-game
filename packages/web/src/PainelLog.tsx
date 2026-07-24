@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { narrarCombate } from './narrarCombate';
 import type { EventoDaMesa, JogadorNaMesa } from '@card-dungeon/shared';
 
@@ -28,37 +29,74 @@ export function PainelLog({ log, jogadores, voce }: {
 }) {
   const nomeDe = (id: string): string => jogadores.find((j) => j.id === id)?.nome ?? id;
 
+  // `null` = Todos. O filtro é estado LOCAL: é preferência de leitura, não estado
+  // de jogo — subir isso para a TelaMesa (ou para o servidor) só acoplaria coisas.
+  const [filtro, definirFiltro] = useState<string | null>(null);
+  const cauda = useRef<HTMLLIElement>(null);
+
+  const visiveis = log.filter(
+    // Evento sem `jogadorId` é global (`fim`): aparece em qualquer filtro.
+    (e) => filtro === null || !('jogadorId' in e) || e.jogadorId === filtro,
+  );
+
+  useEffect(() => {
+    cauda.current?.scrollIntoView({ block: 'end' });
+  }, [log.length, filtro]);
+
   return (
-    // O log é append-only: eventos nunca são removidos nem reordenados, então o
-    // índice É uma identidade estável. Usar o índice como `key` aqui é correto,
-    // não o anti-padrão de listas mutáveis.
-    <ol>
-      {log.map((evento, i) => {
-        const cor = 'jogadorId' in evento ? corDoJogador(jogadores, evento.jogadorId) : CINZA;
-        return (
-          <li key={i} style={{ color: cor }}>
-            {evento.tipo === 'porta' && evento.carta.tipo === 'salaVazia' && 'A sala está vazia.'}
-            {evento.tipo === 'porta' && evento.carta.tipo === 'monstro' && 'Um monstro apareceu!'}
-            {evento.tipo === 'patente' && `${nomeDe(evento.jogadorId)} subiu para a patente ${String(evento.patente)}.`}
-            {evento.tipo === 'derrota' && `${nomeDe(evento.jogadorId)} foi evacuado.`}
-            {evento.tipo === 'vez' && <small>Vez de {nomeDe(evento.jogadorId)}.</small>}
-            {evento.tipo === 'fim' && 'A partida terminou.'}
-            {evento.tipo === 'combate' && (
-              <>
-                {evento.jogadorId === voce ? 'Seu combate:' : `Combate de ${nomeDe(evento.jogadorId)}:`}
-                <ul>
-                  {narrarCombate(
-                    evento.eventos,
-                    evento.jogadorId === voce ? 'Você' : nomeDe(evento.jogadorId),
-                  ).map((linha, j) => (
-                    <li key={j}>{linha}</li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </li>
-        );
-      })}
-    </ol>
+    <>
+      <div>
+        <button
+          type="button"
+          aria-pressed={filtro === null}
+          onClick={() => { definirFiltro(null); }}
+        >
+          Todos
+        </button>
+        {jogadores.map((j) => (
+          <button
+            key={j.id}
+            type="button"
+            aria-pressed={filtro === j.id}
+            style={{ color: corDoJogador(jogadores, j.id) }}
+            onClick={() => { definirFiltro(j.id); }}
+          >
+            {j.nome}
+          </button>
+        ))}
+      </div>
+      {/* O log é append-only: eventos nunca são removidos nem reordenados, então o
+          índice É uma identidade estável. Usar o índice como `key` aqui é correto,
+          não o anti-padrão de listas mutáveis. */}
+      <ol>
+        {visiveis.map((evento, i) => {
+          const cor = 'jogadorId' in evento ? corDoJogador(jogadores, evento.jogadorId) : CINZA;
+          return (
+            <li key={i} style={{ color: cor }}>
+              {evento.tipo === 'porta' && evento.carta.tipo === 'salaVazia' && 'A sala está vazia.'}
+              {evento.tipo === 'porta' && evento.carta.tipo === 'monstro' && 'Um monstro apareceu!'}
+              {evento.tipo === 'patente' && `${nomeDe(evento.jogadorId)} subiu para a patente ${String(evento.patente)}.`}
+              {evento.tipo === 'derrota' && `${nomeDe(evento.jogadorId)} foi evacuado.`}
+              {evento.tipo === 'vez' && <small>Vez de {nomeDe(evento.jogadorId)}.</small>}
+              {evento.tipo === 'fim' && 'A partida terminou.'}
+              {evento.tipo === 'combate' && (
+                <>
+                  {evento.jogadorId === voce ? 'Seu combate:' : `Combate de ${nomeDe(evento.jogadorId)}:`}
+                  <ul>
+                    {narrarCombate(
+                      evento.eventos,
+                      evento.jogadorId === voce ? 'Você' : nomeDe(evento.jogadorId),
+                    ).map((linha, j) => (
+                      <li key={j}>{linha}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </li>
+          );
+        })}
+        <li ref={cauda} aria-hidden="true" />
+      </ol>
+    </>
   );
 }
