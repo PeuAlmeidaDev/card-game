@@ -123,7 +123,7 @@ competitivo com ranking — a assimetria é *feature*.
 Composto pela zona **em jogo**, que é **persistente entre turnos**:
 
 - **1 raça** + **1 classe** (padrão).
-  - Raça = modificadores numéricos.
+  - Raça = **uma passiva, não stats** (corrigido 2026-07-24 — ver `docs/game-design/mecanica-cartas.md` §5). Stats vêm dos **itens**. Isso mantém o **Humano** (sem carta de raça) jogável: jogar uma raça é **trocar generalismo por especialização**, não ganhar poder bruto de graça.
   - Classe = modificadores + **1 habilidade ativa + 1 passiva**.
 - **5 slots de equipamento:** **Capacete · Armadura · Mão direita · Mão esquerda · Pés**.
   - Arma de **duas mãos** ocupa **os dois slots de mão**.
@@ -151,7 +151,9 @@ duas mãos e eu perco o escudo") e é a âncora natural das skins.
 
 1. **(Re)composição do personagem** — pode trocar raça/classe/equipamento (carta da mão → zona
    em jogo; a antiga sai). Termina com um personagem definido.
-2. **Chutar a porta (aberta)** — compra 1 carta de **Portais**, virada.
+2. **Vasculhar local (aberta)** — compra 1 carta de **Portais**, virada. *(Antes "chutar a
+   porta"; renomeado 2026-07-24 — os caçadores já estão dentro do portal, então revelam o
+   próximo perigo vasculhando o local. Mecânica idêntica.)*
    - **Monstro** → combate agora. · **Maldição** → efeito imediato.
    - Qualquer outra carta → vai pra **mão**.
    - ⬜ Existem outros tipos de Portal além de monstro/maldição/raça/classe/equipamento?
@@ -375,6 +377,13 @@ Copiamos a *ideia mecânica*, nunca a *expressão*.
 | Fatia 5 antiga (habilidades), desenhada e parada | ⏸️ Continua válida, mas **não é mais a próxima** |
 
 **Ordem acordada:**
+
+> ⚠️ **Revisão 2026-07-24:** a fatia 5 (A Mesa) **foi entregue e mergeada** (PR #9). A ordem
+> abaixo (Online → Interferência → Cartas → Habilidades) foi **reordenada**: a próxima fatia
+> passou a ser **Cartas (raças primeiro), em hotseat**, puxando parte da infra de habilidades
+> junto — para validar a *mecânica das cartas* antes do transporte online. Design em
+> `docs/game-design/mecanica-cartas.md`. As fatias abaixo seguem válidas como destino; só a
+> **sequência** mudou.
 
 > **Fatia 5 — A MESA (próxima).** Pacote `partida`: reducer puro de **N jogadores** (N=4),
 > **rodando no servidor, autoritativo**, via HTTP request/response. Ordem de turno, baralho
