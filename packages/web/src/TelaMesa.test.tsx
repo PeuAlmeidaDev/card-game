@@ -38,6 +38,63 @@ const abrirMesa = async (vista: VistaDaPartida) => {
 };
 
 describe('TelaMesa', () => {
+  const vistaComEspiada: VistaDaPartida = {
+    ...vistaBase,
+    espiada: { jogadorId: 'p1', carta: { tipo: 'monstro' } },
+  };
+
+  it('mostra o que o vidente pressentiu e oferece encarar ou empurrar', async () => {
+    await abrirMesa(vistaComEspiada);
+
+    expect(await screen.findByText(/pressente.*monstro/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /encarar/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /empurrar/i })).toBeEnabled();
+  });
+
+  it('bloqueia vasculhar enquanto a espiada não for resolvida', async () => {
+    // Sem isto o jogador clica em vasculhar, o domínio recusa ("há uma espiada
+    // pendente") e ele leva um erro vermelho por uma jogada que a tela deixou fazer.
+    await abrirMesa(vistaComEspiada);
+
+    expect(await screen.findByRole('button', { name: /vasculhar local/i })).toBeDisabled();
+  });
+
+  it('encarar manda manterCarta com a versão que está vendo', async () => {
+    const agir = vi.spyOn(api, 'agir')
+      .mockResolvedValue({ status: 200, body: vistaBase } as never);
+    await abrirMesa({ ...vistaComEspiada, versao: 9 });
+
+    await userEvent.click(await screen.findByRole('button', { name: /encarar/i }));
+
+    expect(agir).toHaveBeenCalledWith({
+      params: { id: 'm1' },
+      body: { acao: { tipo: 'manterCarta' }, versao: 9 },
+    });
+  });
+
+  it('empurrar manda empurrarCarta', async () => {
+    const agir = vi.spyOn(api, 'agir')
+      .mockResolvedValue({ status: 200, body: vistaBase } as never);
+    await abrirMesa(vistaComEspiada);
+
+    await userEvent.click(await screen.findByRole('button', { name: /empurrar/i }));
+
+    expect(agir).toHaveBeenCalledWith({
+      params: { id: 'm1' },
+      body: { acao: { tipo: 'empurrarCarta' }, versao: 1 },
+    });
+  });
+
+  it('sem espiada na vista, os botões da Presciência ficam desabilitados', async () => {
+    // A vista de quem NÃO espiou vem com `espiada: null` (a projeção esconde o
+    // segredo). A tela não pode oferecer uma decisão que o dono não tem.
+    await abrirMesa(vistaBase);
+
+    expect(await screen.findByRole('button', { name: /encarar/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /empurrar/i })).toBeDisabled();
+    expect(screen.queryByText(/pressente/i)).not.toBeInTheDocument();
+  });
+
   it('mostra os jogadores e as patentes depois de criar a partida', async () => {
     await abrirMesa(vistaBase);
 
