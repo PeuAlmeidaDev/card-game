@@ -3,6 +3,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { resolverDuelo, type RolarD12, type Combatente } from '@card-dungeon/motor';
 import { contrato } from '@card-dungeon/shared';
 import { CATALOGO, MONSTRO_PADRAO, resolverEscolhas, montarCombatente } from '@card-dungeon/personagem';
+import { obterRaca } from '@card-dungeon/cartas';
 import {
   AcaoInvalida, COMPOSICAO_POR_JOGADOR, aplicarAcao, avancarBots, criarPartida, projetarPara,
   type Embaralhar, type EntradaJogador, type EstadoPartida,
@@ -44,22 +45,22 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
   const app = Fastify();
   const s = initServer();
   const repositorio = criarRepositorio();
-  const deps = { rolar, embaralhar, monstro };
+  const resolverPassiva = (racaId: string | undefined) =>
+    racaId ? (obterRaca(racaId)?.passivaCombate ?? undefined) : undefined;
+  const deps = { rolar, embaralhar, monstro, resolverPassiva };
 
   const montarBots = (): readonly EntradaJogador[] => {
-    const racas = embaralhar(CATALOGO.racas);
     const classes = embaralhar(CATALOGO.classes);
     return [0, 1, 2].map((i) => {
-      const raca = racas[i % racas.length];
       const classe = classes[i % classes.length];
-      if (raca === undefined || classe === undefined) {
+      if (classe === undefined) {
         throw new Error('montarBots: catálogo vazio');
       }
       return {
         id: randomUUID(),
         nome: `Bot ${String(i + 1)}`,
         ehBot: true,
-        combatenteBase: montarCombatente(raca, classe, []),
+        combatenteBase: montarCombatente(classe, []),
       };
     });
   };
@@ -77,7 +78,7 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
       if (!resolvido) {
         return { status: 400 as const, body: { erro: 'raça, classe ou item inexistente' } };
       }
-      const jogador = montarCombatente(resolvido.raca, resolvido.classe, resolvido.itens);
+      const jogador = montarCombatente(resolvido.classe, resolvido.itens);
       return { status: 200 as const, body: resolverDuelo(jogador, monstro, rolar) };
     },
 
@@ -90,7 +91,8 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
         id: randomUUID(),
         nome: 'Você',
         ehBot: false,
-        combatenteBase: montarCombatente(resolvido.raca, resolvido.classe, resolvido.itens),
+        racaId: resolvido.racaId,
+        combatenteBase: montarCombatente(resolvido.classe, resolvido.itens),
       };
       const estado = criarPartida(
         randomUUID(),

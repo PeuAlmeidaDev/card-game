@@ -25,6 +25,16 @@ describe('GET /catalogo', () => {
     expect(catalogo.base.level).toBe(1);
     await app.close();
   });
+
+  it('o catálogo expõe as raças-carta com texto de passiva', async () => {
+    const app = buildApp();
+    const res = await app.inject({ method: 'GET', url: '/api/catalogo' });
+    const body = res.json<Catalogo>();
+    expect(body.racas.find((r) => r.id === 'orc')).toBeTruthy();
+    expect(body.racas[0]).toHaveProperty('texto');
+    expect(body.racas[0]).not.toHaveProperty('modificadores');
+    await app.close();
+  });
 });
 
 describe('POST /duelo', () => {
@@ -93,8 +103,8 @@ describe('mesa', () => {
   // ~2000 rolagens dentro de uma requisição.
   const appDeJogo = () => buildApp({ rolar: criarDadoCiclico([4, 12]), embaralhar: semEmbaralhar });
 
-  const criar = async (app: ReturnType<typeof buildApp>) => {
-    const res = await app.inject({ method: 'POST', url: '/api/partida', payload: escolhas });
+  const criar = async (app: ReturnType<typeof buildApp>, payload: typeof escolhas = escolhas) => {
+    const res = await app.inject({ method: 'POST', url: '/api/partida', payload });
     return res.json<VistaDaPartida>();
   };
 
@@ -204,6 +214,34 @@ describe('mesa', () => {
     // nada avançou, nenhum dado foi consumido.
     expect(repetida.json<VistaDaPartida>().versao).toBe(primeira.json<VistaDaPartida>().versao);
     expect(repetida.json<VistaDaPartida>().log).toEqual(primeira.json<VistaDaPartida>().log);
+    await app.close();
+  });
+
+  it('uma partida com raça Anão resolve o combate com a passiva Casca de Pedra', async () => {
+    // Prova a borda inteira: obterRaca('anao') tem passivaCombate real (cartas),
+    // resolverPassiva injetado nas deps da Mesa aplica ela ao humano.
+    // Monstro rápido e certeiro (agilidade/habilidade máximas) ataca primeiro.
+    // dado[0]=1: ataque do monstro acerta (<=12). dado[1]=12: esquiva do humano
+    // falha (12 > 1). Dano base = level(1)+forca(5) = 6; a passiva reduz o
+    // PRIMEIRO dano sofrido no combate à metade -> 3. Vida do guerreiro Anão
+    // (base 10 + guerreiro +5 = 15) cai para 12.
+    const monstro = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 };
+    const app = buildApp({ rolar: filaDeDados([1, 12]), embaralhar: semEmbaralhar, monstro });
+
+    const vista = await criar(app, { racaId: 'anao', classeId: 'guerreiro', itemIds: [] });
+    const abrePorta = await app.inject({
+      method: 'POST', url: `/api/partida/${vista.id}/acao`,
+      payload: { acao: { tipo: 'chutarPorta' }, versao: vista.versao },
+    });
+    const aposPorta = abrePorta.json<VistaDaPartida>();
+
+    const res = await app.inject({
+      method: 'POST', url: `/api/partida/${vista.id}/acao`,
+      payload: { acao: { tipo: 'esquivar' }, versao: aposPorta.versao },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json<VistaDaPartida>().combate?.estado.jogador.vida).toBe(12);
     await app.close();
   });
 });
