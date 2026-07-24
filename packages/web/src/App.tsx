@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from './api';
+import { TelaMesa } from './TelaMesa';
 import type { Catalogo, Combatente, ModificadoresDeStat, ResultadoDuelo } from '@card-dungeon/shared';
 
 function calcularPreview(base: Combatente, mods: readonly ModificadoresDeStat[]): Combatente {
@@ -103,6 +104,11 @@ export function App() {
 
       <button onClick={() => void duelar()}>Duelar</button>
       <p>{texto}</p>
+
+      {/* A mesa recebe as MESMAS escolhas do construtor acima — o servidor monta
+          o combatente a partir delas, como já faz no duelo. Passar as escolhas
+          em vez de um personagem fixo é o que liga esta tela ao resto do jogo. */}
+      <TelaMesa escolhas={{ racaId, classeId, itemIds }} />
     </main>
   );
 }
