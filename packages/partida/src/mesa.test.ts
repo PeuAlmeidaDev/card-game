@@ -6,7 +6,7 @@ import { projetarPara } from './projecao';
 import { AcaoInvalida } from './erros';
 import { filaDeDados, criarDadoCiclico } from './testes/dados';
 import type { EntradaJogador } from './tipos';
-import type { Combatente } from '@card-dungeon/motor';
+import type { Combatente, PassivaCombate } from '@card-dungeon/motor';
 
 const base: Combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
 const semEmbaralhar = <T,>(itens: readonly T[]): T[] => [...itens];
@@ -279,6 +279,47 @@ describe('partida completa', () => {
     expect(estado.classificacao).toHaveLength(4);
     expect(estado.classificacao?.[0]?.posicao).toBe(1);
     expect(estado.log.at(-1)?.tipo).toBe('fim');
+  });
+});
+
+describe('passiva da raça no combate da Mesa', () => {
+  it('aplica a passiva do lutador ao criar o combate', () => {
+    // resolvedor fake: só o anão tem passiva, que reduz o 1º dano sofrido à metade
+    const metade: PassivaCombate = {
+      id: 'fake-metade',
+      aoSofrerDano: (base, ctx) =>
+        ctx.estado.usos >= 1
+          ? { dano: base, estado: ctx.estado }
+          : { dano: Math.floor(base / 2), estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } },
+    };
+    const resolverPassiva = (racaId: string | undefined): PassivaCombate | undefined =>
+      racaId === 'anao' ? metade : undefined;
+
+    const humano: EntradaJogador = {
+      id: 'p1', nome: 'Você', ehBot: false, racaId: 'anao',
+      combatenteBase: { forca: 3, vida: 20, habilidade: 8, agilidade: 1, level: 1 },
+    };
+    const bot: EntradaJogador = {
+      id: 'p2', nome: 'Bot', ehBot: true,
+      combatenteBase: { forca: 3, vida: 20, habilidade: 8, agilidade: 1, level: 1 },
+    };
+
+    // monstro rápido (ataca primeiro) e forte, para o 1º golpe cair no humano
+    const monstro = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 };
+    // criar: monstro ataca (dado 1 acerta) -> pede esquiva; esquivar (dado 12 falha)
+    // dano base 6; com a passiva -> 3; vida 20 - 3 = 17
+    const deps = {
+      rolar: filaDeDados([1, 12]),
+      embaralhar: <T,>(x: readonly T[]) => [...x],
+      monstro,
+      resolverPassiva,
+    };
+
+    let estado = criarPartida('m1', [humano, bot], { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' }] }, { embaralhar: deps.embaralhar });
+    estado = aplicarAcao(estado, { tipo: 'chutarPorta', jogadorId: 'p1' }, deps).estado;
+    const depois = aplicarAcao(estado, { tipo: 'esquivar', jogadorId: 'p1' }, deps).estado;
+
+    expect(depois.combate?.estado.jogador.vida).toBe(17);
   });
 });
 

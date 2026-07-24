@@ -1,4 +1,4 @@
-import type { Combatente, Passo, RolarD12 } from '@card-dungeon/motor';
+import type { Combatente, Passo, RolarD12, PassivaCombate } from '@card-dungeon/motor';
 import { AcaoIlegal, criarCombate, proximoPasso } from '@card-dungeon/motor';
 import type {
   AcaoDaMesa, ConfigPartida, EntradaJogador, Embaralhar, EstadoPartida, EventoDaMesa, JogadorNaMesa,
@@ -17,6 +17,8 @@ export interface DepsMesa {
   readonly rolar: RolarD12;
   readonly embaralhar: Embaralhar;
   readonly monstro: Combatente;
+  /** Resolve a passiva de combate de um jogador pelo id da raça. Ausente/undefined = sem passiva. */
+  readonly resolverPassiva?: (racaId: string | undefined) => PassivaCombate | undefined;
 }
 
 export interface ResultadoAcao {
@@ -43,6 +45,7 @@ export function criarPartida(
     id: e.id,
     nome: e.nome,
     ehBot: e.ehBot,
+    racaId: e.racaId,
     combatenteBase: e.combatenteBase,
     patente: 1,
     derrotas: 0,
@@ -139,7 +142,8 @@ function chutarPorta(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): 
 
   // Vida sempre reseta: o combatente entra no combate com a statline base na patente atual.
   const combatente: Combatente = { ...jogador.combatenteBase, level: jogador.patente };
-  const passo = criarCombate(combatente, deps.monstro, deps.rolar);
+  const passiva = deps.resolverPassiva?.(jogador.racaId);
+  const passo = criarCombate(combatente, deps.monstro, deps.rolar, passiva);
   eventos.push({ tipo: 'combate', jogadorId, eventos: passo.eventos });
 
   return registrar(
@@ -163,9 +167,11 @@ function agirNoCombate(estado: EstadoPartida, acao: AcaoDeCombate, deps: DepsMes
   // do `proximoPasso` (estado corrompido, dado que explode) é bug NOSSO e sobe cru,
   // para virar 500 sem vazar a mensagem interna. Um `catch` que traduzisse tudo
   // devolveria "culpa sua" — com um pedaço da nossa implementação junto.
+  const lutador = estado.jogadores.find((j) => j.id === acao.jogadorId);
+  const passiva = deps.resolverPassiva?.(lutador?.racaId);
   let passo: Passo;
   try {
-    passo = proximoPasso(combate.estado, { tipo: acao.tipo }, deps.rolar);
+    passo = proximoPasso(combate.estado, { tipo: acao.tipo }, deps.rolar, passiva);
   } catch (erro) {
     if (erro instanceof AcaoIlegal) {
       throw new AcaoInvalida(erro.message);

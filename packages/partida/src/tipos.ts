@@ -16,6 +16,8 @@ export interface JogadorNaMesa {
   readonly combatenteBase: Combatente;
   readonly patente: number;
   readonly derrotas: number;
+  /** Id da raça escolhida — resolve a passiva de combate. Ausente = sem raça (bots). */
+  readonly racaId?: string;
 }
 
 export interface PosicaoFinal {
@@ -87,4 +89,5 @@ export interface EntradaJogador {
   readonly nome: string;
   readonly ehBot: boolean;
   readonly combatenteBase: Combatente;
+  readonly racaId?: string;
 }
