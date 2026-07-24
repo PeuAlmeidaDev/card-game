@@ -101,6 +101,51 @@ describe('TelaMesa', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/combate em curso/i);
   });
 
+  it('mostra as vidas do combate em curso', async () => {
+    // Sem isto o jogador não sabe se está ganhando. A vida do jogador tem
+    // máximo conhecido (o combatenteBase); a do monstro só o valor atual.
+    await abrirMesa({
+      ...vistaBase,
+      combate: {
+        proximaDecisao: 'ataque',
+        estado: {
+          jogador: { ...combatente, vida: 6 },
+          monstro: { forca: 4, vida: 23, habilidade: 2, agilidade: 4, level: 5 },
+          vez: 'jogador',
+          turno: 3,
+          ataqueDoMonstro: null,
+          desfecho: 'emAndamento',
+        },
+      },
+    });
+
+    expect(await screen.findByText(/6\s*\/\s*20/)).toBeInTheDocument();
+    expect(screen.getByText(/monstro:\s*23/i)).toBeInTheDocument();
+  });
+
+  it('narra cada lance do combate com a rolagem do dado', async () => {
+    await abrirMesa({
+      ...vistaBase,
+      log: [
+        {
+          tipo: 'combate',
+          jogadorId: 'p1',
+          eventos: [
+            { tipo: 'ataque', atacante: 'a', rolagem: 4, acertou: true },
+            { tipo: 'esquiva', defensor: 'b', rolagem: 12, esquivou: false },
+            { tipo: 'dano', alvo: 'b', quantidade: 7, vidaRestante: 23 },
+          ],
+        },
+      ],
+    });
+
+    expect(await screen.findByText(/rolou 4 — acertou/)).toBeInTheDocument();
+    expect(screen.getByText(/rolou 12 — não esquivou/)).toBeInTheDocument();
+    expect(screen.getByText(/perde 7 de vida — restam 23/)).toBeInTheDocument();
+    // o resumo mudo que existia antes não pode voltar
+    expect(screen.queryByText(/lance\(s\)/)).not.toBeInTheDocument();
+  });
+
   it('mostra a classificação quando a partida termina', async () => {
     await abrirMesa({
       ...vistaBase,

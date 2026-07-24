@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api } from './api';
+import { narrarCombate } from './narrarCombate';
 import type { AcaoDaMesa, Escolhas, VistaDaPartida } from '@card-dungeon/shared';
 
 /**
@@ -62,6 +63,9 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO }: { escolhas?: Escolhas }
   const minhaVez = vista.vezDe === vista.voce;
   const decisao = vista.combate?.proximaDecisao ?? null;
   const nomeDe = (id: string): string => vista.jogadores.find((j) => j.id === id)?.nome ?? id;
+  // A vida máxima do jogador é a do combatente base — a patente muda o dano, não a vida.
+  // Do monstro só temos o valor corrente: a vista não carrega o máximo dele.
+  const vidaMaxima = vista.jogadores.find((j) => j.id === vista.voce)?.combatenteBase.vida ?? null;
 
   return (
     <section>
@@ -77,6 +81,19 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO }: { escolhas?: Escolhas }
       </ul>
 
       <p>Cartas no monte: {vista.cartasNoMonte}</p>
+
+      {vista.combate !== null && (
+        <p>
+          <strong>Combate</strong> — Você: {vista.combate.estado.jogador.vida}
+          {vidaMaxima !== null && ` / ${vidaMaxima}`}
+          {' · '}
+          Monstro: {vista.combate.estado.monstro.vida} de vida
+          {' · '}
+          {vista.combate.proximaDecisao === 'esquiva'
+            ? 'o monstro acertou — esquive!'
+            : 'sua vez de atacar'}
+        </p>
+      )}
 
       {vista.desfecho === 'terminada' ? (
         <ol>
@@ -121,8 +138,25 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO }: { escolhas?: Escolhas }
             {evento.tipo === 'patente' && `${nomeDe(evento.jogadorId)} subiu para a patente ${evento.patente}.`}
             {evento.tipo === 'derrota' && `${nomeDe(evento.jogadorId)} foi evacuado.`}
             {evento.tipo === 'vez' && `Vez de ${nomeDe(evento.jogadorId)}.`}
-            {evento.tipo === 'combate' && `Combate: ${evento.eventos.length} lance(s).`}
             {evento.tipo === 'fim' && 'A partida terminou.'}
+            {/* Cada lance vira uma linha COM a rolagem. O resumo mudo que havia
+                aqui ("N lance(s)") escondia exatamente o que o jogador precisa
+                ver para entender o resultado: o número que saiu no dado. */}
+            {evento.tipo === 'combate' && (
+              <>
+                {evento.jogadorId === vista.voce
+                  ? 'Seu combate:'
+                  : `Combate de ${nomeDe(evento.jogadorId)}:`}
+                <ul>
+                  {narrarCombate(
+                    evento.eventos,
+                    evento.jogadorId === vista.voce ? 'Você' : nomeDe(evento.jogadorId),
+                  ).map((linha, j) => (
+                    <li key={j}>{linha}</li>
+                  ))}
+                </ul>
+              </>
+            )}
           </li>
         ))}
       </ol>
