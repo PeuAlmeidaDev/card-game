@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { projetarPara } from './projecao';
+import { projetarPara, versaoDe } from './projecao';
 import { criarPartida, aplicarAcao } from './mesa';
 import { COMPOSICAO_POR_JOGADOR } from './baralho';
 import { AcaoInvalida } from './erros';
@@ -71,5 +71,57 @@ describe('projetarPara', () => {
     // Pedir a vista de uma mesa em que você não está é erro do CLIENTE (400/403),
     // não invariante quebrada. A borda distingue por `instanceof`.
     expect(() => projetarPara('intruso', partida)).toThrow(AcaoInvalida);
+  });
+});
+
+describe('versaoDe — a versão anda quando a espiada abre', () => {
+  const semEmbaralhar = <T,>(itens: readonly T[]): T[] => [...itens];
+  const entradas = [
+    { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 } },
+    { id: 'p2', nome: 'Bot 1', ehBot: true, combatenteBase: { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 } },
+  ];
+  const depsVidente = {
+    rolar: () => 1,
+    embaralhar: semEmbaralhar,
+    monstro: { forca: 1, vida: 1, habilidade: 0, agilidade: 0, level: 1 },
+    temPresciencia: () => true,
+  };
+  const criar = () => criarPartida('m1', entradas,
+    { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
+    { embaralhar: semEmbaralhar });
+
+  it('sem espiada pendente, a versão É o tamanho do log', () => {
+    const p = criar();
+    expect(versaoDe(p)).toBe(p.log.length);
+  });
+
+  it('com espiada pendente, a versão passa do tamanho do log', () => {
+    // Espiar não emite evento (o topo é segredo). Sem este +1 a versão fica
+    // PARADA: um retry do vasculhar passaria pelo guard de 409 e morreria como
+    // 400 no reducer — o único ponto da mesa que erra onde o resto ressincroniza.
+    const p = criar();
+    const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente).estado;
+
+    expect(comEspiada.log.length).toBe(p.log.length);   // nenhum evento público
+    expect(versaoDe(comEspiada)).toBe(p.log.length + 1); // ...mas a versão andou
+  });
+
+  it('a versão é estritamente crescente através do ciclo espiar → encarar', () => {
+    // A invariante que o 409 depende: dois estados distintos nunca compartilham
+    // versão. Encarar emite 2 eventos (porta + vez/combate), então o log salta de
+    // N para N+2 e a versão de N+1 para N+2 — nunca repete.
+    const p = criar();
+    const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente).estado;
+    const resolvido = aplicarAcao(comEspiada, { tipo: 'manterCarta', jogadorId: 'p1' }, depsVidente).estado;
+
+    expect(versaoDe(comEspiada)).toBeGreaterThan(versaoDe(p));
+    expect(versaoDe(resolvido)).toBeGreaterThan(versaoDe(comEspiada));
+  });
+
+  it('a vista publica a mesma versão derivada', () => {
+    const p = criar();
+    const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente).estado;
+    expect(projetarPara('p1', comEspiada).versao).toBe(versaoDe(comEspiada));
+    expect(projetarPara('p2', comEspiada).versao).toBe(versaoDe(comEspiada));
   });
 });

@@ -10,4 +10,4 @@ export type { DepsMesa, ResultadoAcao } from './mesa';
 // Classe, não tipo: a rota da borda faz `instanceof` nela em runtime.
 export { AcaoInvalida } from './erros';
 export { classificar } from './classificacao';
-export { projetarPara } from './projecao';
+export { projetarPara, versaoDe } from './projecao';
