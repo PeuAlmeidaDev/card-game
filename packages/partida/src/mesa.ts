@@ -64,9 +64,13 @@ export function criarPartida(
 
   // Baralho da MESA: a composição por jogador multiplicada pelo tamanho da mesa.
   const receitas = Array.from({ length: jogadores.length }, () => config.composicaoPorJogador).flat();
-  // A identidade é carimbada AQUI, no único lugar que cria carta. Sequencial e
-  // determinística: não precisa de gerador injetado e o teste continua legível.
-  const cartas: readonly CartaPorta[] = receitas.map((r, i) => ({ ...r, id: `p-${String(i)}` }));
+  // Embaralha ANTES de carimbar: se o id nascesse sobre a composição ORDENADA
+  // (ex.: 5 monstros seguidos de 3 salas vazias por jogador), `p-i` viraria uma
+  // função pública e determinística do tipo da carta — sem vazar nada hoje (só
+  // a espiada cruza o fio com carta oculta, e a projeção já a entrega só ao
+  // dono), mas basta um evento público futuro carregar `cartaId` para o id
+  // entregar qual carta era. Carimbar depois do embaralho quebra essa correlação.
+  const cartas: readonly CartaPorta[] = deps.embaralhar(receitas).map((r, i) => ({ ...r, id: `p-${String(i)}` }));
 
   const primeiro = jogadores[0];
   if (primeiro === undefined) {
@@ -82,7 +86,7 @@ export function criarPartida(
     jogadores,
     vezDe: primeiro.id,
     patenteAlvo: config.patenteAlvo,
-    monte: deps.embaralhar(cartas),
+    monte: cartas,
     cemiterio: [],
     combate: null,
     espiada: null,
