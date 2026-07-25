@@ -5,8 +5,8 @@ import { contrato } from '@card-dungeon/shared';
 import { CATALOGO, MONSTRO_PADRAO, resolverEscolhas, montarCombatente } from '@card-dungeon/personagem';
 import { obterRaca } from '@card-dungeon/cartas';
 import {
-  AcaoInvalida, COMPOSICAO_POR_JOGADOR, aplicarAcao, avancarBots, criarPartida, projetarPara,
-  versaoDe, type Embaralhar, type EntradaJogador, type EstadoPartida,
+  AcaoInvalida, COMPOSICAO_POR_JOGADOR, MAO_INICIAL_PADRAO, aplicarAcao, avancarBots, criarPartida,
+  projetarPara, versaoDe, type Embaralhar, type EntradaJogador, type EstadoPartida,
 } from '@card-dungeon/partida';
 import { initServer } from '@ts-rest/fastify';
 import { criarDadoReal } from './dado';
@@ -100,7 +100,7 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
       const estado = criarPartida(
         randomUUID(),
         [humano, ...montarBots()],
-        { patenteAlvo: PATENTE_ALVO_PADRAO, composicaoPorJogador: COMPOSICAO_POR_JOGADOR },
+        { patenteAlvo: PATENTE_ALVO_PADRAO, composicaoPorJogador: COMPOSICAO_POR_JOGADOR, maoInicial: MAO_INICIAL_PADRAO },
         { embaralhar },
       );
       repositorio.salvar(estado);

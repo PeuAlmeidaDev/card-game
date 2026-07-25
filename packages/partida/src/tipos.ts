@@ -163,6 +163,12 @@ export interface VistaDaPartida {
 export interface ConfigPartida {
   readonly patenteAlvo: number;
   readonly composicaoPorJogador: readonly ReceitaCarta[];
+  /**
+   * Cartas distribuídas a cada jogador na abertura. Ausente = 0, para que os
+   * testes possam montar mesas de baralho mínimo (1 carta por jogador) sem ter
+   * que financiar mãos. Produção passa `MAO_INICIAL_PADRAO`.
+   */
+  readonly maoInicial?: number;
 }
 
 export interface EntradaJogador {

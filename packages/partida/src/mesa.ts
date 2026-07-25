@@ -77,6 +77,20 @@ export function criarPartida(
   // entregar qual carta era. Carimbar depois do embaralho quebra essa correlação.
   const cartas: readonly CartaPorta[] = deps.embaralhar(receitas).map((r, i) => ({ ...r, id: `p-${String(i)}` }));
 
+  // A mão sai do TOPO do baralho já embaralhado — mesmo lugar de onde sairia se
+  // fosse comprada carta a carta. Bloco contíguo por jogador em vez de round-robin
+  // porque o baralho já está aleatório: alternar não acrescentaria aleatoriedade.
+  const porJogador = config.maoInicial ?? 0;
+  const distribuidas = porJogador * jogadores.length;
+  if (distribuidas > cartas.length) {
+    throw new Error('criarPartida: o baralho não tem cartas para a mão inicial');
+  }
+  const comMao: readonly JogadorNaMesa[] = jogadores.map((j, i) => ({
+    ...j,
+    mao: cartas.slice(i * porJogador, (i + 1) * porJogador),
+  }));
+  const monte = cartas.slice(distribuidas);
+
   const primeiro = jogadores[0];
   if (primeiro === undefined) {
     // Inalcançável: o guard acima já garantiu 2+ jogadores. Existe porque
@@ -88,10 +102,10 @@ export function criarPartida(
 
   return {
     id,
-    jogadores,
+    jogadores: comMao,
     vezDe: primeiro.id,
     patenteAlvo: config.patenteAlvo,
-    monte: cartas,
+    monte,
     cemiterio: [],
     combate: null,
     espiada: null,

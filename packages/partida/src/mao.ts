@@ -8,6 +8,12 @@ import type { JogadorNaMesa } from './tipos';
 export const LIMITE_BASE_DE_MAO = 4;
 
 /**
+ * Mão inicial de cartas de Portais. 🎚️ Dial (spec §8): vira 4+4 quando existir
+ * baralho de Tesouros — a abertura do Munchkin, escalonada.
+ */
+export const MAO_INICIAL_PADRAO = 4;
+
+/**
  * Capacidade da mão: CALCULADA a cada consulta, nunca guardada. O bible §5 exige
  * que todo teto seja alterável por carta, e este já nasce assim — o bônus de
  * quem não tem raça em jogo é o Adaptável do Humano.

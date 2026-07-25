@@ -104,6 +104,25 @@ describe('criarPartida', () => {
     expect(p.jogadores[0]?.emJogo.raca?.id).toEqual(expect.any(String));
     expect(p.jogadores[1]?.emJogo.raca).toBeNull();
   });
+
+  it('distribui a mão inicial do topo do baralho', () => {
+    const p = criarPartida('m1', entradas, { ...config, maoInicial: 2 }, { embaralhar: semEmbaralhar });
+
+    expect(p.jogadores.map((j) => j.mao.length)).toEqual([2, 2]);
+    expect(p.monte).toHaveLength(COMPOSICAO_POR_JOGADOR.length * 2 - 4);
+    // Nenhuma carta em dois lugares ao mesmo tempo: a mão SAI do baralho.
+    const todas = [...p.jogadores.flatMap((j) => j.mao), ...p.monte].map((c) => c.id);
+    expect(new Set(todas).size).toBe(todas.length);
+  });
+
+  it('recusa distribuir mais cartas do que o baralho tem', () => {
+    // Sem o guard, `slice` devolve mãos curtas em silêncio e a mesa abre com
+    // jogadores desiguais — configuração errada tem que falhar alto, na criação.
+    expect(() => criarPartida('m1', entradas,
+      { ...config, composicaoPorJogador: [{ tipo: 'salaVazia' }], maoInicial: 4 },
+      { embaralhar: semEmbaralhar }))
+      .toThrow('criarPartida: o baralho não tem cartas para a mão inicial');
+  });
 });
 
 const monstroPadrao: Combatente = { forca: 2, vida: 10, habilidade: 6, agilidade: 1, level: 1 };
