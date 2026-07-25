@@ -1,9 +1,13 @@
 import type { CartaPorta } from '@card-dungeon/shared';
 
 /**
- * Texto de apresentação de uma carta. Fonte ÚNICA: o pressentimento do vidente e
- * o log falavam da mesma carta em dois lugares diferentes, e um ternário sobre
- * uma união aberta anunciava carta nova como sala vazia. O `default` cumpre dois
+ * O **substantivo** de uma carta ("um monstro"), para encaixar numa frase que a
+ * tela monta. Único consumidor: o pressentimento do vidente na `TelaMesa`
+ * ("Você pressente _um monstro_ adiante."). A **frase** do log é outro trabalho e
+ * mora em `narrarPorta`, que precisa nomear quem encontrou e varia o tom por tipo.
+ *
+ * Nasceu porque um ternário sobre uma união ABERTA anunciava carta nova como sala
+ * vazia. O `default` cumpre dois
  * papéis: em COMPILAÇÃO, `const naoTratada: never` cobra esta função quando um
  * tipo de carta novo entrar no código; em RUNTIME, o gatilho real não é tipo
  * novo — é skew de versão (bundle antigo no browser recebendo do server um tipo
