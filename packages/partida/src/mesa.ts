@@ -63,7 +63,10 @@ export function criarPartida(
   }));
 
   // Baralho da MESA: a composição por jogador multiplicada pelo tamanho da mesa.
-  const composicao = Array.from({ length: jogadores.length }, () => config.composicaoPorJogador).flat();
+  const receitas = Array.from({ length: jogadores.length }, () => config.composicaoPorJogador).flat();
+  // A identidade é carimbada AQUI, no único lugar que cria carta. Sequencial e
+  // determinística: não precisa de gerador injetado e o teste continua legível.
+  const cartas: readonly CartaPorta[] = receitas.map((r, i) => ({ ...r, id: `p-${String(i)}` }));
 
   const primeiro = jogadores[0];
   if (primeiro === undefined) {
@@ -79,7 +82,7 @@ export function criarPartida(
     jogadores,
     vezDe: primeiro.id,
     patenteAlvo: config.patenteAlvo,
-    monte: deps.embaralhar(composicao),
+    monte: deps.embaralhar(cartas),
     cemiterio: [],
     combate: null,
     espiada: null,

@@ -40,7 +40,7 @@ const abrirMesa = async (vista: VistaDaPartida) => {
 describe('TelaMesa', () => {
   const vistaComEspiada: VistaDaPartida = {
     ...vistaBase,
-    espiada: { jogadorId: 'p1', carta: { tipo: 'monstro' } },
+    espiada: { jogadorId: 'p1', carta: { id: 'p-0', tipo: 'monstro' } },
   };
 
   it('mostra o que o vidente pressentiu e oferece encarar ou empurrar', async () => {

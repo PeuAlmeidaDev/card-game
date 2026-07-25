@@ -1,9 +1,20 @@
 import type { Combatente, EstadoCombate, EventoCombate, DecisaoPendente, PassivaCombate } from '@card-dungeon/motor';
 
-/** Carta do baralho de Portais. União ABERTA: `maldicao`/`raca`/`classe`/`item` entram na fatia 8. */
-export type CartaPorta =
+/**
+ * **Receita** de carta: o que compor, SEM identidade. É o que entra em
+ * `ConfigPartida.composicaoPorJogador` — ali a carta ainda não existe, é só a
+ * descrição do baralho. União ABERTA: `maldicao`/`classe`/`item` entram depois.
+ */
+export type ReceitaCarta =
   | { readonly tipo: 'monstro' }
   | { readonly tipo: 'salaVazia' };
+
+/**
+ * Carta como **instância** no jogo: a receita mais uma identidade estável. O id
+ * é o que permite apontar para UMA carta quando existirem cópias iguais na mão
+ * (a mão da fatia 7). Circula por `monte`, `cemiterio`, `espiada` e eventos.
+ */
+export type CartaPorta = ReceitaCarta & { readonly id: string };
 
 /** Embaralhamento injetado (aleatoriedade na borda). */
 export type Embaralhar = <T>(itens: readonly T[]) => T[];
@@ -109,7 +120,7 @@ export interface VistaDaPartida {
 
 export interface ConfigPartida {
   readonly patenteAlvo: number;
-  readonly composicaoPorJogador: readonly CartaPorta[];
+  readonly composicaoPorJogador: readonly ReceitaCarta[];
 }
 
 export interface EntradaJogador {

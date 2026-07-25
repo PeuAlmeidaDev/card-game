@@ -1,14 +1,14 @@
-import type { CartaPorta, Embaralhar } from './tipos';
+import type { CartaPorta, Embaralhar, ReceitaCarta } from './tipos';
 
-export function montarComposicao(nMonstros: number, nSalasVazias: number): CartaPorta[] {
+export function montarComposicao(nMonstros: number, nSalasVazias: number): ReceitaCarta[] {
   return [
-    ...Array.from({ length: nMonstros }, (): CartaPorta => ({ tipo: 'monstro' })),
-    ...Array.from({ length: nSalasVazias }, (): CartaPorta => ({ tipo: 'salaVazia' })),
+    ...Array.from({ length: nMonstros }, (): ReceitaCarta => ({ tipo: 'monstro' })),
+    ...Array.from({ length: nSalasVazias }, (): ReceitaCarta => ({ tipo: 'salaVazia' })),
   ];
 }
 
 /** Composição por jogador: a mesa multiplica isto pelo número de jogadores. */
-export const COMPOSICAO_POR_JOGADOR: readonly CartaPorta[] = montarComposicao(5, 3);
+export const COMPOSICAO_POR_JOGADOR: readonly ReceitaCarta[] = montarComposicao(5, 3);
 
 /**
  * Tira a carta do topo (reshuffle do cemitério se o monte estiver vazio) SEM
