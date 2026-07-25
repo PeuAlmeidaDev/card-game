@@ -327,4 +327,22 @@ describe('TelaMesa — a mão', () => {
 
     expect(screen.getByText(/Orc/)).toBeInTheDocument();
   });
+
+  it('partida terminada na vez do humano: jogar carta fica desabilitado', async () => {
+    // Achado do review: `fecharCombate` termina a partida sem passar a vez, então
+    // `vezDe` continua no vencedor — se a guarda da mão não olhar o desfecho, o
+    // botão "Jogar" fica aceso no exato momento da vitória. O clique manda a ação,
+    // o servidor recusa (a partida já terminou) e a tela da vitória ganha um alerta.
+    await abrirMesa({
+      ...vistaBase,
+      desfecho: 'terminada',
+      classificacao: [
+        { jogadorId: 'p1', posicao: 1 },
+        { jogadorId: 'p2', posicao: 2 },
+      ],
+      suaMao: [{ id: 'p-9', tipo: 'raca', racaId: 'orc' }],
+    });
+
+    expect(await screen.findByRole('button', { name: 'Jogar' })).toBeDisabled();
+  });
 });

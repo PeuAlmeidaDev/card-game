@@ -78,8 +78,13 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [] }: {
   // aqui seria reimplementar regra de jogo na UI — e ela divergiria no dia em que
   // um item mexesse no teto.
   const acimaDoLimite = eu !== undefined && vista.suaMao.length > eu.limiteDeMao;
-  // Mão só se mexe com o turno parado: mesma guarda que o domínio aplica.
-  const podeMexerNaMao = minhaVez && vista.combate === null && espiada === null;
+  // Mão só se mexe com o turno parado: mesma guarda que o domínio aplica. O desfecho
+  // entra aqui porque `fecharCombate` termina a partida SEM passar a vez — sem este
+  // check, `minhaVez` continua true para o vencedor e o botão fica aceso no exato
+  // momento da vitória (o clique leva a um 400, já que `aplicarAcao` recusa tudo
+  // depois do fim).
+  const podeMexerNaMao = minhaVez && vista.desfecho === 'emAndamento'
+    && vista.combate === null && espiada === null;
 
   return (
     <section>
