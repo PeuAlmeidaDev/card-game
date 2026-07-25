@@ -140,6 +140,16 @@ function proximoJogador(estado: EstadoPartida): JogadorNaMesa {
 }
 
 /**
+ * Encerra o turno: passa a vez e fecha a ação. Porta ÚNICA — a sala vazia, a
+ * carta de raça e o fim de combate encerravam cada uma por conta própria, e a
+ * checagem de limite de mão (Plano 3) teria que ser lembrada em três lugares.
+ */
+function encerrarTurno(base: EstadoPartida, eventos: readonly EventoDaMesa[]): ResultadoAcao {
+  const seguinte = proximoJogador(base);
+  return registrar({ ...base, vezDe: seguinte.id }, [...eventos, { tipo: 'vez', jogadorId: seguinte.id }]);
+}
+
+/**
  * Reducer autoritativo da mesa. Recusa do cliente sai como `AcaoInvalida` (a borda
  * traduz em 400); invariante nossa quebrada sai como `Error` cru (500, sem vazar).
  */
@@ -163,10 +173,11 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
 }
 
 /**
- * Resolve uma carta JÁ comprada (o baralho em `base` já reflete a compra): emite
- * o evento `porta` e segue um de três caminhos — `salaVazia` passa a vez,
- * `monstro` abre combate, `raca` (ver o `case` abaixo). É o núcleo compartilhado
- * do vasculhar atômico e da resolução da espiada.
+ * Resolve uma carta JÁ comprada (o baralho em `base` já reflete a compra) e é
+ * dona do seu DESTINO: emite o evento `porta` e segue um de três caminhos —
+ * `salaVazia` passa a vez, `monstro` abre combate, `raca` vai para a mão de
+ * quem vasculhou e passa a vez. É o núcleo compartilhado do vasculhar atômico
+ * e da resolução da espiada.
  */
 function resolverCarta(
   base: EstadoPartida,
@@ -182,16 +193,16 @@ function resolverCarta(
   const revelada: EstadoPartida = { ...base, cemiterio: [...base.cemiterio, carta] };
 
   switch (carta.tipo) {
-    case 'salaVazia': {
-      const seguinte = proximoJogador(revelada);
-      eventos.push({ tipo: 'vez', jogadorId: seguinte.id });
-      return registrar({ ...revelada, vezDe: seguinte.id }, eventos);
+    case 'salaVazia':
+      return encerrarTurno(revelada, eventos);
+    case 'raca': {
+      // A carta sacada NÃO vai ao cemitério: ela fica com quem vasculhou. Por isso
+      // o estado usado aqui é `base` (sem a carta), e não `revelada`.
+      const jogadores = base.jogadores.map((j) => (
+        j.id === jogadorId ? { ...j, mao: [...j.mao, carta] } : j
+      ));
+      return encerrarTurno({ ...base, jogadores }, eventos);
     }
-    case 'raca':
-      // A mão que recebe esta carta chega no Plano 2. Até lá o baralho de
-      // produção não tem raça e este caminho é inalcançável — mas ele precisa
-      // EXISTIR, senão a carta cairia no ramo do monstro e viraria combate.
-      throw new Error('resolverCarta: carta de raça ainda não tem mão para receber');
     case 'monstro':
       break;
     default: {
@@ -359,9 +370,7 @@ function fecharCombate(
     return registrar({ ...semCombate, desfecho: 'terminada', classificacao }, eventos);
   }
 
-  const seguinte = proximoJogador(semCombate);
-  eventos.push({ tipo: 'vez', jogadorId: seguinte.id });
-  return registrar({ ...semCombate, vezDe: seguinte.id }, eventos);
+  return encerrarTurno(semCombate, eventos);
 }
 
 /**

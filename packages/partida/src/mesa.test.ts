@@ -620,22 +620,24 @@ describe('avancarBots — teto de ações automáticas', () => {
   });
 });
 
-describe('resolverCarta — carta de tipo novo', () => {
-  it('recusa a carta de raça com erro NOSSO em vez de abrir combate', () => {
-    // Antes da exaustividade, `if (tipo === 'salaVazia') … else combate` fazia
-    // qualquer tipo novo cair no ramo do monstro — o jogador lutaria contra uma
-    // carta de raça, sem nenhum erro. A mão que recebe esta carta chega no Plano 2;
-    // até lá o caso é inalcançável em produção (o baralho não tem raça) e um
-    // `Error` cru é o certo: invariante nossa quebrada => 500, não culpa do cliente.
+describe('vasculhar — carta de raça', () => {
+  it('a carta de raça vai para a mão de quem vasculhou, e o turno encerra', () => {
+    // O baralho de produção só ganha raça no Plano 4; aqui o monte é forjado.
+    // A carta é PÚBLICA na revelação (evento `porta`, como toda porta) e privada
+    // depois — quem prestou atenção sabe o que o vizinho tem, e é assim mesmo.
     const p0 = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' }] },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
       { embaralhar: semEmbaralhar });
     const p = { ...p0, monte: [raca('r1', 'elfo')] };
 
-    expect(() => aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])))
-      .toThrow('resolverCarta: carta de raça ainda não tem mão para receber');
-    expect(() => aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])))
-      .not.toThrow(AcaoInvalida);
+    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
+
+    expect(r.estado.jogadores[0]?.mao.map((c) => c.id)).toEqual(['r1']);
+    expect(r.estado.jogadores[1]?.mao).toEqual([]);
+    expect(r.estado.cemiterio.some((c) => c.id === 'r1')).toBe(false); // está na mão, não no lixo
+    expect(r.estado.combate).toBeNull();                               // raça não abre combate
+    expect(r.estado.vezDe).toBe('p2');
+    expect(r.eventos[0]).toMatchObject({ tipo: 'porta', jogadorId: 'p1', carta: { tipo: 'raca' } });
   });
 });
 
