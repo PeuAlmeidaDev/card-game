@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { criarPartida, aplicarAcao, avancarBots } from './mesa';
 import { COMPOSICAO_POR_JOGADOR } from './baralho';
+import { MAO_INICIAL_PADRAO, limiteDeMao } from './mao';
 import { escolherAcao } from './bot';
 import { projetarPara } from './projecao';
 import { AcaoInvalida } from './erros';
@@ -1154,5 +1155,52 @@ describe('aplicarAcao — vasculhar com a mão estourada', () => {
     expect(() => aplicarAcao(
       r.estado, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: restante!.id }, deps([]),
     )).not.toThrow();
+  });
+});
+
+describe('a config de PRODUÇÃO não pode nascer travada', () => {
+  // Guard de fronteira, não de comportamento. `MAO_INICIAL_PADRAO` e
+  // `LIMITE_BASE_DE_MAO` são dials que o spec §8 diz que VÃO subir, e
+  // `COMPOSICAO_POR_JOGADOR` ganha carta de raça no Plano 4. Desde que o limite
+  // passou a ser IMPOSTO (a vez não passa acima dele), um dial mal girado não
+  // desbalanceia o jogo — ele MATA o app: o jogador nasce acima do limite,
+  // `vasculhar` é recusado, e a única saída (`entregarCarta`) ainda não tem
+  // botão. Este par de testes é o alarme que dispara aqui em vez de no navegador.
+  const producao = {
+    patenteAlvo: 10,
+    composicaoPorJogador: COMPOSICAO_POR_JOGADOR,
+    maoInicial: MAO_INICIAL_PADRAO,
+  };
+  // A mesa que o `server` monta: 1 humano com a raça do construtor + 3 bots sem raça.
+  const mesaDeProducao: readonly EntradaJogador[] = [
+    { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base, racaId: 'elfo' },
+    { id: 'p2', nome: 'Bot 1', ehBot: true, combatenteBase: base },
+    { id: 'p3', nome: 'Bot 2', ehBot: true, combatenteBase: base },
+    { id: 'p4', nome: 'Bot 3', ehBot: true, combatenteBase: base },
+  ];
+
+  it('ninguém nasce acima do limite de mão', () => {
+    const p = criarPartida('m1', mesaDeProducao, producao, { embaralhar: semEmbaralhar });
+
+    // Lista em vez de um `every`: a falha precisa dizer QUEM estourou e por quanto.
+    const acimaDoLimite = p.jogadores
+      .filter((j) => j.mao.length > limiteDeMao(j))
+      .map((j) => `${j.nome}: ${String(j.mao.length)} cartas, limite ${String(limiteDeMao(j))}`);
+
+    expect(acimaDoLimite).toEqual([]);
+  });
+
+  it('nascer acima do limite deixaria o jogador SEM nenhuma ação legal', () => {
+    // O porquê do teste acima, escrito como comportamento. Com um a mais na mão
+    // inicial, o humano não pode vasculhar (recusado) e não pode jogar carta
+    // nenhuma (o baralho de produção não tem raça) — tela morta no primeiro clique.
+    const p = criarPartida('m1', mesaDeProducao,
+      { ...producao, maoInicial: MAO_INICIAL_PADRAO + 1 }, { embaralhar: semEmbaralhar });
+    const humano = p.jogadores[0];
+
+    expect(humano!.mao.length).toBeGreaterThan(limiteDeMao(humano!));
+    expect(() => aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])))
+      .toThrow('aplicarAcao: sua mão está acima do limite — entregue uma carta');
+    expect(humano!.mao.every((c) => c.tipo !== 'raca')).toBe(true);
   });
 });
