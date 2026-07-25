@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { criarPartida, aplicarAcao, avancarBots } from './mesa';
+import { aplicarAcao, avancarBots } from './mesa';
+import { criarPartida } from './montagem';
 import { COMPOSICAO_POR_JOGADOR } from './baralho';
 import { MAO_INICIAL_PADRAO, limiteDeMao } from './mao';
 import { escolherAcao } from './bot';
@@ -20,58 +21,14 @@ export const entradas: readonly EntradaJogador[] = [
 
 const config = { patenteAlvo: 3, composicaoPorJogador: COMPOSICAO_POR_JOGADOR };
 
-describe('criarPartida', () => {
-  it('coloca todos na patente 1, sem derrotas, e dá a vez ao primeiro assento', () => {
-    const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
+const monstroPadrao: Combatente = { forca: 2, vida: 10, habilidade: 6, agilidade: 1, level: 1 };
+const deps = (dados: readonly number[]) => ({
+  rolar: filaDeDados(dados),
+  embaralhar: semEmbaralhar,
+  monstro: monstroPadrao,
+});
 
-    expect(p.jogadores.map((j) => j.id)).toEqual(['p1', 'p2']);
-    expect(p.jogadores.every((j) => j.patente === 1 && j.derrotas === 0)).toBe(true);
-    expect(p.vezDe).toBe('p1');
-    expect(p.desfecho).toBe('emAndamento');
-    expect(p.combate).toBeNull();
-    expect(p.classificacao).toBeNull();
-  });
-
-  it('monta o baralho escalado pelo número de jogadores', () => {
-    const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
-    // 8 cartas por jogador × 2 jogadores
-    expect(p.monte).toHaveLength(COMPOSICAO_POR_JOGADOR.length * 2);
-    expect(p.cemiterio).toEqual([]);
-  });
-
-  it('registra de quem é a vez no log', () => {
-    const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
-    expect(p.log).toEqual([{ tipo: 'vez', jogadorId: 'p1' }]);
-  });
-
-  it('lança com menos de dois jogadores', () => {
-    expect(() => criarPartida('m1', [entradas[0]!], config, { embaralhar: semEmbaralhar }))
-      .toThrow('criarPartida: a mesa precisa de pelo menos 2 jogadores');
-  });
-
-  it('lança com ids repetidos', () => {
-    // O id é a chave de TUDO na mesa (vez, patente, classificação) e a mesa
-    // resolve jogador por `find`. Com id repetido o `find` sempre acha o primeiro:
-    // a vez nunca sairia do assento 0 e a classificação teria duas linhas do mesmo
-    // jogador. Zod na borda valida a forma de cada entrada, não a unicidade entre elas.
-    const repetido: readonly EntradaJogador[] = [
-      { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base },
-      { id: 'p1', nome: 'Bot 1', ehBot: true, combatenteBase: base },
-    ];
-    expect(() => criarPartida('m1', repetido, config, { embaralhar: semEmbaralhar }))
-      .toThrow('criarPartida: ids de jogador repetidos');
-  });
-
-  it('cada carta do baralho nasce com um id único', () => {
-    // Identidade é o que permite o cliente dizer "jogue ESTA carta" quando a mão
-    // tiver duas cópias da mesma raça. Ids repetidos fariam a ação errada acertar.
-    const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
-    const ids = p.monte.map((c) => c.id);
-
-    expect(ids).toHaveLength(COMPOSICAO_POR_JOGADOR.length * 2);
-    expect(new Set(ids).size).toBe(ids.length);
-  });
-
+describe('aplicarAcao — vasculhar', () => {
   it('o id acompanha a carta quando ela sai do monte', () => {
     const p = criarPartida('m1', entradas,
       { ...config, composicaoPorJogador: [{ tipo: 'salaVazia' }] },
@@ -86,68 +43,6 @@ describe('criarPartida', () => {
     expect(r.estado.cemiterio[0]?.id).toBe(topo?.id);
   });
 
-  it('todo jogador nasce com a mão vazia e sem raça em jogo', () => {
-    const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
-
-    expect(p.jogadores.map((j) => j.mao)).toEqual([[], []]);
-    expect(p.jogadores.map((j) => j.emJogo.raca)).toEqual([null, null]);
-  });
-
-  it('a raça escolhida na entrada nasce como carta JÁ em jogo', () => {
-    // A zona é a fonte única da raça. A escolha do construtor não fica num campo
-    // paralelo: ela entra como carta na mesa, do mesmo jeito que uma carta sacada
-    // vai entrar no Plano 4 — quando o server parar de mandar `racaId`, nada mais
-    // aqui muda.
-    const comRaca: readonly EntradaJogador[] = [
-      { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base, racaId: 'anao' },
-      { id: 'p2', nome: 'Bot 1', ehBot: true, combatenteBase: base },
-    ];
-    const p = criarPartida('m1', comRaca, config, { embaralhar: semEmbaralhar });
-
-    expect(p.jogadores[0]?.emJogo.raca).toMatchObject({ tipo: 'raca', racaId: 'anao' });
-    expect(p.jogadores[0]?.emJogo.raca?.id).toEqual(expect.any(String));
-    expect(p.jogadores[1]?.emJogo.raca).toBeNull();
-  });
-
-  it('distribui a mão inicial do topo do baralho', () => {
-    const p = criarPartida('m1', entradas, { ...config, maoInicial: 2 }, { embaralhar: semEmbaralhar });
-
-    expect(p.jogadores.map((j) => j.mao.length)).toEqual([2, 2]);
-    expect(p.monte).toHaveLength(COMPOSICAO_POR_JOGADOR.length * 2 - 4);
-    // Nenhuma carta em dois lugares ao mesmo tempo: a mão SAI do baralho.
-    const todas = [...p.jogadores.flatMap((j) => j.mao), ...p.monte].map((c) => c.id);
-    expect(new Set(todas).size).toBe(todas.length);
-  });
-
-  it('recusa distribuir mais cartas do que o baralho tem', () => {
-    // Sem o guard, `slice` devolve mãos curtas em silêncio e a mesa abre com
-    // jogadores desiguais — configuração errada tem que falhar alto, na criação.
-    expect(() => criarPartida('m1', entradas,
-      { ...config, composicaoPorJogador: [{ tipo: 'salaVazia' }], maoInicial: 4 },
-      { embaralhar: semEmbaralhar }))
-      .toThrow('criarPartida: o baralho não tem cartas para a mão inicial');
-  });
-
-  it('recusa a mão inicial quando ela consome o baralho EXATAMENTE (não sobra carta pro 1º vasculhar)', () => {
-    // Caso-limite do guard: distribuidas === cartas.length. Com `>` isto passava
-    // e a mesa nascia com monte:[] e cemiterio:[] — o 1º `vasculhar` reembaralharia
-    // um cemitério vazio e explodiria (`tirarDoTopo: baralho vazio`), um 500 na
-    // mesa que este mesmo validador acabou de aprovar.
-    expect(() => criarPartida('m1', entradas,
-      { ...config, composicaoPorJogador: [{ tipo: 'salaVazia' }], maoInicial: 1 },
-      { embaralhar: semEmbaralhar }))
-      .toThrow('criarPartida: o baralho não tem cartas para a mão inicial');
-  });
-});
-
-const monstroPadrao: Combatente = { forca: 2, vida: 10, habilidade: 6, agilidade: 1, level: 1 };
-const deps = (dados: readonly number[]) => ({
-  rolar: filaDeDados(dados),
-  embaralhar: semEmbaralhar,
-  monstro: monstroPadrao,
-});
-
-describe('aplicarAcao — vasculhar', () => {
   it('rejeita ação de quem não tem a vez', () => {
     const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
     expect(() => aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p2' }, deps([])))

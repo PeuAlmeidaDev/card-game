@@ -1,8 +1,7 @@
 import type { Combatente, Passo, RolarD12, PassivaCombate } from '@card-dungeon/motor';
 import { AcaoIlegal, criarCombate, proximoPasso } from '@card-dungeon/motor';
 import type {
-  AcaoDaMesa, CartaPorta, ConfigPartida, EntradaJogador, Embaralhar, EstadoPartida, EventoDaMesa, InfoRaca,
-  JogadorNaMesa,
+  AcaoDaMesa, CartaPorta, Embaralhar, EstadoPartida, EventoDaMesa, InfoRaca, JogadorNaMesa,
 } from './tipos';
 import { tirarDoTopo } from './baralho';
 import { escolherAcao } from './bot';
@@ -39,86 +38,6 @@ function passivaDoLutador(deps: DepsMesa, jogador: JogadorNaMesa | undefined): P
 export interface ResultadoAcao {
   readonly estado: EstadoPartida;
   readonly eventos: readonly EventoDaMesa[];
-}
-
-export function criarPartida(
-  id: string,
-  entradas: readonly EntradaJogador[],
-  config: ConfigPartida,
-  deps: { readonly embaralhar: Embaralhar },
-): EstadoPartida {
-  if (entradas.length < 2) {
-    throw new Error('criarPartida: a mesa precisa de pelo menos 2 jogadores');
-  }
-  // O id é a chave de tudo na mesa e é resolvido por `find`: repetido, a vez
-  // nunca sairia do primeiro assento e a classificação duplicaria o jogador.
-  if (new Set(entradas.map((e) => e.id)).size !== entradas.length) {
-    throw new Error('criarPartida: ids de jogador repetidos');
-  }
-
-  const jogadores: readonly JogadorNaMesa[] = entradas.map((e) => ({
-    id: e.id,
-    nome: e.nome,
-    ehBot: e.ehBot,
-    combatenteBase: e.combatenteBase,
-    patente: 1,
-    derrotas: 0,
-    mao: [],
-    // A escolha do construtor entra como carta JÁ em jogo. O id `r-<jogador>` não
-    // colide com o `p-N` do baralho e é estável: esta carta nunca foi comprada.
-    emJogo: { raca: e.racaId === undefined ? null : { id: `r-${e.id}`, tipo: 'raca', racaId: e.racaId } },
-  }));
-
-  // Baralho da MESA: a composição por jogador multiplicada pelo tamanho da mesa.
-  const receitas = Array.from({ length: jogadores.length }, () => config.composicaoPorJogador).flat();
-  // Embaralha ANTES de carimbar: se o id nascesse sobre a composição ORDENADA
-  // (ex.: 5 monstros seguidos de 3 salas vazias por jogador), `p-i` viraria uma
-  // função pública e determinística do tipo da carta — sem vazar nada hoje (só
-  // a espiada cruza o fio com carta oculta, e a projeção já a entrega só ao
-  // dono), mas basta um evento público futuro carregar `cartaId` para o id
-  // entregar qual carta era. Carimbar depois do embaralho quebra essa correlação.
-  const cartas: readonly CartaPorta[] = deps.embaralhar(receitas).map((r, i) => ({ ...r, id: `p-${String(i)}` }));
-
-  // A mão sai do TOPO do baralho já embaralhado — mesmo lugar de onde sairia se
-  // fosse comprada carta a carta. Bloco contíguo por jogador em vez de round-robin
-  // porque o baralho já está aleatório: alternar não acrescentaria aleatoriedade.
-  const porJogador = config.maoInicial ?? 0;
-  const distribuidas = porJogador * jogadores.length;
-  // `>=`, não `>`: a mesa precisa sobrar ao menos 1 carta no monte para o 1º
-  // `vasculhar` ter o que tirar. Com `distribuidas === cartas.length` a mesa
-  // nasceria com monte:[] e cemiterio:[], e `tirarDoTopo` reembaralharia um
-  // cemitério vazio e lançaria — um 500 na mesa que este guard acabou de aprovar.
-  if (distribuidas >= cartas.length) {
-    throw new Error('criarPartida: o baralho não tem cartas para a mão inicial');
-  }
-  const comMao: readonly JogadorNaMesa[] = jogadores.map((j, i) => ({
-    ...j,
-    mao: cartas.slice(i * porJogador, (i + 1) * porJogador),
-  }));
-  const monte = cartas.slice(distribuidas);
-
-  const primeiro = jogadores[0];
-  if (primeiro === undefined) {
-    // Inalcançável: o guard acima já garantiu 2+ jogadores. Existe porque
-    // `noUncheckedIndexedAccess` tipa o acesso por índice como possivelmente
-    // undefined — mensagem própria para não confundir com a recusa de entrada.
-    throw new Error('criarPartida: invariante quebrada, mesa sem primeiro assento');
-  }
-  const abertura: EventoDaMesa = { tipo: 'vez', jogadorId: primeiro.id };
-
-  return {
-    id,
-    jogadores: comMao,
-    vezDe: primeiro.id,
-    patenteAlvo: config.patenteAlvo,
-    monte,
-    cemiterio: [],
-    combate: null,
-    espiada: null,
-    desfecho: 'emAndamento',
-    classificacao: null,
-    log: [abertura],
-  };
 }
 
 /**

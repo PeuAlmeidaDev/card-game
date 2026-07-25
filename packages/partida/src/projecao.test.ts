@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { projetarPara, versaoDe } from './projecao';
-import { criarPartida, aplicarAcao } from './mesa';
+import { aplicarAcao } from './mesa';
+import { criarPartida } from './montagem';
 import { COMPOSICAO_POR_JOGADOR } from './baralho';
 import { AcaoInvalida } from './erros';
 import { filaDeDados } from './testes/dados';
