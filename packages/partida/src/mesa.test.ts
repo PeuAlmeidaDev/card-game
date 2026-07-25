@@ -748,6 +748,20 @@ describe('aplicarAcao — jogarCarta', () => {
       .toThrow('aplicarAcao: só carta de raça entra em jogo nesta fatia');
   });
 
+  it('recusa trocar de raça com uma espiada pendente', () => {
+    // O guard gêmeo do `vasculhar`: sem ele daria para trocar de raça no meio de
+    // uma Presciência pendente (a espiada não travaria a mão, só o combate).
+    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const comEspiada = aplicarAcao(comMao(p0, [raca('r1', 'anao')]),
+      { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])).estado;
+    expect(comEspiada.espiada).not.toBeNull();
+
+    expect(() => aplicarAcao(comEspiada, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r1' }, deps([])))
+      .toThrow(AcaoInvalida);
+    expect(() => aplicarAcao(comEspiada, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r1' }, deps([])))
+      .toThrow('aplicarAcao: há uma espiada pendente');
+  });
+
   it('recusa trocar de raça com um combate em curso', () => {
     // Bible §5: troca de raça só fora do combate. A guarda fala o vocabulário que
     // o reducer já tem (`combate`/`espiada`) — não há máquina de fases aqui.
