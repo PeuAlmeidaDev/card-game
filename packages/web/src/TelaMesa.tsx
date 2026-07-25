@@ -34,6 +34,9 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO }: { escolhas?: Escolhas }
     definirErro(null);
     const resposta = await api.agir({
       params: { id: vista.id },
+      // Só a intenção e a versão: QUEM age vem da conexão, não do corpo (mandar o
+      // id daqui deixaria jogar no lugar de outro); a versão é a que esta tela vê —
+      // se o servidor já avançou, ele responde 409 sem rolar dado.
       body: { acao, versao: vista.versao },
     });
     if (resposta.status === 200 || resposta.status === 409) {
