@@ -4,7 +4,7 @@ import type {
   AcaoDaMesa, CartaPorta, ConfigPartida, EntradaJogador, Embaralhar, EstadoPartida, EventoDaMesa, InfoRaca,
   JogadorNaMesa,
 } from './tipos';
-import { comprarCarta, tirarDoTopo } from './baralho';
+import { tirarDoTopo } from './baralho';
 import { escolherAcao } from './bot';
 import { classificar } from './classificacao';
 import { AcaoInvalida } from './erros';
@@ -176,11 +176,16 @@ function resolverCarta(
 ): ResultadoAcao {
   const eventos: EventoDaMesa[] = [{ tipo: 'porta', jogadorId, carta }];
 
+  // A carta revelada vai para o cemitério AQUI, um lugar só. Antes cada caminho de
+  // entrada descartava por conta própria — e a carta que vai para a MÃO (Task 5)
+  // teria que ser retirada do cemitério depois de lá colocada.
+  const revelada: EstadoPartida = { ...base, cemiterio: [...base.cemiterio, carta] };
+
   switch (carta.tipo) {
     case 'salaVazia': {
-      const seguinte = proximoJogador(base);
+      const seguinte = proximoJogador(revelada);
       eventos.push({ tipo: 'vez', jogadorId: seguinte.id });
-      return registrar({ ...base, vezDe: seguinte.id }, eventos);
+      return registrar({ ...revelada, vezDe: seguinte.id }, eventos);
     }
     case 'raca':
       // A mão que recebe esta carta chega no Plano 2. Até lá o baralho de
@@ -196,7 +201,7 @@ function resolverCarta(
     }
   }
 
-  const jogador = base.jogadores.find((j) => j.id === jogadorId);
+  const jogador = revelada.jogadores.find((j) => j.id === jogadorId);
   if (jogador === undefined) {
     throw new Error(`resolverCarta: jogador ${jogadorId} não está na mesa`);
   }
@@ -206,7 +211,7 @@ function resolverCarta(
   const passo = criarCombate(combatente, deps.monstro, deps.rolar, passiva);
   eventos.push({ tipo: 'combate', jogadorId, eventos: passo.eventos });
   return registrar(
-    { ...base, combate: { estado: passo.estado, proximaDecisao: passo.proximaDecisao } },
+    { ...revelada, combate: { estado: passo.estado, proximaDecisao: passo.proximaDecisao } },
     eventos,
   );
 }
@@ -232,9 +237,9 @@ function vasculhar(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): Re
     );
   }
 
-  const compra = comprarCarta(estado.monte, estado.cemiterio, deps.embaralhar);
-  const base: EstadoPartida = { ...estado, monte: compra.monte, cemiterio: compra.cemiterio };
-  return resolverCarta(base, jogadorId, compra.carta, deps);
+  const t = tirarDoTopo(estado.monte, estado.cemiterio, deps.embaralhar);
+  const base: EstadoPartida = { ...estado, monte: t.monte, cemiterio: t.cemiterio };
+  return resolverCarta(base, jogadorId, t.carta, deps);
 }
 
 /** As ações que só fazem sentido com uma espiada pendente. */
@@ -252,11 +257,7 @@ function resolverEspiada(estado: EstadoPartida, acao: AcaoDeEspiada, deps: DepsM
   }
 
   if (acao.tipo === 'manterCarta') {
-    const base: EstadoPartida = {
-      ...estado,
-      espiada: null,
-      cemiterio: [...estado.cemiterio, espiada.carta],
-    };
+    const base: EstadoPartida = { ...estado, espiada: null };
     return resolverCarta(base, espiada.jogadorId, espiada.carta, deps);
   }
 
@@ -275,7 +276,7 @@ function resolverEspiada(estado: EstadoPartida, acao: AcaoDeEspiada, deps: DepsM
   const monteBase = precisaReembaralhar ? deps.embaralhar(estado.cemiterio) : estado.monte;
   const cemiterioBase = precisaReembaralhar ? [] : estado.cemiterio;
   const monteComEmpurrada: readonly CartaPorta[] = [...monteBase, espiada.carta];
-  const compra = comprarCarta(monteComEmpurrada, cemiterioBase, deps.embaralhar);
+  const compra = tirarDoTopo(monteComEmpurrada, cemiterioBase, deps.embaralhar);
   const base: EstadoPartida = {
     ...estado,
     espiada: null,
