@@ -20,18 +20,23 @@ export interface MonstroCarta {
 }
 
 /**
- * 🎚️ Quatro monstros em três faixas de perigo. O **Goblin é idêntico ao
- * `MONSTRO_PADRAO`** da fatia 2: é a linha de base do balanceamento medido na
- * fatia 5, preservada de propósito para que a dificuldade que mudar seja
- * atribuível às cartas novas.
+ * 🎚️ Cinco monstros em três faixas de perigo, em ordem de perigo crescente. O
+ * **Goblin é idêntico ao `MONSTRO_PADRAO`** da fatia 2: é a linha de base do
+ * balanceamento medido na fatia 5, preservada de propósito para que a dificuldade
+ * que mudar seja atribuível às cartas novas.
  *
  * Lembrete da regra: o atacante ACERTA quando a rolagem de 1d12 é ≤ habilidade.
  * Habilidade 2 é 2/12; habilidade alta transforma o monstro em máquina de acerto.
+ *
+ * O **Carniçal** troca resistência por precisão — é o que mais acerta (4/12) e o
+ * que menos aguenta na faixa dele. Nenhum outro monstro ocupa esse eixo, e é o
+ * que o mantém uma escolha diferente e não um Lobo Sombrio com outros números.
  */
 export const MONSTROS: readonly MonstroCarta[] = [
   { id: 'rato-gigante', nome: 'Rato Gigante', forca: 3, vida: 14, habilidade: 2, agilidade: 3, level: 1 },
   { id: 'goblin', nome: 'Goblin', forca: 4, vida: 20, habilidade: 2, agilidade: 4, level: 1 },
   { id: 'lobo-sombrio', nome: 'Lobo Sombrio', forca: 4, vida: 18, habilidade: 3, agilidade: 7, level: 2 },
+  { id: 'carnical', nome: 'Carniçal', forca: 5, vida: 16, habilidade: 4, agilidade: 4, level: 2 },
   { id: 'ogro', nome: 'Ogro', forca: 6, vida: 28, habilidade: 3, agilidade: 2, level: 3 },
 ];
 

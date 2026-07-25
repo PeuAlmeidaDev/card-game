@@ -53,39 +53,36 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
   const repositorio = criarRepositorio();
   const monstros = opcoes.monstros ?? MONSTROS_SACAVEIS;
   if (monstros.length === 0) {
-    // Invariante da borda: sem bestiário não há baralho montável, e o erro tem
-    // que aparecer aqui e não como um 500 no primeiro `vasculhar` da partida.
+    // Invariante da borda: com a composição derivando as cartas de monstro do
+    // bestiário, um bestiário vazio produz ZERO monstro — e um baralho sem
+    // monstro é uma partida que ninguém pode vencer, porque a patente só sobe por
+    // abate. Falhar na construção é melhor do que abrir uma mesa insolúvel.
     throw new Error('buildApp: bestiário vazio');
   }
   const acharMonstro = (id: string) => monstros.find((m) => m.id === id);
 
   /**
-   * Baralho de produção (spec §8): **5 cartas de monstro** por jogador (a
-   * densidade que a fatia 5 calibrou), tiradas do bestiário em rodízio, mais 3
-   * salas vazias e uma carta para cada raça sacável. Numa mesa de 4 isso dá 48
-   * cartas — a repetição vem da multiplicação por assento, não daqui.
+   * Baralho de produção (spec §8): **uma carta para cada monstro do bestiário**,
+   * 3 salas vazias, e **uma carta para cada raça sacável** — por jogador. Numa
+   * mesa de 4 isso dá 48 cartas com 4 cópias de cada uma; a repetição vem da
+   * multiplicação por assento, não daqui.
    *
-   * O rodízio (`i % monstros.length`) é o que mantém a composição correta quando
-   * os testes injetam um bestiário de UM monstro só: repetir esse único id 5
-   * vezes é sempre resolvível, enquanto costurar um id fixo à lista injetada
-   * produziria uma carta que o catálogo daquele teste não conhece — um 500 no
-   * meio da partida.
+   * A regra é a MESMA para monstro e para raça de propósito. A alternativa — uma
+   * contagem fixa de cartas de monstro preenchida em rodízio pelo bestiário —
+   * fazia a densidade depender do tamanho do catálogo: 5 cartas sobre 4 monstros
+   * punha o mais fraco em dobro, uma decisão de balanceamento que ninguém tomou e
+   * que nada no código declarava. Derivar a quantidade do catálogo faz a
+   * repetição desaparecer em vez de precisar ser escolhida, e o dial que passa a
+   * existir (quantos monstros o jogo tem) mora onde ele é visível: em `MONSTROS`.
    *
    * Montado no `server` porque é aqui que catálogo e mesa se encontram: `partida`
    * não conhece `cartas` de propósito, e as regras não devem conhecer.
    */
-  const CARTAS_DE_MONSTRO_POR_JOGADOR = 5;
-  const idsDeMonstro = Array.from({ length: CARTAS_DE_MONSTRO_POR_JOGADOR }, (_, i) => {
-    const escolhido = monstros[i % monstros.length];
-    if (escolhido === undefined) {
-      // Inalcançável: o guard de bestiário vazio já passou. Existe porque
-      // `noUncheckedIndexedAccess` tipa o acesso por índice como possivelmente
-      // undefined.
-      throw new Error('buildApp: invariante quebrada ao compor o bestiário');
-    }
-    return escolhido.id;
-  });
-  const composicaoDeProducao = montarComposicao(3, idsDeMonstro, RACAS_SACAVEIS.map((r) => r.id));
+  const composicaoDeProducao = montarComposicao(
+    3,
+    monstros.map((m) => m.id),
+    RACAS_SACAVEIS.map((r) => r.id),
+  );
 
   // O server RESOLVE (pergunta à carta), nunca DECIDE (`racaId === 'elfo'` seria
   // regra de jogo na borda). As cartas do pacote `cartas` satisfazem

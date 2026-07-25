@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { RolarD12 } from '@card-dungeon/motor';
 import type { ResultadoDuelo, Catalogo, VistaDaPartida } from '@card-dungeon/shared';
 import type { Embaralhar } from '@card-dungeon/partida';
+import { obterMonstro } from '@card-dungeon/cartas';
 import { buildApp } from './app';
 
 function filaDeDados(rolagens: readonly number[]): RolarD12 {
@@ -224,6 +225,42 @@ describe('mesa', () => {
     expect(vista.cartasNoMonte).toBe(12 * 4 - 4 * 4);
     expect(vista.suaMao.some((c) => c.tipo === 'raca')).toBe(true);
     await app.close();
+  });
+
+  it('toda carta de monstro do baralho de produção resolve pelo catálogo', async () => {
+    // O irmão do alarme acima, sobre a invariante que sustenta o desenho inteiro:
+    // baralho de produção ⊆ catálogo. Hoje ela vale só porque a composição e o
+    // resolvedor derivam da MESMA lista — uma edição futura que costure um id à
+    // mão falharia como 500 no meio de uma partida, não aqui.
+    //
+    // A sonda é o próprio `embaralhar`: `criarPartida` o chama com o baralho
+    // INTEIRO, então ele vê todas as cartas, não só as 4 que caem na mão.
+    const vistas: { readonly tipo: string; readonly monstroId?: string }[] = [];
+    const espiaOBaralho: Embaralhar = (itens) => {
+      for (const item of itens) {
+        if (typeof item === 'object' && item !== null && 'tipo' in item) {
+          vistas.push(item as { tipo: string; monstroId?: string });
+        }
+      }
+      return [...itens];
+    };
+    const app = buildApp({ embaralhar: espiaOBaralho });
+    await criar(app);
+
+    const cartasDeMonstro = vistas.filter((c) => c.tipo === 'monstro');
+    expect(cartasDeMonstro.length).toBeGreaterThan(0);   // senão o loop abaixo passa vazio
+    const orfas = cartasDeMonstro
+      .map((c) => c.monstroId)
+      .filter((id) => id === undefined || obterMonstro(id) === undefined);
+    // Lista, não um `every`: a falha precisa dizer QUAL id ficou órfão.
+    expect(orfas).toEqual([]);
+    await app.close();
+  });
+
+  it('recusa nascer com o bestiário vazio', () => {
+    // Sem monstro no baralho ninguém sobe de patente e a partida não tem como
+    // terminar. O erro pertence à construção do app, não ao primeiro `vasculhar`.
+    expect(() => buildApp({ monstros: [] })).toThrow(/bestiário vazio/);
   });
 
   it('rejeita escolhas inválidas com 400', async () => {
