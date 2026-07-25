@@ -3,7 +3,7 @@ import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TelaMesa } from './TelaMesa';
 import { api } from './api';
-import type { VistaDaPartida } from '@card-dungeon/shared';
+import type { Catalogo, VistaDaPartida } from '@card-dungeon/shared';
 
 const combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
 
@@ -32,9 +32,9 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const abrirMesa = async (vista: VistaDaPartida) => {
+const abrirMesa = async (vista: VistaDaPartida, racas: Catalogo['racas'] = []) => {
   vi.spyOn(api, 'criarPartida').mockResolvedValue({ status: 200, body: vista } as never);
-  render(<TelaMesa />);
+  render(<TelaMesa racas={racas} />);
   await userEvent.click(screen.getByRole('button', { name: /nova partida/i }));
 };
 
@@ -89,9 +89,14 @@ describe('TelaMesa', () => {
   it('descreve corretamente a carta pressentida de cada tipo', async () => {
     // Ternário sobre união ABERTA mente: antes desta correção, uma carta de raça
     // era anunciada como "uma sala vazia" na única tela que existe para informar.
-    await abrirMesa({ ...vistaBase, espiada: { jogadorId: 'p1', carta: { id: 'p-9', tipo: 'raca', racaId: 'elfo' } } });
+    // Desde a task 4, a carta de raça é nomeada pelo nome (não mais "uma carta de
+    // raça" genérico) — por isso o teste passa o catálogo de raças e afirma o nome.
+    await abrirMesa(
+      { ...vistaBase, espiada: { jogadorId: 'p1', carta: { id: 'p-9', tipo: 'raca', racaId: 'elfo' } } },
+      [{ id: 'elfo', nome: 'Elfo', texto: 'Presciência: vê o perigo antes de encará-lo.' }],
+    );
 
-    expect(await screen.findByText(/pressente.*carta de raça/i)).toBeInTheDocument();
+    expect(await screen.findByText(/pressente.*carta de Elfo/i)).toBeInTheDocument();
   });
 
   it('sem espiada na vista, os botões da Presciência ficam desabilitados', async () => {

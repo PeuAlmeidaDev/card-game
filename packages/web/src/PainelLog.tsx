@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { narrarCombate } from './narrarCombate';
 import { narrarPorta } from './narrarPorta';
-import type { EventoDaMesa, JogadorPublico } from '@card-dungeon/shared';
+import { descreverCarta } from './descreverCarta';
+import type { Catalogo, EventoDaMesa, JogadorPublico } from '@card-dungeon/shared';
 
 /**
  * Uma cor por ASSENTO, na ordem de turno. Derivar do índice (e não de um hash do
@@ -23,12 +24,16 @@ export function corDoJogador(jogadores: readonly JogadorPublico[], jogadorId: st
  * causou. Componente próprio porque a `TelaMesa` já carrega estado de partida,
  * ações e erro — render de log é outra responsabilidade.
  */
-export function PainelLog({ log, jogadores, voce }: {
+export function PainelLog({ log, jogadores, voce, racas }: {
   readonly log: readonly EventoDaMesa[];
   readonly jogadores: readonly JogadorPublico[];
   readonly voce: string;
+  readonly racas: Catalogo['racas'];
 }) {
   const nomeDe = (id: string): string => jogadores.find((j) => j.id === id)?.nome ?? id;
+  // Cai no id quando a raça é desconhecida: skew de versão (bundle antigo, raça
+  // nova no server) tem que degradar para um texto feio, nunca para tela branca.
+  const nomeDaRaca = (id: string): string => racas.find((r) => r.id === id)?.nome ?? id;
 
   // `null` = Todos. O filtro é estado LOCAL: é preferência de leitura, não estado
   // de jogo — subir isso para a TelaMesa (ou para o servidor) só acoplaria coisas.
@@ -75,19 +80,21 @@ export function PainelLog({ log, jogadores, voce }: {
           const cor = 'jogadorId' in evento ? corDoJogador(jogadores, evento.jogadorId) : CINZA;
           return (
             <li key={i} style={{ color: cor }}>
-              {evento.tipo === 'porta' && narrarPorta(evento.carta, evento.jogadorId === voce ? 'Você' : nomeDe(evento.jogadorId))}
+              {evento.tipo === 'porta' && narrarPorta(evento.carta, evento.jogadorId === voce ? 'Você' : nomeDe(evento.jogadorId), nomeDaRaca)}
               {evento.tipo === 'patente' && `${nomeDe(evento.jogadorId)} subiu para a patente ${String(evento.patente)}.`}
               {evento.tipo === 'derrota' && `${nomeDe(evento.jogadorId)} foi evacuado.`}
               {evento.tipo === 'vez' && <small>Vez de {nomeDe(evento.jogadorId)}.</small>}
               {evento.tipo === 'fim' && 'A partida terminou.'}
-              {/* Três eventos ainda não são narrados aqui: `racaEmJogo`, `entrega` e
-                  `descarte` (os dois últimos nasceram na fatia da caridade). Os
-                  três esbarram na mesma dívida DELIBERADA: o texto bom precisa de
-                  dados (nome da raça, texto da carta) que só o catálogo do pacote
-                  `cartas` conhece, e essa ligação é o Plano 4. A cadeia de `&&`
-                  não dá pressão do compilador (nenhum tipo de evento fica sem
-                  `case`), então este comentário é o único lembrete de que os três
-                  eventos existem e são mudos. */}
+              {evento.tipo === 'racaEmJogo' && `${nomeDe(evento.jogadorId)} entra em campo como ${nomeDaRaca(evento.carta.racaId)}.`}
+              {/* A entrega é PRIVADA: o evento não carrega a carta (spec §5) e a apresentação
+                  não pode inventar o que ele não diz. Só o destinatário descobre o quê, pela
+                  própria mão. A rolagem aparece quando houve empate a desempatar. */}
+              {evento.tipo === 'entrega' && (
+                `${nomeDe(evento.jogadorId)} entregou uma carta a ${nomeDe(evento.paraJogadorId)}.`
+                + (evento.rolagem === null ? '' : ` (1d12: ${String(evento.rolagem)})`)
+              )}
+              {/* O descarte é PÚBLICO: o cemitério já é zona aberta, esconder aqui seria teatro. */}
+              {evento.tipo === 'descarte' && `${nomeDe(evento.jogadorId)} descartou ${descreverCarta(evento.carta, nomeDaRaca)}.`}
               {evento.tipo === 'combate' && (
                 <>
                   {evento.jogadorId === voce ? 'Seu combate:' : `Combate de ${nomeDe(evento.jogadorId)}:`}

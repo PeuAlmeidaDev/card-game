@@ -107,7 +107,7 @@ export function App() {
       {/* A mesa recebe as MESMAS escolhas do construtor acima — o servidor monta
           o combatente a partir delas, como já faz no duelo. Passar as escolhas
           em vez de um personagem fixo é o que liga esta tela ao resto do jogo. */}
-      <TelaMesa escolhas={{ racaId, classeId, itemIds }} />
+      <TelaMesa escolhas={{ racaId, classeId, itemIds }} racas={catalogo.racas} />
     </main>
   );
 }

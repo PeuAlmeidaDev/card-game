@@ -13,14 +13,18 @@ import type { CartaPorta } from '@card-dungeon/shared';
  * esta função quando um tipo de carta entrar na união, e o retorno neutro evita
  * que um bundle antigo com um tipo desconhecido derrube a tela.
  */
-export function narrarPorta(carta: CartaPorta, quem: string): string {
+export function narrarPorta(
+  carta: CartaPorta,
+  quem: string,
+  nomeDaRaca: (racaId: string) => string,
+): string {
   switch (carta.tipo) {
     case 'monstro':
       return `${quem} dá de cara com um monstro!`;
     case 'salaVazia':
       return `${quem} vasculha o local e não encontra nada.`;
     case 'raca':
-      return `${quem} encontra uma carta de raça.`;
+      return `${quem} encontra uma carta de ${nomeDaRaca(carta.racaId)}.`;
     default: {
       const naoTratada: never = carta;
       void naoTratada;

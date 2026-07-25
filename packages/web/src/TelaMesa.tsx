@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api } from './api';
 import { PainelLog } from './PainelLog';
 import { descreverCarta } from './descreverCarta';
-import type { AcaoNoFio, Escolhas, VistaDaPartida } from '@card-dungeon/shared';
+import type { AcaoNoFio, Catalogo, Escolhas, VistaDaPartida } from '@card-dungeon/shared';
 
 /**
  * Usado quando a tela roda sozinha; o `App` passa as escolhas reais do construtor.
@@ -13,7 +13,10 @@ import type { AcaoNoFio, Escolhas, VistaDaPartida } from '@card-dungeon/shared';
  */
 const ESCOLHAS_PADRAO: Escolhas = { racaId: 'elfo', classeId: 'guerreiro', itemIds: [] };
 
-export function TelaMesa({ escolhas = ESCOLHAS_PADRAO }: { escolhas?: Escolhas }) {
+export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [] }: {
+  readonly escolhas?: Escolhas;
+  readonly racas?: Catalogo['racas'];
+}) {
   const [vista, definirVista] = useState<VistaDaPartida | null>(null);
   const [erro, definirErro] = useState<string | null>(null);
 
@@ -66,6 +69,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO }: { escolhas?: Escolhas }
   // A tela não precisa checar de quem é — se veio, é sua.
   const espiada = vista.espiada;
   const nomeDe = (id: string): string => vista.jogadores.find((j) => j.id === id)?.nome ?? id;
+  const nomeDaRaca = (id: string): string => racas.find((r) => r.id === id)?.nome ?? id;
   // A vida máxima do jogador é a do combatente base — a patente muda o dano, não a vida.
   // Do monstro só temos o valor corrente: a vista não carrega o máximo dele.
   const vidaMaxima = vista.jogadores.find((j) => j.id === vista.voce)?.combatenteBase.vida ?? null;
@@ -107,7 +111,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO }: { escolhas?: Escolhas }
       ) : (
         <>
           {espiada !== null && (
-            <p>Você pressente {descreverCarta(espiada.carta)} adiante.</p>
+            <p>Você pressente {descreverCarta(espiada.carta, nomeDaRaca)} adiante.</p>
           )}
 
           <div>
@@ -153,7 +157,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO }: { escolhas?: Escolhas }
         </>
       )}
 
-      <PainelLog log={vista.log} jogadores={vista.jogadores} voce={vista.voce} />
+      <PainelLog log={vista.log} jogadores={vista.jogadores} voce={vista.voce} racas={racas} />
 
       {erro !== null && <p role="alert">{erro}</p>}
     </section>
