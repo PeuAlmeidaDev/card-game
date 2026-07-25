@@ -226,10 +226,14 @@ describe('TelaMesa', () => {
       ],
     });
 
+    // Afirma a POSIÇÃO e o NOME. Só a posição deixava o `nomeDe` desta tela sem
+    // cobertura nenhuma: um mutation-test trocando-o pela identidade passava com
+    // a suíte inteira verde, e a tela de desfecho — onde o jogador lê quem ganhou
+    // — renderizaria uuid em vez de nome sem nada acusar.
     await waitFor(() => {
-      expect(screen.getByText(/1º/)).toBeInTheDocument();
+      expect(screen.getByText(/1º\s*—\s*Bot 1/)).toBeInTheDocument();
     });
-    expect(screen.getByText(/2º/)).toBeInTheDocument();
+    expect(screen.getByText(/2º\s*—\s*Você/)).toBeInTheDocument();
     // com a partida encerrada não há mais o que clicar
     expect(screen.queryByRole('button', { name: /vasculhar local/i })).not.toBeInTheDocument();
   });
