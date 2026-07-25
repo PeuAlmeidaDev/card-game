@@ -27,7 +27,7 @@ pnpm workspaces. Node ≥ 22.13.
 - **Commits em PORTUGUÊS**, Conventional Commits, **um commit por task** (o `CLAUDE.md` do projeto
   sobrescreve a preferência global de commits em inglês). Trailer `Co-Authored-By` mantido.
 - **Regra de jogo mora no domínio.** Nada de lógica de caridade no `server` nem no `web`.
-- **Gate antes de cada commit:** `pnpm -r test` · `pnpm -r typecheck` · `pnpm -r lint`. A workspace
+- **Gate antes de cada commit:** `pnpm -r test` · `pnpm -r typecheck` · `pnpm lint` (na raiz, `eslint .` — NAO existe `pnpm -r lint`). A workspace
   INTEIRA, não só o pacote tocado — campo novo em tipo compartilhado já quebrou literais montados à
   mão em teste de outro pacote duas vezes nesta fatia.
 - **Ponto de partida:** branch `feat/fatia-7-caridade`, a partir da `main` `d8d1d95` (PR #16
@@ -335,12 +335,12 @@ export function destinoDaCaridade(
 ```bash
 pnpm --filter @card-dungeon/partida test caridade
 ```
-Esperado: PASS (11 testes).
+Esperado: PASS (10 testes).
 
 - [ ] **Passo 5: gate + commit**
 
 ```bash
-pnpm -r test && pnpm -r typecheck && pnpm -r lint
+pnpm -r test && pnpm -r typecheck && pnpm lint
 git add packages/partida/src/caridade.ts packages/partida/src/caridade.test.ts
 git commit -m "feat(partida): decide o destino da caridade pela patente, com 1d12 no empate"
 ```
@@ -503,7 +503,7 @@ Esperado: PASS, incluindo os 226 testes anteriores da workspace.
 - [ ] **Passo 5: gate + commit**
 
 ```bash
-pnpm -r test && pnpm -r typecheck && pnpm -r lint
+pnpm -r test && pnpm -r typecheck && pnpm lint
 git add packages/partida/src/mesa.ts packages/partida/src/mesa.test.ts
 git commit -m "feat(partida): o fim de turno cobra o limite de mão antes de passar a vez"
 ```
@@ -899,7 +899,7 @@ Esperado: PASS em toda a workspace.
 - [ ] **Passo 8: gate + commit**
 
 ```bash
-pnpm -r test && pnpm -r typecheck && pnpm -r lint
+pnpm -r test && pnpm -r typecheck && pnpm lint
 git add packages/partida/src/tipos.ts packages/partida/src/mesa.ts packages/partida/src/mesa.test.ts packages/shared/src/index.ts packages/shared/src/index.test.ts
 git commit -m "feat(partida): entregarCarta resolve o excedente da mão pela caridade"
 ```
@@ -1006,7 +1006,7 @@ Esperado: PASS.
 - [ ] **Passo 5: gate + commit**
 
 ```bash
-pnpm -r test && pnpm -r typecheck && pnpm -r lint
+pnpm -r test && pnpm -r typecheck && pnpm lint
 git add packages/partida/src/mesa.ts packages/partida/src/mesa.test.ts
 git commit -m "feat(partida): recusa vasculhar enquanto a mão está acima do limite"
 ```
@@ -1138,7 +1138,7 @@ Esperado: PASS.
 - [ ] **Passo 5: gate + commit**
 
 ```bash
-pnpm -r test && pnpm -r typecheck && pnpm -r lint
+pnpm -r test && pnpm -r typecheck && pnpm lint
 git add packages/partida/src/bot.ts packages/partida/src/bot.test.ts
 git commit -m "feat(partida): o bot entrega o excedente em vez de travar a mesa"
 ```
@@ -1152,7 +1152,7 @@ Antes de abrir o PR:
 - [ ] `pnpm -r test` — a workspace inteira verde. Referência: **226 testes na `main`**; este plano
       acrescenta ~30 (caridade 11 · mesa ~16 · shared 2 · bot 3).
 - [ ] `pnpm -r typecheck` — 7/7 pacotes.
-- [ ] `pnpm -r lint` — limpo.
+- [ ] `pnpm lint` (na raiz: `eslint .`) — limpo.
 - [ ] `git status` — árvore limpa, nada fora dos commits das tasks.
 - [ ] **Gate manual no navegador** (`pnpm dev`): criar partida, vasculhar, combater, terminar uma
       partida. O esperado é **nada mudar** — a camada nasce dormente, e uma regressão visível aqui
