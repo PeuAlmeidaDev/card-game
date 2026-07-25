@@ -431,7 +431,10 @@ function entregarCarta(
  * especialização derruba o próprio bônus que ela substitui. `entregarCarta`
  * é a saída que sempre funciona, nos dois casos.
  */
-function jogarCarta(estado: EstadoPartida, acao: AcaoDeMao): ResultadoAcao {
+function jogarCarta(
+  estado: EstadoPartida,
+  acao: Extract<AcaoDaMesa, { readonly tipo: 'jogarCarta' }>,
+): ResultadoAcao {
   const { jogador, carta } = cartaDaMao(estado, acao);
   if (carta.tipo !== 'raca') {
     throw new AcaoInvalida('aplicarAcao: só carta de raça entra em jogo nesta fatia');
