@@ -55,6 +55,17 @@ describe('PainelLog', () => {
     expect(screen.getByText(/perde 7 de vida — restam 23/)).toBeInTheDocument();
   });
 
+  it('narra o evento de porta com o que a carta revela', () => {
+    const log: readonly EventoDaMesa[] = [
+      { tipo: 'porta', jogadorId: 'p1', carta: { id: 'p-0', tipo: 'monstro' } },
+      { tipo: 'porta', jogadorId: 'p2', carta: { id: 'p-1', tipo: 'salaVazia' } },
+    ];
+    render(<PainelLog log={log} jogadores={jogadores} voce="p1" />);
+
+    expect(screen.getByText(/Você encontra um monstro\./)).toBeInTheDocument();
+    expect(screen.getByText(/Você encontra uma sala vazia\./)).toBeInTheDocument();
+  });
+
   it('mostra o evento de vez de forma discreta', () => {
     const log: readonly EventoDaMesa[] = [{ tipo: 'vez', jogadorId: 'p2' }];
     render(<PainelLog log={log} jogadores={jogadores} voce="p1" />);
