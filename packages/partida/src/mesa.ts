@@ -145,8 +145,9 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
 
 /**
  * Resolve uma carta JÁ comprada (o baralho em `base` já reflete a compra): emite
- * o evento `porta` e bifurca — `salaVazia` passa a vez, `monstro` abre combate.
- * É o núcleo compartilhado do vasculhar atômico e da resolução da espiada.
+ * o evento `porta` e segue um de três caminhos — `salaVazia` passa a vez,
+ * `monstro` abre combate, `raca` (ver o `case` abaixo). É o núcleo compartilhado
+ * do vasculhar atômico e da resolução da espiada.
  */
 function resolverCarta(
   base: EstadoPartida,

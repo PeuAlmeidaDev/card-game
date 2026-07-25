@@ -326,13 +326,13 @@ describe('passiva da raça no combate da Mesa', () => {
     };
 
     // monstro rápido (ataca primeiro) e forte, para o 1º golpe cair no humano
-    const monstro = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 };
+    const monstroForte = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 };
     // criar: monstro ataca (dado 1 acerta) -> pede esquiva; esquivar (dado 12 falha)
     // dano base 6; com a passiva -> 3; vida 20 - 3 = 17
     const deps = {
       rolar: filaDeDados([1, 12]),
       embaralhar: <T,>(x: readonly T[]) => [...x],
-      monstro,
+      monstro: monstroForte,
       resolverRaca,
     };
 

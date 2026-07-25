@@ -222,7 +222,7 @@ describe('mesa', () => {
 
   it('uma partida com raça Anão resolve o combate com a passiva Casca de Pedra', async () => {
     // Prova a borda inteira: obterRaca('anao') tem passivaCombate real (cartas),
-    // resolverPassiva injetado nas deps da Mesa aplica ela ao humano.
+    // resolverRaca injetado nas deps da Mesa aplica ela ao humano.
     // Monstro rápido e certeiro (agilidade/habilidade máximas) ataca primeiro.
     // dado[0]=1: ataque do monstro acerta (<=12). dado[1]=12: esquiva do humano
     // falha (12 > 1). Dano base = level(1)+forca(5) = 6; a passiva reduz o
