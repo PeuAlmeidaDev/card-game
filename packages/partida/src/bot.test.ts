@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { escolherAcao } from './bot';
-import { criarPartida, aplicarAcao } from './mesa';
+import { criarPartida, aplicarAcao, avancarBots } from './mesa';
 import { projetarPara } from './projecao';
 import { filaDeDados } from './testes/dados';
-import type { EntradaJogador } from './tipos';
+import { monstro as cartaMonstro, raca } from './testes/cartas';
+import type { EntradaJogador, EstadoPartida } from './tipos';
 import type { Combatente } from '@card-dungeon/motor';
 
 const base: Combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
@@ -62,5 +63,61 @@ describe('escolherAcao', () => {
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const vista = projetarPara('p1', p);
     expect('monte' in vista).toBe(false);
+  });
+
+  it('acima do limite, entrega uma carta em vez de vasculhar', () => {
+    // Sem esta regra o bot trava a mesa: a vez não passa (o limite a segura), ele
+    // tentaria vasculhar, o reducer recusaria, e `avancarBots` mataria a jogada do
+    // humano com um 400. Mesmo modo de falha do bot vidente que ignorava a espiada.
+    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const estourado: EstadoPartida = {
+      ...p,
+      vezDe: 'p2',
+      jogadores: p.jogadores.map((j) => (
+        j.id === 'p2'
+          ? {
+              ...j,
+              mao: [cartaMonstro('c1'), cartaMonstro('c2'), cartaMonstro('c3'), cartaMonstro('c4'), cartaMonstro('c5'), cartaMonstro('c6')],
+              emJogo: { raca: raca('r1', 'anao') },
+            }
+          : j
+      )),
+    };
+
+    expect(escolherAcao(projetarPara('p2', estourado), 'p2'))
+      .toEqual({ tipo: 'entregarCarta', jogadorId: 'p2', cartaId: 'c1' });
+  });
+
+  it('dentro do limite, ignora a mão e joga normalmente', () => {
+    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const comMao: EstadoPartida = {
+      ...p,
+      jogadores: p.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao: [cartaMonstro('c1')] } : j)),
+    };
+
+    expect(escolherAcao(projetarPara('p1', comMao), 'p1')).toEqual({ tipo: 'vasculhar', jogadorId: 'p1' });
+  });
+
+  it('uma mesa de bots com a mão estourada não trava `avancarBots`', () => {
+    // O teste de ponta: é o laço automático que a regra existe para proteger.
+    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const estourado: EstadoPartida = {
+      ...p,
+      vezDe: 'p2',
+      jogadores: p.jogadores.map((j) => (
+        j.id === 'p2'
+          ? {
+              ...j,
+              patente: 5,
+              mao: [cartaMonstro('c1'), cartaMonstro('c2'), cartaMonstro('c3'), cartaMonstro('c4'), cartaMonstro('c5'), cartaMonstro('c6')],
+              emJogo: { raca: raca('r1', 'anao') },
+            }
+          : j
+      )),
+    };
+
+    const r = avancarBots(estourado, { rolar: filaDeDados([]), embaralhar: semEmbaralhar, monstro });
+
+    expect(r.estado.vezDe).toBe('p1');   // a vez voltou ao humano
   });
 });

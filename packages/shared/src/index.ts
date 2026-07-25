@@ -60,6 +60,7 @@ export const acaoDaMesaSchema = z.discriminatedUnion('tipo', [
   // log do server — "validar a forma" sem validar o TAMANHO não é validação na
   // borda de verdade.
   z.object({ tipo: z.literal('jogarCarta'), cartaId: z.string().min(1).max(64) }),
+  z.object({ tipo: z.literal('entregarCarta'), cartaId: z.string().min(1).max(64) }),
 ]) satisfies z.ZodType<{ tipo: AcaoDaMesa['tipo'] }>;
 
 /** A intenção validada. A rota completa com o `jogadorId` da sessão. */

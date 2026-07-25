@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { criarPartida, aplicarAcao, avancarBots } from './mesa';
 import { COMPOSICAO_POR_JOGADOR } from './baralho';
+import { MAO_INICIAL_PADRAO, limiteDeMao } from './mao';
 import { escolherAcao } from './bot';
 import { projetarPara } from './projecao';
 import { AcaoInvalida } from './erros';
@@ -814,5 +815,392 @@ describe('aplicarAcao — jogarCarta', () => {
     const depois = aplicarAcao(comCombate, { tipo: 'esquivar', jogadorId: 'p1' }, depsAnao).estado;
 
     expect(depois.combate?.estado.jogador.vida).toBe(17);
+  });
+});
+
+describe('aplicarAcao — entregarCarta (a caridade)', () => {
+  const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] };
+
+  /** p1 com a mão estourada (5 cartas, raça em jogo => limite 4). */
+  const estourado = (estado: EstadoPartida, mao = [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5')]): EstadoPartida => ({
+    ...estado,
+    jogadores: estado.jogadores.map((j) => (
+      j.id === 'p1' ? { ...j, mao, emJogo: { raca: raca('r1', 'anao') } } : j
+    )),
+  });
+
+  const comPatentes = (estado: EstadoPartida, porId: Readonly<Record<string, number>>): EstadoPartida => ({
+    ...estado,
+    jogadores: estado.jogadores.map((j) => ({ ...j, patente: porId[j.id] ?? j.patente })),
+  });
+
+  it('a carta sai da mão do doador e entra na mão de quem está atrás', () => {
+    const p = comPatentes(estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar })),
+      { p1: 5, p2: 1 });
+
+    const r = aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([]));
+
+    expect(r.estado.jogadores[0]?.mao.map((c) => c.id)).toEqual(['m2', 'm3', 'm4', 'm5']);
+    expect(r.estado.jogadores[1]?.mao.map((c) => c.id)).toEqual(['m1']);
+    // A carta não fica em dois lugares nem passa pelo cemitério no caminho.
+    expect(r.estado.cemiterio).toEqual([]);
+  });
+
+  it('o evento de entrega NÃO carrega a carta — o log é público', () => {
+    // O `log` inteiro viaja para todos na projeção. Se o evento carregasse a
+    // carta, a doação privada seria anunciada em alto e bom som — o mesmo modo
+    // de falha que a espiada evita ao não emitir evento nenhum.
+    const p = comPatentes(estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar })),
+      { p1: 5, p2: 1 });
+
+    const r = aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([]));
+    const entrega = r.eventos.find((e) => e.tipo === 'entrega');
+
+    expect(entrega).toEqual({ tipo: 'entrega', jogadorId: 'p1', paraJogadorId: 'p2', rolagem: null });
+    expect(JSON.stringify(r.eventos)).not.toContain('m1');
+  });
+
+  it('sem ninguém atrás, a carta vai para o cemitério e o evento MOSTRA a carta', () => {
+    // Assimetria deliberada do spec §5: quem está em último revela o que dispensa.
+    const p = comPatentes(estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar })),
+      { p1: 1, p2: 1 });
+
+    const r = aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([]));
+
+    expect(r.estado.cemiterio.map((c) => c.id)).toEqual(['m1']);
+    expect(r.estado.jogadores[1]?.mao).toEqual([]);
+    expect(r.eventos).toContainEqual({ tipo: 'descarte', jogadorId: 'p1', carta: monstro('m1') });
+  });
+
+  it('havendo empate entre candidatos, o 1d12 decide e a rolagem entra no log', () => {
+    const quatro: readonly EntradaJogador[] = [
+      { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base },
+      { id: 'p2', nome: 'Bot 1', ehBot: true, combatenteBase: base },
+      { id: 'p3', nome: 'Bot 2', ehBot: true, combatenteBase: base },
+      { id: 'p4', nome: 'Bot 3', ehBot: true, combatenteBase: base },
+    ];
+    const p = comPatentes(estourado(criarPartida('m1', quatro, soSalaVazia, { embaralhar: semEmbaralhar })),
+      { p1: 5, p2: 4, p3: 1, p4: 1 });
+
+    const r = aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([2]));
+
+    // (2 - 1) % 2 = 1 => o segundo candidato (p4). E o p2, que está abaixo mas
+    // não no mínimo, não recebe nada.
+    expect(r.eventos).toContainEqual({ tipo: 'entrega', jogadorId: 'p1', paraJogadorId: 'p4', rolagem: 2 });
+    expect(r.estado.jogadores[3]?.mao.map((c) => c.id)).toEqual(['m1']);
+    expect(r.estado.jogadores[1]?.mao).toEqual([]);
+  });
+
+  it('quando a mão passa a caber, a vez passa', () => {
+    const p = comPatentes(estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar })),
+      { p1: 5, p2: 1 });
+
+    const r = aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([]));
+
+    expect(r.estado.vezDe).toBe('p2');
+  });
+
+  it('estourado por duas cartas, a vez só passa na segunda entrega', () => {
+    const seis = [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5'), monstro('m6')];
+    const p = comPatentes(estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }), seis),
+      { p1: 5, p2: 1 });
+
+    const uma = aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([]));
+    expect(uma.estado.vezDe).toBe('p1');
+
+    const duas = aplicarAcao(uma.estado, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm2' }, deps([]));
+    expect(duas.estado.vezDe).toBe('p2');
+  });
+
+  it('quem RECEBE pode ficar acima do limite sem que nada o cobre agora', () => {
+    // Senão uma doação viraria cascata dentro de um turno só. O destinatário
+    // acerta as contas no fim do PRÓPRIO turno.
+    const p = comPatentes(estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar })),
+      { p1: 5, p2: 1 });
+    // p2 já está NO teto dele (5 cartas, sem raça em jogo => limite 5).
+    const cheio: EstadoPartida = {
+      ...p,
+      jogadores: p.jogadores.map((j) => (
+        j.id === 'p2'
+          ? { ...j, mao: [salaVazia('s1'), salaVazia('s2'), salaVazia('s3'), salaVazia('s4'), salaVazia('s5')] }
+          : j
+      )),
+    };
+
+    const r = aplicarAcao(cheio, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([]));
+
+    expect(r.estado.jogadores[1]?.mao).toHaveLength(6);   // acima do limite dele (5)
+    expect(r.estado.vezDe).toBe('p2');                    // e a vez passa mesmo assim
+  });
+
+  it('recusa entregar quando a mão NÃO está acima do limite', () => {
+    // Doação voluntária é política — escolher a quem alimentar é o kingmaking que
+    // a regra do destino existe para matar. A caridade resolve um excedente.
+    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const dentro: EstadoPartida = {
+      ...p0,
+      jogadores: p0.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao: [monstro('m1')] } : j)),
+    };
+
+    expect(() => aplicarAcao(dentro, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([])))
+      .toThrow(AcaoInvalida);
+    expect(() => aplicarAcao(dentro, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([])))
+      .toThrow('aplicarAcao: sua mão não está acima do limite');
+  });
+
+  it('recusa carta que não está na sua mão', () => {
+    const p = comPatentes(estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar })),
+      { p1: 5, p2: 1 });
+
+    expect(() => aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'x9' }, deps([])))
+      .toThrow('aplicarAcao: a carta x9 não está na sua mão');
+  });
+
+  it('recusa entregar com combate em curso', () => {
+    // O guard de combate mora em `cartaDaMao` e roda ANTES de qualquer checagem
+    // de mão — por isso a mão nem precisa estar estourada aqui. (Desde a Task 4,
+    // `vasculhar` também recusa abrir combate com a mão já estourada, então usar
+    // `estourado` para chegar a este `emCombate` nem seria mais possível.)
+    const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const }] };
+    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const emCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
+    expect(emCombate.combate).not.toBeNull();
+
+    expect(() => aplicarAcao(emCombate, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([])))
+      .toThrow('aplicarAcao: há um combate em curso');
+  });
+
+  it('a entrega move a versão — o retry cai no 409, não no 400', () => {
+    const p = comPatentes(estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar })),
+      { p1: 5, p2: 1 });
+
+    const r = aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([]));
+
+    expect(r.estado.log.length).toBeGreaterThan(p.log.length);
+  });
+});
+
+describe('encerrarTurno — o limite de mão segura a vez', () => {
+  const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] };
+  // 5 cartas com raça em jogo = limite 4 => estourado por 1.
+  const maoEstourada = [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5')];
+  // 4 cartas com raça em jogo = EXATAMENTE o limite — ainda não estourada. Ponto
+  // de partida dos dois testes abaixo: desde a Task 4, `vasculhar` recusa ABRIR
+  // com a mão já estourada, então a mão estourada não pode mais ser precondição
+  // do vasculhar — ela tem que nascer da própria compra.
+  const maoNoLimite = [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4')];
+
+  const comMaoEZona = (estado: EstadoPartida): EstadoPartida => ({
+    ...estado,
+    jogadores: estado.jogadores.map((j) => (
+      j.id === 'p1'
+        ? { ...j, mao: maoEstourada, emJogo: { raca: raca('r1', 'anao') } }
+        : j
+    )),
+  });
+
+  const comMaoNoLimiteEZona = (estado: EstadoPartida): EstadoPartida => ({
+    ...estado,
+    jogadores: estado.jogadores.map((j) => (
+      j.id === 'p1'
+        ? { ...j, mao: maoNoLimite, emJogo: { raca: raca('r1', 'anao') } }
+        : j
+    )),
+  });
+
+  it('com a mão acima do limite, a vez NÃO passa', () => {
+    // A carta de raça sacada vai para a MÃO (não para a zona) — é ela que estoura
+    // o limite como CONSEQUÊNCIA da compra, não como precondição do vasculhar.
+    const p0 = comMaoNoLimiteEZona(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }));
+    const p: EstadoPartida = { ...p0, monte: [raca('r9', 'elfo')] };
+
+    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
+
+    expect(r.estado.jogadores[0]?.mao).toHaveLength(5); // a compra estourou a mão
+    expect(r.estado.vezDe).toBe('p1');
+    expect(r.eventos.some((e) => e.tipo === 'vez')).toBe(false);
+  });
+
+  it('mesmo sem passar a vez, o log anda — a versão precisa se mover', () => {
+    // Se a ação não movesse a versão, um retry de rede escaparia do guard de 409
+    // no server e morreria como 400 no reducer. Foi exatamente o achado A3 da
+    // espiada; aqui não se repete porque o evento `porta` já foi emitido.
+    const p0 = comMaoNoLimiteEZona(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }));
+    const p: EstadoPartida = { ...p0, monte: [raca('r9', 'elfo')] };
+
+    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
+
+    expect(r.estado.log.length).toBeGreaterThan(p.log.length);
+  });
+
+  it('com a mão dentro do limite, a vez passa como sempre', () => {
+    const p = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+
+    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
+
+    expect(r.estado.vezDe).toBe('p2');
+    expect(r.eventos.some((e) => e.tipo === 'vez')).toBe(true);
+  });
+
+  it('exatamente NO limite passa a vez — o teto é `>`, não `>=`', () => {
+    // Sem raça em jogo o limite é 5 (o Adaptável do Humano). Com 5 cartas o
+    // jogador está no teto, não acima dele.
+    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const p: EstadoPartida = {
+      ...p0,
+      jogadores: p0.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao: maoEstourada } : j)),
+    };
+
+    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
+
+    expect(r.estado.vezDe).toBe('p2');
+  });
+
+  it('o fim de combate também é segurado pelo limite', () => {
+    // A checagem mora na PORTA ÚNICA: se estivesse copiada em cada caminho de
+    // saída, este aqui seria o esquecido — ele é o único que passa por
+    // `fecharCombate` antes de encerrar.
+    //
+    // Desde a Task 4, `vasculhar` recusa ABRIR combate com a mão já estourada —
+    // então a mão estourada não pode mais vir de ANTES do vasculhar (senão o
+    // combate nem abriria). Ela é forjada DEPOIS que o combate já está aberto,
+    // só para provar que `fecharCombate` também passa pela porta única.
+    const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const }] };
+    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const fraco: Combatente = { forca: 1, vida: 1, habilidade: 0, agilidade: 0, level: 1 };
+    const depsFraco = { rolar: filaDeDados([1, 12]), embaralhar: semEmbaralhar, monstro: fraco };
+
+    const comCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsFraco).estado;
+    const estourado: EstadoPartida = comMaoEZona(comCombate);
+    const r = aplicarAcao(estourado, { tipo: 'atacar', jogadorId: 'p1' }, depsFraco);
+
+    expect(r.estado.combate).toBeNull();          // o combate fechou
+    expect(r.estado.vezDe).toBe('p1');            // mas a vez ficou
+  });
+});
+
+describe('aplicarAcao — vasculhar com a mão estourada', () => {
+  const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] };
+  const cinco = [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5')];
+  const estourado = (estado: EstadoPartida): EstadoPartida => ({
+    ...estado,
+    jogadores: estado.jogadores.map((j) => (
+      j.id === 'p1' ? { ...j, mao: cinco, emJogo: { raca: raca('r1', 'anao') } } : j
+    )),
+  });
+
+  it('recusa vasculhar enquanto a mão excede o limite', () => {
+    // Sem esta recusa, "a vez não passa" vira "jogue para sempre": o jogador
+    // vasculharia de novo a cada turno preso, sacando mais cartas e afundando
+    // mais — ganhando turnos extras de graça por estar acima do limite.
+    const p = estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }));
+
+    expect(() => aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])))
+      .toThrow(AcaoInvalida);
+    expect(() => aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])))
+      .toThrow('aplicarAcao: sua mão está acima do limite — entregue uma carta');
+  });
+
+  it('jogar uma raça continua liberado — é a outra saída do excedente', () => {
+    // Spec §4.2: estando acima do limite, jogar uma raça resolve o excedente (a
+    // carta sai da mão para a zona). Bloquear isso deixaria só um caminho.
+    const p0 = estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }));
+    const comRacaNaMao: EstadoPartida = {
+      ...p0,
+      jogadores: p0.jogadores.map((j) => (
+        j.id === 'p1' ? { ...j, mao: [...cinco, raca('r9', 'orc')] } : j
+      )),
+    };
+
+    const r = aplicarAcao(comRacaNaMao, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r9' }, deps([]));
+
+    expect(r.estado.jogadores[0]?.emJogo.raca?.id).toBe('r9');
+    expect(r.estado.jogadores[0]?.mao).toHaveLength(5);
+  });
+
+  it('dentro do limite, vasculhar segue normal', () => {
+    const p = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+
+    expect(() => aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]))).not.toThrow();
+  });
+
+  it('sem raça em jogo, jogar a raça é NET-ZERO — a mão continua estourada', () => {
+    // Sem raça em jogo o limite é 5 (o bônus do Adaptável do Humano). Uma mão de
+    // 6 cartas (cinco avulsas + uma raça) excede em 1. Jogar a raça tira 1 carta
+    // da mão (6 → 5) MAS também derruba o próprio limite (5 → 4, a especialização
+    // custa o bônus): o excedente continua o mesmo — não é uma saída, ao
+    // contrário do caso em que o jogador já tem raça em jogo (teste acima), onde
+    // o limite já estava em 4 e só a mão encolhe.
+    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const semRacaEstourado: EstadoPartida = {
+      ...p0,
+      jogadores: p0.jogadores.map((j) => (
+        j.id === 'p1' ? { ...j, mao: [...cinco, raca('r9', 'orc')], emJogo: { raca: null } } : j
+      )),
+    };
+
+    const r = aplicarAcao(
+      semRacaEstourado, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r9' }, deps([]),
+    );
+
+    expect(r.estado.jogadores[0]?.mao).toHaveLength(5);
+    expect(r.estado.jogadores[0]?.emJogo.raca?.id).toBe('r9');
+    // Continua estourado: mão(5) > limite(4), agora que a raça está em jogo.
+    expect(() => aplicarAcao(r.estado, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])))
+      .toThrow('aplicarAcao: sua mão está acima do limite — entregue uma carta');
+
+    // `entregarCarta` continua sendo a saída que sempre funciona.
+    const restante = r.estado.jogadores[0]?.mao[0];
+    expect(restante).toBeDefined();
+    expect(() => aplicarAcao(
+      r.estado, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: restante!.id }, deps([]),
+    )).not.toThrow();
+  });
+});
+
+describe('a config de PRODUÇÃO não pode nascer travada', () => {
+  // Guard de fronteira, não de comportamento. `MAO_INICIAL_PADRAO` e
+  // `LIMITE_BASE_DE_MAO` são dials que o spec §8 diz que VÃO subir, e
+  // `COMPOSICAO_POR_JOGADOR` ganha carta de raça no Plano 4. Desde que o limite
+  // passou a ser IMPOSTO (a vez não passa acima dele), um dial mal girado não
+  // desbalanceia o jogo — ele MATA o app: o jogador nasce acima do limite,
+  // `vasculhar` é recusado, e a única saída (`entregarCarta`) ainda não tem
+  // botão. Este par de testes é o alarme que dispara aqui em vez de no navegador.
+  const producao = {
+    patenteAlvo: 10,
+    composicaoPorJogador: COMPOSICAO_POR_JOGADOR,
+    maoInicial: MAO_INICIAL_PADRAO,
+  };
+  // A mesa que o `server` monta: 1 humano com a raça do construtor + 3 bots sem raça.
+  const mesaDeProducao: readonly EntradaJogador[] = [
+    { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base, racaId: 'elfo' },
+    { id: 'p2', nome: 'Bot 1', ehBot: true, combatenteBase: base },
+    { id: 'p3', nome: 'Bot 2', ehBot: true, combatenteBase: base },
+    { id: 'p4', nome: 'Bot 3', ehBot: true, combatenteBase: base },
+  ];
+
+  it('ninguém nasce acima do limite de mão', () => {
+    const p = criarPartida('m1', mesaDeProducao, producao, { embaralhar: semEmbaralhar });
+
+    // Lista em vez de um `every`: a falha precisa dizer QUEM estourou e por quanto.
+    const acimaDoLimite = p.jogadores
+      .filter((j) => j.mao.length > limiteDeMao(j))
+      .map((j) => `${j.nome}: ${String(j.mao.length)} cartas, limite ${String(limiteDeMao(j))}`);
+
+    expect(acimaDoLimite).toEqual([]);
+  });
+
+  it('nascer acima do limite deixaria o jogador SEM nenhuma ação legal', () => {
+    // O porquê do teste acima, escrito como comportamento. Com um a mais na mão
+    // inicial, o humano não pode vasculhar (recusado) e não pode jogar carta
+    // nenhuma (o baralho de produção não tem raça) — tela morta no primeiro clique.
+    const p = criarPartida('m1', mesaDeProducao,
+      { ...producao, maoInicial: MAO_INICIAL_PADRAO + 1 }, { embaralhar: semEmbaralhar });
+    const humano = p.jogadores[0];
+
+    expect(humano!.mao.length).toBeGreaterThan(limiteDeMao(humano!));
+    expect(() => aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])))
+      .toThrow('aplicarAcao: sua mão está acima do limite — entregue uma carta');
+    expect(humano!.mao.every((c) => c.tipo !== 'raca')).toBe(true);
   });
 });

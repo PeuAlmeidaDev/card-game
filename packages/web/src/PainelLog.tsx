@@ -80,11 +80,14 @@ export function PainelLog({ log, jogadores, voce }: {
               {evento.tipo === 'derrota' && `${nomeDe(evento.jogadorId)} foi evacuado.`}
               {evento.tipo === 'vez' && <small>Vez de {nomeDe(evento.jogadorId)}.</small>}
               {evento.tipo === 'fim' && 'A partida terminou.'}
-              {/* `racaEmJogo` ainda não é narrado aqui: o texto bom precisa do nome
-                  da raça, que só o catálogo do pacote `cartas` conhece — dívida
-                  DELIBERADA, fechada no Plano 4. A cadeia de `&&` não dá pressão
-                  do compilador (nenhum tipo de evento fica sem `case`), então este
-                  comentário é o único lembrete de que o evento existe e é mudo. */}
+              {/* Três eventos ainda não são narrados aqui: `racaEmJogo`, `entrega` e
+                  `descarte` (os dois últimos nasceram na fatia da caridade). Os
+                  três esbarram na mesma dívida DELIBERADA: o texto bom precisa de
+                  dados (nome da raça, texto da carta) que só o catálogo do pacote
+                  `cartas` conhece, e essa ligação é o Plano 4. A cadeia de `&&`
+                  não dá pressão do compilador (nenhum tipo de evento fica sem
+                  `case`), então este comentário é o único lembrete de que os três
+                  eventos existem e são mudos. */}
               {evento.tipo === 'combate' && (
                 <>
                   {evento.jogadorId === voce ? 'Seu combate:' : `Combate de ${nomeDe(evento.jogadorId)}:`}

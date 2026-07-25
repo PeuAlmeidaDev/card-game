@@ -100,6 +100,18 @@ describe('acaoDaMesaSchema', () => {
     // trafega inteiro pela borda.
     expect(acaoDaMesaSchema.safeParse({ tipo: 'jogarCarta', cartaId: 'x'.repeat(65) }).success).toBe(false);
   });
+
+  it('aceita entregarCarta com o id da carta', () => {
+    expect(acaoDaMesaSchema.safeParse({ tipo: 'entregarCarta', cartaId: 'p-3' }).success).toBe(true);
+  });
+
+  it('recusa entregarCarta sem cartaId, com cartaId vazio ou longo demais', () => {
+    // Mesmo teto do `jogarCarta`: o `cartaId` é refletido verbatim no 400 e no log
+    // do server, então validar a FORMA sem validar o TAMANHO não é validação de borda.
+    expect(acaoDaMesaSchema.safeParse({ tipo: 'entregarCarta' }).success).toBe(false);
+    expect(acaoDaMesaSchema.safeParse({ tipo: 'entregarCarta', cartaId: '' }).success).toBe(false);
+    expect(acaoDaMesaSchema.safeParse({ tipo: 'entregarCarta', cartaId: 'x'.repeat(65) }).success).toBe(false);
+  });
 });
 
 describe('acaoRequisicaoSchema', () => {
