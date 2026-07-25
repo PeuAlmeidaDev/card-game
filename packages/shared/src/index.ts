@@ -55,7 +55,11 @@ export const acaoDaMesaSchema = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('empurrarCarta') }),
   z.object({ tipo: z.literal('atacar') }),
   z.object({ tipo: z.literal('esquivar') }),
-  z.object({ tipo: z.literal('jogarCarta'), cartaId: z.string() }),
+  // Teto de tamanho: `cartaId` é o único campo livre do fio (os ids reais são
+  // `p-<n>` ou `r-<uuid>`, bem abaixo de 64) e é refletido verbatim no 400 e no
+  // log do server — "validar a forma" sem validar o TAMANHO não é validação na
+  // borda de verdade.
+  z.object({ tipo: z.literal('jogarCarta'), cartaId: z.string().min(1).max(64) }),
 ]) satisfies z.ZodType<{ tipo: AcaoDaMesa['tipo'] }>;
 
 /** A intenção validada. A rota completa com o `jogadorId` da sessão. */
