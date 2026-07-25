@@ -73,6 +73,13 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [] }: {
   // A vida máxima do jogador é a do combatente base — a patente muda o dano, não a vida.
   // Do monstro só temos o valor corrente: a vista não carrega o máximo dele.
   const vidaMaxima = vista.jogadores.find((j) => j.id === vista.voce)?.combatenteBase.vida ?? null;
+  const eu = vista.jogadores.find((j) => j.id === vista.voce);
+  // O limite vem PRONTO da vista (`limiteDeMao` é publicado por jogador). Recalcular
+  // aqui seria reimplementar regra de jogo na UI — e ela divergiria no dia em que
+  // um item mexesse no teto.
+  const acimaDoLimite = eu !== undefined && vista.suaMao.length > eu.limiteDeMao;
+  // Mão só se mexe com o turno parado: mesma guarda que o domínio aplica.
+  const podeMexerNaMao = minhaVez && vista.combate === null && espiada === null;
 
   return (
     <section>
@@ -82,6 +89,8 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [] }: {
         {vista.jogadores.map((j) => (
           <li key={j.id}>
             <strong>{j.nome}</strong> — patente {j.patente} · {j.derrotas} derrota(s)
+            {j.emJogo.raca !== null && ` · ${nomeDaRaca(j.emJogo.raca.racaId)}`}
+            {' · '}{j.cartasNaMao}/{j.limiteDeMao} cartas
             {j.id === vista.vezDe && ' ← jogando'}
           </li>
         ))}
@@ -117,7 +126,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [] }: {
           <div>
             <button
               type="button"
-              disabled={!minhaVez || vista.combate !== null || espiada !== null}
+              disabled={!minhaVez || vista.combate !== null || espiada !== null || acimaDoLimite}
               onClick={() => void agir({ tipo: 'vasculhar' })}
             >
               Vasculhar local
@@ -156,6 +165,40 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [] }: {
           </div>
         </>
       )}
+
+      <section>
+        <h3>Sua mão — {vista.suaMao.length} de {eu?.limiteDeMao ?? 0}</h3>
+        {acimaDoLimite && (
+          <p role="status">
+            Sua mão está acima do limite: entregue uma carta para encerrar o turno.
+          </p>
+        )}
+        <ul>
+          {vista.suaMao.map((carta) => (
+            <li key={carta.id}>
+              {descreverCarta(carta, nomeDaRaca)}{' '}
+              {/* Só raça entra em jogo nesta fatia — o domínio recusa o resto, e um
+                  botão que só serve para levar 400 ensina o jogador a errar. */}
+              {carta.tipo === 'raca' && (
+                <button
+                  type="button"
+                  disabled={!podeMexerNaMao}
+                  onClick={() => void agir({ tipo: 'jogarCarta', cartaId: carta.id })}
+                >
+                  Jogar
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={!podeMexerNaMao || !acimaDoLimite}
+                onClick={() => void agir({ tipo: 'entregarCarta', cartaId: carta.id })}
+              >
+                Entregar
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
 
       <PainelLog log={vista.log} jogadores={vista.jogadores} voce={vista.voce} racas={racas} />
 

@@ -32,7 +32,14 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const abrirMesa = async (vista: VistaDaPartida, racas: Catalogo['racas'] = []) => {
+// Default cobre Orc (testes da mão, task 5) e Elfo (testes da Presciência, task 4)
+// sem cada teste ter que passar o catálogo — só quem precisa de OUTRA raça o faz.
+const RACAS_PADRAO: Catalogo['racas'] = [
+  { id: 'orc', nome: 'Orc', texto: '…' },
+  { id: 'elfo', nome: 'Elfo', texto: '…' },
+];
+
+const abrirMesa = async (vista: VistaDaPartida, racas: Catalogo['racas'] = RACAS_PADRAO) => {
   vi.spyOn(api, 'criarPartida').mockResolvedValue({ status: 200, body: vista } as never);
   render(<TelaMesa racas={racas} />);
   await userEvent.click(screen.getByRole('button', { name: /nova partida/i }));
@@ -242,5 +249,82 @@ describe('TelaMesa', () => {
     expect(screen.getByText(/2º\s*—\s*Você/)).toBeInTheDocument();
     // com a partida encerrada não há mais o que clicar
     expect(screen.queryByRole('button', { name: /vasculhar local/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('TelaMesa — a mão', () => {
+  it('lista as cartas da sua mão, nomeando a raça', async () => {
+    await abrirMesa({
+      ...vistaBase,
+      suaMao: [{ id: 'p-1', tipo: 'monstro' }, { id: 'p-2', tipo: 'raca', racaId: 'orc' }],
+    });
+
+    expect(screen.getByText(/um monstro/)).toBeInTheDocument();
+    expect(screen.getByText(/uma carta de Orc/)).toBeInTheDocument();
+  });
+
+  it('só carta de raça tem botão de jogar', async () => {
+    await abrirMesa({
+      ...vistaBase,
+      suaMao: [{ id: 'p-1', tipo: 'monstro' }, { id: 'p-2', tipo: 'raca', racaId: 'orc' }],
+    });
+
+    expect(screen.getAllByRole('button', { name: 'Jogar' })).toHaveLength(1);
+  });
+
+  it('dentro do limite, entregar fica desabilitado', async () => {
+    // A caridade resolve um EXCEDENTE; doar por vontade própria é escolher a quem
+    // dar vantagem — o kingmaking que a regra do destino existe para matar. O
+    // domínio recusa; a tela não oferece.
+    await abrirMesa({ ...vistaBase, suaMao: [{ id: 'p-1', tipo: 'monstro' }] });
+
+    for (const b of screen.getAllByRole('button', { name: 'Entregar' })) {
+      expect(b).toBeDisabled();
+    }
+  });
+
+  it('acima do limite: avisa, habilita entregar e DESABILITA vasculhar', async () => {
+    // Espelha a recusa do domínio. Deixar o botão aceso só para o servidor
+    // responder 400 é ensinar o jogador a errar.
+    const mao = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => ({ id, tipo: 'monstro' as const }));
+    await abrirMesa({
+      ...vistaBase,
+      suaMao: mao,
+      jogadores: vistaBase.jogadores.map((j) => (
+        j.id === 'p1' ? { ...j, cartasNaMao: mao.length, limiteDeMao: 5 } : j
+      )),
+    });
+
+    expect(screen.getByRole('button', { name: 'Vasculhar local' })).toBeDisabled();
+    expect(screen.getAllByRole('button', { name: 'Entregar' })[0]).toBeEnabled();
+    expect(screen.getByRole('status')).toHaveTextContent(/acima do limite/i);
+  });
+
+  it('jogar uma carta manda a ação com o id DELA', async () => {
+    // O `cartaId` é o único campo livre do fio; mandar o id errado joga a carta
+    // errada, e com duas cópias da mesma raça na mão isso é invisível na tela.
+    const agir = vi.spyOn(api, 'agir').mockResolvedValue({ status: 200, body: vistaBase } as never);
+    await abrirMesa({ ...vistaBase, suaMao: [{ id: 'p-9', tipo: 'raca', racaId: 'orc' }] });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Jogar' }));
+
+    // Estilo `toHaveBeenCalledWith` com objeto exato (não `objectContaining`) para
+    // seguir a convenção já usada no resto do arquivo — `objectContaining` aninhado
+    // tipa como `any` e reprova o `no-unsafe-assignment` do lint da raiz.
+    expect(agir).toHaveBeenCalledWith({
+      params: { id: 'm1' },
+      body: { acao: { tipo: 'jogarCarta', cartaId: 'p-9' }, versao: 1 },
+    });
+  });
+
+  it('mostra a raça em jogo de cada jogador na lista', async () => {
+    await abrirMesa({
+      ...vistaBase,
+      jogadores: vistaBase.jogadores.map((j) => (
+        j.id === 'p2' ? { ...j, emJogo: { raca: { id: 'r1', tipo: 'raca', racaId: 'orc' } } } : j
+      )),
+    });
+
+    expect(screen.getByText(/Orc/)).toBeInTheDocument();
   });
 });
