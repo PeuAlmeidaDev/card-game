@@ -6,6 +6,7 @@ import type {
 } from './tipos';
 import { tirarDoTopo } from './baralho';
 import { escolherAcao } from './bot';
+import { destinoDaCaridade } from './caridade';
 import { classificar } from './classificacao';
 import { AcaoInvalida } from './erros';
 import { MAX_ACOES_AUTOMATICAS } from './limites';
@@ -192,6 +193,10 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
     return jogarCarta(estado, acao);
   }
 
+  if (acao.tipo === 'entregarCarta') {
+    return entregarCarta(estado, acao, deps);
+  }
+
   return agirNoCombate(estado, acao, deps);
 }
 
@@ -320,17 +325,19 @@ function resolverEspiada(estado: EstadoPartida, acao: AcaoDeEspiada, deps: DepsM
   return resolverCarta(base, espiada.jogadorId, compra.carta, deps);
 }
 
-/** As ações que só fazem sentido com uma carta apontada. */
-type AcaoDeMao = Extract<AcaoDaMesa, { readonly tipo: 'jogarCarta' }>;
+/** As ações que apontam para uma carta da própria mão. */
+type AcaoDeMao = Extract<AcaoDaMesa, { readonly tipo: 'jogarCarta' | 'entregarCarta' }>;
 
 /**
- * Põe uma carta de raça da mão na zona em jogo. A anterior vai para o cemitério:
- * a zona é ABERTA, então trocar de raça é jogada pública.
- *
- * A vez NÃO passa — jogar raça é decisão do próprio turno, e estando acima do
- * limite ela é uma das saídas (a outra, entregar, chega no Plano 3).
+ * Guards comuns das ações de mão: o turno tem que estar parado (nada de mexer na
+ * mão no meio de um combate ou com uma espiada pendente — é a guarda que o spec
+ * §4.2 pede, escrita no vocabulário que o reducer já fala, sem inventar máquina
+ * de fases) e a carta apontada tem que ser sua.
  */
-function jogarCarta(estado: EstadoPartida, acao: AcaoDeMao): ResultadoAcao {
+function cartaDaMao(estado: EstadoPartida, acao: AcaoDeMao): {
+  readonly jogador: JogadorNaMesa;
+  readonly carta: CartaPorta;
+} {
   if (estado.combate !== null) {
     throw new AcaoInvalida('aplicarAcao: há um combate em curso');
   }
@@ -340,7 +347,7 @@ function jogarCarta(estado: EstadoPartida, acao: AcaoDeMao): ResultadoAcao {
 
   const jogador = estado.jogadores.find((j) => j.id === acao.jogadorId);
   if (jogador === undefined) {
-    throw new Error(`jogarCarta: jogador ${acao.jogadorId} não está na mesa`);
+    throw new Error(`cartaDaMao: jogador ${acao.jogadorId} não está na mesa`);
   }
 
   const carta = jogador.mao.find((c) => c.id === acao.cartaId);
@@ -349,6 +356,70 @@ function jogarCarta(estado: EstadoPartida, acao: AcaoDeMao): ResultadoAcao {
     // simplesmente não ser dele. 400, nunca 500.
     throw new AcaoInvalida(`aplicarAcao: a carta ${acao.cartaId} não está na sua mão`);
   }
+
+  return { jogador, carta };
+}
+
+/**
+ * Caridade: resolve o excedente da mão entregando UMA carta. O doador escolhe a
+ * carta; o destino é regra (`destinoDaCaridade`), nunca escolha — é o que impede
+ * o kingmaking numa mesa com classificação de 1º a 4º.
+ *
+ * Só é legal ACIMA do limite: doar por vontade própria seria escolher a quem dar
+ * vantagem, exatamente a política que a regra do destino existe para matar.
+ *
+ * Termina em `encerrarTurno`, que recobra o limite: com a mão ainda estourada a
+ * vez continua parada e o jogador entrega de novo; quando couber, a vez passa.
+ * Nenhum laço aqui — a repetição é do jogador, uma ação por vez.
+ */
+function entregarCarta(
+  estado: EstadoPartida,
+  acao: Extract<AcaoDaMesa, { readonly tipo: 'entregarCarta' }>,
+  deps: DepsMesa,
+): ResultadoAcao {
+  const { jogador, carta } = cartaDaMao(estado, acao);
+
+  if (jogador.mao.length <= limiteDeMao(jogador)) {
+    throw new AcaoInvalida('aplicarAcao: sua mão não está acima do limite');
+  }
+
+  const destino = destinoDaCaridade(estado.jogadores, jogador, deps.rolar);
+  const semACarta = jogador.mao.filter((c) => c.id !== carta.id);
+
+  if (destino.destinatario === null) {
+    const jogadores = estado.jogadores.map((j) => (
+      j.id === jogador.id ? { ...j, mao: semACarta } : j
+    ));
+    return encerrarTurno(
+      { ...estado, jogadores, cemiterio: [...estado.cemiterio, carta] },
+      [{ tipo: 'descarte', jogadorId: jogador.id, carta }],
+    );
+  }
+
+  const destinatarioId = destino.destinatario.id;
+  const jogadores = estado.jogadores.map((j) => {
+    if (j.id === jogador.id) return { ...j, mao: semACarta };
+    // Quem recebe pode ultrapassar o próprio limite: ele acerta as contas no fim
+    // do PRÓPRIO turno. Cobrar aqui faria uma doação virar cascata num turno só.
+    if (j.id === destinatarioId) return { ...j, mao: [...j.mao, carta] };
+    return j;
+  });
+
+  return encerrarTurno(
+    { ...estado, jogadores },
+    [{ tipo: 'entrega', jogadorId: jogador.id, paraJogadorId: destinatarioId, rolagem: destino.rolagem }],
+  );
+}
+
+/**
+ * Põe uma carta de raça da mão na zona em jogo. A anterior vai para o cemitério:
+ * a zona é ABERTA, então trocar de raça é jogada pública.
+ *
+ * A vez NÃO passa — jogar raça é decisão do próprio turno, e estando acima do
+ * limite ela é uma das saídas (a outra, entregar).
+ */
+function jogarCarta(estado: EstadoPartida, acao: AcaoDeMao): ResultadoAcao {
+  const { jogador, carta } = cartaDaMao(estado, acao);
   if (carta.tipo !== 'raca') {
     throw new AcaoInvalida('aplicarAcao: só carta de raça entra em jogo nesta fatia');
   }

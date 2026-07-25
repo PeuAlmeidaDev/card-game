@@ -95,7 +95,21 @@ export type EventoDaMesa =
   | { readonly tipo: 'derrota'; readonly jogadorId: string; readonly derrotas: number }
   | { readonly tipo: 'vez'; readonly jogadorId: string }
   | { readonly tipo: 'fim'; readonly classificacao: readonly PosicaoFinal[] }
-  | { readonly tipo: 'racaEmJogo'; readonly jogadorId: string; readonly carta: CartaDeRaca };
+  | { readonly tipo: 'racaEmJogo'; readonly jogadorId: string; readonly carta: CartaDeRaca }
+  /**
+   * Doação PRIVADA: diz quem deu e a quem, **nunca o quê**. O `log` viaja inteiro
+   * para todos na projeção — carregar a carta aqui anunciaria publicamente o que
+   * deveria ser segredo entre doador e destinatário. Quem recebeu descobre o
+   * conteúdo pela própria mão. `rolagem: null` = não houve empate a desempatar.
+   */
+  | { readonly tipo: 'entrega'; readonly jogadorId: string;
+      readonly paraJogadorId: string; readonly rolagem: number | null }
+  /**
+   * Descarte PÚBLICO: carrega a carta, porque o cemitério já é zona aberta e
+   * esconder aqui seria teatro. Assimetria deliberada em relação à `entrega`
+   * (spec §5): quem está em último revela o que dispensa.
+   */
+  | { readonly tipo: 'descarte'; readonly jogadorId: string; readonly carta: CartaPorta };
 
 export type AcaoDaMesa =
   | { readonly tipo: 'vasculhar'; readonly jogadorId: string }
@@ -103,7 +117,8 @@ export type AcaoDaMesa =
   | { readonly tipo: 'empurrarCarta'; readonly jogadorId: string }
   | { readonly tipo: 'atacar'; readonly jogadorId: string }
   | { readonly tipo: 'esquivar'; readonly jogadorId: string }
-  | { readonly tipo: 'jogarCarta'; readonly jogadorId: string; readonly cartaId: string };
+  | { readonly tipo: 'jogarCarta'; readonly jogadorId: string; readonly cartaId: string }
+  | { readonly tipo: 'entregarCarta'; readonly jogadorId: string; readonly cartaId: string };
 
 export interface CombateNaMesa {
   readonly estado: EstadoCombate;

@@ -817,6 +817,165 @@ describe('aplicarAcao — jogarCarta', () => {
   });
 });
 
+describe('aplicarAcao — entregarCarta (a caridade)', () => {
+  const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] };
+
+  /** p1 com a mão estourada (5 cartas, raça em jogo => limite 4). */
+  const estourado = (estado: EstadoPartida, mao = [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5')]): EstadoPartida => ({
+    ...estado,
+    jogadores: estado.jogadores.map((j) => (
+      j.id === 'p1' ? { ...j, mao, emJogo: { raca: raca('r1', 'anao') } } : j
+    )),
+  });
+
+  const comPatentes = (estado: EstadoPartida, porId: Readonly<Record<string, number>>): EstadoPartida => ({
+    ...estado,
+    jogadores: estado.jogadores.map((j) => ({ ...j, patente: porId[j.id] ?? j.patente })),
+  });
+
+  it('a carta sai da mão do doador e entra na mão de quem está atrás', () => {
+    const p = comPatentes(estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar })),
+      { p1: 5, p2: 1 });
+
+    const r = aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([]));
+
+    expect(r.estado.jogadores[0]?.mao.map((c) => c.id)).toEqual(['m2', 'm3', 'm4', 'm5']);
+    expect(r.estado.jogadores[1]?.mao.map((c) => c.id)).toEqual(['m1']);
+    // A carta não fica em dois lugares nem passa pelo cemitério no caminho.
+    expect(r.estado.cemiterio).toEqual([]);
+  });
+
+  it('o evento de entrega NÃO carrega a carta — o log é público', () => {
+    // O `log` inteiro viaja para todos na projeção. Se o evento carregasse a
+    // carta, a doação privada seria anunciada em alto e bom som — o mesmo modo
+    // de falha que a espiada evita ao não emitir evento nenhum.
+    const p = comPatentes(estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar })),
+      { p1: 5, p2: 1 });
+
+    const r = aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([]));
+    const entrega = r.eventos.find((e) => e.tipo === 'entrega');
+
+    expect(entrega).toEqual({ tipo: 'entrega', jogadorId: 'p1', paraJogadorId: 'p2', rolagem: null });
+    expect(JSON.stringify(r.eventos)).not.toContain('m1');
+  });
+
+  it('sem ninguém atrás, a carta vai para o cemitério e o evento MOSTRA a carta', () => {
+    // Assimetria deliberada do spec §5: quem está em último revela o que dispensa.
+    const p = comPatentes(estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar })),
+      { p1: 1, p2: 1 });
+
+    const r = aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([]));
+
+    expect(r.estado.cemiterio.map((c) => c.id)).toEqual(['m1']);
+    expect(r.estado.jogadores[1]?.mao).toEqual([]);
+    expect(r.eventos).toContainEqual({ tipo: 'descarte', jogadorId: 'p1', carta: monstro('m1') });
+  });
+
+  it('havendo empate entre candidatos, o 1d12 decide e a rolagem entra no log', () => {
+    const quatro: readonly EntradaJogador[] = [
+      { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base },
+      { id: 'p2', nome: 'Bot 1', ehBot: true, combatenteBase: base },
+      { id: 'p3', nome: 'Bot 2', ehBot: true, combatenteBase: base },
+      { id: 'p4', nome: 'Bot 3', ehBot: true, combatenteBase: base },
+    ];
+    const p = comPatentes(estourado(criarPartida('m1', quatro, soSalaVazia, { embaralhar: semEmbaralhar })),
+      { p1: 5, p2: 4, p3: 1, p4: 1 });
+
+    const r = aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([2]));
+
+    // (2 - 1) % 2 = 1 => o segundo candidato (p4). E o p2, que está abaixo mas
+    // não no mínimo, não recebe nada.
+    expect(r.eventos).toContainEqual({ tipo: 'entrega', jogadorId: 'p1', paraJogadorId: 'p4', rolagem: 2 });
+    expect(r.estado.jogadores[3]?.mao.map((c) => c.id)).toEqual(['m1']);
+    expect(r.estado.jogadores[1]?.mao).toEqual([]);
+  });
+
+  it('quando a mão passa a caber, a vez passa', () => {
+    const p = comPatentes(estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar })),
+      { p1: 5, p2: 1 });
+
+    const r = aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([]));
+
+    expect(r.estado.vezDe).toBe('p2');
+  });
+
+  it('estourado por duas cartas, a vez só passa na segunda entrega', () => {
+    const seis = [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5'), monstro('m6')];
+    const p = comPatentes(estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }), seis),
+      { p1: 5, p2: 1 });
+
+    const uma = aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([]));
+    expect(uma.estado.vezDe).toBe('p1');
+
+    const duas = aplicarAcao(uma.estado, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm2' }, deps([]));
+    expect(duas.estado.vezDe).toBe('p2');
+  });
+
+  it('quem RECEBE pode ficar acima do limite sem que nada o cobre agora', () => {
+    // Senão uma doação viraria cascata dentro de um turno só. O destinatário
+    // acerta as contas no fim do PRÓPRIO turno.
+    const p = comPatentes(estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar })),
+      { p1: 5, p2: 1 });
+    // p2 já está NO teto dele (5 cartas, sem raça em jogo => limite 5).
+    const cheio: EstadoPartida = {
+      ...p,
+      jogadores: p.jogadores.map((j) => (
+        j.id === 'p2'
+          ? { ...j, mao: [salaVazia('s1'), salaVazia('s2'), salaVazia('s3'), salaVazia('s4'), salaVazia('s5')] }
+          : j
+      )),
+    };
+
+    const r = aplicarAcao(cheio, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([]));
+
+    expect(r.estado.jogadores[1]?.mao).toHaveLength(6);   // acima do limite dele (5)
+    expect(r.estado.vezDe).toBe('p2');                    // e a vez passa mesmo assim
+  });
+
+  it('recusa entregar quando a mão NÃO está acima do limite', () => {
+    // Doação voluntária é política — escolher a quem alimentar é o kingmaking que
+    // a regra do destino existe para matar. A caridade resolve um excedente.
+    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const dentro: EstadoPartida = {
+      ...p0,
+      jogadores: p0.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao: [monstro('m1')] } : j)),
+    };
+
+    expect(() => aplicarAcao(dentro, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([])))
+      .toThrow(AcaoInvalida);
+    expect(() => aplicarAcao(dentro, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([])))
+      .toThrow('aplicarAcao: sua mão não está acima do limite');
+  });
+
+  it('recusa carta que não está na sua mão', () => {
+    const p = comPatentes(estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar })),
+      { p1: 5, p2: 1 });
+
+    expect(() => aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'x9' }, deps([])))
+      .toThrow('aplicarAcao: a carta x9 não está na sua mão');
+  });
+
+  it('recusa entregar com combate em curso', () => {
+    const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const }] };
+    const p = comPatentes(estourado(criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar })),
+      { p1: 5, p2: 1 });
+    const emCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
+    expect(emCombate.combate).not.toBeNull();
+
+    expect(() => aplicarAcao(emCombate, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([])))
+      .toThrow('aplicarAcao: há um combate em curso');
+  });
+
+  it('a entrega move a versão — o retry cai no 409, não no 400', () => {
+    const p = comPatentes(estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar })),
+      { p1: 5, p2: 1 });
+
+    const r = aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([]));
+
+    expect(r.estado.log.length).toBeGreaterThan(p.log.length);
+  });
+});
+
 describe('encerrarTurno — o limite de mão segura a vez', () => {
   const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] };
   // 5 cartas com raça em jogo = limite 4 => estourado por 1.
