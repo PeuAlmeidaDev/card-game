@@ -36,5 +36,17 @@ export function escolherAcao(vista: VistaDaPartida, jogadorId: string): AcaoDaMe
     // Burro por definição: entrega a primeira carta, sem critério nenhum.
     return { tipo: 'entregarCarta', jogadorId, cartaId: primeira.id };
   }
+  // Especializar: sem raça em jogo, a primeira raça da mão entra. Vem DEPOIS do
+  // excedente porque, sem raça em jogo, jogar uma é net-zero para o limite (a mão
+  // cai 1 e o teto cai 1 junto) — entregar primeiro é o que de fato destrava a vez.
+  //
+  // Só quem NÃO tem raça em jogo joga: trocar de raça é decisão de jogo, e bot
+  // burro não decide — trocar por trocar ainda mandaria a anterior pro cemitério.
+  if (eu !== undefined && eu.emJogo.raca === null) {
+    const raca = vista.suaMao.find((c) => c.tipo === 'raca');
+    if (raca !== undefined) {
+      return { tipo: 'jogarCarta', jogadorId, cartaId: raca.id };
+    }
+  }
   return { tipo: 'vasculhar', jogadorId };
 }

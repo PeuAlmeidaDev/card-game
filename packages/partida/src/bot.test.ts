@@ -100,6 +100,57 @@ describe('escolherAcao', () => {
     expect(escolherAcao(projetarPara('p1', comMao), 'p1')).toEqual({ tipo: 'vasculhar', jogadorId: 'p1' });
   });
 
+  it('sem raça em jogo e com raça na mão, joga a raça', () => {
+    // Fecha o ciclo do spec §7 regra 2: os bots passam a ser Elfo/Anão/Orc por
+    // terem SACADO a carta, nunca por ela ter sido colada na criação da mesa.
+    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const comRacaNaMao: EstadoPartida = {
+      ...p,
+      jogadores: p.jogadores.map((j) => (
+        j.id === 'p1' ? { ...j, mao: [cartaMonstro('c1'), raca('r7', 'orc')] } : j
+      )),
+    };
+
+    expect(escolherAcao(projetarPara('p1', comRacaNaMao), 'p1'))
+      .toEqual({ tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r7' });
+  });
+
+  it('com raça JÁ em jogo, ignora a raça da mão e vasculha', () => {
+    // Trocar de raça é decisão de jogo; bot burro não decide, só executa a jogada
+    // legal óbvia. Trocar por trocar ainda mandaria a raça anterior pro cemitério.
+    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const jaEspecializado: EstadoPartida = {
+      ...p,
+      jogadores: p.jogadores.map((j) => (
+        j.id === 'p1' ? { ...j, mao: [raca('r7', 'orc')], emJogo: { raca: raca('r1', 'anao') } } : j
+      )),
+    };
+
+    expect(escolherAcao(projetarPara('p1', jaEspecializado), 'p1'))
+      .toEqual({ tipo: 'vasculhar', jogadorId: 'p1' });
+  });
+
+  it('acima do limite, ENTREGA antes de jogar a raça', () => {
+    // Sem raça em jogo, jogar a raça é net-zero: a mão cai 1 e o limite cai 1
+    // junto (a especialização derruba o bônus do Adaptável). Entregar primeiro
+    // resolve o excedente de verdade; a raça entra no turno seguinte.
+    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const estourado: EstadoPartida = {
+      ...p,
+      jogadores: p.jogadores.map((j) => (
+        j.id === 'p1'
+          ? {
+              ...j,
+              mao: [cartaMonstro('c1'), cartaMonstro('c2'), cartaMonstro('c3'),
+                    cartaMonstro('c4'), cartaMonstro('c5'), raca('r7', 'orc')],
+            }
+          : j
+      )),
+    };
+
+    expect(escolherAcao(projetarPara('p1', estourado), 'p1').tipo).toBe('entregarCarta');
+  });
+
   it('uma mesa de bots com a mão estourada não trava `avancarBots`', () => {
     // O teste de ponta: é o laço automático que a regra existe para proteger.
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
