@@ -1,4 +1,4 @@
-import type { CartaPorta, Embaralhar, ReceitaPorta } from './tipos';
+import type { Baralho, Embaralhar, ReceitaPorta } from './tipos';
 
 /**
  * Composição de um baralho: uma carta de monstro **para cada id de monstro**
@@ -30,24 +30,25 @@ export function montarComposicao(
  * revelá-la — a carta NÃO vai para o cemitério. É o núcleo da espiada (o topo é
  * segredo até o vidente decidir) e de todo vasculhar: quem revela a carta (e
  * decide se ela vai para o cemitério ou para a mão) é `resolverCarta`.
+ *
+ * Genérico: o baralho de Tesouros compra pela mesma regra.
  */
-export function tirarDoTopo(
-  monte: readonly CartaPorta[],
-  cemiterio: readonly CartaPorta[],
+export function tirarDoTopo<T>(
+  baralho: Baralho<T>,
   embaralhar: Embaralhar,
-): { readonly carta: CartaPorta; readonly monte: readonly CartaPorta[]; readonly cemiterio: readonly CartaPorta[] } {
-  let restante = monte;
-  let descarte = cemiterio;
+): { readonly carta: T; readonly baralho: Baralho<T> } {
+  let monte = baralho.monte;
+  let cemiterio = baralho.cemiterio;
 
-  if (restante.length === 0) {
-    restante = embaralhar(descarte);
-    descarte = [];
+  if (monte.length === 0) {
+    monte = embaralhar(cemiterio);
+    cemiterio = [];
   }
 
-  const carta = restante[0];
+  const carta = monte[0];
   if (carta === undefined) {
     throw new Error('tirarDoTopo: baralho vazio');
   }
 
-  return { carta, monte: restante.slice(1), cemiterio: descarte };
+  return { carta, baralho: { monte: monte.slice(1), cemiterio } };
 }

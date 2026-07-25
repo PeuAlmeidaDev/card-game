@@ -40,6 +40,17 @@ export interface ZonaEmJogo {
 /** Embaralhamento injetado (aleatoriedade na borda). */
 export type Embaralhar = <T>(itens: readonly T[]) => T[];
 
+/**
+ * Um baralho: o monte de onde se compra e o cemitério para onde se descarta.
+ * Genérico porque a fatia 8 tem DOIS baralhos com regras de compra idênticas
+ * (incluindo o reshuffle) e conteúdos de tipo diferente — parametrizar é o que
+ * evita a segunda cópia de `tirarDoTopo` e de todas as suas guardas.
+ */
+export interface Baralho<T> {
+  readonly monte: readonly T[];
+  readonly cemiterio: readonly T[];
+}
+
 export interface JogadorNaMesa {
   readonly id: string;
   readonly nome: string;
@@ -193,8 +204,7 @@ export interface EstadoPartida {
   readonly jogadores: readonly JogadorNaMesa[];
   readonly vezDe: string;
   readonly patenteAlvo: number;
-  readonly monte: readonly CartaPorta[];
-  readonly cemiterio: readonly CartaPorta[];
+  readonly portas: Baralho<CartaPorta>;
   readonly combate: CombateNaMesa | null;
   readonly espiada: EspiadaPendente | null;
   readonly desfecho: 'emAndamento' | 'terminada';

@@ -137,7 +137,10 @@ function resolverCarta(
   // A carta revelada vai para o cemitério AQUI, um lugar só. Antes cada caminho de
   // entrada descartava por conta própria — e a carta que vai para a MÃO (Task 5)
   // teria que ser retirada do cemitério depois de lá colocada.
-  const revelada: EstadoPartida = { ...base, cemiterio: [...base.cemiterio, carta] };
+  const revelada: EstadoPartida = {
+    ...base,
+    portas: { ...base.portas, cemiterio: [...base.portas.cemiterio, carta] },
+  };
 
   switch (carta.tipo) {
     case 'salaVazia':
@@ -211,15 +214,15 @@ function vasculhar(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): Re
   if (temPresciencia) {
     // Presciência: espia o topo SEM revelar. Nenhum evento público (o topo é
     // segredo do vidente); manter/empurrar resolvem depois. A vez não passa.
-    const t = tirarDoTopo(estado.monte, estado.cemiterio, deps.embaralhar);
+    const t = tirarDoTopo(estado.portas, deps.embaralhar);
     return registrar(
-      { ...estado, monte: t.monte, cemiterio: t.cemiterio, espiada: { jogadorId, carta: t.carta } },
+      { ...estado, portas: t.baralho, espiada: { jogadorId, carta: t.carta } },
       [],
     );
   }
 
-  const t = tirarDoTopo(estado.monte, estado.cemiterio, deps.embaralhar);
-  const base: EstadoPartida = { ...estado, monte: t.monte, cemiterio: t.cemiterio };
+  const t = tirarDoTopo(estado.portas, deps.embaralhar);
+  const base: EstadoPartida = { ...estado, portas: t.baralho };
   return resolverCarta(base, jogadorId, t.carta, deps);
 }
 
@@ -246,23 +249,22 @@ function resolverEspiada(estado: EstadoPartida, acao: AcaoDeEspiada, deps: DepsM
   // empurrada voltaria como única do monte e sairia revelada na compra às cegas.
   // Recusar é o único desfecho que preserva "a empurrada nunca se torna pública" —
   // o vidente ainda tem `manterCarta` como saída legal.
-  if (estado.monte.length === 0 && estado.cemiterio.length === 0) {
+  if (estado.portas.monte.length === 0 && estado.portas.cemiterio.length === 0) {
     throw new AcaoInvalida('aplicarAcao: não há outra carta para comprar — a espiada tem que ser mantida');
   }
 
   // Se a espiada esvaziou o monte, reembaralha o cemitério ANTES de empurrar — senão
   // a carta empurrada seria a única no monte e voltaria (revelada) na compra às cegas,
   // violando "a empurrada nunca se torna pública".
-  const precisaReembaralhar = estado.monte.length === 0;
-  const monteBase = precisaReembaralhar ? deps.embaralhar(estado.cemiterio) : estado.monte;
-  const cemiterioBase = precisaReembaralhar ? [] : estado.cemiterio;
+  const precisaReembaralhar = estado.portas.monte.length === 0;
+  const monteBase = precisaReembaralhar ? deps.embaralhar(estado.portas.cemiterio) : estado.portas.monte;
+  const cemiterioBase = precisaReembaralhar ? [] : estado.portas.cemiterio;
   const monteComEmpurrada: readonly CartaPorta[] = [...monteBase, espiada.carta];
-  const compra = tirarDoTopo(monteComEmpurrada, cemiterioBase, deps.embaralhar);
+  const compra = tirarDoTopo({ monte: monteComEmpurrada, cemiterio: cemiterioBase }, deps.embaralhar);
   const base: EstadoPartida = {
     ...estado,
     espiada: null,
-    monte: compra.monte,
-    cemiterio: compra.cemiterio,
+    portas: compra.baralho,
   };
   return resolverCarta(base, espiada.jogadorId, compra.carta, deps);
 }
@@ -333,7 +335,7 @@ function entregarCarta(
       j.id === jogador.id ? { ...j, mao: semACarta } : j
     ));
     return encerrarTurno(
-      { ...estado, jogadores, cemiterio: [...estado.cemiterio, carta] },
+      { ...estado, jogadores, portas: { ...estado.portas, cemiterio: [...estado.portas.cemiterio, carta] } },
       [{ tipo: 'descarte', jogadorId: jogador.id, carta }],
     );
   }
@@ -384,7 +386,10 @@ function jogarCarta(
     {
       ...estado,
       jogadores: estado.jogadores.map((j) => (j.id === atualizado.id ? atualizado : j)),
-      cemiterio: anterior === null ? estado.cemiterio : [...estado.cemiterio, anterior],
+      portas: {
+        ...estado.portas,
+        cemiterio: anterior === null ? estado.portas.cemiterio : [...estado.portas.cemiterio, anterior],
+      },
     },
     [{ tipo: 'racaEmJogo', jogadorId: acao.jogadorId, carta }],
   );

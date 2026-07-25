@@ -63,17 +63,34 @@ describe('montarComposicao — cartas de raça', () => {
 
 describe('tirarDoTopo', () => {
   it('tira o topo SEM jogá-lo no cemitério (a carta não é revelada)', () => {
-    const monte = [monstro('m1'), salaVazia('v1')];
-    const r = tirarDoTopo(monte, [], idem);
+    const r = tirarDoTopo({ monte: [monstro('m1'), salaVazia('v1')], cemiterio: [] }, idem);
     expect(r.carta).toEqual(monstro('m1'));
-    expect(r.monte).toEqual([salaVazia('v1')]);
-    expect(r.cemiterio).toEqual([]); // <- diferença central: nada foi revelado
+    expect(r.baralho.monte).toEqual([salaVazia('v1')]);
+    expect(r.baralho.cemiterio).toEqual([]); // <- diferença central: nada foi revelado
   });
 
   it('embaralha o cemitério de volta quando o monte está vazio', () => {
-    const r = tirarDoTopo([], [salaVazia('v1')], idem);
+    const r = tirarDoTopo({ monte: [], cemiterio: [salaVazia('v1')] }, idem);
     expect(r.carta).toEqual(salaVazia('v1'));
-    expect(r.monte).toEqual([]);
-    expect(r.cemiterio).toEqual([]);
+    expect(r.baralho.monte).toEqual([]);
+    expect(r.baralho.cemiterio).toEqual([]);
+  });
+
+  it('tira do topo de um baralho de qualquer tipo de carta', () => {
+    // O genérico é o que deixa o baralho de Tesouros (Plano 3) reusar o reshuffle
+    // sem uma segunda cópia desta função.
+    const baralho = { monte: [{ id: 't-1' }, { id: 't-2' }], cemiterio: [] };
+    const tirado = tirarDoTopo(baralho, idem);
+    expect(tirado.carta).toEqual({ id: 't-1' });
+    expect(tirado.baralho.monte).toEqual([{ id: 't-2' }]);
+    expect(tirado.baralho.cemiterio).toEqual([]);
+  });
+
+  it('reembaralha o cemitério quando o monte acaba', () => {
+    const baralho = { monte: [], cemiterio: [{ id: 't-9' }] };
+    const tirado = tirarDoTopo(baralho, idem);
+    expect(tirado.carta).toEqual({ id: 't-9' });
+    expect(tirado.baralho.monte).toEqual([]);
+    expect(tirado.baralho.cemiterio).toEqual([]);
   });
 });

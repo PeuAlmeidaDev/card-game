@@ -39,14 +39,14 @@ describe('aplicarAcao — vasculhar', () => {
     const p = criarPartida('m1', entradas,
       { ...config, composicaoPorJogador: [{ tipo: 'salaVazia' }] },
       { embaralhar: semEmbaralhar });
-    const topo = p.monte[0];
+    const topo = p.portas.monte[0];
 
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
 
     // `[0]` sozinho passa com a carta lá uma OU duas vezes — o tamanho é o que
     // pega um descarte duplicado (o cemitério é escrito só dentro de `resolverCarta`).
-    expect(r.estado.cemiterio).toHaveLength(1);
-    expect(r.estado.cemiterio[0]?.id).toBe(topo?.id);
+    expect(r.estado.portas.cemiterio).toHaveLength(1);
+    expect(r.estado.portas.cemiterio[0]?.id).toBe(topo?.id);
   });
 
   it('rejeita ação de quem não tem a vez', () => {
@@ -263,7 +263,7 @@ describe('monstro com identidade', () => {
     expect(comRato.estado.combate?.estado.monstro.vida).toBe(6);
 
     const comOgro = aplicarAcao(
-      { ...base, monte: [{ id: 'p-9', tipo: 'monstro', monstroId: 'ogro' }] },
+      { ...base, portas: { ...base.portas, monte: [{ id: 'p-9', tipo: 'monstro', monstroId: 'ogro' }] } },
       { tipo: 'vasculhar', jogadorId: base.vezDe },
       { rolar: filaDeDados([]), embaralhar: semEmbaralhar, catalogo },
     );
@@ -488,7 +488,7 @@ describe('aplicarAcao — espiada (Presciência)', () => {
 
     expect(r.estado.espiada).toBeNull();
     expect(r.estado.vezDe).toBe('p2');            // salaVazia resolvida → vez passou
-    expect(r.estado.cemiterio.map((c) => c.tipo)).toEqual(['salaVazia']); // a mantida foi revelada
+    expect(r.estado.portas.cemiterio.map((c) => c.tipo)).toEqual(['salaVazia']); // a mantida foi revelada
     expect(r.eventos.some((e) => e.tipo === 'porta')).toBe(true);
   });
 
@@ -506,10 +506,10 @@ describe('aplicarAcao — espiada (Presciência)', () => {
     expect(r.estado.espiada).toBeNull();
     expect(r.estado.combate).not.toBeNull(); // a PRÓXIMA (monstro) foi comprada às cegas e abriu combate
     // a salaVazia empurrada NÃO foi revelada: não está no cemitério (foi pro fundo do monte)
-    expect(r.estado.cemiterio.some((c) => c.tipo === 'salaVazia')).toBe(false);
+    expect(r.estado.portas.cemiterio.some((c) => c.tipo === 'salaVazia')).toBe(false);
     // Só o monstro comprado às cegas foi descartado — o tamanho pega um
     // descarte duplicado que `.some` sozinho deixaria passar.
-    expect(r.estado.cemiterio).toHaveLength(1);
+    expect(r.estado.portas.cemiterio).toHaveLength(1);
   });
 
   it('empurrar com o monte vazio reembaralha o cemitério ANTES (a empurrada não volta pública)', () => {
@@ -517,18 +517,18 @@ describe('aplicarAcao — espiada (Presciência)', () => {
       { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
       { embaralhar: semEmbaralhar });
     // Estado forjado: monte com só 1 carta (salaVazia); cemitério com 1 monstro já revelado.
-    const p = { ...p0, monte: [salaVazia('v1')], cemiterio: [monstro('m1')] };
+    const p = { ...p0, portas: { monte: [salaVazia('v1')], cemiterio: [monstro('m1')] } };
     const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])).estado;
-    expect(comEspiada.monte).toEqual([]);                      // tirarDoTopo esvaziou o monte
+    expect(comEspiada.portas.monte).toEqual([]);                // tirarDoTopo esvaziou o monte
     expect(comEspiada.espiada?.carta).toEqual(salaVazia('v1'));
 
     const r = aplicarAcao(comEspiada, { tipo: 'empurrarCarta', jogadorId: 'p1' }, depsVidente([1])).estado;
     expect(r.combate).not.toBeNull();                          // a próxima às cegas foi o monstro
-    expect(r.cemiterio.some((c) => c.tipo === 'salaVazia')).toBe(false); // a empurrada NÃO virou pública
-    expect(r.cemiterio.some((c) => c.tipo === 'monstro')).toBe(true);
+    expect(r.portas.cemiterio.some((c) => c.tipo === 'salaVazia')).toBe(false); // a empurrada NÃO virou pública
+    expect(r.portas.cemiterio.some((c) => c.tipo === 'monstro')).toBe(true);
     // Só o monstro comprado às cegas foi descartado — o tamanho pega um
     // descarte duplicado que `.some` sozinho deixaria passar.
-    expect(r.cemiterio).toHaveLength(1);
+    expect(r.portas.cemiterio).toHaveLength(1);
   });
 
   it('recusa empurrar quando não há OUTRA carta para comprar', () => {
@@ -540,10 +540,10 @@ describe('aplicarAcao — espiada (Presciência)', () => {
     const p0 = criarPartida('m1', entradas,
       { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
       { embaralhar: semEmbaralhar });
-    const p = { ...p0, monte: [salaVazia('v1')], cemiterio: [] };
+    const p = { ...p0, portas: { monte: [salaVazia('v1')], cemiterio: [] } };
     const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])).estado;
-    expect(comEspiada.monte).toEqual([]);
-    expect(comEspiada.cemiterio).toEqual([]);
+    expect(comEspiada.portas.monte).toEqual([]);
+    expect(comEspiada.portas.cemiterio).toEqual([]);
 
     expect(() => aplicarAcao(comEspiada, { tipo: 'empurrarCarta', jogadorId: 'p1' }, depsVidente([1])))
       .toThrow(AcaoInvalida);
@@ -655,14 +655,14 @@ describe('vasculhar — carta de raça', () => {
     const p0 = criarPartida('m1', entradas,
       { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
       { embaralhar: semEmbaralhar });
-    const p = { ...p0, monte: [raca('r1', 'elfo')] };
+    const p = { ...p0, portas: { ...p0.portas, monte: [raca('r1', 'elfo')] } };
 
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
 
     expect(r.estado.jogadores[0]?.mao.map((c) => c.id)).toEqual(['r1']);
     expect(r.estado.jogadores[1]?.mao).toEqual([]);
-    expect(r.estado.cemiterio.some((c) => c.id === 'r1')).toBe(false); // está na mão, não no lixo
-    expect(r.estado.cemiterio).toHaveLength(0);                        // raça não passa pelo descarte
+    expect(r.estado.portas.cemiterio.some((c) => c.id === 'r1')).toBe(false); // está na mão, não no lixo
+    expect(r.estado.portas.cemiterio).toHaveLength(0);                        // raça não passa pelo descarte
     expect(r.estado.combate).toBeNull();                               // raça não abre combate
     expect(r.estado.vezDe).toBe('p2');
     expect(r.eventos[0]).toMatchObject({ tipo: 'achado', jogadorId: 'p1' });
@@ -676,7 +676,7 @@ describe('vasculhar — carta de raça', () => {
     const p0 = criarPartida('m1', entradas,
       { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
       { embaralhar: semEmbaralhar });
-    const p = { ...p0, monte: [raca('carta-secreta', 'raca-secreta')] };
+    const p = { ...p0, portas: { ...p0.portas, monte: [raca('carta-secreta', 'raca-secreta')] } };
 
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
 
@@ -769,7 +769,7 @@ describe('aplicarAcao — jogarCarta', () => {
     const r = aplicarAcao(comAnterior, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r2' }, deps([]));
 
     expect(r.estado.jogadores[0]?.emJogo.raca?.id).toBe('r2');
-    expect(r.estado.cemiterio.some((c) => c.id === 'r1')).toBe(true);
+    expect(r.estado.portas.cemiterio.some((c) => c.id === 'r1')).toBe(true);
   });
 
   it('recusa carta que não está na sua mão', () => {
@@ -877,7 +877,7 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
     expect(r.estado.jogadores[0]?.mao.map((c) => c.id)).toEqual(['m2', 'm3', 'm4', 'm5']);
     expect(r.estado.jogadores[1]?.mao.map((c) => c.id)).toEqual(['m1']);
     // A carta não fica em dois lugares nem passa pelo cemitério no caminho.
-    expect(r.estado.cemiterio).toEqual([]);
+    expect(r.estado.portas.cemiterio).toEqual([]);
   });
 
   it('o evento de entrega NÃO carrega a carta — o log é público', () => {
@@ -901,7 +901,7 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
 
     const r = aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([]));
 
-    expect(r.estado.cemiterio.map((c) => c.id)).toEqual(['m1']);
+    expect(r.estado.portas.cemiterio.map((c) => c.id)).toEqual(['m1']);
     expect(r.estado.jogadores[1]?.mao).toEqual([]);
     expect(r.eventos).toContainEqual({ tipo: 'descarte', jogadorId: 'p1', carta: monstro('m1') });
   });
@@ -1046,7 +1046,7 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
     // A carta de raça sacada vai para a MÃO (não para a zona) — é ela que estoura
     // o limite como CONSEQUÊNCIA da compra, não como precondição do vasculhar.
     const p0 = comMaoNoLimiteEZona(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }));
-    const p: EstadoPartida = { ...p0, monte: [raca('r9', 'elfo')] };
+    const p: EstadoPartida = { ...p0, portas: { ...p0.portas, monte: [raca('r9', 'elfo')] } };
 
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
 
@@ -1060,7 +1060,7 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
     // no server e morreria como 400 no reducer. Foi exatamente o achado A3 da
     // espiada; aqui não se repete porque o evento `porta` já foi emitido.
     const p0 = comMaoNoLimiteEZona(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }));
-    const p: EstadoPartida = { ...p0, monte: [raca('r9', 'elfo')] };
+    const p: EstadoPartida = { ...p0, portas: { ...p0.portas, monte: [raca('r9', 'elfo')] } };
 
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
 
