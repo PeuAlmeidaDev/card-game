@@ -1,9 +1,21 @@
-import type { Combatente, EstadoCombate, EventoCombate, DecisaoPendente } from '@card-dungeon/motor';
+import type { Combatente, EstadoCombate, EventoCombate, DecisaoPendente, PassivaCombate } from '@card-dungeon/motor';
 
-/** Carta do baralho de Portais. União ABERTA: `maldicao`/`raca`/`classe`/`item` entram na fatia 8. */
-export type CartaPorta =
+/**
+ * **Receita** de carta: o que compor, SEM identidade. É o que entra em
+ * `ConfigPartida.composicaoPorJogador` — ali a carta ainda não existe, é só a
+ * descrição do baralho. União ABERTA: `maldicao`/`classe`/`item` entram depois.
+ */
+export type ReceitaCarta =
   | { readonly tipo: 'monstro' }
-  | { readonly tipo: 'salaVazia' };
+  | { readonly tipo: 'salaVazia' }
+  | { readonly tipo: 'raca'; readonly racaId: string };
+
+/**
+ * Carta como **instância** no jogo: a receita mais uma identidade estável. O id
+ * é o que permite apontar para UMA carta quando existirem cópias iguais na mão
+ * (a mão da fatia 7). Circula por `monte`, `cemiterio`, `espiada` e eventos.
+ */
+export type CartaPorta = ReceitaCarta & { readonly id: string };
 
 /** Embaralhamento injetado (aleatoriedade na borda). */
 export type Embaralhar = <T>(itens: readonly T[]) => T[];
@@ -18,6 +30,18 @@ export interface JogadorNaMesa {
   readonly derrotas: number;
   /** Id da raça escolhida — resolve a passiva de combate. Ausente = sem raça (bots). */
   readonly racaId?: string;
+}
+
+/**
+ * O que a raça de um jogador confere. UM resolvedor injetado responde tudo:
+ * duas perguntas sobre a mesma carta em dois resolvedores fazem `DepsMesa`
+ * crescer um campo por passiva. `RacaCarta` (pacote `cartas`) satisfaz este
+ * contrato estruturalmente — por isso `partida` nunca precisa importar `cartas`.
+ */
+export interface InfoRaca {
+  readonly passivaCombate: PassivaCombate | null;
+  /** A raça espia o topo do baralho antes de resolver (Presciência do Elfo). */
+  readonly espiaTopo: boolean;
 }
 
 export interface PosicaoFinal {
@@ -97,7 +121,7 @@ export interface VistaDaPartida {
 
 export interface ConfigPartida {
   readonly patenteAlvo: number;
-  readonly composicaoPorJogador: readonly CartaPorta[];
+  readonly composicaoPorJogador: readonly ReceitaCarta[];
 }
 
 export interface EntradaJogador {

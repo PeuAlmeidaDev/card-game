@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { narrarCombate } from './narrarCombate';
+import { narrarPorta } from './narrarPorta';
 import type { EventoDaMesa, JogadorNaMesa } from '@card-dungeon/shared';
 
 /**
@@ -74,8 +75,7 @@ export function PainelLog({ log, jogadores, voce }: {
           const cor = 'jogadorId' in evento ? corDoJogador(jogadores, evento.jogadorId) : CINZA;
           return (
             <li key={i} style={{ color: cor }}>
-              {evento.tipo === 'porta' && evento.carta.tipo === 'salaVazia' && 'A sala está vazia.'}
-              {evento.tipo === 'porta' && evento.carta.tipo === 'monstro' && 'Um monstro apareceu!'}
+              {evento.tipo === 'porta' && narrarPorta(evento.carta, evento.jogadorId === voce ? 'Você' : nomeDe(evento.jogadorId))}
               {evento.tipo === 'patente' && `${nomeDe(evento.jogadorId)} subiu para a patente ${String(evento.patente)}.`}
               {evento.tipo === 'derrota' && `${nomeDe(evento.jogadorId)} foi evacuado.`}
               {evento.tipo === 'vez' && <small>Vez de {nomeDe(evento.jogadorId)}.</small>}

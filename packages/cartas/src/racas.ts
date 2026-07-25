@@ -16,7 +16,9 @@ export interface RacaCarta {
   /**
    * A raça espia o topo do baralho antes de resolver (Presciência)? É passiva
    * FORA do combate, por isso não cabe em `passivaCombate` — o motor não é
-   * consultado. O server traduz este bool no resolvedor `temPresciencia` da Mesa.
+   * consultado. O resolvedor `resolverRaca` da Mesa devolve a `RacaCarta`
+   * inteira (ela satisfaz `InfoRaca` estruturalmente), e é dali que a Mesa lê
+   * este campo.
    */
   readonly espiaTopo: boolean;
 }

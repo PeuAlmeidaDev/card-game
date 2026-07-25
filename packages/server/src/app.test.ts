@@ -111,6 +111,32 @@ describe('mesa', () => {
     return res.json<VistaDaPartida>();
   };
 
+  it('o 500 NÃO devolve a mensagem interna do erro ao cliente', async () => {
+    // A separação da fatia 5 (`AcaoInvalida` => 400 com a mensagem, que é
+    // contrato; `Error` cru => 500 sem vazar) estava METADE implementada: o
+    // handler de erro padrão do Fastify serializa `err.message`, então o nome das
+    // nossas funções internas — e qualquer caminho de arquivo que um erro de I/O
+    // carregue — chegava ao cliente. Achado por sonda; esta é a sonda virada teste.
+    const app = buildApp({
+      rolar: () => {
+        throw new Error('SEGREDO-INTERNO-nao-deveria-vazar');
+      },
+      embaralhar: semEmbaralhar,
+      monstro: { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 },
+    });
+    const vista = await criar(app);
+
+    const res = await app.inject({
+      method: 'POST', url: `/api/partida/${vista.id}/acao`,
+      payload: { acao: { tipo: 'vasculhar' }, versao: vista.versao },
+    });
+
+    expect(res.statusCode).toBe(500);
+    expect(res.body).not.toContain('SEGREDO-INTERNO');
+    expect(res.json<{ erro: string }>().erro).toBe('erro interno');
+    await app.close();
+  });
+
   it('cria a partida com 4 jogadores e devolve a vista do humano', async () => {
     const app = buildApp({ embaralhar: semEmbaralhar });
     const res = await app.inject({ method: 'POST', url: '/api/partida', payload: escolhas });
@@ -222,7 +248,7 @@ describe('mesa', () => {
 
   it('uma partida com raça Anão resolve o combate com a passiva Casca de Pedra', async () => {
     // Prova a borda inteira: obterRaca('anao') tem passivaCombate real (cartas),
-    // resolverPassiva injetado nas deps da Mesa aplica ela ao humano.
+    // resolverRaca injetado nas deps da Mesa aplica ela ao humano.
     // Monstro rápido e certeiro (agilidade/habilidade máximas) ataca primeiro.
     // dado[0]=1: ataque do monstro acerta (<=12). dado[1]=12: esquiva do humano
     // falha (12 > 1). Dano base = level(1)+forca(5) = 6; a passiva reduz o

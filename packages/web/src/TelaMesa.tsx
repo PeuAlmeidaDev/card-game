@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api } from './api';
 import { PainelLog } from './PainelLog';
+import { descreverCarta } from './descreverCarta';
 import type { AcaoDaMesa, Escolhas, VistaDaPartida } from '@card-dungeon/shared';
 
 /**
@@ -107,9 +108,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO }: { escolhas?: Escolhas }
       ) : (
         <>
           {espiada !== null && (
-            <p>
-              Você pressente {espiada.carta.tipo === 'monstro' ? 'um monstro' : 'uma sala vazia'} adiante.
-            </p>
+            <p>Você pressente {descreverCarta(espiada.carta)} adiante.</p>
           )}
 
           <div>

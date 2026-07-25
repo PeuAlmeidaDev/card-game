@@ -1,7 +1,8 @@
 import type { Combatente, Passo, RolarD12, PassivaCombate } from '@card-dungeon/motor';
 import { AcaoIlegal, criarCombate, proximoPasso } from '@card-dungeon/motor';
 import type {
-  AcaoDaMesa, CartaPorta, ConfigPartida, EntradaJogador, Embaralhar, EstadoPartida, EventoDaMesa, JogadorNaMesa,
+  AcaoDaMesa, CartaPorta, ConfigPartida, EntradaJogador, Embaralhar, EstadoPartida, EventoDaMesa, InfoRaca,
+  JogadorNaMesa,
 } from './tipos';
 import { comprarCarta, tirarDoTopo } from './baralho';
 import { escolherAcao } from './bot';
@@ -17,15 +18,18 @@ export interface DepsMesa {
   readonly rolar: RolarD12;
   readonly embaralhar: Embaralhar;
   readonly monstro: Combatente;
-  /** Resolve a passiva de combate de um jogador pelo id da raça. Ausente/undefined = sem passiva. */
-  readonly resolverPassiva?: (racaId: string | undefined) => PassivaCombate | undefined;
-  /** Resolve se a raça de um jogador tem Presciência (espia o topo). Ausente/undefined = não tem. */
-  readonly temPresciencia?: (racaId: string | undefined) => boolean;
+  /** Resolve o que a raça de um jogador confere. Ausente/undefined = sem raça (baseline). */
+  readonly resolverRaca?: (racaId: string | undefined) => InfoRaca | undefined;
 }
 
-/** Resolve a passiva de combate de um jogador (via o resolvedor injetado). Central para não repetir a chamada. */
+/** Resolve a raça de um jogador (via o resolvedor injetado). Central para não repetir a chamada. */
+function racaDoLutador(deps: DepsMesa, jogador: JogadorNaMesa | undefined): InfoRaca | undefined {
+  return deps.resolverRaca?.(jogador?.racaId);
+}
+
+/** A passiva de combate do jogador, `undefined` quando não há raça ou a raça não tem passiva. */
 function passivaDoLutador(deps: DepsMesa, jogador: JogadorNaMesa | undefined): PassivaCombate | undefined {
-  return deps.resolverPassiva?.(jogador?.racaId);
+  return racaDoLutador(deps, jogador)?.passivaCombate ?? undefined;
 }
 
 export interface ResultadoAcao {
@@ -59,7 +63,14 @@ export function criarPartida(
   }));
 
   // Baralho da MESA: a composição por jogador multiplicada pelo tamanho da mesa.
-  const composicao = Array.from({ length: jogadores.length }, () => config.composicaoPorJogador).flat();
+  const receitas = Array.from({ length: jogadores.length }, () => config.composicaoPorJogador).flat();
+  // Embaralha ANTES de carimbar: se o id nascesse sobre a composição ORDENADA
+  // (ex.: 5 monstros seguidos de 3 salas vazias por jogador), `p-i` viraria uma
+  // função pública e determinística do tipo da carta — sem vazar nada hoje (só
+  // a espiada cruza o fio com carta oculta, e a projeção já a entrega só ao
+  // dono), mas basta um evento público futuro carregar `cartaId` para o id
+  // entregar qual carta era. Carimbar depois do embaralho quebra essa correlação.
+  const cartas: readonly CartaPorta[] = deps.embaralhar(receitas).map((r, i) => ({ ...r, id: `p-${String(i)}` }));
 
   const primeiro = jogadores[0];
   if (primeiro === undefined) {
@@ -75,7 +86,7 @@ export function criarPartida(
     jogadores,
     vezDe: primeiro.id,
     patenteAlvo: config.patenteAlvo,
-    monte: deps.embaralhar(composicao),
+    monte: cartas,
     cemiterio: [],
     combate: null,
     espiada: null,
@@ -134,8 +145,9 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
 
 /**
  * Resolve uma carta JÁ comprada (o baralho em `base` já reflete a compra): emite
- * o evento `porta` e bifurca — `salaVazia` passa a vez, `monstro` abre combate.
- * É o núcleo compartilhado do vasculhar atômico e da resolução da espiada.
+ * o evento `porta` e segue um de três caminhos — `salaVazia` passa a vez,
+ * `monstro` abre combate, `raca` (ver o `case` abaixo). É o núcleo compartilhado
+ * do vasculhar atômico e da resolução da espiada.
  */
 function resolverCarta(
   base: EstadoPartida,
@@ -145,10 +157,24 @@ function resolverCarta(
 ): ResultadoAcao {
   const eventos: EventoDaMesa[] = [{ tipo: 'porta', jogadorId, carta }];
 
-  if (carta.tipo === 'salaVazia') {
-    const seguinte = proximoJogador(base);
-    eventos.push({ tipo: 'vez', jogadorId: seguinte.id });
-    return registrar({ ...base, vezDe: seguinte.id }, eventos);
+  switch (carta.tipo) {
+    case 'salaVazia': {
+      const seguinte = proximoJogador(base);
+      eventos.push({ tipo: 'vez', jogadorId: seguinte.id });
+      return registrar({ ...base, vezDe: seguinte.id }, eventos);
+    }
+    case 'raca':
+      // A mão que recebe esta carta chega no Plano 2. Até lá o baralho de
+      // produção não tem raça e este caminho é inalcançável — mas ele precisa
+      // EXISTIR, senão a carta cairia no ramo do monstro e viraria combate.
+      throw new Error('resolverCarta: carta de raça ainda não tem mão para receber');
+    case 'monstro':
+      break;
+    default: {
+      // `never` faz o compilador recusar um tipo novo sem tratamento aqui.
+      const naoTratada: never = carta;
+      throw new Error(`resolverCarta: tipo de carta não tratado: ${JSON.stringify(naoTratada)}`);
+    }
   }
 
   const jogador = base.jogadores.find((j) => j.id === jogadorId);
@@ -175,7 +201,7 @@ function vasculhar(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): Re
   }
 
   const jogador = estado.jogadores.find((j) => j.id === jogadorId);
-  const temPresciencia = deps.temPresciencia?.(jogador?.racaId) ?? false;
+  const temPresciencia = racaDoLutador(deps, jogador)?.espiaTopo ?? false;
 
   if (temPresciencia) {
     // Presciência: espia o topo SEM revelar. Nenhum evento público (o topo é
