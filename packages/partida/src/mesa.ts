@@ -152,10 +152,24 @@ function resolverCarta(
 ): ResultadoAcao {
   const eventos: EventoDaMesa[] = [{ tipo: 'porta', jogadorId, carta }];
 
-  if (carta.tipo === 'salaVazia') {
-    const seguinte = proximoJogador(base);
-    eventos.push({ tipo: 'vez', jogadorId: seguinte.id });
-    return registrar({ ...base, vezDe: seguinte.id }, eventos);
+  switch (carta.tipo) {
+    case 'salaVazia': {
+      const seguinte = proximoJogador(base);
+      eventos.push({ tipo: 'vez', jogadorId: seguinte.id });
+      return registrar({ ...base, vezDe: seguinte.id }, eventos);
+    }
+    case 'raca':
+      // A mão que recebe esta carta chega no Plano 2. Até lá o baralho de
+      // produção não tem raça e este caminho é inalcançável — mas ele precisa
+      // EXISTIR, senão a carta cairia no ramo do monstro e viraria combate.
+      throw new Error('resolverCarta: carta de raça ainda não tem mão para receber');
+    case 'monstro':
+      break;
+    default: {
+      // `never` faz o compilador recusar um tipo novo sem tratamento aqui.
+      const naoTratada: never = carta;
+      throw new Error(`resolverCarta: tipo de carta não tratado: ${JSON.stringify(naoTratada)}`);
+    }
   }
 
   const jogador = base.jogadores.find((j) => j.id === jogadorId);

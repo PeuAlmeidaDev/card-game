@@ -7,3 +7,4 @@ import type { CartaPorta } from '../tipos';
  */
 export const monstro = (id: string): CartaPorta => ({ id, tipo: 'monstro' });
 export const salaVazia = (id: string): CartaPorta => ({ id, tipo: 'salaVazia' });
+export const raca = (id: string, racaId: string): CartaPorta => ({ id, tipo: 'raca', racaId });

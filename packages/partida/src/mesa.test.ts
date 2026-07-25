@@ -5,7 +5,7 @@ import { escolherAcao } from './bot';
 import { projetarPara } from './projecao';
 import { AcaoInvalida } from './erros';
 import { filaDeDados, criarDadoCiclico } from './testes/dados';
-import { monstro, salaVazia } from './testes/cartas';
+import { monstro, salaVazia, raca } from './testes/cartas';
 import type { EntradaJogador } from './tipos';
 import type { Combatente, PassivaCombate } from '@card-dungeon/motor';
 
@@ -575,5 +575,24 @@ describe('avancarBots — teto de ações automáticas', () => {
 
     expect(r.estado.vezDe).toBe('p1');
     expect(r.eventos.length).toBeGreaterThan(0);
+  });
+});
+
+describe('resolverCarta — carta de tipo novo', () => {
+  it('recusa a carta de raça com erro NOSSO em vez de abrir combate', () => {
+    // Antes da exaustividade, `if (tipo === 'salaVazia') … else combate` fazia
+    // qualquer tipo novo cair no ramo do monstro — o jogador lutaria contra uma
+    // carta de raça, sem nenhum erro. A mão que recebe esta carta chega no Plano 2;
+    // até lá o caso é inalcançável em produção (o baralho não tem raça) e um
+    // `Error` cru é o certo: invariante nossa quebrada => 500, não culpa do cliente.
+    const p0 = criarPartida('m1', entradas,
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' }] },
+      { embaralhar: semEmbaralhar });
+    const p = { ...p0, monte: [raca('r1', 'elfo')] };
+
+    expect(() => aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])))
+      .toThrow('resolverCarta: carta de raça ainda não tem mão para receber');
+    expect(() => aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])))
+      .not.toThrow(AcaoInvalida);
   });
 });

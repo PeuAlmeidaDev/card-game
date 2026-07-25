@@ -7,7 +7,8 @@ import type { Combatente, EstadoCombate, EventoCombate, DecisaoPendente, Passiva
  */
 export type ReceitaCarta =
   | { readonly tipo: 'monstro' }
-  | { readonly tipo: 'salaVazia' };
+  | { readonly tipo: 'salaVazia' }
+  | { readonly tipo: 'raca'; readonly racaId: string };
 
 /**
  * Carta como **instância** no jogo: a receita mais uma identidade estável. O id
