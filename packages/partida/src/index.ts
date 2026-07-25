@@ -4,7 +4,8 @@ export type {
   ConfigPartida, EntradaJogador,
 } from './tipos';
 export { montarComposicao, COMPOSICAO_POR_JOGADOR, tirarDoTopo } from './baralho';
-export { aplicarAcao, avancarBots } from './mesa';
+export { aplicarAcao } from './mesa';
+export { avancarBots } from './automacao';
 export { criarPartida } from './montagem';
 export { escolherAcao } from './bot';
 export { MAX_ACOES_AUTOMATICAS } from './limites';

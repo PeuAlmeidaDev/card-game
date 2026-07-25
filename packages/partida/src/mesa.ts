@@ -4,13 +4,10 @@ import type {
   AcaoDaMesa, CartaPorta, Embaralhar, EstadoPartida, EventoDaMesa, InfoRaca, JogadorNaMesa,
 } from './tipos';
 import { tirarDoTopo } from './baralho';
-import { escolherAcao } from './bot';
 import { destinoDaCaridade } from './caridade';
 import { classificar } from './classificacao';
 import { AcaoInvalida } from './erros';
-import { MAX_ACOES_AUTOMATICAS } from './limites';
 import { limiteDeMao } from './mao';
-import { projetarPara } from './projecao';
 
 /** As ações que só fazem sentido com um combate aberto. */
 type AcaoDeCombate = Extract<AcaoDaMesa, { readonly tipo: 'atacar' | 'esquivar' }>;
@@ -450,32 +447,4 @@ function fecharCombate(
   }
 
   return encerrarTurno(semCombate, eventos);
-}
-
-/**
- * Roda os turnos dos bots até a vez voltar a um humano (ou a partida acabar).
- * Todos os eventos gerados entram no mesmo log, para o cliente animar de uma vez.
- */
-export function avancarBots(estado: EstadoPartida, deps: DepsMesa): ResultadoAcao {
-  let atual = estado;
-  const eventos: EventoDaMesa[] = [];
-
-  for (let acoes = 0; ; acoes += 1) {
-    if (acoes >= MAX_ACOES_AUTOMATICAS) {
-      // Invariante nossa, não pedido inválido: `Error` cru => 500 e alerta.
-      // Erro alto é preferível ao congelamento silencioso do processo.
-      throw new Error('avancarBots: teto de ações automáticas atingido');
-    }
-    if (atual.desfecho !== 'emAndamento') break;
-
-    const daVez = atual.jogadores.find((j) => j.id === atual.vezDe);
-    if (daVez === undefined || !daVez.ehBot) break;
-
-    const acao = escolherAcao(projetarPara(daVez.id, atual), daVez.id);
-    const passo = aplicarAcao(atual, acao, deps);
-    eventos.push(...passo.eventos);
-    atual = passo.estado;
-  }
-
-  return { estado: atual, eventos };
 }

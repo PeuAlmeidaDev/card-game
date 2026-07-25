@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { escolherAcao } from './bot';
-import { aplicarAcao, avancarBots } from './mesa';
+import { aplicarAcao } from './mesa';
+import { avancarBots } from './automacao';
 import { criarPartida } from './montagem';
 import { projetarPara } from './projecao';
 import { filaDeDados } from './testes/dados';

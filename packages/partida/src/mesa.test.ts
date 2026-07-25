@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { aplicarAcao, avancarBots } from './mesa';
+import { aplicarAcao } from './mesa';
+import { avancarBots } from './automacao';
 import { criarPartida } from './montagem';
 import { COMPOSICAO_POR_JOGADOR } from './baralho';
 import { MAO_INICIAL_PADRAO, limiteDeMao } from './mao';
