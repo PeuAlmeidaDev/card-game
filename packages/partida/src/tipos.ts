@@ -99,12 +99,14 @@ export interface InfoRaca {
 }
 
 /**
- * O que o catálogo sabe de um monstro. Os 5 stats são exatamente os campos de
- * `Combatente` mais o nome — `MonstroCarta` (pacote `cartas`) satisfaz isto
- * estruturalmente, por isso `partida` nunca precisa importar `cartas`.
+ * O que o catálogo sabe de um monstro: exatamente os 5 stats de `Combatente`.
+ * `partida` nunca lê o nome do monstro — quem nomeia é o cliente, via
+ * `Catalogo.monstros` + `monstroId` (o nome mora só em `MonstroCarta`, no
+ * pacote `cartas`). `MonstroCarta` satisfaz este contrato estruturalmente
+ * (tem mais campos que o exigido), por isso `partida` nunca precisa importar
+ * `cartas`.
  */
 export interface InfoMonstro {
-  readonly nome: string;
   readonly forca: number;
   readonly vida: number;
   readonly habilidade: number;

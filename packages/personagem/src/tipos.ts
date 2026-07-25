@@ -21,7 +21,7 @@ export interface Equipamento {
   readonly modificadores: ModificadoresDeStat;
 }
 
-/** O que o `GET /catalogo` entrega: raças (carta), classes, itens + a base para o preview. */
+/** O que o `GET /catalogo` entrega: raças (carta), monstros, classes, itens + a base para o preview. */
 export interface Catalogo {
   readonly base: Combatente;
   readonly racas: readonly RacaResumo[];

@@ -30,9 +30,15 @@ describe('projetarPara', () => {
   it('não expõe o monte nem o cemitério, só as contagens', () => {
     const vista = projetarPara('p1', partida);
 
-    // Asserção ESTRUTURAL: as chaves não existem na vista, ponto.
-    // (Não vale procurar a string 'monstro' no JSON: assim que uma porta for
-    // revelada, ela aparece no log de propósito — carta revelada é pública.)
+    // Asserção ESTRUTURAL: a chave não existe na vista, ponto. `portas` é o
+    // campo de `EstadoPartida` que carrega monte+cemitério desde a Task 5 —
+    // é ELE que vazaria a ordem do baralho se `projetarPara` algum dia virasse
+    // um `{ ...estado, ... }`. (Não vale procurar a string 'monstro' no JSON:
+    // assim que uma porta for revelada, ela aparece no log de propósito —
+    // carta revelada é pública.)
+    expect('portas' in vista).toBe(false);
+    // Nomes antigos (pré-Task 5): não fazem mal como guarda extra contra
+    // reintroduzi-los, mas `portas` acima é quem sustenta o alarme agora.
     expect('monte' in vista).toBe(false);
     expect('cemiterio' in vista).toBe(false);
     expect(vista.cartasNoMonte).toBe(composicaoDeTeste.length * 2);
@@ -47,7 +53,7 @@ describe('projetarPara', () => {
     ).estado;
     const vista = projetarPara('p1', depois);
 
-    expect('monte' in vista).toBe(false);
+    expect('portas' in vista).toBe(false);
     expect(vista.cartasNoMonte).toBe(composicaoDeTeste.length * 2 - 1);
   });
 
@@ -123,7 +129,6 @@ describe('versaoDe — a versão anda quando a espiada abre', () => {
   const depsVidente = {
     rolar: () => 1,
     embaralhar: semEmbaralhar,
-    monstro: { forca: 1, vida: 1, habilidade: 0, agilidade: 0, level: 1 },
     catalogo: catalogoDeTeste({ raca: () => ({ passivaCombate: null, espiaTopo: true }) }),
   };
   const criar = () => criarPartida('m1', entradas,

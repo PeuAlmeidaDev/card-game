@@ -28,16 +28,6 @@ describe('montarComposicao — cartas de monstro', () => {
 });
 
 describe('montarComposicao — cartas de raça', () => {
-  it('sem ids de raça, a composição não muda', () => {
-    // Rede de segurança do refactor: dezenas de testes chamam a versão de 2
-    // argumentos.
-    expect(montarComposicao(1, ['goblin', 'goblin'])).toEqual([
-      { tipo: 'monstro', monstroId: 'goblin' },
-      { tipo: 'monstro', monstroId: 'goblin' },
-      { tipo: 'salaVazia' },
-    ]);
-  });
-
   it('cria UMA carta por id de raça, na ordem recebida', () => {
     expect(montarComposicao(0, ['goblin'], ['elfo', 'anao'])).toEqual([
       { tipo: 'monstro', monstroId: 'goblin' },

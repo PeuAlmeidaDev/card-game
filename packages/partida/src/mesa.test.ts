@@ -154,7 +154,7 @@ describe('aplicarAcao — combate', () => {
   });
 
   it('perder o combate conta derrota e passa a vez', () => {
-    const forte = { nome: 'Bruto', forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1 };
+    const forte = { forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1 };
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const depsForte = (dados: readonly number[]) => ({
       rolar: filaDeDados(dados), embaralhar: semEmbaralhar,
@@ -198,7 +198,7 @@ describe('aplicarAcao — combate', () => {
   it('traduz a recusa do motor em AcaoInvalida, preservando a mensagem', () => {
     // O motor recusa `atacar` quando a máquina está pedindo a esquiva. Sem a
     // tradução, esse Error cru viraria 500 na Task 14 em vez do 400 que é.
-    const forte = { nome: 'Bruto', forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1 };
+    const forte = { forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1 };
     const depsForte = (dados: readonly number[]) => ({
       rolar: filaDeDados(dados), embaralhar: semEmbaralhar,
       catalogo: catalogoDeTeste({ monstro: () => forte }),
@@ -234,7 +234,7 @@ describe('aplicarAcao — combate', () => {
 
 describe('monstro com identidade', () => {
   it('resolve os stats do monstro pela carta, não por um monstro fixo nas deps', () => {
-    const ogro = { nome: 'Ogro', forca: 6, vida: 28, habilidade: 3, agilidade: 2, level: 3 };
+    const ogro = { forca: 6, vida: 28, habilidade: 3, agilidade: 2, level: 3 };
     const estado = criarPartida('m1', entradas,
       { ...config, composicaoPorJogador: [{ tipo: 'monstro', monstroId: 'ogro' }] },
       { embaralhar: semEmbaralhar });
@@ -251,8 +251,8 @@ describe('monstro com identidade', () => {
   it('dois monstros diferentes no mesmo baralho abrem combates com vidas diferentes', () => {
     const catalogo = catalogoDeTeste({
       monstro: (id) => (id === 'rato'
-        ? { nome: 'Rato', forca: 1, vida: 6, habilidade: 2, agilidade: 1, level: 1 }
-        : { nome: 'Ogro', forca: 6, vida: 28, habilidade: 3, agilidade: 2, level: 3 }),
+        ? { forca: 1, vida: 6, habilidade: 2, agilidade: 1, level: 1 }
+        : { forca: 6, vida: 28, habilidade: 3, agilidade: 2, level: 3 }),
     });
     const base = criarPartida('m1', entradas,
       { ...config, composicaoPorJogador: [{ tipo: 'monstro', monstroId: 'rato' }] },
@@ -338,7 +338,7 @@ describe('passiva da raça no combate da Mesa', () => {
           : { dano: Math.floor(base / 2), estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } },
     };
     // monstro rápido (ataca primeiro) e forte, para o 1º golpe cair no humano
-    const monstroForte = { nome: 'Colosso', forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 };
+    const monstroForte = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 };
     const catalogo = catalogoDeTeste({
       raca: (racaId) => (racaId === 'anao' ? { passivaCombate: metade, espiaTopo: false } : undefined),
       monstro: () => monstroForte,
@@ -376,7 +376,7 @@ describe('passiva da raça no combate da Mesa', () => {
   });
 });
 
-const monstroFraco = { nome: 'Presa', forca: 1, vida: 1, habilidade: 0, agilidade: 0, level: 1 };
+const monstroFraco = { forca: 1, vida: 1, habilidade: 0, agilidade: 0, level: 1 };
 // deps com Presciência ligada e um monstro fraco para o combate resolver rápido.
 const depsVidente = (dados: readonly number[]) => ({
   rolar: filaDeDados(dados),
@@ -404,7 +404,7 @@ describe('aplicarAcao — espiada (Presciência)', () => {
     };
     // monstro rápido (ataca primeiro) e forte, para o 1º golpe cair no humano —
     // mesmo cálculo do teste "aplica a passiva do lutador ao criar o combate".
-    const monstroForte = { nome: 'Colosso', forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 };
+    const monstroForte = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 };
     const deps1 = {
       rolar: filaDeDados([1, 12]),
       embaralhar: semEmbaralhar,
@@ -705,7 +705,7 @@ describe('a raça vem da ZONA EM JOGO', () => {
           : { dano: Math.floor(dano / 2), estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } },
     };
     // monstro rápido (ataca primeiro) e forte, para o 1º golpe cair no humano
-    const monstroForte = { nome: 'Colosso', forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 };
+    const monstroForte = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 };
     const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] };
 
     const vidaApos = (comRacaNaZona: boolean): number | undefined => {
@@ -830,7 +830,7 @@ describe('aplicarAcao — jogarCarta', () => {
           ? { dano, estado: ctx.estado }
           : { dano: Math.floor(dano / 2), estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } },
     };
-    const monstroForte = { nome: 'Colosso', forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 };
+    const monstroForte = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 };
     const depsAnao = {
       rolar: filaDeDados([1, 12]),
       embaralhar: semEmbaralhar,
@@ -1101,7 +1101,7 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
     // só para provar que `fecharCombate` também passa pela porta única.
     const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] };
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
-    const fraco = { nome: 'Presa', forca: 1, vida: 1, habilidade: 0, agilidade: 0, level: 1 };
+    const fraco = { forca: 1, vida: 1, habilidade: 0, agilidade: 0, level: 1 };
     const depsFraco = {
       rolar: filaDeDados([1, 12]), embaralhar: semEmbaralhar,
       catalogo: catalogoDeTeste({ monstro: () => fraco }),

@@ -8,7 +8,7 @@ import type { CatalogoDaMesa } from '../tipos';
  * números aqui é mudar o resultado de metade da suíte.
  */
 export const MONSTRO_DE_TESTE = {
-  nome: 'Alvo', forca: 2, vida: 10, habilidade: 6, agilidade: 1, level: 1,
+  forca: 2, vida: 10, habilidade: 6, agilidade: 1, level: 1,
 } as const;
 
 /**
