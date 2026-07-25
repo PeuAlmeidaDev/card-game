@@ -62,8 +62,21 @@ describe('PainelLog', () => {
     ];
     render(<PainelLog log={log} jogadores={jogadores} voce="p1" />);
 
-    expect(screen.getByText(/Você encontra um monstro\./)).toBeInTheDocument();
-    expect(screen.getByText(/Você encontra uma sala vazia\./)).toBeInTheDocument();
+    expect(screen.getByText(/Você dá de cara com um monstro!/)).toBeInTheDocument();
+    expect(screen.getByText(/Bot 1 vasculha o local e não encontra nada\./)).toBeInTheDocument();
+  });
+
+  it('narra a porta alheia com o nome do jogador, não como "Você"', () => {
+    // Toda porta era narrada como "Você encontra…", mesmo quando quem vasculhou
+    // era outro jogador — numa mesa de 4 o log mentia três vezes por rodada.
+    const log: readonly EventoDaMesa[] = [
+      { tipo: 'porta', jogadorId: 'p2', carta: { id: 'p-2', tipo: 'monstro' } },
+    ];
+    render(<PainelLog log={log} jogadores={jogadores} voce="p1" />);
+
+    const linha = screen.getByText(/dá de cara com um monstro!/);
+    expect(linha).toHaveTextContent('Bot 1');
+    expect(linha).not.toHaveTextContent(/^Você/);
   });
 
   it('mostra o evento de vez de forma discreta', () => {
