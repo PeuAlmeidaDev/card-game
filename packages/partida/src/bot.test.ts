@@ -11,13 +11,12 @@ import type { EntradaJogador, EstadoPartida } from './tipos';
 import type { Combatente } from '@card-dungeon/motor';
 
 const base: Combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
-const monstro: Combatente = { forca: 2, vida: 10, habilidade: 6, agilidade: 1, level: 1 };
 const semEmbaralhar = <T,>(itens: readonly T[]): T[] => [...itens];
 const entradas: readonly EntradaJogador[] = [
   { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base },
   { id: 'p2', nome: 'Bot 1', ehBot: true, combatenteBase: base },
 ];
-const soMonstro = { patenteAlvo: 5, composicaoPorJogador: [{ tipo: 'monstro' as const }] };
+const soMonstro = { patenteAlvo: 5, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] };
 
 describe('escolherAcao', () => {
   it('sem combate em curso, chuta a porta', () => {
@@ -28,17 +27,18 @@ describe('escolherAcao', () => {
   it('com decisão de ataque pendente, ataca', () => {
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const comCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' },
-      { rolar: filaDeDados([]), embaralhar: semEmbaralhar, monstro, catalogo: catalogoDeTeste() }).estado;
+      { rolar: filaDeDados([]), embaralhar: semEmbaralhar, catalogo: catalogoDeTeste() }).estado;
 
     expect(escolherAcao(projetarPara('p1', comCombate), 'p1')).toEqual({ tipo: 'atacar', jogadorId: 'p1' });
   });
 
   it('com esquiva pendente, esquiva', () => {
     // monstro mais ágil ataca primeiro e acerta => a máquina para pedindo a esquiva
-    const rapido: Combatente = { ...monstro, agilidade: 12 };
+    const rapido = { nome: 'Veloz', forca: 2, vida: 10, habilidade: 6, agilidade: 12, level: 1 };
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const pedindoEsquiva = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' },
-      { rolar: filaDeDados([1]), embaralhar: semEmbaralhar, monstro: rapido, catalogo: catalogoDeTeste() }).estado;
+      { rolar: filaDeDados([1]), embaralhar: semEmbaralhar,
+        catalogo: catalogoDeTeste({ monstro: () => rapido }) }).estado;
     expect(pedindoEsquiva.combate?.proximaDecisao).toBe('esquiva');
 
     expect(escolherAcao(projetarPara('p1', pedindoEsquiva), 'p1'))
@@ -52,7 +52,7 @@ describe('escolherAcao', () => {
     // blefa: mantém sempre, igual já faz com atacar/esquivar.
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, {
-      rolar: filaDeDados([]), embaralhar: semEmbaralhar, monstro,
+      rolar: filaDeDados([]), embaralhar: semEmbaralhar,
       catalogo: catalogoDeTeste({ raca: () => ({ passivaCombate: null, espiaTopo: true }) }),
     }).estado;
     expect(comEspiada.espiada).not.toBeNull();
@@ -173,7 +173,7 @@ describe('escolherAcao', () => {
     };
 
     const r = avancarBots(estourado,
-      { rolar: filaDeDados([]), embaralhar: semEmbaralhar, monstro, catalogo: catalogoDeTeste() });
+      { rolar: filaDeDados([]), embaralhar: semEmbaralhar, catalogo: catalogoDeTeste() });
 
     expect(r.estado.vezDe).toBe('p1');   // a vez voltou ao humano
   });

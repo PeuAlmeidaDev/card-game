@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { projetarPara, versaoDe } from './projecao';
 import { aplicarAcao } from './mesa';
 import { criarPartida } from './montagem';
-import { COMPOSICAO_POR_JOGADOR } from './baralho';
+import { montarComposicao } from './baralho';
 import { AcaoInvalida } from './erros';
 import { filaDeDados } from './testes/dados';
 import { raca } from './testes/cartas';
@@ -11,7 +11,9 @@ import type { EntradaJogador } from './tipos';
 import type { Combatente } from '@card-dungeon/motor';
 
 const base: Combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
-const monstroPadrao: Combatente = { forca: 2, vida: 10, habilidade: 6, agilidade: 1, level: 1 };
+// 5 monstros + 3 salas vazias por jogador. Os ids são explícitos porque, com o
+// monstro tendo stats próprios, a QUANTIDADE sozinha não descreve o baralho.
+const composicaoDeTeste = montarComposicao(3, Array.from({ length: 5 }, () => 'm-teste'));
 const semEmbaralhar = <T,>(itens: readonly T[]): T[] => [...itens];
 const entradas: readonly EntradaJogador[] = [
   { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base },
@@ -21,7 +23,7 @@ const entradas: readonly EntradaJogador[] = [
 describe('projetarPara', () => {
   const partida = criarPartida(
     'm1', entradas,
-    { patenteAlvo: 10, composicaoPorJogador: COMPOSICAO_POR_JOGADOR },
+    { patenteAlvo: 10, composicaoPorJogador: composicaoDeTeste },
     { embaralhar: semEmbaralhar },
   );
 
@@ -33,7 +35,7 @@ describe('projetarPara', () => {
     // revelada, ela aparece no log de propósito — carta revelada é pública.)
     expect('monte' in vista).toBe(false);
     expect('cemiterio' in vista).toBe(false);
-    expect(vista.cartasNoMonte).toBe(COMPOSICAO_POR_JOGADOR.length * 2);
+    expect(vista.cartasNoMonte).toBe(composicaoDeTeste.length * 2);
     expect(vista.cartasNoCemiterio).toBe(0);
   });
 
@@ -41,12 +43,12 @@ describe('projetarPara', () => {
     const depois = aplicarAcao(
       partida,
       { tipo: 'vasculhar', jogadorId: 'p1' },
-      { rolar: filaDeDados([]), embaralhar: semEmbaralhar, monstro: monstroPadrao, catalogo: catalogoDeTeste() },
+      { rolar: filaDeDados([]), embaralhar: semEmbaralhar, catalogo: catalogoDeTeste() },
     ).estado;
     const vista = projetarPara('p1', depois);
 
     expect('monte' in vista).toBe(false);
-    expect(vista.cartasNoMonte).toBe(COMPOSICAO_POR_JOGADOR.length * 2 - 1);
+    expect(vista.cartasNoMonte).toBe(composicaoDeTeste.length * 2 - 1);
   });
 
   it('marca quem está vendo', () => {
@@ -59,7 +61,7 @@ describe('projetarPara', () => {
     const depois = aplicarAcao(
       partida,
       { tipo: 'vasculhar', jogadorId: 'p1' },
-      { rolar: filaDeDados([]), embaralhar: semEmbaralhar, monstro: monstroPadrao, catalogo: catalogoDeTeste() },
+      { rolar: filaDeDados([]), embaralhar: semEmbaralhar, catalogo: catalogoDeTeste() },
     ).estado;
 
     expect(projetarPara('p1', depois).versao).toBeGreaterThan(projetarPara('p1', partida).versao);

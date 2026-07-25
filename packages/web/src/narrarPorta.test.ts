@@ -6,7 +6,7 @@ const nomeDaRaca = (id: string): string => id;
 
 describe('narrarPorta', () => {
   it('narra o monstro com drama', () => {
-    const carta: CartaPorta = { id: 'p-0', tipo: 'monstro' };
+    const carta: CartaPorta = { id: 'p-0', tipo: 'monstro', monstroId: 'goblin' };
     expect(narrarPorta(carta, 'Você', nomeDaRaca)).toBe('Você dá de cara com um monstro!');
   });
 
@@ -22,7 +22,7 @@ describe('narrarPorta', () => {
   });
 
   it('usa o nome já resolvido, não "Você", quando quem vasculhou não é o jogador local', () => {
-    const carta: CartaPorta = { id: 'p-3', tipo: 'monstro' };
+    const carta: CartaPorta = { id: 'p-3', tipo: 'monstro', monstroId: 'goblin' };
     expect(narrarPorta(carta, 'Bot 1', nomeDaRaca)).toBe('Bot 1 dá de cara com um monstro!');
   });
 

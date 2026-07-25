@@ -14,7 +14,7 @@ const ctx: ContextoDeNarracao = {
 
 describe('narrarEvento — linhas de texto puro', () => {
   it('porta: usa a pessoa certa (Você para o dono, nome para os outros)', () => {
-    expect(narrarEvento({ tipo: 'porta', jogadorId: 'p1', carta: { id: 'c1', tipo: 'monstro' } }, ctx))
+    expect(narrarEvento({ tipo: 'porta', jogadorId: 'p1', carta: { id: 'c1', tipo: 'monstro', monstroId: 'goblin' } }, ctx))
       .toBe('Você dá de cara com um monstro!');
     expect(narrarEvento({ tipo: 'porta', jogadorId: 'p2', carta: { id: 'c2', tipo: 'salaVazia' } }, ctx))
       .toBe('Bot 1 vasculha o local e não encontra nada.');

@@ -61,7 +61,7 @@ describe('PainelLog', () => {
 
   it('narra o evento de porta com o que a carta revela', () => {
     const log: readonly EventoDaMesa[] = [
-      { tipo: 'porta', jogadorId: 'p1', carta: { id: 'p-0', tipo: 'monstro' } },
+      { tipo: 'porta', jogadorId: 'p1', carta: { id: 'p-0', tipo: 'monstro', monstroId: 'goblin' } },
       { tipo: 'porta', jogadorId: 'p2', carta: { id: 'p-1', tipo: 'salaVazia' } },
     ];
     render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} />);
@@ -74,7 +74,7 @@ describe('PainelLog', () => {
     // Toda porta era narrada como "Você encontra…", mesmo quando quem vasculhou
     // era outro jogador — numa mesa de 4 o log mentia três vezes por rodada.
     const log: readonly EventoDaMesa[] = [
-      { tipo: 'porta', jogadorId: 'p2', carta: { id: 'p-2', tipo: 'monstro' } },
+      { tipo: 'porta', jogadorId: 'p2', carta: { id: 'p-2', tipo: 'monstro', monstroId: 'goblin' } },
     ];
     render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} />);
 

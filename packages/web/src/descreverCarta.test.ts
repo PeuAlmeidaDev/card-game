@@ -6,7 +6,7 @@ const nomeDaRaca = (id: string): string => (id === 'elfo' ? 'Elfo' : id);
 
 describe('descreverCarta', () => {
   it('descreve cada tipo de carta', () => {
-    expect(descreverCarta({ id: 'a', tipo: 'monstro' }, nomeDaRaca)).toBe('um monstro');
+    expect(descreverCarta({ id: 'a', tipo: 'monstro', monstroId: 'goblin' }, nomeDaRaca)).toBe('um monstro');
     expect(descreverCarta({ id: 'b', tipo: 'salaVazia' }, nomeDaRaca)).toBe('uma sala vazia');
   });
 

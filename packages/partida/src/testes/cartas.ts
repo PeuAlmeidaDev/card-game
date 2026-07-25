@@ -5,7 +5,7 @@ import type { CartaPorta, CartaDeRaca } from '../tipos';
  * há contador escondido): teste com estado global fica dependente de ordem de
  * execução, e o id é justamente o que estes testes precisam controlar.
  */
-export const monstro = (id: string): CartaPorta => ({ id, tipo: 'monstro' });
+export const monstro = (id: string, monstroId = 'goblin'): CartaPorta => ({ id, tipo: 'monstro', monstroId });
 export const salaVazia = (id: string): CartaPorta => ({ id, tipo: 'salaVazia' });
 // Anotado como `CartaDeRaca` (não `CartaPorta`): ela continua atribuível a todo
 // lugar que espera `CartaPorta` (inclusive `monte: [...]`), mas agora também

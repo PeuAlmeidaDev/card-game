@@ -48,7 +48,7 @@ const abrirMesa = async (vista: VistaDaPartida, racas: Catalogo['racas'] = RACAS
 describe('TelaMesa', () => {
   const vistaComEspiada: VistaDaPartida = {
     ...vistaBase,
-    espiada: { jogadorId: 'p1', carta: { id: 'p-0', tipo: 'monstro' } },
+    espiada: { jogadorId: 'p1', carta: { id: 'p-0', tipo: 'monstro', monstroId: 'goblin' } },
   };
 
   it('mostra o que o vidente pressentiu e oferece encarar ou empurrar', async () => {
@@ -272,7 +272,7 @@ describe('TelaMesa — a mão', () => {
   it('lista as cartas da sua mão, nomeando a raça', async () => {
     await abrirMesa({
       ...vistaBase,
-      suaMao: [{ id: 'p-1', tipo: 'monstro' }, { id: 'p-2', tipo: 'raca', racaId: 'orc' }],
+      suaMao: [{ id: 'p-1', tipo: 'monstro', monstroId: 'goblin' }, { id: 'p-2', tipo: 'raca', racaId: 'orc' }],
     });
 
     expect(screen.getByText(/um monstro/)).toBeInTheDocument();
@@ -282,7 +282,7 @@ describe('TelaMesa — a mão', () => {
   it('só carta de raça tem botão de jogar', async () => {
     await abrirMesa({
       ...vistaBase,
-      suaMao: [{ id: 'p-1', tipo: 'monstro' }, { id: 'p-2', tipo: 'raca', racaId: 'orc' }],
+      suaMao: [{ id: 'p-1', tipo: 'monstro', monstroId: 'goblin' }, { id: 'p-2', tipo: 'raca', racaId: 'orc' }],
     });
 
     expect(screen.getAllByRole('button', { name: 'Jogar' })).toHaveLength(1);
@@ -292,7 +292,7 @@ describe('TelaMesa — a mão', () => {
     // A caridade resolve um EXCEDENTE; doar por vontade própria é escolher a quem
     // dar vantagem — o kingmaking que a regra do destino existe para matar. O
     // domínio recusa; a tela não oferece.
-    await abrirMesa({ ...vistaBase, suaMao: [{ id: 'p-1', tipo: 'monstro' }] });
+    await abrirMesa({ ...vistaBase, suaMao: [{ id: 'p-1', tipo: 'monstro', monstroId: 'goblin' }] });
 
     for (const b of screen.getAllByRole('button', { name: 'Entregar' })) {
       expect(b).toBeDisabled();
@@ -302,7 +302,7 @@ describe('TelaMesa — a mão', () => {
   it('acima do limite: avisa, habilita entregar e DESABILITA vasculhar', async () => {
     // Espelha a recusa do domínio. Deixar o botão aceso só para o servidor
     // responder 400 é ensinar o jogador a errar.
-    const mao = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => ({ id, tipo: 'monstro' as const }));
+    const mao = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => ({ id, tipo: 'monstro' as const, monstroId: 'goblin' }));
     await abrirMesa({
       ...vistaBase,
       suaMao: mao,
@@ -340,7 +340,7 @@ describe('TelaMesa — a mão', () => {
     // (achado 3 do review final: este clique não tinha teste nenhum).
     const agir = vi.spyOn(api, 'agir').mockResolvedValue({ status: 200, body: vistaBase } as never);
     const mao = [
-      ...['a', 'b', 'c', 'd', 'e'].map((id) => ({ id, tipo: 'monstro' as const })),
+      ...['a', 'b', 'c', 'd', 'e'].map((id) => ({ id, tipo: 'monstro' as const, monstroId: 'goblin' })),
       { id: 'p-alvo', tipo: 'raca' as const, racaId: 'orc' },
     ];
     await abrirMesa({

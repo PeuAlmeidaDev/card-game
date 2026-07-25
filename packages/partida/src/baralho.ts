@@ -1,31 +1,29 @@
-import type { CartaPorta, Embaralhar, ReceitaCarta } from './tipos';
+import type { CartaPorta, Embaralhar, ReceitaPorta } from './tipos';
 
 /**
- * Composição de um baralho: quantos monstros, quantas salas vazias e **uma carta
- * para cada id de raça** recebido.
+ * Composição de um baralho: uma carta de monstro **para cada id de monstro**
+ * recebido, `nSalasVazias` salas vazias, e uma carta para cada id de raça.
  *
  * Os ids entram por parâmetro porque `partida` não conhece o catálogo — quem sabe
- * quais raças existem é o pacote `cartas`, e quem as injeta é a borda. Manter esse
- * desconhecimento é o que deixa o pacote de regras testável sem catálogo nenhum.
+ * quais monstros e raças existem é o pacote `cartas`, e quem os injeta é a borda.
+ * Não há mais como pedir "5 monstros" sem dizer QUAIS: desde que o monstro tem
+ * stats próprios, a quantidade sozinha não descreve o baralho.
  *
- * A REPETIÇÃO de raças no baralho (spec §8) não acontece aqui: `criarPartida`
- * multiplica esta composição pelo número de assentos, então 4 ids numa mesa de 4
- * viram 4 cópias de cada raça.
+ * A REPETIÇÃO no baralho (spec §8) não acontece aqui: `criarPartida` multiplica
+ * esta composição pelo número de assentos, então 4 ids numa mesa de 4 viram 4
+ * cópias de cada carta.
  */
 export function montarComposicao(
-  nMonstros: number,
   nSalasVazias: number,
+  monstroIds: readonly string[],
   racaIds: readonly string[] = [],
-): ReceitaCarta[] {
+): ReceitaPorta[] {
   return [
-    ...Array.from({ length: nMonstros }, (): ReceitaCarta => ({ tipo: 'monstro' })),
-    ...Array.from({ length: nSalasVazias }, (): ReceitaCarta => ({ tipo: 'salaVazia' })),
-    ...racaIds.map((racaId): ReceitaCarta => ({ tipo: 'raca', racaId })),
+    ...monstroIds.map((monstroId): ReceitaPorta => ({ tipo: 'monstro', monstroId })),
+    ...Array.from({ length: nSalasVazias }, (): ReceitaPorta => ({ tipo: 'salaVazia' })),
+    ...racaIds.map((racaId): ReceitaPorta => ({ tipo: 'raca', racaId })),
   ];
 }
-
-/** Composição por jogador: a mesa multiplica isto pelo número de jogadores. */
-export const COMPOSICAO_POR_JOGADOR: readonly ReceitaCarta[] = montarComposicao(5, 3);
 
 /**
  * Tira a carta do topo (reshuffle do cemitério se o monte estiver vazio) SEM

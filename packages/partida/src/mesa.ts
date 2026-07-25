@@ -15,7 +15,6 @@ type AcaoDeCombate = Extract<AcaoDaMesa, { readonly tipo: 'atacar' | 'esquivar' 
 export interface DepsMesa {
   readonly rolar: RolarD12;
   readonly embaralhar: Embaralhar;
-  readonly monstro: Combatente;
   readonly catalogo: CatalogoDaMesa;
 }
 
@@ -168,8 +167,20 @@ function resolverCarta(
   }
   // Vida sempre reseta: o combatente entra no combate com a statline base na patente atual.
   const combatente: Combatente = { ...jogador.combatenteBase, level: jogador.patente };
+  // Os stats do adversário vêm da CARTA, não das deps: é o que faz cada monstro
+  // do baralho ser um adversário diferente. Id que o catálogo não conhece é
+  // invariante nossa quebrada (a carta veio da composição que a borda montou do
+  // próprio catálogo), então sobe como Error cru => 500 sem vazar.
+  const info = deps.catalogo.monstro(carta.monstroId);
+  if (info === undefined) {
+    throw new Error(`resolverCarta: monstro ${carta.monstroId} não está no catálogo`);
+  }
+  const adversario: Combatente = {
+    forca: info.forca, vida: info.vida, habilidade: info.habilidade,
+    agilidade: info.agilidade, level: info.level,
+  };
   const passiva = passivaDoLutador(deps, jogador);
-  const passo = criarCombate(combatente, deps.monstro, deps.rolar, passiva);
+  const passo = criarCombate(combatente, adversario, deps.rolar, passiva);
   eventos.push({ tipo: 'combate', jogadorId, eventos: passo.eventos });
   return registrar(
     { ...revelada, combate: { estado: passo.estado, proximaDecisao: passo.proximaDecisao } },
