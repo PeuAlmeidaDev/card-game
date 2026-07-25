@@ -816,3 +816,77 @@ describe('aplicarAcao — jogarCarta', () => {
     expect(depois.combate?.estado.jogador.vida).toBe(17);
   });
 });
+
+describe('encerrarTurno — o limite de mão segura a vez', () => {
+  const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] };
+  // 5 cartas com raça em jogo = limite 4 => estourado por 1.
+  const maoEstourada = [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5')];
+
+  const comMaoEZona = (estado: EstadoPartida): EstadoPartida => ({
+    ...estado,
+    jogadores: estado.jogadores.map((j) => (
+      j.id === 'p1'
+        ? { ...j, mao: maoEstourada, emJogo: { raca: raca('r1', 'anao') } }
+        : j
+    )),
+  });
+
+  it('com a mão acima do limite, a vez NÃO passa', () => {
+    const p = comMaoEZona(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }));
+
+    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
+
+    expect(r.estado.vezDe).toBe('p1');
+    expect(r.eventos.some((e) => e.tipo === 'vez')).toBe(false);
+  });
+
+  it('mesmo sem passar a vez, o log anda — a versão precisa se mover', () => {
+    // Se a ação não movesse a versão, um retry de rede escaparia do guard de 409
+    // no server e morreria como 400 no reducer. Foi exatamente o achado A3 da
+    // espiada; aqui não se repete porque o evento `porta` já foi emitido.
+    const p = comMaoEZona(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }));
+
+    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
+
+    expect(r.estado.log.length).toBeGreaterThan(p.log.length);
+  });
+
+  it('com a mão dentro do limite, a vez passa como sempre', () => {
+    const p = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+
+    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
+
+    expect(r.estado.vezDe).toBe('p2');
+    expect(r.eventos.some((e) => e.tipo === 'vez')).toBe(true);
+  });
+
+  it('exatamente NO limite passa a vez — o teto é `>`, não `>=`', () => {
+    // Sem raça em jogo o limite é 5 (o Adaptável do Humano). Com 5 cartas o
+    // jogador está no teto, não acima dele.
+    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const p: EstadoPartida = {
+      ...p0,
+      jogadores: p0.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao: maoEstourada } : j)),
+    };
+
+    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
+
+    expect(r.estado.vezDe).toBe('p2');
+  });
+
+  it('o fim de combate também é segurado pelo limite', () => {
+    // A checagem mora na PORTA ÚNICA: se estivesse copiada em cada caminho de
+    // saída, este aqui seria o esquecido — ele é o único que passa por
+    // `fecharCombate` antes de encerrar.
+    const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const }] };
+    const p = comMaoEZona(criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar }));
+    const fraco: Combatente = { forca: 1, vida: 1, habilidade: 0, agilidade: 0, level: 1 };
+    const depsFraco = { rolar: filaDeDados([1, 12]), embaralhar: semEmbaralhar, monstro: fraco };
+
+    const comCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsFraco).estado;
+    const r = aplicarAcao(comCombate, { tipo: 'atacar', jogadorId: 'p1' }, depsFraco);
+
+    expect(r.estado.combate).toBeNull();          // o combate fechou
+    expect(r.estado.vezDe).toBe('p1');            // mas a vez ficou
+  });
+});

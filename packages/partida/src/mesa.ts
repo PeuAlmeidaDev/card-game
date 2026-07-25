@@ -9,6 +9,7 @@ import { escolherAcao } from './bot';
 import { classificar } from './classificacao';
 import { AcaoInvalida } from './erros';
 import { MAX_ACOES_AUTOMATICAS } from './limites';
+import { limiteDeMao } from './mao';
 import { projetarPara } from './projecao';
 
 /** As ações que só fazem sentido com um combate aberto. */
@@ -144,11 +145,25 @@ function proximoJogador(estado: EstadoPartida): JogadorNaMesa {
 }
 
 /**
- * Encerra o turno: passa a vez e fecha a ação. Porta ÚNICA — a sala vazia, a
- * carta de raça e o fim de combate encerravam cada uma por conta própria, e a
- * checagem de limite de mão (Plano 3) teria que ser lembrada em três lugares.
+ * Encerra o turno: cobra o limite de mão e, se ele couber, passa a vez. Porta
+ * ÚNICA — a sala vazia, a carta de raça e o fim de combate encerravam cada uma
+ * por conta própria, e esta checagem teria que ser lembrada em três lugares.
+ *
+ * Acima do limite a vez NÃO passa: o jogador tem que se desfazer de uma carta
+ * (entregando ou jogando uma raça). Nenhum evento próprio é emitido para isso —
+ * a ação que chegou até aqui já emitiu os dela, então a versão se move e o guard
+ * de 409 do server continua funcionando sem tratamento especial.
  */
 function encerrarTurno(base: EstadoPartida, eventos: readonly EventoDaMesa[]): ResultadoAcao {
+  const daVez = base.jogadores.find((j) => j.id === base.vezDe);
+  // `daVez === undefined` é a vez apontando para fora da mesa: NÃO é tratado
+  // aqui. O limite simplesmente não se aplica a quem não existe, e quem lança
+  // por esse estado corrompido continua sendo o `proximoJogador`, logo abaixo —
+  // um `throw` próprio aqui só duplicaria o guard com outra mensagem.
+  if (daVez !== undefined && daVez.mao.length > limiteDeMao(daVez)) {
+    return registrar(base, eventos);
+  }
+
   const seguinte = proximoJogador(base);
   return registrar({ ...base, vezDe: seguinte.id }, [...eventos, { tipo: 'vez', jogadorId: seguinte.id }]);
 }
