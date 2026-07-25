@@ -6,7 +6,7 @@ import { CATALOGO, MONSTRO_PADRAO, resolverEscolhas, montarCombatente } from '@c
 import { RACAS_SACAVEIS, obterRaca } from '@card-dungeon/cartas';
 import {
   AcaoInvalida, MAO_INICIAL_PADRAO, aplicarAcao, avancarBots, criarPartida, montarComposicao,
-  projetarPara, versaoDe, type Embaralhar, type EntradaJogador, type EstadoPartida,
+  projetarPara, versaoDe, type CatalogoDaMesa, type Embaralhar, type EntradaJogador, type EstadoPartida,
 } from '@card-dungeon/partida';
 import { initServer } from '@ts-rest/fastify';
 import { criarDadoReal } from './dado';
@@ -55,12 +55,14 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
   const app = Fastify();
   const s = initServer();
   const repositorio = criarRepositorio();
-  // UM resolvedor para tudo que a raça confere. O server RESOLVE (pergunta à
-  // carta), nunca DECIDE (`racaId === 'elfo'` seria regra de jogo na borda).
-  // `RacaCarta` satisfaz `InfoRaca` estruturalmente, então não há tradução aqui.
-  const resolverRaca = (racaId: string | undefined) =>
-    racaId === undefined ? undefined : obterRaca(racaId);
-  const deps = { rolar, embaralhar, monstro, resolverRaca };
+  // O server RESOLVE (pergunta à carta), nunca DECIDE (`racaId === 'elfo'` seria
+  // regra de jogo na borda). `RacaCarta` satisfaz `InfoRaca` estruturalmente,
+  // então não há tradução aqui — só o casamento entre catálogo e mesa, que é
+  // exatamente o trabalho da borda.
+  const catalogo: CatalogoDaMesa = {
+    raca: (racaId) => (racaId === undefined ? undefined : obterRaca(racaId)),
+  };
+  const deps = { rolar, embaralhar, monstro, catalogo };
 
   const montarBots = (): readonly EntradaJogador[] => {
     const classes = embaralhar(CATALOGO.classes);

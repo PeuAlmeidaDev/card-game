@@ -83,6 +83,21 @@ export interface InfoRaca {
   readonly espiaTopo: boolean;
 }
 
+/**
+ * A porta ÚNICA de `partida` para o catálogo. O pacote de regras continua cego —
+ * ele não sabe quais raças ou monstros existem, só sabe perguntar. Cada categoria
+ * de carta ganha um membro aqui, e não um campo irmão em `DepsMesa`: com monstro,
+ * classe e item chegando, seriam quatro resolvedores soltos viajando juntos por
+ * toda a chamada.
+ *
+ * As cartas do pacote `cartas` satisfazem estes retornos **estruturalmente**, e é
+ * isso que dispensa qualquer import de `cartas` aqui.
+ */
+export interface CatalogoDaMesa {
+  /** `undefined` (id ausente ou desconhecido) = sem raça, o baseline Humano. */
+  readonly raca: (racaId: string | undefined) => InfoRaca | undefined;
+}
+
 export interface PosicaoFinal {
   readonly jogadorId: string;
   readonly posicao: number;

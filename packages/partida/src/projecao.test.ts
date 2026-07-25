@@ -6,6 +6,7 @@ import { COMPOSICAO_POR_JOGADOR } from './baralho';
 import { AcaoInvalida } from './erros';
 import { filaDeDados } from './testes/dados';
 import { raca } from './testes/cartas';
+import { catalogoDeTeste } from './testes/catalogo';
 import type { EntradaJogador } from './tipos';
 import type { Combatente } from '@card-dungeon/motor';
 
@@ -40,7 +41,7 @@ describe('projetarPara', () => {
     const depois = aplicarAcao(
       partida,
       { tipo: 'vasculhar', jogadorId: 'p1' },
-      { rolar: filaDeDados([]), embaralhar: semEmbaralhar, monstro: monstroPadrao },
+      { rolar: filaDeDados([]), embaralhar: semEmbaralhar, monstro: monstroPadrao, catalogo: catalogoDeTeste() },
     ).estado;
     const vista = projetarPara('p1', depois);
 
@@ -58,7 +59,7 @@ describe('projetarPara', () => {
     const depois = aplicarAcao(
       partida,
       { tipo: 'vasculhar', jogadorId: 'p1' },
-      { rolar: filaDeDados([]), embaralhar: semEmbaralhar, monstro: monstroPadrao },
+      { rolar: filaDeDados([]), embaralhar: semEmbaralhar, monstro: monstroPadrao, catalogo: catalogoDeTeste() },
     ).estado;
 
     expect(projetarPara('p1', depois).versao).toBeGreaterThan(projetarPara('p1', partida).versao);
@@ -121,7 +122,7 @@ describe('versaoDe — a versão anda quando a espiada abre', () => {
     rolar: () => 1,
     embaralhar: semEmbaralhar,
     monstro: { forca: 1, vida: 1, habilidade: 0, agilidade: 0, level: 1 },
-    resolverRaca: () => ({ passivaCombate: null, espiaTopo: true }),
+    catalogo: catalogoDeTeste({ raca: () => ({ passivaCombate: null, espiaTopo: true }) }),
   };
   const criar = () => criarPartida('m1', entradas,
     { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },

@@ -9,6 +9,7 @@ import { projetarPara } from './projecao';
 import { AcaoInvalida } from './erros';
 import { filaDeDados, criarDadoCiclico } from './testes/dados';
 import { monstro, salaVazia, raca } from './testes/cartas';
+import { catalogoDeTeste } from './testes/catalogo';
 import type { EntradaJogador, CartaPorta, EstadoPartida } from './tipos';
 import type { Combatente, PassivaCombate } from '@card-dungeon/motor';
 
@@ -27,6 +28,7 @@ const deps = (dados: readonly number[]) => ({
   rolar: filaDeDados(dados),
   embaralhar: semEmbaralhar,
   monstro: monstroPadrao,
+  catalogo: catalogoDeTeste(),
 });
 
 describe('aplicarAcao — vasculhar', () => {
@@ -152,7 +154,7 @@ describe('aplicarAcao — combate', () => {
     const forte: Combatente = { forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1 };
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const depsForte = (dados: readonly number[]) =>
-      ({ rolar: filaDeDados(dados), embaralhar: semEmbaralhar, monstro: forte });
+      ({ rolar: filaDeDados(dados), embaralhar: semEmbaralhar, monstro: forte, catalogo: catalogoDeTeste() });
 
     // monstro mais ágil ataca primeiro e acerta (rolagem 1 <= habilidade 12)
     const comCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsForte([1])).estado;
@@ -193,7 +195,7 @@ describe('aplicarAcao — combate', () => {
     // tradução, esse Error cru viraria 500 na Task 14 em vez do 400 que é.
     const forte: Combatente = { forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1 };
     const depsForte = (dados: readonly number[]) =>
-      ({ rolar: filaDeDados(dados), embaralhar: semEmbaralhar, monstro: forte });
+      ({ rolar: filaDeDados(dados), embaralhar: semEmbaralhar, monstro: forte, catalogo: catalogoDeTeste() });
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const pedindoEsquiva = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsForte([1])).estado;
 
@@ -212,7 +214,9 @@ describe('aplicarAcao — combate', () => {
     const rolarQuebrado = () => {
       throw new TypeError('detalhe interno do servidor');
     };
-    const depsQuebradas = { rolar: rolarQuebrado, embaralhar: semEmbaralhar, monstro: monstroPadrao };
+    const depsQuebradas = {
+      rolar: rolarQuebrado, embaralhar: semEmbaralhar, monstro: monstroPadrao, catalogo: catalogoDeTeste(),
+    };
 
     expect(() => aplicarAcao(comCombate, { tipo: 'atacar', jogadorId: 'p1' }, depsQuebradas))
       .toThrow(TypeError);
@@ -233,6 +237,7 @@ describe('partida completa', () => {
       rolar: criarDadoCiclico([4, 12]), // sempre acerta e o defensor nunca esquiva
       embaralhar: semEmbaralhar,
       monstro: monstroPadrao,
+      catalogo: catalogoDeTeste(),
     };
 
     let estado = criarPartida('m1', quatro, { patenteAlvo: 3, composicaoPorJogador: [{ tipo: 'monstro' }] },
@@ -268,8 +273,9 @@ describe('passiva da raça no combate da Mesa', () => {
           ? { dano: base, estado: ctx.estado }
           : { dano: Math.floor(base / 2), estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } },
     };
-    const resolverRaca = (racaId: string | undefined) =>
-      racaId === 'anao' ? { passivaCombate: metade, espiaTopo: false } : undefined;
+    const catalogo = catalogoDeTeste({
+      raca: (racaId) => (racaId === 'anao' ? { passivaCombate: metade, espiaTopo: false } : undefined),
+    });
 
     const humano: EntradaJogador = {
       id: 'p1', nome: 'Você', ehBot: false,
@@ -288,7 +294,7 @@ describe('passiva da raça no combate da Mesa', () => {
       rolar: filaDeDados([1, 12]),
       embaralhar: <T,>(x: readonly T[]) => [...x],
       monstro: monstroForte,
-      resolverRaca,
+      catalogo,
     };
 
     const nascida = criarPartida('m1', [humano, bot], { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' }] }, { embaralhar: deps.embaralhar });
@@ -312,7 +318,7 @@ const depsVidente = (dados: readonly number[]) => ({
   rolar: filaDeDados(dados),
   embaralhar: semEmbaralhar,
   monstro: monstroFraco,
-  resolverRaca: () => ({ passivaCombate: null, espiaTopo: true }),
+  catalogo: catalogoDeTeste({ raca: () => ({ passivaCombate: null, espiaTopo: true }) }),
 });
 
 describe('aplicarAcao — espiada (Presciência)', () => {
@@ -337,10 +343,12 @@ describe('aplicarAcao — espiada (Presciência)', () => {
       rolar: filaDeDados([1, 12]),
       embaralhar: semEmbaralhar,
       monstro: monstroForte,
-      resolverRaca: (racaId: string | undefined) => {
-        chamadas.push(racaId);
-        return { passivaCombate: metade, espiaTopo: true };
-      },
+      catalogo: catalogoDeTeste({
+        raca: (racaId) => {
+          chamadas.push(racaId);
+          return { passivaCombate: metade, espiaTopo: true };
+        },
+      }),
     };
     const p = criarPartida('m1', entradas,
       { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const }] },
@@ -493,9 +501,35 @@ describe('aplicarAcao — espiada (Presciência)', () => {
     const p = criarPartida('m1', entradas,
       { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
       { embaralhar: semEmbaralhar });
-    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])); // deps() sem resolverRaca
+    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])); // deps() sem catálogo de raça
     expect(r.estado.espiada).toBeNull();
     expect(r.estado.vezDe).toBe('p2'); // resolveu na hora
+  });
+
+  it('lê a passiva da raça pelo catálogo injetado, não por um resolvedor solto', () => {
+    const vistas: (string | undefined)[] = [];
+    const catalogo = catalogoDeTeste({
+      raca: (racaId) => {
+        vistas.push(racaId);
+        return racaId === 'elfo' ? { passivaCombate: null, espiaTopo: true } : undefined;
+      },
+    });
+    const estado = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'salaVazia' }] },
+      { embaralhar: semEmbaralhar });
+    const comElfo: EstadoPartida = {
+      ...estado,
+      jogadores: estado.jogadores.map((j) => (
+        j.id === estado.vezDe ? { ...j, emJogo: { raca: raca('r-1', 'elfo') } } : j
+      )),
+    };
+
+    const depois = aplicarAcao(comElfo, { tipo: 'vasculhar', jogadorId: comElfo.vezDe }, {
+      rolar: filaDeDados([]), embaralhar: semEmbaralhar, monstro: monstroPadrao, catalogo,
+    });
+
+    // Espiada aberta => a Presciência foi lida pelo catálogo, e o racaId chegou lá.
+    expect(depois.estado.espiada).not.toBeNull();
+    expect(vistas).toContain('elfo');
   });
 });
 
@@ -515,6 +549,7 @@ describe('avancarBots — teto de ações automáticas', () => {
 
     expect(() => avancarBots(p, {
       rolar: criarDadoCiclico([4, 12]), embaralhar: semEmbaralhar, monstro: monstroPadrao,
+      catalogo: catalogoDeTeste(),
     })).toThrow('avancarBots: teto de ações automáticas atingido');
   });
 
@@ -612,8 +647,9 @@ describe('a raça vem da ZONA EM JOGO', () => {
         rolar: filaDeDados([1, 12]),   // monstro acerta; jogador falha a esquiva
         embaralhar: semEmbaralhar,
         monstro: monstroForte,
-        resolverRaca: (racaId: string | undefined) =>
-          racaId === 'anao' ? { passivaCombate: metade, espiaTopo: false } : undefined,
+        catalogo: catalogoDeTeste({
+          raca: (racaId) => (racaId === 'anao' ? { passivaCombate: metade, espiaTopo: false } : undefined),
+        }),
       };
       const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
       const inicial: EstadoPartida = comRacaNaZona
@@ -733,8 +769,9 @@ describe('aplicarAcao — jogarCarta', () => {
       rolar: filaDeDados([1, 12]),
       embaralhar: semEmbaralhar,
       monstro: monstroForte,
-      resolverRaca: (racaId: string | undefined) =>
-        racaId === 'anao' ? { passivaCombate: metade, espiaTopo: false } : undefined,
+      catalogo: catalogoDeTeste({
+        raca: (racaId) => (racaId === 'anao' ? { passivaCombate: metade, espiaTopo: false } : undefined),
+      }),
     };
     const p0 = criarPartida('m1', entradas,
       { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const }] },
@@ -999,7 +1036,9 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
     const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const }] };
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const fraco: Combatente = { forca: 1, vida: 1, habilidade: 0, agilidade: 0, level: 1 };
-    const depsFraco = { rolar: filaDeDados([1, 12]), embaralhar: semEmbaralhar, monstro: fraco };
+    const depsFraco = {
+      rolar: filaDeDados([1, 12]), embaralhar: semEmbaralhar, monstro: fraco, catalogo: catalogoDeTeste(),
+    };
 
     const comCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsFraco).estado;
     const estourado: EstadoPartida = comMaoEZona(comCombate);

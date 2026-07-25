@@ -1,7 +1,7 @@
 import type { Combatente, Passo, RolarD12, PassivaCombate } from '@card-dungeon/motor';
 import { AcaoIlegal, criarCombate, proximoPasso } from '@card-dungeon/motor';
 import type {
-  AcaoDaMesa, CartaPorta, Embaralhar, EstadoPartida, EventoDaMesa, InfoRaca, JogadorNaMesa,
+  AcaoDaMesa, CartaPorta, CatalogoDaMesa, Embaralhar, EstadoPartida, EventoDaMesa, InfoRaca, JogadorNaMesa,
 } from './tipos';
 import { tirarDoTopo } from './baralho';
 import { destinoDaCaridade } from './caridade';
@@ -16,15 +16,14 @@ export interface DepsMesa {
   readonly rolar: RolarD12;
   readonly embaralhar: Embaralhar;
   readonly monstro: Combatente;
-  /** Resolve o que a raça de um jogador confere. Ausente/undefined = sem raça (baseline). */
-  readonly resolverRaca?: (racaId: string | undefined) => InfoRaca | undefined;
+  readonly catalogo: CatalogoDaMesa;
 }
 
-/** Resolve a raça de um jogador (via o resolvedor injetado). Central para não repetir a chamada. */
+/** Resolve a raça de um jogador (via o catálogo injetado). Central para não repetir a chamada. */
 function racaDoLutador(deps: DepsMesa, jogador: JogadorNaMesa | undefined): InfoRaca | undefined {
-  // A ZONA é a fonte: quem troca de raça no meio da partida (Task 6) muda de
-  // passiva na hora, sem nenhum campo paralelo para sincronizar.
-  return deps.resolverRaca?.(jogador?.emJogo.raca?.racaId);
+  // A ZONA é a fonte: quem troca de raça no meio da partida muda de passiva na
+  // hora, sem nenhum campo paralelo para sincronizar.
+  return deps.catalogo.raca(jogador?.emJogo.raca?.racaId);
 }
 
 /** A passiva de combate do jogador, `undefined` quando não há raça ou a raça não tem passiva. */
