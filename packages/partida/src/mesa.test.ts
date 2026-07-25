@@ -79,6 +79,9 @@ describe('criarPartida', () => {
 
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
 
+    // `[0]` sozinho passa com a carta lá uma OU duas vezes — o tamanho é o que
+    // pega um descarte duplicado (o cemitério é escrito só dentro de `resolverCarta`).
+    expect(r.estado.cemiterio).toHaveLength(1);
     expect(r.estado.cemiterio[0]?.id).toBe(topo?.id);
   });
 
@@ -524,6 +527,9 @@ describe('aplicarAcao — espiada (Presciência)', () => {
     expect(r.estado.combate).not.toBeNull(); // a PRÓXIMA (monstro) foi comprada às cegas e abriu combate
     // a salaVazia empurrada NÃO foi revelada: não está no cemitério (foi pro fundo do monte)
     expect(r.estado.cemiterio.some((c) => c.tipo === 'salaVazia')).toBe(false);
+    // Só o monstro comprado às cegas foi descartado — o tamanho pega um
+    // descarte duplicado que `.some` sozinho deixaria passar.
+    expect(r.estado.cemiterio).toHaveLength(1);
   });
 
   it('empurrar com o monte vazio reembaralha o cemitério ANTES (a empurrada não volta pública)', () => {
@@ -540,6 +546,9 @@ describe('aplicarAcao — espiada (Presciência)', () => {
     expect(r.combate).not.toBeNull();                          // a próxima às cegas foi o monstro
     expect(r.cemiterio.some((c) => c.tipo === 'salaVazia')).toBe(false); // a empurrada NÃO virou pública
     expect(r.cemiterio.some((c) => c.tipo === 'monstro')).toBe(true);
+    // Só o monstro comprado às cegas foi descartado — o tamanho pega um
+    // descarte duplicado que `.some` sozinho deixaria passar.
+    expect(r.cemiterio).toHaveLength(1);
   });
 
   it('recusa empurrar quando não há OUTRA carta para comprar', () => {
@@ -646,6 +655,7 @@ describe('vasculhar — carta de raça', () => {
     expect(r.estado.jogadores[0]?.mao.map((c) => c.id)).toEqual(['r1']);
     expect(r.estado.jogadores[1]?.mao).toEqual([]);
     expect(r.estado.cemiterio.some((c) => c.id === 'r1')).toBe(false); // está na mão, não no lixo
+    expect(r.estado.cemiterio).toHaveLength(0);                        // raça não passa pelo descarte
     expect(r.estado.combate).toBeNull();                               // raça não abre combate
     expect(r.estado.vezDe).toBe('p2');
     expect(r.eventos[0]).toMatchObject({ tipo: 'porta', jogadorId: 'p1', carta: { tipo: 'raca' } });
