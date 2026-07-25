@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, waitFor, cleanup } from '@testing-library/react';
+import { render, screen, waitFor, cleanup, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TelaMesa } from './TelaMesa';
 import { api } from './api';
@@ -314,6 +314,37 @@ describe('TelaMesa — a mão', () => {
     expect(agir).toHaveBeenCalledWith({
       params: { id: 'm1' },
       body: { acao: { tipo: 'jogarCarta', cartaId: 'p-9' }, versao: 1 },
+    });
+  });
+
+  it('entregar uma carta manda a ação com o id DELA', async () => {
+    // Simétrico ao teste de "Jogar" acima, e mais grave: mandar o id errado aqui
+    // não joga a carta errada, DOA ao adversário uma carta que o jogador não
+    // escolheu — sem volta. Mão acima do limite para o botão estar habilitado
+    // (achado 3 do review final: este clique não tinha teste nenhum).
+    const agir = vi.spyOn(api, 'agir').mockResolvedValue({ status: 200, body: vistaBase } as never);
+    const mao = [
+      ...['a', 'b', 'c', 'd', 'e'].map((id) => ({ id, tipo: 'monstro' as const })),
+      { id: 'p-alvo', tipo: 'raca' as const, racaId: 'orc' },
+    ];
+    await abrirMesa({
+      ...vistaBase,
+      suaMao: mao,
+      jogadores: vistaBase.jogadores.map((j) => (
+        j.id === 'p1' ? { ...j, cartasNaMao: mao.length, limiteDeMao: 5 } : j
+      )),
+    });
+
+    // Escopa pela carta-alvo (a única de Orc), não por índice: com cinco cópias
+    // idênticas de "um monstro" na lista, `getAllByRole('button', ...)[n]` afirmaria
+    // a ordem do DOM, não QUAL carta foi clicada.
+    const linhaDaCartaAlvo = (await screen.findByText(/carta de Orc/)).closest('li');
+    if (linhaDaCartaAlvo === null) throw new Error('linha da carta-alvo não encontrada no DOM');
+    await userEvent.click(within(linhaDaCartaAlvo).getByRole('button', { name: 'Entregar' }));
+
+    expect(agir).toHaveBeenCalledWith({
+      params: { id: 'm1' },
+      body: { acao: { tipo: 'entregarCarta', cartaId: 'p-alvo' }, versao: 1 },
     });
   });
 
