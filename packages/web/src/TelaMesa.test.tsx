@@ -85,6 +85,14 @@ describe('TelaMesa', () => {
     });
   });
 
+  it('descreve corretamente a carta pressentida de cada tipo', async () => {
+    // Ternário sobre união ABERTA mente: antes desta correção, uma carta de raça
+    // era anunciada como "uma sala vazia" na única tela que existe para informar.
+    await abrirMesa({ ...vistaBase, espiada: { jogadorId: 'p1', carta: { id: 'p-9', tipo: 'raca', racaId: 'elfo' } } });
+
+    expect(await screen.findByText(/pressente.*carta de raça/i)).toBeInTheDocument();
+  });
+
   it('sem espiada na vista, os botões da Presciência ficam desabilitados', async () => {
     // A vista de quem NÃO espiou vem com `espiada: null` (a projeção esconde o
     // segredo). A tela não pode oferecer uma decisão que o dono não tem.
