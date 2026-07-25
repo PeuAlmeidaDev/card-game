@@ -82,7 +82,11 @@ export function criarPartida(
   // porque o baralho já está aleatório: alternar não acrescentaria aleatoriedade.
   const porJogador = config.maoInicial ?? 0;
   const distribuidas = porJogador * jogadores.length;
-  if (distribuidas > cartas.length) {
+  // `>=`, não `>`: a mesa precisa sobrar ao menos 1 carta no monte para o 1º
+  // `vasculhar` ter o que tirar. Com `distribuidas === cartas.length` a mesa
+  // nasceria com monte:[] e cemiterio:[], e `tirarDoTopo` reembaralharia um
+  // cemitério vazio e lançaria — um 500 na mesa que este guard acabou de aprovar.
+  if (distribuidas >= cartas.length) {
     throw new Error('criarPartida: o baralho não tem cartas para a mão inicial');
   }
   const comMao: readonly JogadorNaMesa[] = jogadores.map((j, i) => ({

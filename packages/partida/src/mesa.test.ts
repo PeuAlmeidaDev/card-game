@@ -123,6 +123,17 @@ describe('criarPartida', () => {
       { embaralhar: semEmbaralhar }))
       .toThrow('criarPartida: o baralho não tem cartas para a mão inicial');
   });
+
+  it('recusa a mão inicial quando ela consome o baralho EXATAMENTE (não sobra carta pro 1º vasculhar)', () => {
+    // Caso-limite do guard: distribuidas === cartas.length. Com `>` isto passava
+    // e a mesa nascia com monte:[] e cemiterio:[] — o 1º `vasculhar` reembaralharia
+    // um cemitério vazio e explodiria (`tirarDoTopo: baralho vazio`), um 500 na
+    // mesa que este mesmo validador acabou de aprovar.
+    expect(() => criarPartida('m1', entradas,
+      { ...config, composicaoPorJogador: [{ tipo: 'salaVazia' }], maoInicial: 1 },
+      { embaralhar: semEmbaralhar }))
+      .toThrow('criarPartida: o baralho não tem cartas para a mão inicial');
+  });
 });
 
 const monstroPadrao: Combatente = { forca: 2, vida: 10, habilidade: 6, agilidade: 1, level: 1 };
