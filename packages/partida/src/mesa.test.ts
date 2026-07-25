@@ -549,8 +549,8 @@ describe('avancarBots — teto de ações automáticas', () => {
 describe('vasculhar — carta de raça', () => {
   it('a carta de raça vai para a mão de quem vasculhou, e o turno encerra', () => {
     // O baralho de produção só ganha raça no Plano 4; aqui o monte é forjado.
-    // A carta é PÚBLICA na revelação (evento `porta`, como toda porta) e privada
-    // depois — quem prestou atenção sabe o que o vizinho tem, e é assim mesmo.
+    // A carta vai para uma zona OCULTA, então o evento é `achado` (porta fechada):
+    // diz que aconteceu, nunca o quê. Quem sacou descobre pela própria mão.
     const p0 = criarPartida('m1', entradas,
       { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
       { embaralhar: semEmbaralhar });
@@ -564,7 +564,28 @@ describe('vasculhar — carta de raça', () => {
     expect(r.estado.cemiterio).toHaveLength(0);                        // raça não passa pelo descarte
     expect(r.estado.combate).toBeNull();                               // raça não abre combate
     expect(r.estado.vezDe).toBe('p2');
-    expect(r.eventos[0]).toMatchObject({ tipo: 'porta', jogadorId: 'p1', carta: { tipo: 'raca' } });
+    expect(r.eventos[0]).toMatchObject({ tipo: 'achado', jogadorId: 'p1' });
+  });
+
+  it('a carta que vai para a MÃO não aparece na vista dos adversários', () => {
+    // O `log` viaja inteiro para todos. A mão é zona OCULTA — se o evento da compra
+    // carregasse a carta, um adversário reconstruiria a mão de todo mundo lendo só
+    // o log. Foi assim que a sonda que motivou este teste montou um "trapaceador"
+    // que acertou as raças sacadas dos 4 jogadores da mesa.
+    const p0 = criarPartida('m1', entradas,
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
+      { embaralhar: semEmbaralhar });
+    const p = { ...p0, monte: [raca('carta-secreta', 'raca-secreta')] };
+
+    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
+
+    // A vista INTEIRA serializada, não campo a campo: o vazamento anterior estava no
+    // `log`, um campo que nenhuma asserção sobre `jogadores`/`suaMao` alcançaria.
+    const vistaDoAdversario = JSON.stringify(projetarPara('p2', r.estado));
+    expect(vistaDoAdversario).not.toContain('carta-secreta');
+    expect(vistaDoAdversario).not.toContain('raca-secreta');
+    // Não é perda de informação: quem sacou descobre o quê pela própria mão.
+    expect(projetarPara('p1', r.estado).suaMao.map((c) => c.id)).toEqual(['carta-secreta']);
   });
 });
 

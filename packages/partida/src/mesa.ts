@@ -118,10 +118,17 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
 
 /**
  * Resolve uma carta JÁ comprada (o baralho em `base` já reflete a compra) e é
- * dona do seu DESTINO: emite o evento `porta` e segue um de três caminhos —
- * `salaVazia` passa a vez, `monstro` abre combate, `raca` vai para a mão de
- * quem vasculhou e passa a vez. É o núcleo compartilhado do vasculhar atômico
- * e da resolução da espiada.
+ * dona do seu DESTINO: `salaVazia` passa a vez, `monstro` abre combate, `raca`
+ * vai para a mão de quem vasculhou e passa a vez. É o núcleo compartilhado do
+ * vasculhar atômico e da resolução da espiada.
+ *
+ * O EVENTO sai por ramo, não antes do `switch`, porque quem decide se a carta
+ * pode ser anunciada é o DESTINO dela — e é este `switch` que o conhece. Um
+ * `porta` único no topo carregava a carta em todos os casos, inclusive no que a
+ * manda para a mão: como o `log` viaja inteiro para todos na projeção, isso
+ * publicava o conteúdo de uma zona oculta (uma sonda reconstruiu as raças
+ * sacadas dos 4 jogadores lendo só o log). Zona aberta → `porta` com a carta;
+ * zona oculta → `achado` sem ela.
  */
 function resolverCarta(
   base: EstadoPartida,
@@ -129,8 +136,6 @@ function resolverCarta(
   carta: CartaPorta,
   deps: DepsMesa,
 ): ResultadoAcao {
-  const eventos: EventoDaMesa[] = [{ tipo: 'porta', jogadorId, carta }];
-
   // A carta revelada vai para o cemitério AQUI, um lugar só. Antes cada caminho de
   // entrada descartava por conta própria — e a carta que vai para a MÃO (Task 5)
   // teria que ser retirada do cemitério depois de lá colocada.
@@ -138,14 +143,14 @@ function resolverCarta(
 
   switch (carta.tipo) {
     case 'salaVazia':
-      return encerrarTurno(revelada, eventos);
+      return encerrarTurno(revelada, [{ tipo: 'porta', jogadorId, carta }]);
     case 'raca': {
       // A carta sacada NÃO vai ao cemitério: ela fica com quem vasculhou. Por isso
       // o estado usado aqui é `base` (sem a carta), e não `revelada`.
       const jogadores = base.jogadores.map((j) => (
         j.id === jogadorId ? { ...j, mao: [...j.mao, carta] } : j
       ));
-      return encerrarTurno({ ...base, jogadores }, eventos);
+      return encerrarTurno({ ...base, jogadores }, [{ tipo: 'achado', jogadorId }]);
     }
     case 'monstro':
       break;
@@ -155,6 +160,8 @@ function resolverCarta(
       throw new Error(`resolverCarta: tipo de carta não tratado: ${JSON.stringify(naoTratada)}`);
     }
   }
+
+  const eventos: EventoDaMesa[] = [{ tipo: 'porta', jogadorId, carta }];
 
   const jogador = revelada.jogadores.find((j) => j.id === jogadorId);
   if (jogador === undefined) {

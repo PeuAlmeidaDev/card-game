@@ -89,7 +89,23 @@ export interface PosicaoFinal {
 }
 
 export type EventoDaMesa =
+  /**
+   * Porta ABERTA: a carta se revelou e resolveu à VISTA DE TODOS (monstro ou sala
+   * vazia), então o evento carrega a carta — esconder o que a mesa inteira acabou
+   * de ver seria teatro. A carta que vai para uma zona oculta sai por `achado`.
+   */
   | { readonly tipo: 'porta'; readonly jogadorId: string; readonly carta: CartaPorta }
+  /**
+   * Porta FECHADA: a carta sacada foi para uma zona OCULTA (a mão de quem
+   * vasculhou), então o evento diz que aconteceu e **nunca o quê**. O `log` viaja
+   * inteiro para todos na projeção — carregar a carta aqui, como o `porta` faz,
+   * anunciava para a mesa o conteúdo de uma mão que o tipo `JogadorPublico`
+   * existe para esconder. Quem sacou descobre o quê pela própria mão (`suaMao`).
+   *
+   * Mesma assimetria de `entrega` (privada) × `descarte` (público): o que define
+   * se o evento carrega a carta é a zona de DESTINO, não a ação.
+   */
+  | { readonly tipo: 'achado'; readonly jogadorId: string }
   | { readonly tipo: 'combate'; readonly jogadorId: string; readonly eventos: readonly EventoCombate[] }
   | { readonly tipo: 'patente'; readonly jogadorId: string; readonly patente: number }
   | { readonly tipo: 'derrota'; readonly jogadorId: string; readonly derrotas: number }

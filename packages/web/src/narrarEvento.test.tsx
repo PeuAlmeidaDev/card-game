@@ -20,6 +20,16 @@ describe('narrarEvento — linhas de texto puro', () => {
       .toBe('Bot 1 vasculha o local e não encontra nada.');
   });
 
+  it('achado NÃO diz o que foi encontrado — a mão é zona oculta', () => {
+    // A carta foi para a mão. O `log` é público, então a narração não pode nomeá-la
+    // (e nem poderia: o evento não carrega a carta). Vale também para quem sacou —
+    // ele descobre o quê pela própria mão.
+    const linhaDoDono = narrarEvento({ tipo: 'achado', jogadorId: 'p1' }, ctx);
+    expect(linhaDoDono).toBe('Você vasculha o local e guarda o que encontrou.');
+    expect(narrarEvento({ tipo: 'achado', jogadorId: 'p2' }, ctx))
+      .toBe('Bot 1 vasculha o local e guarda o que encontrou.');
+  });
+
   it('patente e derrota', () => {
     expect(narrarEvento({ tipo: 'patente', jogadorId: 'p2', patente: 3 }, ctx))
       .toBe('Bot 1 subiu para a patente 3.');

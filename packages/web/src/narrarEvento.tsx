@@ -28,6 +28,13 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
         evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId),
         ctx.nomeDaRaca,
       );
+    // Porta FECHADA: o evento não carrega a carta, e a narração não pode inventar
+    // o que ele não diz. Vale inclusive para quem sacou — ele descobre o quê pela
+    // própria mão, que só ele vê. Enriquecer o evento na projeção só para o dono
+    // seria reescrever o log por destinatário: complexidade e superfície de bug
+    // para ganhar zero.
+    case 'achado':
+      return `${evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId)} vasculha o local e guarda o que encontrou.`;
     case 'patente':
       return `${ctx.nomeDe(evento.jogadorId)} subiu para a patente ${String(evento.patente)}.`;
     case 'derrota':
