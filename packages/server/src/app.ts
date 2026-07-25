@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import { resolverDuelo, type RolarD12, type Combatente } from '@card-dungeon/motor';
 import { contrato } from '@card-dungeon/shared';
 import { CATALOGO, MONSTRO_PADRAO, resolverEscolhas, montarCombatente } from '@card-dungeon/personagem';
@@ -142,7 +142,9 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
         // - AcaoInvalida = as regras recusaram o pedido do cliente => 400 com a
         //   mensagem, que faz parte do contrato. Registrada em warn.
         // - qualquer outro = invariante nossa quebrada => erro logado inteiro e
-        //   REPROPAGADO (500 pelo Fastify). A mensagem interna não vai ao cliente.
+        //   REPROPAGADO. Quem garante que a mensagem interna não chega ao cliente
+        //   é o `setErrorHandler` no fim deste arquivo — repropagar sozinho não
+        //   basta, porque o handler padrão do Fastify serializa `err.message`.
         // Um `catch (unknown) => 400` classificaria bug de servidor como culpa do
         // cliente e vazaria interno — é o try/catch genérico que o CLAUDE.md recusa.
         if (erro instanceof AcaoInvalida) {
@@ -167,6 +169,25 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
     },
   });
   /* eslint-enable @typescript-eslint/require-await */
+
+  // Último portão de saída. O `catch` do `agir` já repropaga o que é invariante
+  // nossa — mas repropagar sozinho não basta: o handler PADRÃO do Fastify
+  // serializa `err.message` no corpo, então o nome das nossas funções internas
+  // (e qualquer caminho de arquivo que um erro de I/O carregue) chegava ao
+  // cliente num 500. Aqui a mensagem morre no log.
+  //
+  // Erros com `statusCode` abaixo de 500 seguem intactos: são a validação do
+  // contrato (corpo inválido => 400) e o 404 de rota inexistente, e o corpo
+  // deles FAZ parte do contrato.
+  app.setErrorHandler((erro: FastifyError, _requisicao, resposta) => {
+    const status = erro.statusCode ?? 500;
+    if (status < 500) {
+      void resposta.status(status).send(erro);
+      return;
+    }
+    app.log.error({ erro }, 'erro não tratado na borda');
+    void resposta.status(500).send({ erro: 'erro interno' });
+  });
 
   app.register(s.plugin(router));
 
