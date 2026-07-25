@@ -264,6 +264,15 @@ function vasculhar(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): Re
   }
 
   const jogador = estado.jogadores.find((j) => j.id === jogadorId);
+
+  // A vez não passa acima do limite (ver `encerrarTurno`). Se vasculhar também
+  // continuasse legal, "não passar a vez" viraria "jogar para sempre": o jogador
+  // sacaria carta atrás de carta sem nunca ter que resolver o excedente. As duas
+  // saídas legais são `entregarCarta` e `jogarCarta`.
+  if (jogador !== undefined && jogador.mao.length > limiteDeMao(jogador)) {
+    throw new AcaoInvalida('aplicarAcao: sua mão está acima do limite — entregue uma carta');
+  }
+
   const temPresciencia = racaDoLutador(deps, jogador)?.espiaTopo ?? false;
 
   if (temPresciencia) {

@@ -956,9 +956,12 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
   });
 
   it('recusa entregar com combate em curso', () => {
+    // O guard de combate mora em `cartaDaMao` e roda ANTES de qualquer checagem
+    // de mão — por isso a mão nem precisa estar estourada aqui. (Desde a Task 4,
+    // `vasculhar` também recusa abrir combate com a mão já estourada, então usar
+    // `estourado` para chegar a este `emCombate` nem seria mais possível.)
     const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const }] };
-    const p = comPatentes(estourado(criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar })),
-      { p1: 5, p2: 1 });
+    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const emCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
     expect(emCombate.combate).not.toBeNull();
 
@@ -980,6 +983,11 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
   const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] };
   // 5 cartas com raça em jogo = limite 4 => estourado por 1.
   const maoEstourada = [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5')];
+  // 4 cartas com raça em jogo = EXATAMENTE o limite — ainda não estourada. Ponto
+  // de partida dos dois testes abaixo: desde a Task 4, `vasculhar` recusa ABRIR
+  // com a mão já estourada, então a mão estourada não pode mais ser precondição
+  // do vasculhar — ela tem que nascer da própria compra.
+  const maoNoLimite = [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4')];
 
   const comMaoEZona = (estado: EstadoPartida): EstadoPartida => ({
     ...estado,
@@ -990,11 +998,24 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
     )),
   });
 
+  const comMaoNoLimiteEZona = (estado: EstadoPartida): EstadoPartida => ({
+    ...estado,
+    jogadores: estado.jogadores.map((j) => (
+      j.id === 'p1'
+        ? { ...j, mao: maoNoLimite, emJogo: { raca: raca('r1', 'anao') } }
+        : j
+    )),
+  });
+
   it('com a mão acima do limite, a vez NÃO passa', () => {
-    const p = comMaoEZona(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }));
+    // A carta de raça sacada vai para a MÃO (não para a zona) — é ela que estoura
+    // o limite como CONSEQUÊNCIA da compra, não como precondição do vasculhar.
+    const p0 = comMaoNoLimiteEZona(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }));
+    const p: EstadoPartida = { ...p0, monte: [raca('r9', 'elfo')] };
 
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
 
+    expect(r.estado.jogadores[0]?.mao).toHaveLength(5); // a compra estourou a mão
     expect(r.estado.vezDe).toBe('p1');
     expect(r.eventos.some((e) => e.tipo === 'vez')).toBe(false);
   });
@@ -1003,7 +1024,8 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
     // Se a ação não movesse a versão, um retry de rede escaparia do guard de 409
     // no server e morreria como 400 no reducer. Foi exatamente o achado A3 da
     // espiada; aqui não se repete porque o evento `porta` já foi emitido.
-    const p = comMaoEZona(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }));
+    const p0 = comMaoNoLimiteEZona(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }));
+    const p: EstadoPartida = { ...p0, monte: [raca('r9', 'elfo')] };
 
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
 
@@ -1037,15 +1059,67 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
     // A checagem mora na PORTA ÚNICA: se estivesse copiada em cada caminho de
     // saída, este aqui seria o esquecido — ele é o único que passa por
     // `fecharCombate` antes de encerrar.
+    //
+    // Desde a Task 4, `vasculhar` recusa ABRIR combate com a mão já estourada —
+    // então a mão estourada não pode mais vir de ANTES do vasculhar (senão o
+    // combate nem abriria). Ela é forjada DEPOIS que o combate já está aberto,
+    // só para provar que `fecharCombate` também passa pela porta única.
     const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const }] };
-    const p = comMaoEZona(criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar }));
+    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const fraco: Combatente = { forca: 1, vida: 1, habilidade: 0, agilidade: 0, level: 1 };
     const depsFraco = { rolar: filaDeDados([1, 12]), embaralhar: semEmbaralhar, monstro: fraco };
 
     const comCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsFraco).estado;
-    const r = aplicarAcao(comCombate, { tipo: 'atacar', jogadorId: 'p1' }, depsFraco);
+    const estourado: EstadoPartida = comMaoEZona(comCombate);
+    const r = aplicarAcao(estourado, { tipo: 'atacar', jogadorId: 'p1' }, depsFraco);
 
     expect(r.estado.combate).toBeNull();          // o combate fechou
     expect(r.estado.vezDe).toBe('p1');            // mas a vez ficou
+  });
+});
+
+describe('aplicarAcao — vasculhar com a mão estourada', () => {
+  const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] };
+  const cinco = [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5')];
+  const estourado = (estado: EstadoPartida): EstadoPartida => ({
+    ...estado,
+    jogadores: estado.jogadores.map((j) => (
+      j.id === 'p1' ? { ...j, mao: cinco, emJogo: { raca: raca('r1', 'anao') } } : j
+    )),
+  });
+
+  it('recusa vasculhar enquanto a mão excede o limite', () => {
+    // Sem esta recusa, "a vez não passa" vira "jogue para sempre": o jogador
+    // vasculharia de novo a cada turno preso, sacando mais cartas e afundando
+    // mais — ganhando turnos extras de graça por estar acima do limite.
+    const p = estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }));
+
+    expect(() => aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])))
+      .toThrow(AcaoInvalida);
+    expect(() => aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])))
+      .toThrow('aplicarAcao: sua mão está acima do limite — entregue uma carta');
+  });
+
+  it('jogar uma raça continua liberado — é a outra saída do excedente', () => {
+    // Spec §4.2: estando acima do limite, jogar uma raça resolve o excedente (a
+    // carta sai da mão para a zona). Bloquear isso deixaria só um caminho.
+    const p0 = estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }));
+    const comRacaNaMao: EstadoPartida = {
+      ...p0,
+      jogadores: p0.jogadores.map((j) => (
+        j.id === 'p1' ? { ...j, mao: [...cinco, raca('r9', 'orc')] } : j
+      )),
+    };
+
+    const r = aplicarAcao(comRacaNaMao, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r9' }, deps([]));
+
+    expect(r.estado.jogadores[0]?.emJogo.raca?.id).toBe('r9');
+    expect(r.estado.jogadores[0]?.mao).toHaveLength(5);
+  });
+
+  it('dentro do limite, vasculhar segue normal', () => {
+    const p = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+
+    expect(() => aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]))).not.toThrow();
   });
 });
