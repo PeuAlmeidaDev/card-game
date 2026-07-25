@@ -39,9 +39,19 @@ const RACAS_PADRAO: Catalogo['racas'] = [
   { id: 'elfo', nome: 'Elfo', texto: '…' },
 ];
 
-const abrirMesa = async (vista: VistaDaPartida, racas: Catalogo['racas'] = RACAS_PADRAO) => {
+// Mesma ideia de RACAS_PADRAO, para o bestiário: os fixtures desta suíte usam
+// `monstroId: 'goblin'`, e sem o catálogo o nome cairia no fallback `?? id`.
+const MONSTROS_PADRAO: Catalogo['monstros'] = [
+  { id: 'goblin', nome: 'Goblin', forca: 4, vida: 20, habilidade: 2, agilidade: 4, level: 1 },
+];
+
+const abrirMesa = async (
+  vista: VistaDaPartida,
+  racas: Catalogo['racas'] = RACAS_PADRAO,
+  monstros: Catalogo['monstros'] = MONSTROS_PADRAO,
+) => {
   vi.spyOn(api, 'criarPartida').mockResolvedValue({ status: 200, body: vista } as never);
-  render(<TelaMesa racas={racas} />);
+  render(<TelaMesa racas={racas} monstros={monstros} />);
   await userEvent.click(screen.getByRole('button', { name: /nova partida/i }));
 };
 
@@ -54,7 +64,7 @@ describe('TelaMesa', () => {
   it('mostra o que o vidente pressentiu e oferece encarar ou empurrar', async () => {
     await abrirMesa(vistaComEspiada);
 
-    expect(await screen.findByText(/pressente.*monstro/i)).toBeInTheDocument();
+    expect(await screen.findByText(/pressente.*goblin/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /encarar/i })).toBeEnabled();
     expect(screen.getByRole('button', { name: /empurrar/i })).toBeEnabled();
   });
@@ -269,13 +279,13 @@ describe('TelaMesa', () => {
 });
 
 describe('TelaMesa — a mão', () => {
-  it('lista as cartas da sua mão, nomeando a raça', async () => {
+  it('lista as cartas da sua mão, nomeando a raça e o monstro', async () => {
     await abrirMesa({
       ...vistaBase,
       suaMao: [{ id: 'p-1', tipo: 'monstro', monstroId: 'goblin' }, { id: 'p-2', tipo: 'raca', racaId: 'orc' }],
     });
 
-    expect(screen.getByText(/um monstro/)).toBeInTheDocument();
+    expect(screen.getByText(/um Goblin/)).toBeInTheDocument();
     expect(screen.getByText(/uma carta de Orc/)).toBeInTheDocument();
   });
 
@@ -352,7 +362,7 @@ describe('TelaMesa — a mão', () => {
     });
 
     // Escopa pela carta-alvo (a única de Orc), não por índice: com cinco cópias
-    // idênticas de "um monstro" na lista, `getAllByRole('button', ...)[n]` afirmaria
+    // idênticas de "um Goblin" na lista, `getAllByRole('button', ...)[n]` afirmaria
     // a ordem do DOM, não QUAL carta foi clicada.
     const linhaDaCartaAlvo = (await screen.findByText(/carta de Orc/)).closest('li');
     if (linhaDaCartaAlvo === null) throw new Error('linha da carta-alvo não encontrada no DOM');

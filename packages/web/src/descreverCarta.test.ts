@@ -3,22 +3,23 @@ import { descreverCarta } from './descreverCarta';
 import type { CartaPorta } from '@card-dungeon/shared';
 
 const nomeDaRaca = (id: string): string => (id === 'elfo' ? 'Elfo' : id);
+const nomeDoMonstro = (id: string): string => (id === 'goblin' ? 'Goblin' : id);
 
 describe('descreverCarta', () => {
   it('descreve cada tipo de carta', () => {
-    expect(descreverCarta({ id: 'a', tipo: 'monstro', monstroId: 'goblin' }, nomeDaRaca)).toBe('um monstro');
-    expect(descreverCarta({ id: 'b', tipo: 'salaVazia' }, nomeDaRaca)).toBe('uma sala vazia');
+    expect(descreverCarta({ id: 'a', tipo: 'monstro', monstroId: 'goblin' }, nomeDaRaca, nomeDoMonstro)).toBe('um Goblin');
+    expect(descreverCarta({ id: 'b', tipo: 'salaVazia' }, nomeDaRaca, nomeDoMonstro)).toBe('uma sala vazia');
   });
 
   it('nomeia a raça da carta', () => {
     // "uma carta de raça" era informação zero num baralho cheio de raças: o vidente
     // pressente o QUÊ, e é isso que faz a Presciência valer a decisão.
-    expect(descreverCarta({ id: 'c', tipo: 'raca', racaId: 'elfo' }, nomeDaRaca)).toBe('uma carta de Elfo');
+    expect(descreverCarta({ id: 'c', tipo: 'raca', racaId: 'elfo' }, nomeDaRaca, nomeDoMonstro)).toBe('uma carta de Elfo');
   });
 
   it('cai no id quando a raça não está no catálogo', () => {
     // Skew de versão (bundle antigo, raça nova no server) não pode derrubar a tela.
-    expect(descreverCarta({ id: 'c', tipo: 'raca', racaId: 'grifo' }, nomeDaRaca)).toBe('uma carta de grifo');
+    expect(descreverCarta({ id: 'c', tipo: 'raca', racaId: 'grifo' }, nomeDaRaca, nomeDoMonstro)).toBe('uma carta de grifo');
   });
 
   it('degrada para um texto neutro em vez de lançar quando o tipo é desconhecido', () => {
@@ -27,6 +28,14 @@ describe('descreverCarta', () => {
     // este literal se passado sem ele, que é exatamente a guarda que queremos manter.
     const cartaDesconhecida = { id: 'x', tipo: 'maldicao' } as unknown as CartaPorta;
 
-    expect(descreverCarta(cartaDesconhecida, nomeDaRaca)).toBe('uma carta desconhecida');
+    expect(descreverCarta(cartaDesconhecida, nomeDaRaca, nomeDoMonstro)).toBe('uma carta desconhecida');
+  });
+
+  it('descreve o monstro pelo nome do catálogo', () => {
+    expect(descreverCarta(
+      { id: 'p-1', tipo: 'monstro', monstroId: 'lobo-sombrio' },
+      () => 'Elfo',
+      (id) => (id === 'lobo-sombrio' ? 'Lobo Sombrio' : '???'),
+    )).toBe('um Lobo Sombrio');
   });
 });

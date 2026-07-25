@@ -22,10 +22,11 @@ export function narrarPorta(
   carta: CartaPorta,
   quem: string,
   nomeDaRaca: (racaId: string) => string,
+  nomeDoMonstro: (monstroId: string) => string,
 ): string {
   switch (carta.tipo) {
     case 'monstro':
-      return `${quem} dá de cara com um monstro!`;
+      return `${quem} dá de cara com um ${nomeDoMonstro(carta.monstroId)}!`;
     case 'salaVazia':
       return `${quem} vasculha o local e não encontra nada.`;
     case 'raca':

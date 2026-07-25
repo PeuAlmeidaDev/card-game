@@ -19,10 +19,14 @@ import type { CartaPorta } from '@card-dungeon/shared';
  * para o compilador cobrar cada call-site — um default silencioso que caísse no
  * id faria a tela dizer "uma carta de anao" sem ninguém perceber.
  */
-export function descreverCarta(carta: CartaPorta, nomeDaRaca: (racaId: string) => string): string {
+export function descreverCarta(
+  carta: CartaPorta,
+  nomeDaRaca: (racaId: string) => string,
+  nomeDoMonstro: (monstroId: string) => string,
+): string {
   switch (carta.tipo) {
     case 'monstro':
-      return 'um monstro';
+      return `um ${nomeDoMonstro(carta.monstroId)}`;
     case 'salaVazia':
       return 'uma sala vazia';
     case 'raca':

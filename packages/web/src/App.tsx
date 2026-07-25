@@ -97,8 +97,9 @@ export function App() {
           em vez de um personagem fixo é o que liga esta tela ao resto do jogo.
 
           `racas` continua vindo do catálogo: não para ESCOLHER, e sim para a mesa
-          nomear as cartas de raça que aparecem na mão e no log. */}
-      <TelaMesa escolhas={{ classeId, itemIds }} racas={catalogo.racas} />
+          nomear as cartas de raça que aparecem na mão e no log. `monstros` faz o
+          mesmo papel para o bestiário. */}
+      <TelaMesa escolhas={{ classeId, itemIds }} racas={catalogo.racas} monstros={catalogo.monstros} />
     </main>
   );
 }

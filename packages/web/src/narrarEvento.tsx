@@ -9,6 +9,7 @@ export interface ContextoDeNarracao {
   readonly voce: string;
   readonly nomeDe: (jogadorId: string) => string;
   readonly nomeDaRaca: (racaId: string) => string;
+  readonly nomeDoMonstro: (monstroId: string) => string;
 }
 
 /**
@@ -27,6 +28,7 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
         evento.carta,
         evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId),
         ctx.nomeDaRaca,
+        ctx.nomeDoMonstro,
       );
     // Porta FECHADA: o evento não carrega a carta, e a narração não pode inventar
     // o que ele não diz. Vale inclusive para quem sacou — ele descobre o quê pela
@@ -53,7 +55,7 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
         + (evento.rolagem === null ? '' : ` (1d12: ${String(evento.rolagem)})`);
     // O descarte é PÚBLICO: o cemitério já é zona aberta, esconder aqui seria teatro.
     case 'descarte':
-      return `${ctx.nomeDe(evento.jogadorId)} descartou ${descreverCarta(evento.carta, ctx.nomeDaRaca)}.`;
+      return `${ctx.nomeDe(evento.jogadorId)} descartou ${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro)}.`;
     case 'combate':
       return (
         <>

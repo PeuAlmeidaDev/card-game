@@ -24,6 +24,7 @@ describe('GET /catalogo', () => {
     expect(catalogo.racas.map((r) => r.id)).toContain('elfo');
     expect(catalogo.classes.map((c) => c.id)).toContain('guerreiro');
     expect(catalogo.base.level).toBe(1);
+    expect(catalogo.monstros.map((m) => m.id)).toContain('goblin');
     await app.close();
   });
 

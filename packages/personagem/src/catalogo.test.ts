@@ -14,6 +14,13 @@ describe('CATALOGO', () => {
     expect(CATALOGO.itens.map((i) => i.id)).toEqual(['espada', 'escudo']);
     expect(CATALOGO.base.level).toBe(1);
   });
+
+  it('entrega os monstros com stats, para o cliente nomear e avaliar o perigo', () => {
+    expect(CATALOGO.monstros.length).toBeGreaterThan(0);
+    expect(CATALOGO.monstros.map((m) => m.id)).toContain('goblin');
+    // Dado puro: o catálogo tem que sobreviver ao JSON do fio sem perder campo.
+    expect(JSON.parse(JSON.stringify(CATALOGO.monstros))).toEqual(CATALOGO.monstros);
+  });
 });
 
 describe('resolverEscolhas', () => {

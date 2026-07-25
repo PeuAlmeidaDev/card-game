@@ -13,9 +13,10 @@ import type { AcaoNoFio, Catalogo, Escolhas, VistaDaPartida } from '@card-dungeo
  */
 const ESCOLHAS_PADRAO: Escolhas = { classeId: 'guerreiro', itemIds: [] };
 
-export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [] }: {
+export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = [] }: {
   readonly escolhas?: Escolhas;
   readonly racas?: Catalogo['racas'];
+  readonly monstros?: Catalogo['monstros'];
 }) {
   const [vista, definirVista] = useState<VistaDaPartida | null>(null);
   const [erro, definirErro] = useState<string | null>(null);
@@ -70,6 +71,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [] }: {
   const espiada = vista.espiada;
   const nomeDe = (id: string): string => vista.jogadores.find((j) => j.id === id)?.nome ?? id;
   const nomeDaRaca = (id: string): string => racas.find((r) => r.id === id)?.nome ?? id;
+  const nomeDoMonstro = (id: string): string => monstros.find((m) => m.id === id)?.nome ?? id;
   // A vida máxima do jogador é a do combatente base — a patente muda o dano, não a vida.
   // Do monstro só temos o valor corrente: a vista não carrega o máximo dele.
   const vidaMaxima = vista.jogadores.find((j) => j.id === vista.voce)?.combatenteBase.vida ?? null;
@@ -129,7 +131,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [] }: {
       ) : (
         <>
           {espiada !== null && (
-            <p>Você pressente {descreverCarta(espiada.carta, nomeDaRaca)} adiante.</p>
+            <p>Você pressente {descreverCarta(espiada.carta, nomeDaRaca, nomeDoMonstro)} adiante.</p>
           )}
 
           <div>
@@ -185,7 +187,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [] }: {
         <ul>
           {vista.suaMao.map((carta) => (
             <li key={carta.id}>
-              {descreverCarta(carta, nomeDaRaca)}{' '}
+              {descreverCarta(carta, nomeDaRaca, nomeDoMonstro)}{' '}
               {/* Só raça entra em jogo nesta fatia — o domínio recusa o resto, e um
                   botão que só serve para levar 400 ensina o jogador a errar. */}
               {carta.tipo === 'raca' && (
@@ -209,7 +211,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [] }: {
         </ul>
       </section>
 
-      <PainelLog log={vista.log} jogadores={vista.jogadores} voce={vista.voce} racas={racas} />
+      <PainelLog log={vista.log} jogadores={vista.jogadores} voce={vista.voce} racas={racas} monstros={monstros} />
 
       {erro !== null && <p role="alert">{erro}</p>}
     </section>
