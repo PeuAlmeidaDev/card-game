@@ -1,4 +1,4 @@
-import type { CartaPorta } from '../tipos';
+import type { CartaPorta, CartaDeRaca } from '../tipos';
 
 /**
  * Cartas-instância para testes que forjam monte/cemitério. O id é EXPLÍCITO (não
@@ -7,4 +7,7 @@ import type { CartaPorta } from '../tipos';
  */
 export const monstro = (id: string): CartaPorta => ({ id, tipo: 'monstro' });
 export const salaVazia = (id: string): CartaPorta => ({ id, tipo: 'salaVazia' });
-export const raca = (id: string, racaId: string): CartaPorta => ({ id, tipo: 'raca', racaId });
+// Anotado como `CartaDeRaca` (não `CartaPorta`): ela continua atribuível a todo
+// lugar que espera `CartaPorta` (inclusive `monte: [...]`), mas agora também
+// encaixa direto em `emJogo.raca` (`CartaDeRaca | null`) sem precisar de `as`.
+export const raca = (id: string, racaId: string): CartaDeRaca => ({ id, tipo: 'raca', racaId });

@@ -94,14 +94,16 @@ export type EventoDaMesa =
   | { readonly tipo: 'patente'; readonly jogadorId: string; readonly patente: number }
   | { readonly tipo: 'derrota'; readonly jogadorId: string; readonly derrotas: number }
   | { readonly tipo: 'vez'; readonly jogadorId: string }
-  | { readonly tipo: 'fim'; readonly classificacao: readonly PosicaoFinal[] };
+  | { readonly tipo: 'fim'; readonly classificacao: readonly PosicaoFinal[] }
+  | { readonly tipo: 'racaEmJogo'; readonly jogadorId: string; readonly carta: CartaDeRaca };
 
 export type AcaoDaMesa =
   | { readonly tipo: 'vasculhar'; readonly jogadorId: string }
   | { readonly tipo: 'manterCarta'; readonly jogadorId: string }
   | { readonly tipo: 'empurrarCarta'; readonly jogadorId: string }
   | { readonly tipo: 'atacar'; readonly jogadorId: string }
-  | { readonly tipo: 'esquivar'; readonly jogadorId: string };
+  | { readonly tipo: 'esquivar'; readonly jogadorId: string }
+  | { readonly tipo: 'jogarCarta'; readonly jogadorId: string; readonly cartaId: string };
 
 export interface CombateNaMesa {
   readonly estado: EstadoCombate;

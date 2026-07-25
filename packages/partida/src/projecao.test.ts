@@ -5,7 +5,7 @@ import { COMPOSICAO_POR_JOGADOR } from './baralho';
 import { AcaoInvalida } from './erros';
 import { filaDeDados } from './testes/dados';
 import { raca } from './testes/cartas';
-import type { EntradaJogador, CartaDeRaca } from './tipos';
+import type { EntradaJogador } from './tipos';
 import type { Combatente } from '@card-dungeon/motor';
 
 const base: Combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
@@ -101,11 +101,7 @@ describe('projetarPara', () => {
     const comEspecializado = {
       ...comMao,
       jogadores: comMao.jogadores.map((j) => (
-        // `raca(...)` devolve `CartaPorta` (tipo do fixture, usado também para o
-        // monte); sem o cast, o literal não estreita para `CartaDeRaca` aqui
-        // porque não há tipo contextual — diferente do `mao.test.ts`, onde a
-        // variável já nasce anotada como `JogadorNaMesa`.
-        j.id === 'p2' ? { ...j, emJogo: { raca: raca('r-p2', 'anao') as CartaDeRaca } } : j
+        j.id === 'p2' ? { ...j, emJogo: { raca: raca('r-p2', 'anao') } } : j
       )),
     };
     const vista = projetarPara('p1', comEspecializado);

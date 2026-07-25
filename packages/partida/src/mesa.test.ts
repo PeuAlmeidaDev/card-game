@@ -6,7 +6,7 @@ import { projetarPara } from './projecao';
 import { AcaoInvalida } from './erros';
 import { filaDeDados, criarDadoCiclico } from './testes/dados';
 import { monstro, salaVazia, raca } from './testes/cartas';
-import type { EntradaJogador } from './tipos';
+import type { EntradaJogador, CartaPorta, EstadoPartida } from './tipos';
 import type { Combatente, PassivaCombate } from '@card-dungeon/motor';
 
 const base: Combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
@@ -679,5 +679,105 @@ describe('a raça vem da ZONA EM JOGO, não da entrada', () => {
     const depois = aplicarAcao(comCombate, { tipo: 'esquivar', jogadorId: 'p1' }, depsAnao).estado;
 
     expect(depois.combate?.estado.jogador.vida).toBe(14);
+  });
+});
+
+describe('aplicarAcao — jogarCarta', () => {
+  const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] };
+  const comMao = (estado: EstadoPartida, cartas: readonly CartaPorta[]): EstadoPartida => ({
+    ...estado,
+    jogadores: estado.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao: cartas } : j)),
+  });
+
+  it('move a carta da mão para a zona em jogo e NÃO passa a vez', () => {
+    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const p = comMao(p0, [raca('r1', 'anao')]);
+
+    const r = aplicarAcao(p, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r1' }, deps([]));
+
+    expect(r.estado.jogadores[0]?.emJogo.raca?.id).toBe('r1');
+    expect(r.estado.jogadores[0]?.mao).toEqual([]);
+    expect(r.estado.vezDe).toBe('p1');   // jogar raça é decisão do próprio turno
+    expect(r.eventos).toEqual([{ tipo: 'racaEmJogo', jogadorId: 'p1', carta: raca('r1', 'anao') }]);
+  });
+
+  it('a raça anterior vai para o cemitério', () => {
+    // Zona ABERTA: a raça trocada era pública, então o descarte dela é público.
+    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const comAnterior: EstadoPartida = {
+      ...comMao(p0, [raca('r2', 'orc')]),
+      jogadores: comMao(p0, [raca('r2', 'orc')]).jogadores.map((j) => (
+        j.id === 'p1' ? { ...j, emJogo: { raca: raca('r1', 'anao') } } : j
+      )),
+    };
+
+    const r = aplicarAcao(comAnterior, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r2' }, deps([]));
+
+    expect(r.estado.jogadores[0]?.emJogo.raca?.id).toBe('r2');
+    expect(r.estado.cemiterio.some((c) => c.id === 'r1')).toBe(true);
+  });
+
+  it('recusa carta que não está na sua mão', () => {
+    // A mão do outro é secreta, mas o id não: sem este guard bastaria adivinhar
+    // um id para jogar a carta ALHEIA na própria zona.
+    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const p = comMao(p0, [raca('r1', 'anao')]);
+
+    expect(() => aplicarAcao(p, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r9' }, deps([])))
+      .toThrow(AcaoInvalida);
+    expect(() => aplicarAcao(p, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r9' }, deps([])))
+      .toThrow('aplicarAcao: a carta r9 não está na sua mão');
+  });
+
+  it('recusa carta que não é de raça', () => {
+    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const p = comMao(p0, [monstro('m9')]);
+
+    expect(() => aplicarAcao(p, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'm9' }, deps([])))
+      .toThrow('aplicarAcao: só carta de raça entra em jogo nesta fatia');
+  });
+
+  it('recusa trocar de raça com um combate em curso', () => {
+    // Bible §5: troca de raça só fora do combate. A guarda fala o vocabulário que
+    // o reducer já tem (`combate`/`espiada`) — não há máquina de fases aqui.
+    const p0 = criarPartida('m1', entradas,
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const }] },
+      { embaralhar: semEmbaralhar });
+    const emCombate = aplicarAcao(comMao(p0, [raca('r1', 'anao')]),
+      { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
+    expect(emCombate.combate).not.toBeNull();
+
+    expect(() => aplicarAcao(emCombate, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r1' }, deps([])))
+      .toThrow('aplicarAcao: há um combate em curso');
+  });
+
+  it('a passiva da raça jogada vale no combate seguinte', () => {
+    // O critério de sucesso da fatia (spec §9 nº 2): jogar a carta e VER a passiva
+    // agir. Sem a raça em jogo o dano seria 6 (vida 14); com ela, 3 (vida 17).
+    const metade: PassivaCombate = {
+      id: 'fake-metade',
+      aoSofrerDano: (dano, ctx) =>
+        ctx.estado.usos >= 1
+          ? { dano, estado: ctx.estado }
+          : { dano: Math.floor(dano / 2), estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } },
+    };
+    const monstroForte: Combatente = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 };
+    const depsAnao = {
+      rolar: filaDeDados([1, 12]),
+      embaralhar: semEmbaralhar,
+      monstro: monstroForte,
+      resolverRaca: (racaId: string | undefined) =>
+        racaId === 'anao' ? { passivaCombate: metade, espiaTopo: false } : undefined,
+    };
+    const p0 = criarPartida('m1', entradas,
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const }] },
+      { embaralhar: semEmbaralhar });
+
+    const jogou = aplicarAcao(comMao(p0, [raca('r1', 'anao')]),
+      { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r1' }, depsAnao).estado;
+    const comCombate = aplicarAcao(jogou, { tipo: 'vasculhar', jogadorId: 'p1' }, depsAnao).estado;
+    const depois = aplicarAcao(comCombate, { tipo: 'esquivar', jogadorId: 'p1' }, depsAnao).estado;
+
+    expect(depois.combate?.estado.jogador.vida).toBe(17);
   });
 });

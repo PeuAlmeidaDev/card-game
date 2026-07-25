@@ -78,6 +78,17 @@ describe('acaoDaMesaSchema', () => {
     expect(acaoDaMesaSchema.parse({ tipo: 'atacar', jogadorId: 'vitima' }))
       .toEqual({ tipo: 'atacar' });
   });
+
+  it('aceita jogarCarta apontando a carta', () => {
+    expect(acaoDaMesaSchema.parse({ tipo: 'jogarCarta', cartaId: 'p-3' }))
+      .toEqual({ tipo: 'jogarCarta', cartaId: 'p-3' });
+  });
+
+  it('recusa jogarCarta sem dizer qual carta', () => {
+    // `cartaId` é a única ação do jogo que carrega dado do cliente. Sem ele o
+    // servidor teria que adivinhar qual carta jogar.
+    expect(acaoDaMesaSchema.safeParse({ tipo: 'jogarCarta' }).success).toBe(false);
+  });
 });
 
 describe('acaoRequisicaoSchema', () => {

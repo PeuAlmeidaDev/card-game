@@ -169,6 +169,10 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
     return resolverEspiada(estado, acao, deps);
   }
 
+  if (acao.tipo === 'jogarCarta') {
+    return jogarCarta(estado, acao);
+  }
+
   return agirNoCombate(estado, acao, deps);
 }
 
@@ -295,6 +299,56 @@ function resolverEspiada(estado: EstadoPartida, acao: AcaoDeEspiada, deps: DepsM
     cemiterio: compra.cemiterio,
   };
   return resolverCarta(base, espiada.jogadorId, compra.carta, deps);
+}
+
+/** As ações que só fazem sentido com uma carta apontada. */
+type AcaoDeMao = Extract<AcaoDaMesa, { readonly tipo: 'jogarCarta' }>;
+
+/**
+ * Põe uma carta de raça da mão na zona em jogo. A anterior vai para o cemitério:
+ * a zona é ABERTA, então trocar de raça é jogada pública.
+ *
+ * A vez NÃO passa — jogar raça é decisão do próprio turno, e estando acima do
+ * limite ela é uma das saídas (a outra, entregar, chega no Plano 3).
+ */
+function jogarCarta(estado: EstadoPartida, acao: AcaoDeMao): ResultadoAcao {
+  if (estado.combate !== null) {
+    throw new AcaoInvalida('aplicarAcao: há um combate em curso');
+  }
+  if (estado.espiada !== null) {
+    throw new AcaoInvalida('aplicarAcao: há uma espiada pendente');
+  }
+
+  const jogador = estado.jogadores.find((j) => j.id === acao.jogadorId);
+  if (jogador === undefined) {
+    throw new Error(`jogarCarta: jogador ${acao.jogadorId} não está na mesa`);
+  }
+
+  const carta = jogador.mao.find((c) => c.id === acao.cartaId);
+  if (carta === undefined) {
+    // Pedido do cliente, não bug nosso: o id pode ser velho (a carta já saiu) ou
+    // simplesmente não ser dele. 400, nunca 500.
+    throw new AcaoInvalida(`aplicarAcao: a carta ${acao.cartaId} não está na sua mão`);
+  }
+  if (carta.tipo !== 'raca') {
+    throw new AcaoInvalida('aplicarAcao: só carta de raça entra em jogo nesta fatia');
+  }
+
+  const anterior = jogador.emJogo.raca;
+  const atualizado: JogadorNaMesa = {
+    ...jogador,
+    mao: jogador.mao.filter((c) => c.id !== carta.id),
+    emJogo: { raca: carta },
+  };
+
+  return registrar(
+    {
+      ...estado,
+      jogadores: estado.jogadores.map((j) => (j.id === atualizado.id ? atualizado : j)),
+      cemiterio: anterior === null ? estado.cemiterio : [...estado.cemiterio, anterior],
+    },
+    [{ tipo: 'racaEmJogo', jogadorId: acao.jogadorId, carta }],
+  );
 }
 
 function agirNoCombate(estado: EstadoPartida, acao: AcaoDeCombate, deps: DepsMesa): ResultadoAcao {

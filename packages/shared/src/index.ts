@@ -55,6 +55,7 @@ export const acaoDaMesaSchema = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('empurrarCarta') }),
   z.object({ tipo: z.literal('atacar') }),
   z.object({ tipo: z.literal('esquivar') }),
+  z.object({ tipo: z.literal('jogarCarta'), cartaId: z.string() }),
 ]) satisfies z.ZodType<{ tipo: AcaoDaMesa['tipo'] }>;
 
 /** A intenção validada. A rota completa com o `jogadorId` da sessão. */
