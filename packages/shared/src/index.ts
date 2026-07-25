@@ -13,7 +13,7 @@ import type {
   CartaPorta,
   EspiadaPendente,
   EventoDaMesa,
-  JogadorNaMesa,
+  JogadorPublico,
   PosicaoFinal,
   VistaDaPartida,
 } from '@card-dungeon/partida';
@@ -164,7 +164,7 @@ export type {
   EscolhasPersonagem,
   VistaDaPartida,
   AcaoDaMesa,
-  JogadorNaMesa,
+  JogadorPublico,
   EventoDaMesa,
   PosicaoFinal,
   CartaPorta,

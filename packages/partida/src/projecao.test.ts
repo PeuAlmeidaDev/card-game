@@ -4,7 +4,8 @@ import { criarPartida, aplicarAcao } from './mesa';
 import { COMPOSICAO_POR_JOGADOR } from './baralho';
 import { AcaoInvalida } from './erros';
 import { filaDeDados } from './testes/dados';
-import type { EntradaJogador } from './tipos';
+import { raca } from './testes/cartas';
+import type { EntradaJogador, CartaDeRaca } from './tipos';
 import type { Combatente } from '@card-dungeon/motor';
 
 const base: Combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
@@ -71,6 +72,45 @@ describe('projetarPara', () => {
     // Pedir a vista de uma mesa em que você não está é erro do CLIENTE (400/403),
     // não invariante quebrada. A borda distingue por `instanceof`.
     expect(() => projetarPara('intruso', partida)).toThrow(AcaoInvalida);
+  });
+
+  const comMao = {
+    ...partida,
+    jogadores: partida.jogadores.map((j) => ({ ...j, mao: [raca(`h-${j.id}`, 'elfo')] })),
+  };
+
+  it('não entrega a mão de ninguém — só a contagem', () => {
+    // Mesmo formato do teste que trava o segredo da espiada: a asserção é
+    // ESTRUTURAL (a chave não existe) mais uma varredura do JSON pelo id da carta
+    // alheia. Sem isto, um `jogadores: estado.jogadores` de volta passaria limpo.
+    const vista = projetarPara('p1', comMao);
+
+    expect(vista.jogadores.every((j) => !('mao' in j))).toBe(true);
+    expect(vista.jogadores.map((j) => j.cartasNaMao)).toEqual([1, 1]);
+    expect(JSON.stringify(vista.jogadores)).not.toContain('h-p2');
+  });
+
+  it('a mão do próprio jogador vem num campo à parte', () => {
+    expect(projetarPara('p1', comMao).suaMao.map((c) => c.id)).toEqual(['h-p1']);
+    expect(projetarPara('p2', comMao).suaMao.map((c) => c.id)).toEqual(['h-p2']);
+  });
+
+  it('publica a capacidade da mão de cada um', () => {
+    // O limite é REGRA, não segredo: quem lê a mesa precisa saber quantas cartas
+    // o outro ainda segura antes de ser obrigado a se desfazer de uma.
+    const comEspecializado = {
+      ...comMao,
+      jogadores: comMao.jogadores.map((j) => (
+        // `raca(...)` devolve `CartaPorta` (tipo do fixture, usado também para o
+        // monte); sem o cast, o literal não estreita para `CartaDeRaca` aqui
+        // porque não há tipo contextual — diferente do `mao.test.ts`, onde a
+        // variável já nasce anotada como `JogadorNaMesa`.
+        j.id === 'p2' ? { ...j, emJogo: { raca: raca('r-p2', 'anao') as CartaDeRaca } } : j
+      )),
+    };
+    const vista = projetarPara('p1', comEspecializado);
+
+    expect(vista.jogadores.map((j) => j.limiteDeMao)).toEqual([5, 4]);
   });
 });
 

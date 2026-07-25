@@ -51,6 +51,27 @@ export interface JogadorNaMesa {
 }
 
 /**
+ * O jogador como os OUTROS o veem. Escrito campo a campo de propósito: um
+ * `Omit<JogadorNaMesa, 'mao'>` publicaria automaticamente todo campo secreto
+ * futuro, e o silêncio é exatamente o modo de falha que este tipo existe para
+ * impedir. Publicar passa a ser uma decisão, não o default.
+ */
+export interface JogadorPublico {
+  readonly id: string;
+  readonly nome: string;
+  readonly ehBot: boolean;
+  readonly combatenteBase: Combatente;
+  readonly patente: number;
+  readonly derrotas: number;
+  /** Zona ABERTA: a raça em jogo é informação pública. */
+  readonly emJogo: ZonaEmJogo;
+  /** QUANTAS cartas ele tem — nunca QUAIS. */
+  readonly cartasNaMao: number;
+  /** A capacidade dele agora (o limite é regra pública, não segredo). */
+  readonly limiteDeMao: number;
+}
+
+/**
  * O que a raça de um jogador confere. UM resolvedor injetado responde tudo:
  * duas perguntas sobre a mesma carta em dois resolvedores fazem `DepsMesa`
  * crescer um campo por passiva. `RacaCarta` (pacote `cartas`) satisfaz este
@@ -124,7 +145,7 @@ export interface VistaDaPartida {
    * duplo-clique ou retry de rede.
    */
   readonly versao: number;
-  readonly jogadores: readonly JogadorNaMesa[];
+  readonly jogadores: readonly JogadorPublico[];
   readonly vezDe: string;
   readonly patenteAlvo: number;
   readonly cartasNoMonte: number;
@@ -135,6 +156,8 @@ export interface VistaDaPartida {
   readonly desfecho: 'emAndamento' | 'terminada';
   readonly classificacao: readonly PosicaoFinal[] | null;
   readonly log: readonly EventoDaMesa[];
+  /** A SUA mão. A dos outros não existe nesta vista — só a contagem, em `jogadores`. */
+  readonly suaMao: readonly CartaPorta[];
 }
 
 export interface ConfigPartida {

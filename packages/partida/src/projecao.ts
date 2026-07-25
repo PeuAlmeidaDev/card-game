@@ -1,5 +1,6 @@
 import type { EstadoPartida, VistaDaPartida } from './tipos';
 import { AcaoInvalida } from './erros';
+import { limiteDeMao } from './mao';
 
 /**
  * Versão do estado que o cliente devolve na ação e que o servidor usa no guard de
@@ -31,7 +32,19 @@ export function projetarPara(jogadorId: string, estado: EstadoPartida): VistaDaP
     // Fonte única da versão: derivada do estado por `versaoDe`, nunca guardada em
     // paralelo (campo duplicado é campo que diverge) nem recalculada na borda.
     versao: versaoDe(estado),
-    jogadores: estado.jogadores,
+    // Mapeia campo a campo: entregar o objeto de domínio era o que fazia a mão de
+    // todo mundo viajar para todo mundo no instante em que `mao` passou a existir.
+    jogadores: estado.jogadores.map((j) => ({
+      id: j.id,
+      nome: j.nome,
+      ehBot: j.ehBot,
+      combatenteBase: j.combatenteBase,
+      patente: j.patente,
+      derrotas: j.derrotas,
+      emJogo: j.emJogo,
+      cartasNaMao: j.mao.length,
+      limiteDeMao: limiteDeMao(j),
+    })),
     vezDe: estado.vezDe,
     patenteAlvo: estado.patenteAlvo,
     cartasNoMonte: estado.monte.length,
@@ -42,5 +55,9 @@ export function projetarPara(jogadorId: string, estado: EstadoPartida): VistaDaP
     desfecho: estado.desfecho,
     classificacao: estado.classificacao,
     log: estado.log,
+    // O `?? []` é inalcançável — o guard no topo da função já recusou quem não
+    // está na mesa — mas `find` devolve `undefined` para o compilador e um
+    // `throw` aqui duplicaria o guard.
+    suaMao: estado.jogadores.find((j) => j.id === jogadorId)?.mao ?? [],
   };
 }
