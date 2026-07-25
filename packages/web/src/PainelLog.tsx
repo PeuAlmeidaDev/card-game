@@ -80,6 +80,11 @@ export function PainelLog({ log, jogadores, voce }: {
               {evento.tipo === 'derrota' && `${nomeDe(evento.jogadorId)} foi evacuado.`}
               {evento.tipo === 'vez' && <small>Vez de {nomeDe(evento.jogadorId)}.</small>}
               {evento.tipo === 'fim' && 'A partida terminou.'}
+              {/* `racaEmJogo` ainda não é narrado aqui: o texto bom precisa do nome
+                  da raça, que só o catálogo do pacote `cartas` conhece — dívida
+                  DELIBERADA, fechada no Plano 4. A cadeia de `&&` não dá pressão
+                  do compilador (nenhum tipo de evento fica sem `case`), então este
+                  comentário é o único lembrete de que o evento existe e é mudo. */}
               {evento.tipo === 'combate' && (
                 <>
                   {evento.jogadorId === voce ? 'Seu combate:' : `Combate de ${nomeDe(evento.jogadorId)}:`}
