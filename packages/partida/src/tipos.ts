@@ -17,6 +17,22 @@ export type ReceitaCarta =
  */
 export type CartaPorta = ReceitaCarta & { readonly id: string };
 
+/**
+ * Uma carta de raça como instância. O slot da zona em jogo aceita SÓ esta: tipar
+ * o slot com `CartaPorta` deixaria um monstro entrar em jogo como se fosse raça,
+ * e a checagem viraria runtime em vez de compilação.
+ */
+export type CartaDeRaca = Extract<CartaPorta, { readonly tipo: 'raca' }>;
+
+/**
+ * Zona ABERTA do jogador: o que está na mesa, à vista de todos. Um slot nesta
+ * fatia; os 5 de equipamento (bible §5) encaixam aqui depois, sem redesenho.
+ * `raca: null` = Humano baseline — a ausência de especialização É a linha zero.
+ */
+export interface ZonaEmJogo {
+  readonly raca: CartaDeRaca | null;
+}
+
 /** Embaralhamento injetado (aleatoriedade na borda). */
 export type Embaralhar = <T>(itens: readonly T[]) => T[];
 
@@ -28,8 +44,31 @@ export interface JogadorNaMesa {
   readonly combatenteBase: Combatente;
   readonly patente: number;
   readonly derrotas: number;
-  /** Id da raça escolhida — resolve a passiva de combate. Ausente = sem raça (bots). */
-  readonly racaId?: string;
+  /** Zona OCULTA: só o dono vê o conteúdo. A projeção publica só a contagem. */
+  readonly mao: readonly CartaPorta[];
+  /** Zona ABERTA. É daqui que sai a raça do lutador — não mais da criação da partida. */
+  readonly emJogo: ZonaEmJogo;
+}
+
+/**
+ * O jogador como os OUTROS o veem. Escrito campo a campo de propósito: um
+ * `Omit<JogadorNaMesa, 'mao'>` publicaria automaticamente todo campo secreto
+ * futuro, e o silêncio é exatamente o modo de falha que este tipo existe para
+ * impedir. Publicar passa a ser uma decisão, não o default.
+ */
+export interface JogadorPublico {
+  readonly id: string;
+  readonly nome: string;
+  readonly ehBot: boolean;
+  readonly combatenteBase: Combatente;
+  readonly patente: number;
+  readonly derrotas: number;
+  /** Zona ABERTA: a raça em jogo é informação pública. */
+  readonly emJogo: ZonaEmJogo;
+  /** QUANTAS cartas ele tem — nunca QUAIS. */
+  readonly cartasNaMao: number;
+  /** A capacidade dele agora (o limite é regra pública, não segredo). */
+  readonly limiteDeMao: number;
 }
 
 /**
@@ -55,14 +94,16 @@ export type EventoDaMesa =
   | { readonly tipo: 'patente'; readonly jogadorId: string; readonly patente: number }
   | { readonly tipo: 'derrota'; readonly jogadorId: string; readonly derrotas: number }
   | { readonly tipo: 'vez'; readonly jogadorId: string }
-  | { readonly tipo: 'fim'; readonly classificacao: readonly PosicaoFinal[] };
+  | { readonly tipo: 'fim'; readonly classificacao: readonly PosicaoFinal[] }
+  | { readonly tipo: 'racaEmJogo'; readonly jogadorId: string; readonly carta: CartaDeRaca };
 
 export type AcaoDaMesa =
   | { readonly tipo: 'vasculhar'; readonly jogadorId: string }
   | { readonly tipo: 'manterCarta'; readonly jogadorId: string }
   | { readonly tipo: 'empurrarCarta'; readonly jogadorId: string }
   | { readonly tipo: 'atacar'; readonly jogadorId: string }
-  | { readonly tipo: 'esquivar'; readonly jogadorId: string };
+  | { readonly tipo: 'esquivar'; readonly jogadorId: string }
+  | { readonly tipo: 'jogarCarta'; readonly jogadorId: string; readonly cartaId: string };
 
 export interface CombateNaMesa {
   readonly estado: EstadoCombate;
@@ -106,7 +147,7 @@ export interface VistaDaPartida {
    * duplo-clique ou retry de rede.
    */
   readonly versao: number;
-  readonly jogadores: readonly JogadorNaMesa[];
+  readonly jogadores: readonly JogadorPublico[];
   readonly vezDe: string;
   readonly patenteAlvo: number;
   readonly cartasNoMonte: number;
@@ -117,11 +158,19 @@ export interface VistaDaPartida {
   readonly desfecho: 'emAndamento' | 'terminada';
   readonly classificacao: readonly PosicaoFinal[] | null;
   readonly log: readonly EventoDaMesa[];
+  /** A SUA mão. A dos outros não existe nesta vista — só a contagem, em `jogadores`. */
+  readonly suaMao: readonly CartaPorta[];
 }
 
 export interface ConfigPartida {
   readonly patenteAlvo: number;
   readonly composicaoPorJogador: readonly ReceitaCarta[];
+  /**
+   * Cartas distribuídas a cada jogador na abertura. Ausente = 0, para que os
+   * testes possam montar mesas de baralho mínimo (1 carta por jogador) sem ter
+   * que financiar mãos. Produção passa `MAO_INICIAL_PADRAO`.
+   */
+  readonly maoInicial?: number;
 }
 
 export interface EntradaJogador {
@@ -129,5 +178,9 @@ export interface EntradaJogador {
   readonly nome: string;
   readonly ehBot: boolean;
   readonly combatenteBase: Combatente;
+  /**
+   * Raça escolhida no construtor. `criarPartida` a transforma em carta já em
+   * jogo. Some no Plano 4, quando raça virar carta sacável do baralho.
+   */
   readonly racaId?: string;
 }

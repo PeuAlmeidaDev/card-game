@@ -151,6 +151,19 @@ describe('mesa', () => {
     await app.close();
   });
 
+  it('a mesa abre com a mão inicial distribuída', async () => {
+    // O dial da mão vive no domínio (`MAO_INICIAL_PADRAO`); a borda só o passa.
+    // Este teste é o que prova que ele chegou — sem ele, a mesa de produção
+    // poderia abrir com mão zero e todos os testes de `partida` seguiriam verdes.
+    const app = buildApp({ embaralhar: semEmbaralhar });
+    const res = await app.inject({ method: 'POST', url: '/api/partida', payload: escolhas });
+    const vista = res.json<VistaDaPartida>();
+
+    expect(vista.suaMao).toHaveLength(4);
+    expect(vista.jogadores.map((j) => j.cartasNaMao)).toEqual([4, 4, 4, 4]);
+    await app.close();
+  });
+
   it('rejeita escolhas inválidas com 400', async () => {
     const app = buildApp();
     const res = await app.inject({

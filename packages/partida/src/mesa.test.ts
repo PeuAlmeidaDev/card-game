@@ -6,7 +6,7 @@ import { projetarPara } from './projecao';
 import { AcaoInvalida } from './erros';
 import { filaDeDados, criarDadoCiclico } from './testes/dados';
 import { monstro, salaVazia, raca } from './testes/cartas';
-import type { EntradaJogador } from './tipos';
+import type { EntradaJogador, CartaPorta, EstadoPartida } from './tipos';
 import type { Combatente, PassivaCombate } from '@card-dungeon/motor';
 
 const base: Combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
@@ -79,7 +79,63 @@ describe('criarPartida', () => {
 
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
 
+    // `[0]` sozinho passa com a carta lá uma OU duas vezes — o tamanho é o que
+    // pega um descarte duplicado (o cemitério é escrito só dentro de `resolverCarta`).
+    expect(r.estado.cemiterio).toHaveLength(1);
     expect(r.estado.cemiterio[0]?.id).toBe(topo?.id);
+  });
+
+  it('todo jogador nasce com a mão vazia e sem raça em jogo', () => {
+    const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
+
+    expect(p.jogadores.map((j) => j.mao)).toEqual([[], []]);
+    expect(p.jogadores.map((j) => j.emJogo.raca)).toEqual([null, null]);
+  });
+
+  it('a raça escolhida na entrada nasce como carta JÁ em jogo', () => {
+    // A zona é a fonte única da raça. A escolha do construtor não fica num campo
+    // paralelo: ela entra como carta na mesa, do mesmo jeito que uma carta sacada
+    // vai entrar no Plano 4 — quando o server parar de mandar `racaId`, nada mais
+    // aqui muda.
+    const comRaca: readonly EntradaJogador[] = [
+      { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base, racaId: 'anao' },
+      { id: 'p2', nome: 'Bot 1', ehBot: true, combatenteBase: base },
+    ];
+    const p = criarPartida('m1', comRaca, config, { embaralhar: semEmbaralhar });
+
+    expect(p.jogadores[0]?.emJogo.raca).toMatchObject({ tipo: 'raca', racaId: 'anao' });
+    expect(p.jogadores[0]?.emJogo.raca?.id).toEqual(expect.any(String));
+    expect(p.jogadores[1]?.emJogo.raca).toBeNull();
+  });
+
+  it('distribui a mão inicial do topo do baralho', () => {
+    const p = criarPartida('m1', entradas, { ...config, maoInicial: 2 }, { embaralhar: semEmbaralhar });
+
+    expect(p.jogadores.map((j) => j.mao.length)).toEqual([2, 2]);
+    expect(p.monte).toHaveLength(COMPOSICAO_POR_JOGADOR.length * 2 - 4);
+    // Nenhuma carta em dois lugares ao mesmo tempo: a mão SAI do baralho.
+    const todas = [...p.jogadores.flatMap((j) => j.mao), ...p.monte].map((c) => c.id);
+    expect(new Set(todas).size).toBe(todas.length);
+  });
+
+  it('recusa distribuir mais cartas do que o baralho tem', () => {
+    // Sem o guard, `slice` devolve mãos curtas em silêncio e a mesa abre com
+    // jogadores desiguais — configuração errada tem que falhar alto, na criação.
+    expect(() => criarPartida('m1', entradas,
+      { ...config, composicaoPorJogador: [{ tipo: 'salaVazia' }], maoInicial: 4 },
+      { embaralhar: semEmbaralhar }))
+      .toThrow('criarPartida: o baralho não tem cartas para a mão inicial');
+  });
+
+  it('recusa a mão inicial quando ela consome o baralho EXATAMENTE (não sobra carta pro 1º vasculhar)', () => {
+    // Caso-limite do guard: distribuidas === cartas.length. Com `>` isto passava
+    // e a mesa nascia com monte:[] e cemiterio:[] — o 1º `vasculhar` reembaralharia
+    // um cemitério vazio e explodiria (`tirarDoTopo: baralho vazio`), um 500 na
+    // mesa que este mesmo validador acabou de aprovar.
+    expect(() => criarPartida('m1', entradas,
+      { ...config, composicaoPorJogador: [{ tipo: 'salaVazia' }], maoInicial: 1 },
+      { embaralhar: semEmbaralhar }))
+      .toThrow('criarPartida: o baralho não tem cartas para a mão inicial');
   });
 });
 
@@ -471,6 +527,9 @@ describe('aplicarAcao — espiada (Presciência)', () => {
     expect(r.estado.combate).not.toBeNull(); // a PRÓXIMA (monstro) foi comprada às cegas e abriu combate
     // a salaVazia empurrada NÃO foi revelada: não está no cemitério (foi pro fundo do monte)
     expect(r.estado.cemiterio.some((c) => c.tipo === 'salaVazia')).toBe(false);
+    // Só o monstro comprado às cegas foi descartado — o tamanho pega um
+    // descarte duplicado que `.some` sozinho deixaria passar.
+    expect(r.estado.cemiterio).toHaveLength(1);
   });
 
   it('empurrar com o monte vazio reembaralha o cemitério ANTES (a empurrada não volta pública)', () => {
@@ -487,6 +546,9 @@ describe('aplicarAcao — espiada (Presciência)', () => {
     expect(r.combate).not.toBeNull();                          // a próxima às cegas foi o monstro
     expect(r.cemiterio.some((c) => c.tipo === 'salaVazia')).toBe(false); // a empurrada NÃO virou pública
     expect(r.cemiterio.some((c) => c.tipo === 'monstro')).toBe(true);
+    // Só o monstro comprado às cegas foi descartado — o tamanho pega um
+    // descarte duplicado que `.some` sozinho deixaria passar.
+    expect(r.cemiterio).toHaveLength(1);
   });
 
   it('recusa empurrar quando não há OUTRA carta para comprar', () => {
@@ -578,21 +640,179 @@ describe('avancarBots — teto de ações automáticas', () => {
   });
 });
 
-describe('resolverCarta — carta de tipo novo', () => {
-  it('recusa a carta de raça com erro NOSSO em vez de abrir combate', () => {
-    // Antes da exaustividade, `if (tipo === 'salaVazia') … else combate` fazia
-    // qualquer tipo novo cair no ramo do monstro — o jogador lutaria contra uma
-    // carta de raça, sem nenhum erro. A mão que recebe esta carta chega no Plano 2;
-    // até lá o caso é inalcançável em produção (o baralho não tem raça) e um
-    // `Error` cru é o certo: invariante nossa quebrada => 500, não culpa do cliente.
+describe('vasculhar — carta de raça', () => {
+  it('a carta de raça vai para a mão de quem vasculhou, e o turno encerra', () => {
+    // O baralho de produção só ganha raça no Plano 4; aqui o monte é forjado.
+    // A carta é PÚBLICA na revelação (evento `porta`, como toda porta) e privada
+    // depois — quem prestou atenção sabe o que o vizinho tem, e é assim mesmo.
     const p0 = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' }] },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
       { embaralhar: semEmbaralhar });
     const p = { ...p0, monte: [raca('r1', 'elfo')] };
 
-    expect(() => aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])))
-      .toThrow('resolverCarta: carta de raça ainda não tem mão para receber');
-    expect(() => aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])))
-      .not.toThrow(AcaoInvalida);
+    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
+
+    expect(r.estado.jogadores[0]?.mao.map((c) => c.id)).toEqual(['r1']);
+    expect(r.estado.jogadores[1]?.mao).toEqual([]);
+    expect(r.estado.cemiterio.some((c) => c.id === 'r1')).toBe(false); // está na mão, não no lixo
+    expect(r.estado.cemiterio).toHaveLength(0);                        // raça não passa pelo descarte
+    expect(r.estado.combate).toBeNull();                               // raça não abre combate
+    expect(r.estado.vezDe).toBe('p2');
+    expect(r.eventos[0]).toMatchObject({ tipo: 'porta', jogadorId: 'p1', carta: { tipo: 'raca' } });
+  });
+});
+
+describe('a raça vem da ZONA EM JOGO, não da entrada', () => {
+  it('esvaziar a zona tira a passiva do combate', () => {
+    // Mutação: mesma entrada (`racaId: 'anao'`), mesmas rolagens — só a zona muda.
+    // Com a raça em jogo o dano de 6 cai para 3 (vida 20 → 17); com a zona vazia
+    // o dano é cheio (vida 20 → 14). Se a raça ainda viesse da entrada, os dois
+    // números seriam iguais e este teste não teria como falhar.
+    const metade: PassivaCombate = {
+      id: 'fake-metade',
+      aoSofrerDano: (dano, ctx) =>
+        ctx.estado.usos >= 1
+          ? { dano, estado: ctx.estado }
+          : { dano: Math.floor(dano / 2), estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } },
+    };
+    const comRaca: readonly EntradaJogador[] = [
+      { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base, racaId: 'anao' },
+      { id: 'p2', nome: 'Bot 1', ehBot: true, combatenteBase: base },
+    ];
+    // monstro rápido (ataca primeiro) e forte, para o 1º golpe cair no humano
+    const monstroForte: Combatente = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 };
+    const depsAnao = {
+      rolar: filaDeDados([1, 12]),   // monstro acerta; jogador falha a esquiva
+      embaralhar: semEmbaralhar,
+      monstro: monstroForte,
+      resolverRaca: (racaId: string | undefined) =>
+        racaId === 'anao' ? { passivaCombate: metade, espiaTopo: false } : undefined,
+    };
+    const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const }] };
+
+    const p = criarPartida('m1', comRaca, soMonstro, { embaralhar: semEmbaralhar });
+    const semZona = {
+      ...p,
+      jogadores: p.jogadores.map((j) => (j.id === 'p1' ? { ...j, emJogo: { raca: null } } : j)),
+    };
+
+    const comCombate = aplicarAcao(semZona, { tipo: 'vasculhar', jogadorId: 'p1' }, depsAnao).estado;
+    const depois = aplicarAcao(comCombate, { tipo: 'esquivar', jogadorId: 'p1' }, depsAnao).estado;
+
+    expect(depois.combate?.estado.jogador.vida).toBe(14);
+  });
+});
+
+describe('aplicarAcao — jogarCarta', () => {
+  const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] };
+  const comMao = (estado: EstadoPartida, cartas: readonly CartaPorta[]): EstadoPartida => ({
+    ...estado,
+    jogadores: estado.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao: cartas } : j)),
+  });
+
+  it('move a carta da mão para a zona em jogo e NÃO passa a vez', () => {
+    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const p = comMao(p0, [raca('r1', 'anao')]);
+
+    const r = aplicarAcao(p, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r1' }, deps([]));
+
+    expect(r.estado.jogadores[0]?.emJogo.raca?.id).toBe('r1');
+    expect(r.estado.jogadores[0]?.mao).toEqual([]);
+    expect(r.estado.vezDe).toBe('p1');   // jogar raça é decisão do próprio turno
+    expect(r.eventos).toEqual([{ tipo: 'racaEmJogo', jogadorId: 'p1', carta: raca('r1', 'anao') }]);
+  });
+
+  it('a raça anterior vai para o cemitério', () => {
+    // Zona ABERTA: a raça trocada era pública, então o descarte dela é público.
+    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const comAnterior: EstadoPartida = {
+      ...comMao(p0, [raca('r2', 'orc')]),
+      jogadores: comMao(p0, [raca('r2', 'orc')]).jogadores.map((j) => (
+        j.id === 'p1' ? { ...j, emJogo: { raca: raca('r1', 'anao') } } : j
+      )),
+    };
+
+    const r = aplicarAcao(comAnterior, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r2' }, deps([]));
+
+    expect(r.estado.jogadores[0]?.emJogo.raca?.id).toBe('r2');
+    expect(r.estado.cemiterio.some((c) => c.id === 'r1')).toBe(true);
+  });
+
+  it('recusa carta que não está na sua mão', () => {
+    // A mão do outro é secreta, mas o id não: sem este guard bastaria adivinhar
+    // um id para jogar a carta ALHEIA na própria zona.
+    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const p = comMao(p0, [raca('r1', 'anao')]);
+
+    expect(() => aplicarAcao(p, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r9' }, deps([])))
+      .toThrow(AcaoInvalida);
+    expect(() => aplicarAcao(p, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r9' }, deps([])))
+      .toThrow('aplicarAcao: a carta r9 não está na sua mão');
+  });
+
+  it('recusa carta que não é de raça', () => {
+    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const p = comMao(p0, [monstro('m9')]);
+
+    expect(() => aplicarAcao(p, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'm9' }, deps([])))
+      .toThrow('aplicarAcao: só carta de raça entra em jogo nesta fatia');
+  });
+
+  it('recusa trocar de raça com uma espiada pendente', () => {
+    // O guard gêmeo do `vasculhar`: sem ele daria para trocar de raça no meio de
+    // uma Presciência pendente (a espiada não travaria a mão, só o combate).
+    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const comEspiada = aplicarAcao(comMao(p0, [raca('r1', 'anao')]),
+      { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])).estado;
+    expect(comEspiada.espiada).not.toBeNull();
+
+    expect(() => aplicarAcao(comEspiada, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r1' }, deps([])))
+      .toThrow(AcaoInvalida);
+    expect(() => aplicarAcao(comEspiada, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r1' }, deps([])))
+      .toThrow('aplicarAcao: há uma espiada pendente');
+  });
+
+  it('recusa trocar de raça com um combate em curso', () => {
+    // Bible §5: troca de raça só fora do combate. A guarda fala o vocabulário que
+    // o reducer já tem (`combate`/`espiada`) — não há máquina de fases aqui.
+    const p0 = criarPartida('m1', entradas,
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const }] },
+      { embaralhar: semEmbaralhar });
+    const emCombate = aplicarAcao(comMao(p0, [raca('r1', 'anao')]),
+      { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
+    expect(emCombate.combate).not.toBeNull();
+
+    expect(() => aplicarAcao(emCombate, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r1' }, deps([])))
+      .toThrow('aplicarAcao: há um combate em curso');
+  });
+
+  it('a passiva da raça jogada vale no combate seguinte', () => {
+    // O critério de sucesso da fatia (spec §9 nº 2): jogar a carta e VER a passiva
+    // agir. Sem a raça em jogo o dano seria 6 (vida 14); com ela, 3 (vida 17).
+    const metade: PassivaCombate = {
+      id: 'fake-metade',
+      aoSofrerDano: (dano, ctx) =>
+        ctx.estado.usos >= 1
+          ? { dano, estado: ctx.estado }
+          : { dano: Math.floor(dano / 2), estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } },
+    };
+    const monstroForte: Combatente = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 };
+    const depsAnao = {
+      rolar: filaDeDados([1, 12]),
+      embaralhar: semEmbaralhar,
+      monstro: monstroForte,
+      resolverRaca: (racaId: string | undefined) =>
+        racaId === 'anao' ? { passivaCombate: metade, espiaTopo: false } : undefined,
+    };
+    const p0 = criarPartida('m1', entradas,
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const }] },
+      { embaralhar: semEmbaralhar });
+
+    const jogou = aplicarAcao(comMao(p0, [raca('r1', 'anao')]),
+      { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r1' }, depsAnao).estado;
+    const comCombate = aplicarAcao(jogou, { tipo: 'vasculhar', jogadorId: 'p1' }, depsAnao).estado;
+    const depois = aplicarAcao(comCombate, { tipo: 'esquivar', jogadorId: 'p1' }, depsAnao).estado;
+
+    expect(depois.combate?.estado.jogador.vida).toBe(17);
   });
 });

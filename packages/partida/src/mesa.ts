@@ -4,7 +4,7 @@ import type {
   AcaoDaMesa, CartaPorta, ConfigPartida, EntradaJogador, Embaralhar, EstadoPartida, EventoDaMesa, InfoRaca,
   JogadorNaMesa,
 } from './tipos';
-import { comprarCarta, tirarDoTopo } from './baralho';
+import { tirarDoTopo } from './baralho';
 import { escolherAcao } from './bot';
 import { classificar } from './classificacao';
 import { AcaoInvalida } from './erros';
@@ -24,7 +24,9 @@ export interface DepsMesa {
 
 /** Resolve a raça de um jogador (via o resolvedor injetado). Central para não repetir a chamada. */
 function racaDoLutador(deps: DepsMesa, jogador: JogadorNaMesa | undefined): InfoRaca | undefined {
-  return deps.resolverRaca?.(jogador?.racaId);
+  // A ZONA é a fonte: quem troca de raça no meio da partida (Task 6) muda de
+  // passiva na hora, sem nenhum campo paralelo para sincronizar.
+  return deps.resolverRaca?.(jogador?.emJogo.raca?.racaId);
 }
 
 /** A passiva de combate do jogador, `undefined` quando não há raça ou a raça não tem passiva. */
@@ -56,10 +58,13 @@ export function criarPartida(
     id: e.id,
     nome: e.nome,
     ehBot: e.ehBot,
-    racaId: e.racaId,
     combatenteBase: e.combatenteBase,
     patente: 1,
     derrotas: 0,
+    mao: [],
+    // A escolha do construtor entra como carta JÁ em jogo. O id `r-<jogador>` não
+    // colide com o `p-N` do baralho e é estável: esta carta nunca foi comprada.
+    emJogo: { raca: e.racaId === undefined ? null : { id: `r-${e.id}`, tipo: 'raca', racaId: e.racaId } },
   }));
 
   // Baralho da MESA: a composição por jogador multiplicada pelo tamanho da mesa.
@@ -72,6 +77,24 @@ export function criarPartida(
   // entregar qual carta era. Carimbar depois do embaralho quebra essa correlação.
   const cartas: readonly CartaPorta[] = deps.embaralhar(receitas).map((r, i) => ({ ...r, id: `p-${String(i)}` }));
 
+  // A mão sai do TOPO do baralho já embaralhado — mesmo lugar de onde sairia se
+  // fosse comprada carta a carta. Bloco contíguo por jogador em vez de round-robin
+  // porque o baralho já está aleatório: alternar não acrescentaria aleatoriedade.
+  const porJogador = config.maoInicial ?? 0;
+  const distribuidas = porJogador * jogadores.length;
+  // `>=`, não `>`: a mesa precisa sobrar ao menos 1 carta no monte para o 1º
+  // `vasculhar` ter o que tirar. Com `distribuidas === cartas.length` a mesa
+  // nasceria com monte:[] e cemiterio:[], e `tirarDoTopo` reembaralharia um
+  // cemitério vazio e lançaria — um 500 na mesa que este guard acabou de aprovar.
+  if (distribuidas >= cartas.length) {
+    throw new Error('criarPartida: o baralho não tem cartas para a mão inicial');
+  }
+  const comMao: readonly JogadorNaMesa[] = jogadores.map((j, i) => ({
+    ...j,
+    mao: cartas.slice(i * porJogador, (i + 1) * porJogador),
+  }));
+  const monte = cartas.slice(distribuidas);
+
   const primeiro = jogadores[0];
   if (primeiro === undefined) {
     // Inalcançável: o guard acima já garantiu 2+ jogadores. Existe porque
@@ -83,10 +106,10 @@ export function criarPartida(
 
   return {
     id,
-    jogadores,
+    jogadores: comMao,
     vezDe: primeiro.id,
     patenteAlvo: config.patenteAlvo,
-    monte: cartas,
+    monte,
     cemiterio: [],
     combate: null,
     espiada: null,
@@ -121,6 +144,16 @@ function proximoJogador(estado: EstadoPartida): JogadorNaMesa {
 }
 
 /**
+ * Encerra o turno: passa a vez e fecha a ação. Porta ÚNICA — a sala vazia, a
+ * carta de raça e o fim de combate encerravam cada uma por conta própria, e a
+ * checagem de limite de mão (Plano 3) teria que ser lembrada em três lugares.
+ */
+function encerrarTurno(base: EstadoPartida, eventos: readonly EventoDaMesa[]): ResultadoAcao {
+  const seguinte = proximoJogador(base);
+  return registrar({ ...base, vezDe: seguinte.id }, [...eventos, { tipo: 'vez', jogadorId: seguinte.id }]);
+}
+
+/**
  * Reducer autoritativo da mesa. Recusa do cliente sai como `AcaoInvalida` (a borda
  * traduz em 400); invariante nossa quebrada sai como `Error` cru (500, sem vazar).
  */
@@ -140,14 +173,19 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
     return resolverEspiada(estado, acao, deps);
   }
 
+  if (acao.tipo === 'jogarCarta') {
+    return jogarCarta(estado, acao);
+  }
+
   return agirNoCombate(estado, acao, deps);
 }
 
 /**
- * Resolve uma carta JÁ comprada (o baralho em `base` já reflete a compra): emite
- * o evento `porta` e segue um de três caminhos — `salaVazia` passa a vez,
- * `monstro` abre combate, `raca` (ver o `case` abaixo). É o núcleo compartilhado
- * do vasculhar atômico e da resolução da espiada.
+ * Resolve uma carta JÁ comprada (o baralho em `base` já reflete a compra) e é
+ * dona do seu DESTINO: emite o evento `porta` e segue um de três caminhos —
+ * `salaVazia` passa a vez, `monstro` abre combate, `raca` vai para a mão de
+ * quem vasculhou e passa a vez. É o núcleo compartilhado do vasculhar atômico
+ * e da resolução da espiada.
  */
 function resolverCarta(
   base: EstadoPartida,
@@ -157,17 +195,22 @@ function resolverCarta(
 ): ResultadoAcao {
   const eventos: EventoDaMesa[] = [{ tipo: 'porta', jogadorId, carta }];
 
+  // A carta revelada vai para o cemitério AQUI, um lugar só. Antes cada caminho de
+  // entrada descartava por conta própria — e a carta que vai para a MÃO (Task 5)
+  // teria que ser retirada do cemitério depois de lá colocada.
+  const revelada: EstadoPartida = { ...base, cemiterio: [...base.cemiterio, carta] };
+
   switch (carta.tipo) {
-    case 'salaVazia': {
-      const seguinte = proximoJogador(base);
-      eventos.push({ tipo: 'vez', jogadorId: seguinte.id });
-      return registrar({ ...base, vezDe: seguinte.id }, eventos);
+    case 'salaVazia':
+      return encerrarTurno(revelada, eventos);
+    case 'raca': {
+      // A carta sacada NÃO vai ao cemitério: ela fica com quem vasculhou. Por isso
+      // o estado usado aqui é `base` (sem a carta), e não `revelada`.
+      const jogadores = base.jogadores.map((j) => (
+        j.id === jogadorId ? { ...j, mao: [...j.mao, carta] } : j
+      ));
+      return encerrarTurno({ ...base, jogadores }, eventos);
     }
-    case 'raca':
-      // A mão que recebe esta carta chega no Plano 2. Até lá o baralho de
-      // produção não tem raça e este caminho é inalcançável — mas ele precisa
-      // EXISTIR, senão a carta cairia no ramo do monstro e viraria combate.
-      throw new Error('resolverCarta: carta de raça ainda não tem mão para receber');
     case 'monstro':
       break;
     default: {
@@ -177,7 +220,7 @@ function resolverCarta(
     }
   }
 
-  const jogador = base.jogadores.find((j) => j.id === jogadorId);
+  const jogador = revelada.jogadores.find((j) => j.id === jogadorId);
   if (jogador === undefined) {
     throw new Error(`resolverCarta: jogador ${jogadorId} não está na mesa`);
   }
@@ -187,7 +230,7 @@ function resolverCarta(
   const passo = criarCombate(combatente, deps.monstro, deps.rolar, passiva);
   eventos.push({ tipo: 'combate', jogadorId, eventos: passo.eventos });
   return registrar(
-    { ...base, combate: { estado: passo.estado, proximaDecisao: passo.proximaDecisao } },
+    { ...revelada, combate: { estado: passo.estado, proximaDecisao: passo.proximaDecisao } },
     eventos,
   );
 }
@@ -213,9 +256,9 @@ function vasculhar(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): Re
     );
   }
 
-  const compra = comprarCarta(estado.monte, estado.cemiterio, deps.embaralhar);
-  const base: EstadoPartida = { ...estado, monte: compra.monte, cemiterio: compra.cemiterio };
-  return resolverCarta(base, jogadorId, compra.carta, deps);
+  const t = tirarDoTopo(estado.monte, estado.cemiterio, deps.embaralhar);
+  const base: EstadoPartida = { ...estado, monte: t.monte, cemiterio: t.cemiterio };
+  return resolverCarta(base, jogadorId, t.carta, deps);
 }
 
 /** As ações que só fazem sentido com uma espiada pendente. */
@@ -233,11 +276,7 @@ function resolverEspiada(estado: EstadoPartida, acao: AcaoDeEspiada, deps: DepsM
   }
 
   if (acao.tipo === 'manterCarta') {
-    const base: EstadoPartida = {
-      ...estado,
-      espiada: null,
-      cemiterio: [...estado.cemiterio, espiada.carta],
-    };
+    const base: EstadoPartida = { ...estado, espiada: null };
     return resolverCarta(base, espiada.jogadorId, espiada.carta, deps);
   }
 
@@ -256,7 +295,7 @@ function resolverEspiada(estado: EstadoPartida, acao: AcaoDeEspiada, deps: DepsM
   const monteBase = precisaReembaralhar ? deps.embaralhar(estado.cemiterio) : estado.monte;
   const cemiterioBase = precisaReembaralhar ? [] : estado.cemiterio;
   const monteComEmpurrada: readonly CartaPorta[] = [...monteBase, espiada.carta];
-  const compra = comprarCarta(monteComEmpurrada, cemiterioBase, deps.embaralhar);
+  const compra = tirarDoTopo(monteComEmpurrada, cemiterioBase, deps.embaralhar);
   const base: EstadoPartida = {
     ...estado,
     espiada: null,
@@ -264,6 +303,56 @@ function resolverEspiada(estado: EstadoPartida, acao: AcaoDeEspiada, deps: DepsM
     cemiterio: compra.cemiterio,
   };
   return resolverCarta(base, espiada.jogadorId, compra.carta, deps);
+}
+
+/** As ações que só fazem sentido com uma carta apontada. */
+type AcaoDeMao = Extract<AcaoDaMesa, { readonly tipo: 'jogarCarta' }>;
+
+/**
+ * Põe uma carta de raça da mão na zona em jogo. A anterior vai para o cemitério:
+ * a zona é ABERTA, então trocar de raça é jogada pública.
+ *
+ * A vez NÃO passa — jogar raça é decisão do próprio turno, e estando acima do
+ * limite ela é uma das saídas (a outra, entregar, chega no Plano 3).
+ */
+function jogarCarta(estado: EstadoPartida, acao: AcaoDeMao): ResultadoAcao {
+  if (estado.combate !== null) {
+    throw new AcaoInvalida('aplicarAcao: há um combate em curso');
+  }
+  if (estado.espiada !== null) {
+    throw new AcaoInvalida('aplicarAcao: há uma espiada pendente');
+  }
+
+  const jogador = estado.jogadores.find((j) => j.id === acao.jogadorId);
+  if (jogador === undefined) {
+    throw new Error(`jogarCarta: jogador ${acao.jogadorId} não está na mesa`);
+  }
+
+  const carta = jogador.mao.find((c) => c.id === acao.cartaId);
+  if (carta === undefined) {
+    // Pedido do cliente, não bug nosso: o id pode ser velho (a carta já saiu) ou
+    // simplesmente não ser dele. 400, nunca 500.
+    throw new AcaoInvalida(`aplicarAcao: a carta ${acao.cartaId} não está na sua mão`);
+  }
+  if (carta.tipo !== 'raca') {
+    throw new AcaoInvalida('aplicarAcao: só carta de raça entra em jogo nesta fatia');
+  }
+
+  const anterior = jogador.emJogo.raca;
+  const atualizado: JogadorNaMesa = {
+    ...jogador,
+    mao: jogador.mao.filter((c) => c.id !== carta.id),
+    emJogo: { raca: carta },
+  };
+
+  return registrar(
+    {
+      ...estado,
+      jogadores: estado.jogadores.map((j) => (j.id === atualizado.id ? atualizado : j)),
+      cemiterio: anterior === null ? estado.cemiterio : [...estado.cemiterio, anterior],
+    },
+    [{ tipo: 'racaEmJogo', jogadorId: acao.jogadorId, carta }],
+  );
 }
 
 function agirNoCombate(estado: EstadoPartida, acao: AcaoDeCombate, deps: DepsMesa): ResultadoAcao {
@@ -339,9 +428,7 @@ function fecharCombate(
     return registrar({ ...semCombate, desfecho: 'terminada', classificacao }, eventos);
   }
 
-  const seguinte = proximoJogador(semCombate);
-  eventos.push({ tipo: 'vez', jogadorId: seguinte.id });
-  return registrar({ ...semCombate, vezDe: seguinte.id }, eventos);
+  return encerrarTurno(semCombate, eventos);
 }
 
 /**

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { narrarCombate } from './narrarCombate';
 import { narrarPorta } from './narrarPorta';
-import type { EventoDaMesa, JogadorNaMesa } from '@card-dungeon/shared';
+import type { EventoDaMesa, JogadorPublico } from '@card-dungeon/shared';
 
 /**
  * Uma cor por ASSENTO, na ordem de turno. Derivar do índice (e não de um hash do
@@ -11,7 +11,7 @@ import type { EventoDaMesa, JogadorNaMesa } from '@card-dungeon/shared';
 const CORES: readonly string[] = ['#1d4ed8', '#b91c1c', '#15803d', '#a16207'];
 const CINZA = '#475569';
 
-export function corDoJogador(jogadores: readonly JogadorNaMesa[], jogadorId: string): string {
+export function corDoJogador(jogadores: readonly JogadorPublico[], jogadorId: string): string {
   const assento = jogadores.findIndex((j) => j.id === jogadorId);
   // `noUncheckedIndexedAccess` + assento -1 (id desconhecido) caem no mesmo
   // fallback: uma cor a menos é feio, uma exceção no meio do log é uma tela branca.
@@ -25,7 +25,7 @@ export function corDoJogador(jogadores: readonly JogadorNaMesa[], jogadorId: str
  */
 export function PainelLog({ log, jogadores, voce }: {
   readonly log: readonly EventoDaMesa[];
-  readonly jogadores: readonly JogadorNaMesa[];
+  readonly jogadores: readonly JogadorPublico[];
   readonly voce: string;
 }) {
   const nomeDe = (id: string): string => jogadores.find((j) => j.id === id)?.nome ?? id;
@@ -80,6 +80,11 @@ export function PainelLog({ log, jogadores, voce }: {
               {evento.tipo === 'derrota' && `${nomeDe(evento.jogadorId)} foi evacuado.`}
               {evento.tipo === 'vez' && <small>Vez de {nomeDe(evento.jogadorId)}.</small>}
               {evento.tipo === 'fim' && 'A partida terminou.'}
+              {/* `racaEmJogo` ainda não é narrado aqui: o texto bom precisa do nome
+                  da raça, que só o catálogo do pacote `cartas` conhece — dívida
+                  DELIBERADA, fechada no Plano 4. A cadeia de `&&` não dá pressão
+                  do compilador (nenhum tipo de evento fica sem `case`), então este
+                  comentário é o único lembrete de que o evento existe e é mudo. */}
               {evento.tipo === 'combate' && (
                 <>
                   {evento.jogadorId === voce ? 'Seu combate:' : `Combate de ${nomeDe(evento.jogadorId)}:`}

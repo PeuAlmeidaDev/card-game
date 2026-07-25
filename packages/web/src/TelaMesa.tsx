@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api } from './api';
 import { PainelLog } from './PainelLog';
 import { descreverCarta } from './descreverCarta';
-import type { AcaoDaMesa, Escolhas, VistaDaPartida } from '@card-dungeon/shared';
+import type { AcaoNoFio, Escolhas, VistaDaPartida } from '@card-dungeon/shared';
 
 /**
  * Usado quando a tela roda sozinha; o `App` passa as escolhas reais do construtor.
@@ -29,16 +29,15 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO }: { escolhas?: Escolhas }
     definirErro(resposta.status === 400 ? resposta.body.erro : 'Não foi possível criar a partida.');
   };
 
-  const agir = async (tipo: AcaoDaMesa['tipo']): Promise<void> => {
+  const agir = async (acao: AcaoNoFio): Promise<void> => {
     if (vista === null) return;
     definirErro(null);
     const resposta = await api.agir({
       params: { id: vista.id },
-      // Só a intenção e a versão. QUEM age é decidido pelo servidor a partir da
-      // conexão — mandar o id daqui é o que permitiria jogar no lugar de outro.
-      // A versão é a que ESTA tela está vendo: se o servidor já avançou
-      // (duplo-clique, retry de rede), ele responde 409 sem rolar dado.
-      body: { acao: { tipo }, versao: vista.versao },
+      // Só a intenção e a versão: QUEM age vem da conexão, não do corpo (mandar o
+      // id daqui deixaria jogar no lugar de outro); a versão é a que esta tela vê —
+      // se o servidor já avançou, ele responde 409 sem rolar dado.
+      body: { acao, versao: vista.versao },
     });
     if (resposta.status === 200 || resposta.status === 409) {
       // 409 não é erro para o jogador: a ação dele já valeu. Só ressincroniza.
@@ -115,7 +114,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO }: { escolhas?: Escolhas }
             <button
               type="button"
               disabled={!minhaVez || vista.combate !== null || espiada !== null}
-              onClick={() => void agir('vasculhar')}
+              onClick={() => void agir({ tipo: 'vasculhar' })}
             >
               Vasculhar local
             </button>
@@ -125,28 +124,28 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO }: { escolhas?: Escolhas }
             <button
               type="button"
               disabled={!minhaVez || espiada === null}
-              onClick={() => void agir('manterCarta')}
+              onClick={() => void agir({ tipo: 'manterCarta' })}
             >
               Encarar
             </button>
             <button
               type="button"
               disabled={!minhaVez || espiada === null}
-              onClick={() => void agir('empurrarCarta')}
+              onClick={() => void agir({ tipo: 'empurrarCarta' })}
             >
               Empurrar
             </button>
             <button
               type="button"
               disabled={!minhaVez || decisao !== 'ataque'}
-              onClick={() => void agir('atacar')}
+              onClick={() => void agir({ tipo: 'atacar' })}
             >
               Atacar
             </button>
             <button
               type="button"
               disabled={!minhaVez || decisao !== 'esquiva'}
-              onClick={() => void agir('esquivar')}
+              onClick={() => void agir({ tipo: 'esquivar' })}
             >
               Esquivar
             </button>
