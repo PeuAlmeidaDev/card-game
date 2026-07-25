@@ -210,13 +210,19 @@ describe('mesa', () => {
 
   it('o baralho de produção TEM carta de raça — senão a mão nunca cresce', async () => {
     // Sem isto a fatia 7 inteira continua dormente e nenhum outro teste acusaria:
-    // a mão só cresce por carta de raça sacada.
-    const app = buildApp({ embaralhar: semEmbaralhar });
+    // a mão só cresce por carta de raça sacada. A contagem sozinha não provava
+    // isso (achado do review final: trocar a composição por outra com o mesmo
+    // total de cartas manteria a asserção de contagem verde com ZERO raça no
+    // baralho) — por isso também afirma a PRESENÇA de fato, usando o
+    // embaralhamento dirigido `racasNoTopo` para garantir que a mão inicial
+    // traga uma.
+    const app = buildApp({ embaralhar: racasNoTopo });
     const vista = await criar(app);
 
     // 12 cartas por jogador (5 monstro + 3 sala vazia + 4 raça) × 4 assentos,
     // menos as 4 da mão inicial de cada um.
     expect(vista.cartasNoMonte).toBe(12 * 4 - 4 * 4);
+    expect(vista.suaMao.some((c) => c.tipo === 'raca')).toBe(true);
     await app.close();
   });
 
