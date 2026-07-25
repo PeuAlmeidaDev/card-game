@@ -1083,6 +1083,8 @@ git commit -m "feat(partida): jogarCarta põe a raça da mão na zona em jogo"
 - **`racaEmJogo` não é narrado no `PainelLog`.** O evento renderiza uma linha em branco. Inalcançável em produção neste plano (não há UI que jogue carta e o bot não joga), mas o texto bom exige o nome da raça, que só o catálogo do `cartas` conhece — é trabalho do Plano 4, junto da UI da mão. O `PainelLog` usa cadeia de `&&`, não `switch` exaustivo, então **o compilador não vai cobrar**: é preciso lembrar.
 - **A mão inicial é composta de cartas sem verbo** (monstro e sala vazia). Aceito no spec §2; elas viram o excedente que a caridade do Plano 3 entrega, e ganham verbo ("procurar encrenca") na fatia seguinte.
 - **`escolherAcao` não joga raça.** O bot recebe cartas e não faz nada com elas até o Plano 4 (spec §7).
+- ⚠️ **A carta de raça semeada (`r-<jogadorId>`) nunca saiu do baralho.** No instante em que `jogarCarta` a substituir, ela cai no cemitério e passa a entrar no reembaralho — o baralho **cresce uma carta que nunca foi distribuída**. Inalcançável hoje (a mão de abertura só tem monstro/sala vazia, então `jogarCarta` sempre bate no guard "só carta de raça"), mas vira real no Plano 4, quando raça entrar no monte. Achado da revisão final da branch.
+- ⚠️ **A tensão do spec §4.3 ainda não é observável.** O humano abre com mão 4 / limite 4 (a raça do construtor já está em jogo) e os bots com 4/5. O efeito desenhado — todos começam Humano no limite 5, e **especializar** é o que te empurra para cima do limite — só aparece quando o construtor perder o seletor de raça, no Plano 4. O Plano 3 não trava nada por causa disso (ninguém abre **acima** do limite).
 
 ---
 
