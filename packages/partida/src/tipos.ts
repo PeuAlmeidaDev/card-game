@@ -193,9 +193,4 @@ export interface EntradaJogador {
   readonly nome: string;
   readonly ehBot: boolean;
   readonly combatenteBase: Combatente;
-  /**
-   * Raça escolhida no construtor. `criarPartida` a transforma em carta já em
-   * jogo. Some no Plano 4, quando raça virar carta sacável do baralho.
-   */
-  readonly racaId?: string;
 }

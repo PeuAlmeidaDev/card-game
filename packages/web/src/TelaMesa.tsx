@@ -11,7 +11,7 @@ import type { AcaoNoFio, Catalogo, Escolhas, VistaDaPartida } from '@card-dungeo
  * domínio): o segundo tem `readonly itemIds`, e um `readonly string[]` não é
  * assinável ao `string[]` que o corpo da rota espera. Na borda vale o tipo da borda.
  */
-const ESCOLHAS_PADRAO: Escolhas = { racaId: 'elfo', classeId: 'guerreiro', itemIds: [] };
+const ESCOLHAS_PADRAO: Escolhas = { classeId: 'guerreiro', itemIds: [] };
 
 export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [] }: {
   readonly escolhas?: Escolhas;

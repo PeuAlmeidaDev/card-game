@@ -41,7 +41,7 @@ describe('POST /duelo', () => {
   it('monta o personagem das escolhas e duela (dado determinístico)', async () => {
     // Monstro FIXO injetado (desacopla do MONSTRO_PADRAO de produção, que pode ser tunado à vontade).
     const monstro = { forca: 4, vida: 18, habilidade: 7, agilidade: 4, level: 2 };
-    // Elfo+Guerreiro+Espada => {forca:6, vida:15, hab:7, agi:7, level:1}, dano 7.
+    // Guerreiro+Espada => {forca:6, vida:15, hab:7, agi:7, level:1}, dano 7.
     // Monstro {vida:18}. Jogador (a) tem +Agilidade => começa, sem rolagem de iniciativa.
     // T1 a: ataque 3 (<=7 acerto), esquiva 12 (não) -> 18-7=11
     // T2 b: ataque 8 (>7 erro)
@@ -52,7 +52,7 @@ describe('POST /duelo', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/duelo',
-      payload: { racaId: 'elfo', classeId: 'guerreiro', itemIds: ['espada'] },
+      payload: { classeId: 'guerreiro', itemIds: ['espada'] },
     });
     expect(res.statusCode).toBe(200);
     const body = res.json<ResultadoDuelo>();
@@ -76,7 +76,7 @@ describe('POST /duelo', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/duelo',
-      payload: { racaId: 'dragao', classeId: 'guerreiro', itemIds: [] },
+      payload: { classeId: 'dragao', itemIds: [] },
     });
     expect(res.statusCode).toBe(400);
     await app.close();
@@ -95,19 +95,48 @@ function criarDadoCiclico(valores: readonly number[]): RolarD12 {
 }
 
 describe('mesa', () => {
-  // Raça BASELINE (sem passiva) para os testes genéricos da mesa: o Elfo espia o
-  // topo, então com ele um `vasculhar` não resolve porta nenhuma.
-  const escolhas = { racaId: 'humano', classeId: 'guerreiro', itemIds: [] };
-  const escolhasVidente = { racaId: 'elfo', classeId: 'guerreiro', itemIds: [] };
+  // Todo mundo nasce Humano (o baseline, sem passiva): a raça é carta sacável, não
+  // escolha de menu. Quem precisa de uma raça na zona faz o que o jogador faz —
+  // ver `comRacaEmJogo`.
+  const escolhas = { classeId: 'guerreiro', itemIds: [] };
   const semEmbaralhar: Embaralhar = (itens) => [...itens];
+  // Embaralhamento DIRIGIDO: sobe as cartas de raça para o topo, então a mão
+  // inicial do humano nasce com uma de cada. É assim que um teste de borda
+  // alcança uma raça agora que ela não vem mais do construtor.
+  const ehRaca = (x: unknown): boolean =>
+    typeof x === 'object' && x !== null && (x as { tipo?: unknown }).tipo === 'raca';
+  const racasNoTopo: Embaralhar = (itens) => [
+    ...itens.filter((i) => ehRaca(i)),
+    ...itens.filter((i) => !ehRaca(i)),
+  ];
   // `[4, 12]` faz o combate progredir: o atacante acerta e o defensor falha a
   // esquiva. Com o dado sempre 1 o defensor SEMPRE esquiva (empate favorece o
   // defensor), ninguém toma dano e o combate só para no teto de MAX_TURNOS —
   // ~2000 rolagens dentro de uma requisição.
   const appDeJogo = () => buildApp({ rolar: criarDadoCiclico([4, 12]), embaralhar: semEmbaralhar });
+  const appDeJogoComRacas = () => buildApp({ rolar: criarDadoCiclico([4, 12]), embaralhar: racasNoTopo });
 
   const criar = async (app: ReturnType<typeof buildApp>, payload: typeof escolhas = escolhas) => {
     const res = await app.inject({ method: 'POST', url: '/api/partida', payload });
+    return res.json<VistaDaPartida>();
+  };
+
+  /**
+   * Põe uma raça na zona do humano pelo caminho REAL: a carta que ele sacou na mão
+   * inicial (com `racasNoTopo`) é jogada na mesa. Depende do app ter sido montado
+   * com `racasNoTopo` — sem isso a mão inicial não traz raça e o helper falha alto.
+   */
+  const comRacaEmJogo = async (app: ReturnType<typeof buildApp>, racaId: string) => {
+    const vista = await criar(app);
+    const carta = vista.suaMao.find((c) => c.tipo === 'raca' && c.racaId === racaId);
+    if (carta === undefined) {
+      throw new Error(`comRacaEmJogo: a mão inicial não trouxe a carta de ${racaId}`);
+    }
+    const res = await app.inject({
+      method: 'POST', url: `/api/partida/${vista.id}/acao`,
+      payload: { acao: { tipo: 'jogarCarta', cartaId: carta.id }, versao: vista.versao },
+    });
+    expect(res.statusCode).toBe(200);
     return res.json<VistaDaPartida>();
   };
 
@@ -164,11 +193,38 @@ describe('mesa', () => {
     await app.close();
   });
 
+  it('a mesa de produção nasce SEM raça em jogo e com folga na mão', async () => {
+    // O guard que impede o app de nascer morto, no lugar onde a config de produção
+    // de fato é montada. Se um dial for girado errado, o jogador nasce acima do
+    // limite: `vasculhar` é recusado e a única saída é entregar — um clique que
+    // existe, mas num turno que nunca deveria ter começado assim.
+    const app = buildApp({ embaralhar: semEmbaralhar });
+    const vista = await criar(app);
+
+    for (const j of vista.jogadores) {
+      expect(j.emJogo.raca).toBeNull();                       // todos começam Humano
+      expect(j.cartasNaMao).toBeLessThanOrEqual(j.limiteDeMao);
+    }
+    await app.close();
+  });
+
+  it('o baralho de produção TEM carta de raça — senão a mão nunca cresce', async () => {
+    // Sem isto a fatia 7 inteira continua dormente e nenhum outro teste acusaria:
+    // a mão só cresce por carta de raça sacada.
+    const app = buildApp({ embaralhar: semEmbaralhar });
+    const vista = await criar(app);
+
+    // 12 cartas por jogador (5 monstro + 3 sala vazia + 4 raça) × 4 assentos,
+    // menos as 4 da mão inicial de cada um.
+    expect(vista.cartasNoMonte).toBe(12 * 4 - 4 * 4);
+    await app.close();
+  });
+
   it('rejeita escolhas inválidas com 400', async () => {
     const app = buildApp();
     const res = await app.inject({
       method: 'POST', url: '/api/partida',
-      payload: { racaId: 'nao-existe', classeId: 'guerreiro', itemIds: [] },
+      payload: { classeId: 'nao-existe', itemIds: [] },
     });
     expect(res.statusCode).toBe(400);
     await app.close();
@@ -260,17 +316,19 @@ describe('mesa', () => {
   });
 
   it('uma partida com raça Anão resolve o combate com a passiva Casca de Pedra', async () => {
-    // Prova a borda inteira: obterRaca('anao') tem passivaCombate real (cartas),
-    // resolverRaca injetado nas deps da Mesa aplica ela ao humano.
+    // Prova a borda inteira, agora pelo caminho do jogador: a carta de Anão é
+    // sacada, jogada, e só então a passiva vale. obterRaca('anao') tem
+    // passivaCombate real (cartas), e o resolverRaca injetado nas deps da Mesa a
+    // aplica ao humano.
     // Monstro rápido e certeiro (agilidade/habilidade máximas) ataca primeiro.
     // dado[0]=1: ataque do monstro acerta (<=12). dado[1]=12: esquiva do humano
     // falha (12 > 1). Dano base = level(1)+forca(5) = 6; a passiva reduz o
     // PRIMEIRO dano sofrido no combate à metade -> 3. Vida do guerreiro Anão
     // (base 10 + guerreiro +5 = 15) cai para 12.
     const monstro = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 };
-    const app = buildApp({ rolar: filaDeDados([1, 12]), embaralhar: semEmbaralhar, monstro });
+    const app = buildApp({ rolar: filaDeDados([1, 12]), embaralhar: racasNoTopo, monstro });
 
-    const vista = await criar(app, { racaId: 'anao', classeId: 'guerreiro', itemIds: [] });
+    const vista = await comRacaEmJogo(app, 'anao');
     const abrePorta = await app.inject({
       method: 'POST', url: `/api/partida/${vista.id}/acao`,
       payload: { acao: { tipo: 'vasculhar' }, versao: vista.versao },
@@ -288,8 +346,8 @@ describe('mesa', () => {
   });
 
   it('o Elfo espia o topo em vez de resolver a porta', async () => {
-    const app = appDeJogo();
-    const vista = await criar(app, escolhasVidente);
+    const app = appDeJogoComRacas();
+    const vista = await comRacaEmJogo(app, 'elfo');
 
     const res = await app.inject({
       method: 'POST', url: `/api/partida/${vista.id}/acao`,
@@ -310,8 +368,8 @@ describe('mesa', () => {
   });
 
   it('encarar a carta espiada resolve a porta', async () => {
-    const app = appDeJogo();
-    const vista = await criar(app, escolhasVidente);
+    const app = appDeJogoComRacas();
+    const vista = await comRacaEmJogo(app, 'elfo');
     const espiou = await app.inject({
       method: 'POST', url: `/api/partida/${vista.id}/acao`,
       payload: { acao: { tipo: 'vasculhar' }, versao: vista.versao },
@@ -334,8 +392,8 @@ describe('mesa', () => {
     // O achado A3 do review: a espiada não loga, então sem `versaoDe` a versão
     // ficava parada, o guard não disparava e o reducer respondia 400 — a única
     // ação da mesa que puniria um duplo-clique com erro vermelho.
-    const app = appDeJogo();
-    const vista = await criar(app, escolhasVidente);
+    const app = appDeJogoComRacas();
+    const vista = await comRacaEmJogo(app, 'elfo');
     const url = `/api/partida/${vista.id}/acao`;
     const payload = { acao: { tipo: 'vasculhar' }, versao: vista.versao };
 

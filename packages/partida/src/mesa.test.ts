@@ -258,6 +258,8 @@ describe('partida completa', () => {
 
 describe('passiva da raça no combate da Mesa', () => {
   it('aplica a passiva do lutador ao criar o combate', () => {
+    // A raça entra pela ZONA (é lá que `jogarCarta` a deixa), nunca pela entrada
+    // do jogador — a mesa nasce sem raça nenhuma.
     // resolvedor fake: só o anão tem passiva, que reduz o 1º dano sofrido à metade
     const metade: PassivaCombate = {
       id: 'fake-metade',
@@ -270,7 +272,7 @@ describe('passiva da raça no combate da Mesa', () => {
       racaId === 'anao' ? { passivaCombate: metade, espiaTopo: false } : undefined;
 
     const humano: EntradaJogador = {
-      id: 'p1', nome: 'Você', ehBot: false, racaId: 'anao',
+      id: 'p1', nome: 'Você', ehBot: false,
       combatenteBase: { forca: 3, vida: 20, habilidade: 8, agilidade: 1, level: 1 },
     };
     const bot: EntradaJogador = {
@@ -289,7 +291,14 @@ describe('passiva da raça no combate da Mesa', () => {
       resolverRaca,
     };
 
-    let estado = criarPartida('m1', [humano, bot], { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' }] }, { embaralhar: deps.embaralhar });
+    const nascida = criarPartida('m1', [humano, bot], { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' }] }, { embaralhar: deps.embaralhar });
+    // A carta de Anão já na zona — o mesmo lugar onde `jogarCarta` a deixaria.
+    let estado: EstadoPartida = {
+      ...nascida,
+      jogadores: nascida.jogadores.map((j) => (
+        j.id === 'p1' ? { ...j, emJogo: { raca: raca('r-anao', 'anao') } } : j
+      )),
+    };
     estado = aplicarAcao(estado, { tipo: 'vasculhar', jogadorId: 'p1' }, deps).estado;
     const depois = aplicarAcao(estado, { tipo: 'esquivar', jogadorId: 'p1' }, deps).estado;
 
@@ -559,12 +568,13 @@ describe('vasculhar — carta de raça', () => {
   });
 });
 
-describe('a raça vem da ZONA EM JOGO, não da entrada', () => {
-  it('esvaziar a zona tira a passiva do combate', () => {
-    // Mutação: mesma entrada (`racaId: 'anao'`), mesmas rolagens — só a zona muda.
-    // Com a raça em jogo o dano de 6 cai para 3 (vida 20 → 17); com a zona vazia
-    // o dano é cheio (vida 20 → 14). Se a raça ainda viesse da entrada, os dois
-    // números seriam iguais e este teste não teria como falhar.
+describe('a raça vem da ZONA EM JOGO', () => {
+  it('a zona cheia corta o dano pela metade; a zona vazia deixa o dano cheio', () => {
+    // Mutação: as MESMAS entradas e as mesmas rolagens — só a zona muda. Com a
+    // raça em jogo o dano de 6 cai para 3 (vida 20 → 17); com a zona vazia o dano
+    // é cheio (vida 20 → 14). Se a passiva viesse de qualquer outro lugar (da
+    // entrada do jogador, como já veio), os dois números seriam iguais e este
+    // teste não teria como falhar.
     const metade: PassivaCombate = {
       id: 'fake-metade',
       aoSofrerDano: (dano, ctx) =>
@@ -572,31 +582,35 @@ describe('a raça vem da ZONA EM JOGO, não da entrada', () => {
           ? { dano, estado: ctx.estado }
           : { dano: Math.floor(dano / 2), estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } },
     };
-    const comRaca: readonly EntradaJogador[] = [
-      { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base, racaId: 'anao' },
-      { id: 'p2', nome: 'Bot 1', ehBot: true, combatenteBase: base },
-    ];
     // monstro rápido (ataca primeiro) e forte, para o 1º golpe cair no humano
     const monstroForte: Combatente = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 };
-    const depsAnao = {
-      rolar: filaDeDados([1, 12]),   // monstro acerta; jogador falha a esquiva
-      embaralhar: semEmbaralhar,
-      monstro: monstroForte,
-      resolverRaca: (racaId: string | undefined) =>
-        racaId === 'anao' ? { passivaCombate: metade, espiaTopo: false } : undefined,
-    };
     const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const }] };
 
-    const p = criarPartida('m1', comRaca, soMonstro, { embaralhar: semEmbaralhar });
-    const semZona = {
-      ...p,
-      jogadores: p.jogadores.map((j) => (j.id === 'p1' ? { ...j, emJogo: { raca: null } } : j)),
+    const vidaApos = (comRacaNaZona: boolean): number | undefined => {
+      const depsAnao = {
+        rolar: filaDeDados([1, 12]),   // monstro acerta; jogador falha a esquiva
+        embaralhar: semEmbaralhar,
+        monstro: monstroForte,
+        resolverRaca: (racaId: string | undefined) =>
+          racaId === 'anao' ? { passivaCombate: metade, espiaTopo: false } : undefined,
+      };
+      const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+      const inicial: EstadoPartida = comRacaNaZona
+        ? {
+            ...p,
+            jogadores: p.jogadores.map((j) => (
+              j.id === 'p1' ? { ...j, emJogo: { raca: raca('r1', 'anao') } } : j
+            )),
+          }
+        : p;
+
+      const comCombate = aplicarAcao(inicial, { tipo: 'vasculhar', jogadorId: 'p1' }, depsAnao).estado;
+      const depois = aplicarAcao(comCombate, { tipo: 'esquivar', jogadorId: 'p1' }, depsAnao).estado;
+      return depois.combate?.estado.jogador.vida;
     };
 
-    const comCombate = aplicarAcao(semZona, { tipo: 'vasculhar', jogadorId: 'p1' }, depsAnao).estado;
-    const depois = aplicarAcao(comCombate, { tipo: 'esquivar', jogadorId: 'p1' }, depsAnao).estado;
-
-    expect(depois.combate?.estado.jogador.vida).toBe(14);
+    expect(vidaApos(true)).toBe(17);
+    expect(vidaApos(false)).toBe(14);
   });
 });
 
@@ -1067,9 +1081,9 @@ describe('a config de PRODUÇÃO não pode nascer travada', () => {
     composicaoPorJogador: COMPOSICAO_POR_JOGADOR,
     maoInicial: MAO_INICIAL_PADRAO,
   };
-  // A mesa que o `server` monta: 1 humano com a raça do construtor + 3 bots sem raça.
+  // A mesa que o `server` monta: 1 humano + 3 bots, todos começando sem raça.
   const mesaDeProducao: readonly EntradaJogador[] = [
-    { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base, racaId: 'elfo' },
+    { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base },
     { id: 'p2', nome: 'Bot 1', ehBot: true, combatenteBase: base },
     { id: 'p3', nome: 'Bot 2', ehBot: true, combatenteBase: base },
     { id: 'p4', nome: 'Bot 3', ehBot: true, combatenteBase: base },
@@ -1087,11 +1101,15 @@ describe('a config de PRODUÇÃO não pode nascer travada', () => {
   });
 
   it('nascer acima do limite deixaria o jogador SEM nenhuma ação legal', () => {
-    // O porquê do teste acima, escrito como comportamento. Com um a mais na mão
+    // O porquê do teste acima, escrito como comportamento. Com DOIS a mais na mão
     // inicial, o humano não pode vasculhar (recusado) e não pode jogar carta
-    // nenhuma (o baralho de produção não tem raça) — tela morta no primeiro clique.
+    // nenhuma (esta composição não tem raça) — tela morta no primeiro clique.
+    //
+    // `+ 2`, não `+ 1`: sem raça em jogo o limite é 5 (`LIMITE_BASE_DE_MAO` mais o
+    // bônus de quem está sem especialização), então 5 cartas ficariam NO teto, e
+    // o teste passaria por não estourar nada — falhando pelo motivo errado.
     const p = criarPartida('m1', mesaDeProducao,
-      { ...producao, maoInicial: MAO_INICIAL_PADRAO + 1 }, { embaralhar: semEmbaralhar });
+      { ...producao, maoInicial: MAO_INICIAL_PADRAO + 2 }, { embaralhar: semEmbaralhar });
     const humano = p.jogadores[0];
 
     expect(humano!.mao.length).toBeGreaterThan(limiteDeMao(humano!));

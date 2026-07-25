@@ -19,11 +19,15 @@ import type {
 } from '@card-dungeon/partida';
 
 /**
- * Corpo do POST /api/duelo: as escolhas do jogador (ids). Restrito ao tipo de
- * domínio via `satisfies` — o `personagem` continua a fonte única do tipo.
+ * Corpo do POST /api/duelo e /api/partida: as escolhas do jogador (ids).
+ * Restrito ao tipo de domínio via `satisfies` — o `personagem` continua a fonte
+ * única do tipo.
+ *
+ * **Sem `racaId`:** desde a fatia 7 a raça não é escolha de menu — é carta que se
+ * saca do baralho e se joga na mesa. Manter o campo aqui deixaria um dado que o
+ * cliente é obrigado a mandar e o servidor ignora: um tipo que mente no fio.
  */
 export const escolhasSchema = z.object({
-  racaId: z.string(),
   classeId: z.string(),
   itemIds: z.array(z.string()),
 }) satisfies z.ZodType<EscolhasPersonagem>;

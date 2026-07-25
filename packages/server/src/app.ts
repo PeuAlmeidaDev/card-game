@@ -3,9 +3,9 @@ import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import { resolverDuelo, type RolarD12, type Combatente } from '@card-dungeon/motor';
 import { contrato } from '@card-dungeon/shared';
 import { CATALOGO, MONSTRO_PADRAO, resolverEscolhas, montarCombatente } from '@card-dungeon/personagem';
-import { obterRaca } from '@card-dungeon/cartas';
+import { RACAS_SACAVEIS, obterRaca } from '@card-dungeon/cartas';
 import {
-  AcaoInvalida, COMPOSICAO_POR_JOGADOR, MAO_INICIAL_PADRAO, aplicarAcao, avancarBots, criarPartida,
+  AcaoInvalida, MAO_INICIAL_PADRAO, aplicarAcao, avancarBots, criarPartida, montarComposicao,
   projetarPara, versaoDe, type Embaralhar, type EntradaJogador, type EstadoPartida,
 } from '@card-dungeon/partida';
 import { initServer } from '@ts-rest/fastify';
@@ -14,6 +14,16 @@ import { criarEmbaralhamentoReal } from './embaralhar';
 import { criarRepositorio } from './repositorio';
 
 export const PATENTE_ALVO_PADRAO = 10;
+
+/**
+ * Baralho de produção (spec §8): 5 monstros · 3 salas vazias · **uma carta para
+ * cada raça sacável**, por jogador. Numa mesa de 4 isso dá 48 cartas com 4 cópias
+ * de cada raça — a repetição vem da multiplicação por assento, não daqui.
+ *
+ * Montado no `server` porque é aqui que catálogo e mesa se encontram: `partida`
+ * não conhece `cartas` de propósito, e as regras não devem conhecer.
+ */
+const COMPOSICAO_DE_PRODUCAO = montarComposicao(5, 3, RACAS_SACAVEIS.map((r) => r.id));
 
 /**
  * Quem está agindo. Enquanto não houver contas, a mesa tem exatamente um humano
@@ -79,7 +89,7 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
     duelo: async ({ body }) => {
       const resolvido = resolverEscolhas(CATALOGO, body);
       if (!resolvido) {
-        return { status: 400 as const, body: { erro: 'raça, classe ou item inexistente' } };
+        return { status: 400 as const, body: { erro: 'classe ou item inexistente' } };
       }
       const jogador = montarCombatente(resolvido.classe, resolvido.itens);
       return { status: 200 as const, body: resolverDuelo(jogador, monstro, rolar) };
@@ -88,19 +98,18 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
     criarPartida: async ({ body }) => {
       const resolvido = resolverEscolhas(CATALOGO, body);
       if (!resolvido) {
-        return { status: 400 as const, body: { erro: 'raça, classe ou item inexistente' } };
+        return { status: 400 as const, body: { erro: 'classe ou item inexistente' } };
       }
       const humano: EntradaJogador = {
         id: randomUUID(),
         nome: 'Você',
         ehBot: false,
-        racaId: resolvido.racaId,
         combatenteBase: montarCombatente(resolvido.classe, resolvido.itens),
       };
       const estado = criarPartida(
         randomUUID(),
         [humano, ...montarBots()],
-        { patenteAlvo: PATENTE_ALVO_PADRAO, composicaoPorJogador: COMPOSICAO_POR_JOGADOR, maoInicial: MAO_INICIAL_PADRAO },
+        { patenteAlvo: PATENTE_ALVO_PADRAO, composicaoPorJogador: COMPOSICAO_DE_PRODUCAO, maoInicial: MAO_INICIAL_PADRAO },
         { embaralhar },
       );
       repositorio.salvar(estado);
