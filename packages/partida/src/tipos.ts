@@ -17,6 +17,22 @@ export type ReceitaCarta =
  */
 export type CartaPorta = ReceitaCarta & { readonly id: string };
 
+/**
+ * Uma carta de raça como instância. O slot da zona em jogo aceita SÓ esta: tipar
+ * o slot com `CartaPorta` deixaria um monstro entrar em jogo como se fosse raça,
+ * e a checagem viraria runtime em vez de compilação.
+ */
+export type CartaDeRaca = Extract<CartaPorta, { readonly tipo: 'raca' }>;
+
+/**
+ * Zona ABERTA do jogador: o que está na mesa, à vista de todos. Um slot nesta
+ * fatia; os 5 de equipamento (bible §5) encaixam aqui depois, sem redesenho.
+ * `raca: null` = Humano baseline — a ausência de especialização É a linha zero.
+ */
+export interface ZonaEmJogo {
+  readonly raca: CartaDeRaca | null;
+}
+
 /** Embaralhamento injetado (aleatoriedade na borda). */
 export type Embaralhar = <T>(itens: readonly T[]) => T[];
 
@@ -28,8 +44,10 @@ export interface JogadorNaMesa {
   readonly combatenteBase: Combatente;
   readonly patente: number;
   readonly derrotas: number;
-  /** Id da raça escolhida — resolve a passiva de combate. Ausente = sem raça (bots). */
-  readonly racaId?: string;
+  /** Zona OCULTA: só o dono vê o conteúdo. A projeção publica só a contagem. */
+  readonly mao: readonly CartaPorta[];
+  /** Zona ABERTA. É daqui que sai a raça do lutador — não mais da criação da partida. */
+  readonly emJogo: ZonaEmJogo;
 }
 
 /**
@@ -129,5 +147,9 @@ export interface EntradaJogador {
   readonly nome: string;
   readonly ehBot: boolean;
   readonly combatenteBase: Combatente;
+  /**
+   * Raça escolhida no construtor. `criarPartida` a transforma em carta já em
+   * jogo. Some no Plano 4, quando raça virar carta sacável do baralho.
+   */
   readonly racaId?: string;
 }

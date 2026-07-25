@@ -1,6 +1,7 @@
 export type {
-  CartaPorta, ReceitaCarta, Embaralhar, InfoRaca, JogadorNaMesa, PosicaoFinal, EventoDaMesa, AcaoDaMesa,
-  CombateNaMesa, EspiadaPendente, EstadoPartida, VistaDaPartida, ConfigPartida, EntradaJogador,
+  CartaPorta, CartaDeRaca, ReceitaCarta, Embaralhar, InfoRaca, JogadorNaMesa, ZonaEmJogo, PosicaoFinal,
+  EventoDaMesa, AcaoDaMesa, CombateNaMesa, EspiadaPendente, EstadoPartida, VistaDaPartida, ConfigPartida,
+  EntradaJogador,
 } from './tipos';
 export { montarComposicao, COMPOSICAO_POR_JOGADOR, comprarCarta, tirarDoTopo } from './baralho';
 export { criarPartida, aplicarAcao, avancarBots } from './mesa';

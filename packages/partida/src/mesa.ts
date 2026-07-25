@@ -24,7 +24,9 @@ export interface DepsMesa {
 
 /** Resolve a raça de um jogador (via o resolvedor injetado). Central para não repetir a chamada. */
 function racaDoLutador(deps: DepsMesa, jogador: JogadorNaMesa | undefined): InfoRaca | undefined {
-  return deps.resolverRaca?.(jogador?.racaId);
+  // A ZONA é a fonte: quem troca de raça no meio da partida (Task 6) muda de
+  // passiva na hora, sem nenhum campo paralelo para sincronizar.
+  return deps.resolverRaca?.(jogador?.emJogo.raca?.racaId);
 }
 
 /** A passiva de combate do jogador, `undefined` quando não há raça ou a raça não tem passiva. */
@@ -56,10 +58,13 @@ export function criarPartida(
     id: e.id,
     nome: e.nome,
     ehBot: e.ehBot,
-    racaId: e.racaId,
     combatenteBase: e.combatenteBase,
     patente: 1,
     derrotas: 0,
+    mao: [],
+    // A escolha do construtor entra como carta JÁ em jogo. O id `r-<jogador>` não
+    // colide com o `p-N` do baralho e é estável: esta carta nunca foi comprada.
+    emJogo: { raca: e.racaId === undefined ? null : { id: `r-${e.id}`, tipo: 'raca', racaId: e.racaId } },
   }));
 
   // Baralho da MESA: a composição por jogador multiplicada pelo tamanho da mesa.

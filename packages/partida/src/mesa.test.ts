@@ -81,6 +81,29 @@ describe('criarPartida', () => {
 
     expect(r.estado.cemiterio[0]?.id).toBe(topo?.id);
   });
+
+  it('todo jogador nasce com a mão vazia e sem raça em jogo', () => {
+    const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
+
+    expect(p.jogadores.map((j) => j.mao)).toEqual([[], []]);
+    expect(p.jogadores.map((j) => j.emJogo.raca)).toEqual([null, null]);
+  });
+
+  it('a raça escolhida na entrada nasce como carta JÁ em jogo', () => {
+    // A zona é a fonte única da raça. A escolha do construtor não fica num campo
+    // paralelo: ela entra como carta na mesa, do mesmo jeito que uma carta sacada
+    // vai entrar no Plano 4 — quando o server parar de mandar `racaId`, nada mais
+    // aqui muda.
+    const comRaca: readonly EntradaJogador[] = [
+      { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base, racaId: 'anao' },
+      { id: 'p2', nome: 'Bot 1', ehBot: true, combatenteBase: base },
+    ];
+    const p = criarPartida('m1', comRaca, config, { embaralhar: semEmbaralhar });
+
+    expect(p.jogadores[0]?.emJogo.raca).toMatchObject({ tipo: 'raca', racaId: 'anao' });
+    expect(p.jogadores[0]?.emJogo.raca?.id).toEqual(expect.any(String));
+    expect(p.jogadores[1]?.emJogo.raca).toBeNull();
+  });
 });
 
 const monstroPadrao: Combatente = { forca: 2, vida: 10, habilidade: 6, agilidade: 1, level: 1 };
@@ -594,5 +617,46 @@ describe('resolverCarta — carta de tipo novo', () => {
       .toThrow('resolverCarta: carta de raça ainda não tem mão para receber');
     expect(() => aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])))
       .not.toThrow(AcaoInvalida);
+  });
+});
+
+describe('a raça vem da ZONA EM JOGO, não da entrada', () => {
+  it('esvaziar a zona tira a passiva do combate', () => {
+    // Mutação: mesma entrada (`racaId: 'anao'`), mesmas rolagens — só a zona muda.
+    // Com a raça em jogo o dano de 6 cai para 3 (vida 20 → 17); com a zona vazia
+    // o dano é cheio (vida 20 → 14). Se a raça ainda viesse da entrada, os dois
+    // números seriam iguais e este teste não teria como falhar.
+    const metade: PassivaCombate = {
+      id: 'fake-metade',
+      aoSofrerDano: (dano, ctx) =>
+        ctx.estado.usos >= 1
+          ? { dano, estado: ctx.estado }
+          : { dano: Math.floor(dano / 2), estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } },
+    };
+    const comRaca: readonly EntradaJogador[] = [
+      { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base, racaId: 'anao' },
+      { id: 'p2', nome: 'Bot 1', ehBot: true, combatenteBase: base },
+    ];
+    // monstro rápido (ataca primeiro) e forte, para o 1º golpe cair no humano
+    const monstroForte: Combatente = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 };
+    const depsAnao = {
+      rolar: filaDeDados([1, 12]),   // monstro acerta; jogador falha a esquiva
+      embaralhar: semEmbaralhar,
+      monstro: monstroForte,
+      resolverRaca: (racaId: string | undefined) =>
+        racaId === 'anao' ? { passivaCombate: metade, espiaTopo: false } : undefined,
+    };
+    const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const }] };
+
+    const p = criarPartida('m1', comRaca, soMonstro, { embaralhar: semEmbaralhar });
+    const semZona = {
+      ...p,
+      jogadores: p.jogadores.map((j) => (j.id === 'p1' ? { ...j, emJogo: { raca: null } } : j)),
+    };
+
+    const comCombate = aplicarAcao(semZona, { tipo: 'vasculhar', jogadorId: 'p1' }, depsAnao).estado;
+    const depois = aplicarAcao(comCombate, { tipo: 'esquivar', jogadorId: 'p1' }, depsAnao).estado;
+
+    expect(depois.combate?.estado.jogador.vida).toBe(14);
   });
 });

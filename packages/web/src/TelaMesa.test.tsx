@@ -12,8 +12,8 @@ const vistaBase: VistaDaPartida = {
   voce: 'p1',
   versao: 1,
   jogadores: [
-    { id: 'p1', nome: 'Você', ehBot: false, patente: 1, derrotas: 0, combatenteBase: combatente },
-    { id: 'p2', nome: 'Bot 1', ehBot: true, patente: 2, derrotas: 1, combatenteBase: combatente },
+    { id: 'p1', nome: 'Você', ehBot: false, patente: 1, derrotas: 0, combatenteBase: combatente, mao: [], emJogo: { raca: null } },
+    { id: 'p2', nome: 'Bot 1', ehBot: true, patente: 2, derrotas: 1, combatenteBase: combatente, mao: [], emJogo: { raca: null } },
   ],
   vezDe: 'p1',
   patenteAlvo: 10,

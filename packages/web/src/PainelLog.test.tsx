@@ -6,8 +6,8 @@ import type { EventoDaMesa, JogadorNaMesa } from '@card-dungeon/shared';
 
 const combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
 const jogadores: readonly JogadorNaMesa[] = [
-  { id: 'p1', nome: 'Você', ehBot: false, patente: 1, derrotas: 0, combatenteBase: combatente },
-  { id: 'p2', nome: 'Bot 1', ehBot: true, patente: 1, derrotas: 0, combatenteBase: combatente },
+  { id: 'p1', nome: 'Você', ehBot: false, patente: 1, derrotas: 0, combatenteBase: combatente, mao: [], emJogo: { raca: null } },
+  { id: 'p2', nome: 'Bot 1', ehBot: true, patente: 1, derrotas: 0, combatenteBase: combatente, mao: [], emJogo: { raca: null } },
 ];
 
 afterEach(cleanup);
