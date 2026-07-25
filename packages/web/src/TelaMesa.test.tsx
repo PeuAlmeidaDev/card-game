@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, waitFor, cleanup } from '@testing-library/react';
+import { render, screen, waitFor, cleanup, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TelaMesa } from './TelaMesa';
 import { api } from './api';
-import type { VistaDaPartida } from '@card-dungeon/shared';
+import type { Catalogo, VistaDaPartida } from '@card-dungeon/shared';
 
 const combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
 
@@ -32,9 +32,16 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const abrirMesa = async (vista: VistaDaPartida) => {
+// Default cobre Orc (testes da mão, task 5) e Elfo (testes da Presciência, task 4)
+// sem cada teste ter que passar o catálogo — só quem precisa de OUTRA raça o faz.
+const RACAS_PADRAO: Catalogo['racas'] = [
+  { id: 'orc', nome: 'Orc', texto: '…' },
+  { id: 'elfo', nome: 'Elfo', texto: '…' },
+];
+
+const abrirMesa = async (vista: VistaDaPartida, racas: Catalogo['racas'] = RACAS_PADRAO) => {
   vi.spyOn(api, 'criarPartida').mockResolvedValue({ status: 200, body: vista } as never);
-  render(<TelaMesa />);
+  render(<TelaMesa racas={racas} />);
   await userEvent.click(screen.getByRole('button', { name: /nova partida/i }));
 };
 
@@ -58,6 +65,22 @@ describe('TelaMesa', () => {
     await abrirMesa(vistaComEspiada);
 
     expect(await screen.findByRole('button', { name: /vasculhar local/i })).toBeDisabled();
+  });
+
+  it('as ações de turno respeitam a MESMA guarda — vasculhar e mão bloqueiam juntos', async () => {
+    // `turnoParado` é fonte única: antes existiam duas expressões dizendo "é minha
+    // vez e o turno está parado", e elas já divergiam num termo. A asserção é
+    // CONJUNTA de propósito — quando a janela de interferência da próxima fatia
+    // virar um quarto estado bloqueante, esquecer um dos dois consumidores faz
+    // este teste falhar em vez de deixar um botão aceso numa hora em que o
+    // domínio recusa.
+    await abrirMesa({
+      ...vistaComEspiada,
+      suaMao: [{ id: 'p-9', tipo: 'raca', racaId: 'orc' }],
+    });
+
+    expect(await screen.findByRole('button', { name: 'Vasculhar local' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Jogar' })).toBeDisabled();
   });
 
   it('encarar manda manterCarta com a versão que está vendo', async () => {
@@ -89,9 +112,14 @@ describe('TelaMesa', () => {
   it('descreve corretamente a carta pressentida de cada tipo', async () => {
     // Ternário sobre união ABERTA mente: antes desta correção, uma carta de raça
     // era anunciada como "uma sala vazia" na única tela que existe para informar.
-    await abrirMesa({ ...vistaBase, espiada: { jogadorId: 'p1', carta: { id: 'p-9', tipo: 'raca', racaId: 'elfo' } } });
+    // Desde a task 4, a carta de raça é nomeada pelo nome (não mais "uma carta de
+    // raça" genérico) — por isso o teste passa o catálogo de raças e afirma o nome.
+    await abrirMesa(
+      { ...vistaBase, espiada: { jogadorId: 'p1', carta: { id: 'p-9', tipo: 'raca', racaId: 'elfo' } } },
+      [{ id: 'elfo', nome: 'Elfo', texto: 'Presciência: vê o perigo antes de encará-lo.' }],
+    );
 
-    expect(await screen.findByText(/pressente.*carta de raça/i)).toBeInTheDocument();
+    expect(await screen.findByText(/pressente.*carta de Elfo/i)).toBeInTheDocument();
   });
 
   it('sem espiada na vista, os botões da Presciência ficam desabilitados', async () => {
@@ -237,5 +265,131 @@ describe('TelaMesa', () => {
     expect(screen.getByText(/2º\s*—\s*Você/)).toBeInTheDocument();
     // com a partida encerrada não há mais o que clicar
     expect(screen.queryByRole('button', { name: /vasculhar local/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('TelaMesa — a mão', () => {
+  it('lista as cartas da sua mão, nomeando a raça', async () => {
+    await abrirMesa({
+      ...vistaBase,
+      suaMao: [{ id: 'p-1', tipo: 'monstro' }, { id: 'p-2', tipo: 'raca', racaId: 'orc' }],
+    });
+
+    expect(screen.getByText(/um monstro/)).toBeInTheDocument();
+    expect(screen.getByText(/uma carta de Orc/)).toBeInTheDocument();
+  });
+
+  it('só carta de raça tem botão de jogar', async () => {
+    await abrirMesa({
+      ...vistaBase,
+      suaMao: [{ id: 'p-1', tipo: 'monstro' }, { id: 'p-2', tipo: 'raca', racaId: 'orc' }],
+    });
+
+    expect(screen.getAllByRole('button', { name: 'Jogar' })).toHaveLength(1);
+  });
+
+  it('dentro do limite, entregar fica desabilitado', async () => {
+    // A caridade resolve um EXCEDENTE; doar por vontade própria é escolher a quem
+    // dar vantagem — o kingmaking que a regra do destino existe para matar. O
+    // domínio recusa; a tela não oferece.
+    await abrirMesa({ ...vistaBase, suaMao: [{ id: 'p-1', tipo: 'monstro' }] });
+
+    for (const b of screen.getAllByRole('button', { name: 'Entregar' })) {
+      expect(b).toBeDisabled();
+    }
+  });
+
+  it('acima do limite: avisa, habilita entregar e DESABILITA vasculhar', async () => {
+    // Espelha a recusa do domínio. Deixar o botão aceso só para o servidor
+    // responder 400 é ensinar o jogador a errar.
+    const mao = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => ({ id, tipo: 'monstro' as const }));
+    await abrirMesa({
+      ...vistaBase,
+      suaMao: mao,
+      jogadores: vistaBase.jogadores.map((j) => (
+        j.id === 'p1' ? { ...j, cartasNaMao: mao.length, limiteDeMao: 5 } : j
+      )),
+    });
+
+    expect(screen.getByRole('button', { name: 'Vasculhar local' })).toBeDisabled();
+    expect(screen.getAllByRole('button', { name: 'Entregar' })[0]).toBeEnabled();
+    expect(screen.getByRole('status')).toHaveTextContent(/acima do limite/i);
+  });
+
+  it('jogar uma carta manda a ação com o id DELA', async () => {
+    // O `cartaId` é o único campo livre do fio; mandar o id errado joga a carta
+    // errada, e com duas cópias da mesma raça na mão isso é invisível na tela.
+    const agir = vi.spyOn(api, 'agir').mockResolvedValue({ status: 200, body: vistaBase } as never);
+    await abrirMesa({ ...vistaBase, suaMao: [{ id: 'p-9', tipo: 'raca', racaId: 'orc' }] });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Jogar' }));
+
+    // Estilo `toHaveBeenCalledWith` com objeto exato (não `objectContaining`) para
+    // seguir a convenção já usada no resto do arquivo — `objectContaining` aninhado
+    // tipa como `any` e reprova o `no-unsafe-assignment` do lint da raiz.
+    expect(agir).toHaveBeenCalledWith({
+      params: { id: 'm1' },
+      body: { acao: { tipo: 'jogarCarta', cartaId: 'p-9' }, versao: 1 },
+    });
+  });
+
+  it('entregar uma carta manda a ação com o id DELA', async () => {
+    // Simétrico ao teste de "Jogar" acima, e mais grave: mandar o id errado aqui
+    // não joga a carta errada, DOA ao adversário uma carta que o jogador não
+    // escolheu — sem volta. Mão acima do limite para o botão estar habilitado
+    // (achado 3 do review final: este clique não tinha teste nenhum).
+    const agir = vi.spyOn(api, 'agir').mockResolvedValue({ status: 200, body: vistaBase } as never);
+    const mao = [
+      ...['a', 'b', 'c', 'd', 'e'].map((id) => ({ id, tipo: 'monstro' as const })),
+      { id: 'p-alvo', tipo: 'raca' as const, racaId: 'orc' },
+    ];
+    await abrirMesa({
+      ...vistaBase,
+      suaMao: mao,
+      jogadores: vistaBase.jogadores.map((j) => (
+        j.id === 'p1' ? { ...j, cartasNaMao: mao.length, limiteDeMao: 5 } : j
+      )),
+    });
+
+    // Escopa pela carta-alvo (a única de Orc), não por índice: com cinco cópias
+    // idênticas de "um monstro" na lista, `getAllByRole('button', ...)[n]` afirmaria
+    // a ordem do DOM, não QUAL carta foi clicada.
+    const linhaDaCartaAlvo = (await screen.findByText(/carta de Orc/)).closest('li');
+    if (linhaDaCartaAlvo === null) throw new Error('linha da carta-alvo não encontrada no DOM');
+    await userEvent.click(within(linhaDaCartaAlvo).getByRole('button', { name: 'Entregar' }));
+
+    expect(agir).toHaveBeenCalledWith({
+      params: { id: 'm1' },
+      body: { acao: { tipo: 'entregarCarta', cartaId: 'p-alvo' }, versao: 1 },
+    });
+  });
+
+  it('mostra a raça em jogo de cada jogador na lista', async () => {
+    await abrirMesa({
+      ...vistaBase,
+      jogadores: vistaBase.jogadores.map((j) => (
+        j.id === 'p2' ? { ...j, emJogo: { raca: { id: 'r1', tipo: 'raca', racaId: 'orc' } } } : j
+      )),
+    });
+
+    expect(screen.getByText(/Orc/)).toBeInTheDocument();
+  });
+
+  it('partida terminada na vez do humano: jogar carta fica desabilitado', async () => {
+    // Achado do review: `fecharCombate` termina a partida sem passar a vez, então
+    // `vezDe` continua no vencedor — se a guarda da mão não olhar o desfecho, o
+    // botão "Jogar" fica aceso no exato momento da vitória. O clique manda a ação,
+    // o servidor recusa (a partida já terminou) e a tela da vitória ganha um alerta.
+    await abrirMesa({
+      ...vistaBase,
+      desfecho: 'terminada',
+      classificacao: [
+        { jogadorId: 'p1', posicao: 1 },
+        { jogadorId: 'p2', posicao: 2 },
+      ],
+      suaMao: [{ id: 'p-9', tipo: 'raca', racaId: 'orc' }],
+    });
+
+    expect(await screen.findByRole('button', { name: 'Jogar' })).toBeDisabled();
   });
 });

@@ -28,14 +28,19 @@ function json(data: unknown): Response {
   });
 }
 
+/** O que o cliente mandou pela rede, para os testes que afirmam o CORPO enviado. */
+const chamadas: { readonly url: string; readonly init?: RequestInit }[] = [];
+
 // O cliente ts-rest usa fetch por baixo e lê status + content-type do Response,
 // por isso o mock devolve um Response de verdade (não um objeto só com .json()).
 function mockFetch(): void {
+  chamadas.length = 0;
   vi.stubGlobal(
     'fetch',
-    vi.fn((url: string) =>
-      Promise.resolve(url.includes('/api/catalogo') ? json(catalogo) : json(resultado)),
-    ),
+    vi.fn((url: string, init?: RequestInit) => {
+      chamadas.push({ url, init });
+      return Promise.resolve(url.includes('/api/catalogo') ? json(catalogo) : json(resultado));
+    }),
   );
 }
 
@@ -48,10 +53,28 @@ describe('App', () => {
     expect(screen.getByText(/Vida 15/)).toBeInTheDocument();
   });
 
-  it('mostra o texto da passiva da raça selecionada', async () => {
+  it('não tem seletor de raça: a raça é carta sacável, não escolha de menu', async () => {
     mockFetch();
     render(<App />);
-    expect(await screen.findByText(/Casca de Pedra/i)).toBeInTheDocument();
+    await screen.findByText(/Força/); // espera o catálogo carregar
+    expect(screen.queryByLabelText(/Raça/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Casca de Pedra/i)).not.toBeInTheDocument();
+  });
+
+  it('manda só classe e itens no corpo do duelo', async () => {
+    // O `racaId` saiu do contrato: se o construtor continuasse mandando, seria um
+    // campo que o cliente é obrigado a preencher e o servidor ignora.
+    mockFetch();
+    render(<App />);
+    await screen.findByText(/Força/);
+    await userEvent.click(screen.getByRole('button', { name: 'Duelar' }));
+    await screen.findByText("Vitória de 'a' em 3 turnos");
+
+    const enviado = chamadas.find((c) => c.url.includes('/api/duelo'))?.init?.body;
+    if (typeof enviado !== 'string') {
+      throw new Error('o duelo não chegou a mandar um corpo JSON');
+    }
+    expect(JSON.parse(enviado) as unknown).toEqual({ classeId: 'guerreiro', itemIds: [] });
   });
 
   it('ao clicar em Duelar mostra o desfecho', async () => {

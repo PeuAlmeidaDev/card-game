@@ -67,26 +67,13 @@ describe('criarPartida', () => {
   });
 
   it('todo jogador nasce com a mão vazia e sem raça em jogo', () => {
+    // Ninguém nasce especializado: a zona só se preenche por `jogarCarta`. Era
+    // aqui que a escolha do construtor era semeada — e ela semeava uma carta que
+    // nunca tinha saído do baralho, então trocá-la fazia o baralho CRESCER 1.
     const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
 
     expect(p.jogadores.map((j) => j.mao)).toEqual([[], []]);
     expect(p.jogadores.map((j) => j.emJogo.raca)).toEqual([null, null]);
-  });
-
-  it('a raça escolhida na entrada nasce como carta JÁ em jogo', () => {
-    // A zona é a fonte única da raça. A escolha do construtor não fica num campo
-    // paralelo: ela entra como carta na mesa, do mesmo jeito que uma carta sacada
-    // vai entrar no Plano 4 — quando o server parar de mandar `racaId`, nada mais
-    // aqui muda.
-    const comRaca: readonly EntradaJogador[] = [
-      { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base, racaId: 'anao' },
-      { id: 'p2', nome: 'Bot 1', ehBot: true, combatenteBase: base },
-    ];
-    const p = criarPartida('m1', comRaca, config, { embaralhar: semEmbaralhar });
-
-    expect(p.jogadores[0]?.emJogo.raca).toMatchObject({ tipo: 'raca', racaId: 'anao' });
-    expect(p.jogadores[0]?.emJogo.raca?.id).toEqual(expect.any(String));
-    expect(p.jogadores[1]?.emJogo.raca).toBeNull();
   });
 
   it('distribui a mão inicial do topo do baralho', () => {

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { escolhasSchema, contrato, acaoDaMesaSchema, acaoRequisicaoSchema } from './index';
 
-const valido = { racaId: 'elfo', classeId: 'ladino', itemIds: ['espada'] };
+const valido = { classeId: 'ladino', itemIds: ['espada'] };
 
 describe('contrato', () => {
   it('expõe o catálogo como GET /api/catalogo', () => {
@@ -17,7 +17,7 @@ describe('contrato', () => {
 });
 
 describe('escolhasSchema', () => {
-  it('valida escolhas com raça, classe e itens', () => {
+  it('valida escolhas com classe e itens', () => {
     expect(escolhasSchema.safeParse(valido).success).toBe(true);
   });
 
@@ -25,8 +25,12 @@ describe('escolhasSchema', () => {
     expect(escolhasSchema.safeParse({ ...valido, itemIds: [] }).success).toBe(true);
   });
 
-  it('rejeita quando falta a raça', () => {
-    expect(escolhasSchema.safeParse({ classeId: 'ladino', itemIds: [] }).success).toBe(false);
+  it('escolhasSchema não pede mais racaId — a raça virou carta sacável', () => {
+    expect(escolhasSchema.safeParse({ classeId: 'guerreiro', itemIds: [] }).success).toBe(true);
+  });
+
+  it('rejeita quando falta a classe', () => {
+    expect(escolhasSchema.safeParse({ itemIds: [] }).success).toBe(false);
   });
 
   it('rejeita itemIds que não é lista de strings', () => {

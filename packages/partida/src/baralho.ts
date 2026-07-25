@@ -1,9 +1,26 @@
 import type { CartaPorta, Embaralhar, ReceitaCarta } from './tipos';
 
-export function montarComposicao(nMonstros: number, nSalasVazias: number): ReceitaCarta[] {
+/**
+ * Composição de um baralho: quantos monstros, quantas salas vazias e **uma carta
+ * para cada id de raça** recebido.
+ *
+ * Os ids entram por parâmetro porque `partida` não conhece o catálogo — quem sabe
+ * quais raças existem é o pacote `cartas`, e quem as injeta é a borda. Manter esse
+ * desconhecimento é o que deixa o pacote de regras testável sem catálogo nenhum.
+ *
+ * A REPETIÇÃO de raças no baralho (spec §8) não acontece aqui: `criarPartida`
+ * multiplica esta composição pelo número de assentos, então 4 ids numa mesa de 4
+ * viram 4 cópias de cada raça.
+ */
+export function montarComposicao(
+  nMonstros: number,
+  nSalasVazias: number,
+  racaIds: readonly string[] = [],
+): ReceitaCarta[] {
   return [
     ...Array.from({ length: nMonstros }, (): ReceitaCarta => ({ tipo: 'monstro' })),
     ...Array.from({ length: nSalasVazias }, (): ReceitaCarta => ({ tipo: 'salaVazia' })),
+    ...racaIds.map((racaId): ReceitaCarta => ({ tipo: 'raca', racaId })),
   ];
 }
 

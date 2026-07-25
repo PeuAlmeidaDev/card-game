@@ -17,18 +17,17 @@ describe('CATALOGO', () => {
 });
 
 describe('resolverEscolhas', () => {
-  it('resolverEscolhas devolve o racaId validado + classe + itens', () => {
-    const r = resolverEscolhas(CATALOGO, { racaId: 'orc', classeId: 'guerreiro', itemIds: ['espada'] });
-    expect(r?.racaId).toBe('orc');
+  it('resolverEscolhas devolve a classe + os itens (a raça não é mais escolha)', () => {
+    const r = resolverEscolhas(CATALOGO, { classeId: 'guerreiro', itemIds: ['espada'] });
     expect(r?.classe.id).toBe('guerreiro');
     expect(r?.itens.map((i) => i.id)).toEqual(['espada']);
   });
 
-  it('recusa racaId inexistente', () => {
-    expect(resolverEscolhas(CATALOGO, { racaId: 'xxx', classeId: 'guerreiro', itemIds: [] })).toBeNull();
+  it('devolve null se a classe não existe', () => {
+    expect(resolverEscolhas(CATALOGO, { classeId: 'xxx', itemIds: [] })).toBeNull();
   });
 
   it('devolve null se um item não existe', () => {
-    expect(resolverEscolhas(CATALOGO, { racaId: 'orc', classeId: 'guerreiro', itemIds: ['bazuca'] })).toBeNull();
+    expect(resolverEscolhas(CATALOGO, { classeId: 'guerreiro', itemIds: ['bazuca'] })).toBeNull();
   });
 });

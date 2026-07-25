@@ -18,14 +18,13 @@ export const MONSTRO_PADRAO: Combatente = { forca: 4, vida: 20, habilidade: 2, a
 
 export const CATALOGO: Catalogo = { base: BASE, racas: RACAS_PUBLICAS, classes: CLASSES, itens: ITENS };
 
-/** Valida os ids das escolhas. Devolve o racaId (para a passiva) + classe + itens (para os stats). */
+/** Valida os ids das escolhas. Devolve classe + itens (os stats do combatente). */
 export function resolverEscolhas(
   catalogo: Catalogo,
   escolhas: EscolhasPersonagem,
-): { racaId: string; classe: Classe; itens: Equipamento[] } | null {
-  const raca = catalogo.racas.find((r) => r.id === escolhas.racaId);
+): { classe: Classe; itens: Equipamento[] } | null {
   const classe = catalogo.classes.find((c) => c.id === escolhas.classeId);
-  if (!raca || !classe) return null;
+  if (!classe) return null;
 
   const itens: Equipamento[] = [];
   for (const id of escolhas.itemIds) {
@@ -33,5 +32,5 @@ export function resolverEscolhas(
     if (!item) return null;
     itens.push(item);
   }
-  return { racaId: raca.id, classe, itens };
+  return { classe, itens };
 }

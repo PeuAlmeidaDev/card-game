@@ -22,7 +22,6 @@ function descrever(r: ResultadoDuelo): string {
 
 export function App() {
   const [catalogo, setCatalogo] = useState<Catalogo | null>(null);
-  const [racaId, setRacaId] = useState('');
   const [classeId, setClasseId] = useState('');
   const [itemIds, setItemIds] = useState<string[]>([]);
   const [texto, setTexto] = useState('');
@@ -33,7 +32,6 @@ export function App() {
       if (resposta.status !== 200) return;
       const c = resposta.body;
       setCatalogo(c);
-      setRacaId(c.racas[0]?.id ?? '');
       setClasseId(c.classes[0]?.id ?? '');
     })();
   }, []);
@@ -49,7 +47,7 @@ export function App() {
 
   async function duelar(): Promise<void> {
     setTexto('Rolando os dados…');
-    const resposta = await api.duelo({ body: { racaId, classeId, itemIds } });
+    const resposta = await api.duelo({ body: { classeId, itemIds } });
     if (resposta.status === 200) {
       setTexto(descrever(resposta.body));
     } else {
@@ -60,16 +58,6 @@ export function App() {
   return (
     <main>
       <h1>card-dungeon — monte seu personagem</h1>
-
-      <label>
-        Raça{' '}
-        <select value={racaId} onChange={(e) => setRacaId(e.target.value)}>
-          {catalogo.racas.map((r) => (
-            <option key={r.id} value={r.id}>{r.nome}</option>
-          ))}
-        </select>
-      </label>
-      <p>{catalogo.racas.find((r) => r.id === racaId)?.texto}</p>
 
       <label>
         Classe{' '}
@@ -106,8 +94,11 @@ export function App() {
 
       {/* A mesa recebe as MESMAS escolhas do construtor acima — o servidor monta
           o combatente a partir delas, como já faz no duelo. Passar as escolhas
-          em vez de um personagem fixo é o que liga esta tela ao resto do jogo. */}
-      <TelaMesa escolhas={{ racaId, classeId, itemIds }} />
+          em vez de um personagem fixo é o que liga esta tela ao resto do jogo.
+
+          `racas` continua vindo do catálogo: não para ESCOLHER, e sim para a mesa
+          nomear as cartas de raça que aparecem na mão e no log. */}
+      <TelaMesa escolhas={{ classeId, itemIds }} racas={catalogo.racas} />
     </main>
   );
 }

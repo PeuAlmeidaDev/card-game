@@ -34,9 +34,11 @@ export function criarPartida(
     patente: 1,
     derrotas: 0,
     mao: [],
-    // A escolha do construtor entra como carta JÁ em jogo. O id `r-<jogador>` não
-    // colide com o `p-N` do baralho e é estável: esta carta nunca foi comprada.
-    emJogo: { raca: e.racaId === undefined ? null : { id: `r-${e.id}`, tipo: 'raca', racaId: e.racaId } },
+    // Todo mundo começa Humano: a raça agora é carta que se saca e se joga
+    // (`jogarCarta`). Nascer com uma raça em jogo era o andaime do construtor —
+    // e ele custava caro: a carta semeada nunca tinha saído do baralho, então
+    // trocá-la fazia o baralho CRESCER 1.
+    emJogo: { raca: null },
   }));
 
   // Baralho da MESA: a composição por jogador multiplicada pelo tamanho da mesa.

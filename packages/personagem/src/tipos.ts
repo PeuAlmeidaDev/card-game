@@ -29,9 +29,12 @@ export interface Catalogo {
   readonly itens: readonly Equipamento[];
 }
 
-/** Escolhas do jogador (corpo do POST). */
+/**
+ * Escolhas do jogador (corpo do POST). Só o que MONTA os stats: a raça saiu na
+ * fatia 7 porque virou carta sacável — ela entra na mesa por `jogarCarta`, não
+ * pelo construtor.
+ */
 export interface EscolhasPersonagem {
-  readonly racaId: string;
   readonly classeId: string;
   readonly itemIds: readonly string[];
 }

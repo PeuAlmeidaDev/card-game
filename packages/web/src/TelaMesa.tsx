@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api } from './api';
 import { PainelLog } from './PainelLog';
 import { descreverCarta } from './descreverCarta';
-import type { AcaoNoFio, Escolhas, VistaDaPartida } from '@card-dungeon/shared';
+import type { AcaoNoFio, Catalogo, Escolhas, VistaDaPartida } from '@card-dungeon/shared';
 
 /**
  * Usado quando a tela roda sozinha; o `App` passa as escolhas reais do construtor.
@@ -11,9 +11,12 @@ import type { AcaoNoFio, Escolhas, VistaDaPartida } from '@card-dungeon/shared';
  * domínio): o segundo tem `readonly itemIds`, e um `readonly string[]` não é
  * assinável ao `string[]` que o corpo da rota espera. Na borda vale o tipo da borda.
  */
-const ESCOLHAS_PADRAO: Escolhas = { racaId: 'elfo', classeId: 'guerreiro', itemIds: [] };
+const ESCOLHAS_PADRAO: Escolhas = { classeId: 'guerreiro', itemIds: [] };
 
-export function TelaMesa({ escolhas = ESCOLHAS_PADRAO }: { escolhas?: Escolhas }) {
+export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [] }: {
+  readonly escolhas?: Escolhas;
+  readonly racas?: Catalogo['racas'];
+}) {
   const [vista, definirVista] = useState<VistaDaPartida | null>(null);
   const [erro, definirErro] = useState<string | null>(null);
 
@@ -66,9 +69,26 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO }: { escolhas?: Escolhas }
   // A tela não precisa checar de quem é — se veio, é sua.
   const espiada = vista.espiada;
   const nomeDe = (id: string): string => vista.jogadores.find((j) => j.id === id)?.nome ?? id;
+  const nomeDaRaca = (id: string): string => racas.find((r) => r.id === id)?.nome ?? id;
   // A vida máxima do jogador é a do combatente base — a patente muda o dano, não a vida.
   // Do monstro só temos o valor corrente: a vista não carrega o máximo dele.
   const vidaMaxima = vista.jogadores.find((j) => j.id === vista.voce)?.combatenteBase.vida ?? null;
+  const eu = vista.jogadores.find((j) => j.id === vista.voce);
+  // O limite vem PRONTO da vista (`limiteDeMao` é publicado por jogador). Recalcular
+  // aqui seria reimplementar regra de jogo na UI — e ela divergiria no dia em que
+  // um item mexesse no teto.
+  const acimaDoLimite = eu !== undefined && vista.suaMao.length > eu.limiteDeMao;
+  // O turno está parado e é meu: a condição que TODA ação de turno compartilha.
+  // Escrita uma vez porque estados bloqueantes novos (a janela de interferência da
+  // próxima fatia) têm que entrar em UM lugar — duas cópias divergem em silêncio, e
+  // a que ficar para trás deixa um botão aceso numa hora em que o domínio recusa.
+  //
+  // O desfecho entra aqui porque `fecharCombate` termina a partida SEM passar a vez —
+  // sem este check, `minhaVez` continua true para o vencedor e o botão fica aceso no
+  // exato momento da vitória (o clique leva a um 400, já que `aplicarAcao` recusa tudo
+  // depois do fim).
+  const turnoParado = minhaVez && vista.desfecho === 'emAndamento'
+    && vista.combate === null && espiada === null;
 
   return (
     <section>
@@ -78,6 +98,8 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO }: { escolhas?: Escolhas }
         {vista.jogadores.map((j) => (
           <li key={j.id}>
             <strong>{j.nome}</strong> — patente {j.patente} · {j.derrotas} derrota(s)
+            {j.emJogo.raca !== null && ` · ${nomeDaRaca(j.emJogo.raca.racaId)}`}
+            {' · '}{j.cartasNaMao}/{j.limiteDeMao} cartas
             {j.id === vista.vezDe && ' ← jogando'}
           </li>
         ))}
@@ -107,13 +129,13 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO }: { escolhas?: Escolhas }
       ) : (
         <>
           {espiada !== null && (
-            <p>Você pressente {descreverCarta(espiada.carta)} adiante.</p>
+            <p>Você pressente {descreverCarta(espiada.carta, nomeDaRaca)} adiante.</p>
           )}
 
           <div>
             <button
               type="button"
-              disabled={!minhaVez || vista.combate !== null || espiada !== null}
+              disabled={!turnoParado || acimaDoLimite}
               onClick={() => void agir({ tipo: 'vasculhar' })}
             >
               Vasculhar local
@@ -153,7 +175,41 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO }: { escolhas?: Escolhas }
         </>
       )}
 
-      <PainelLog log={vista.log} jogadores={vista.jogadores} voce={vista.voce} />
+      <section>
+        <h3>Sua mão — {vista.suaMao.length} de {eu?.limiteDeMao ?? 0}</h3>
+        {acimaDoLimite && (
+          <p role="status">
+            Sua mão está acima do limite: entregue uma carta para encerrar o turno.
+          </p>
+        )}
+        <ul>
+          {vista.suaMao.map((carta) => (
+            <li key={carta.id}>
+              {descreverCarta(carta, nomeDaRaca)}{' '}
+              {/* Só raça entra em jogo nesta fatia — o domínio recusa o resto, e um
+                  botão que só serve para levar 400 ensina o jogador a errar. */}
+              {carta.tipo === 'raca' && (
+                <button
+                  type="button"
+                  disabled={!turnoParado}
+                  onClick={() => void agir({ tipo: 'jogarCarta', cartaId: carta.id })}
+                >
+                  Jogar
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={!turnoParado || !acimaDoLimite}
+                onClick={() => void agir({ tipo: 'entregarCarta', cartaId: carta.id })}
+              >
+                Entregar
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <PainelLog log={vista.log} jogadores={vista.jogadores} voce={vista.voce} racas={racas} />
 
       {erro !== null && <p role="alert">{erro}</p>}
     </section>

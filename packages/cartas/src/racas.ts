@@ -47,3 +47,15 @@ export interface RacaResumo {
 }
 
 export const RACAS_PUBLICAS: readonly RacaResumo[] = RACAS.map(({ id, nome, texto }) => ({ id, nome, texto }));
+
+/**
+ * As raças que existem **como carta** no baralho de Portais. O Humano fica de
+ * fora porque ele É a ausência de carta (`emJogo.raca === null`): uma carta de
+ * Humano poria na zona uma raça sem passiva e ainda derrubaria o bônus de mão de
+ * quem não tem raça — carta estritamente ruim, e pior, uma que contradiz a regra.
+ *
+ * Mora aqui, e não em quem monta o baralho, porque "quais raças são cartas" é
+ * conhecimento do catálogo. Na borda isso viraria um `filter(id !== 'humano')` —
+ * regra de jogo escrita no lugar errado.
+ */
+export const RACAS_SACAVEIS: readonly RacaResumo[] = RACAS_PUBLICAS.filter((r) => r.id !== 'humano');
