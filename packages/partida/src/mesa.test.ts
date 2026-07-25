@@ -1068,14 +1068,19 @@ describe('aplicarAcao — vasculhar com a mão estourada', () => {
   });
 });
 
-describe('a config de PRODUÇÃO não pode nascer travada', () => {
-  // Guard de fronteira, não de comportamento. `MAO_INICIAL_PADRAO` e
-  // `LIMITE_BASE_DE_MAO` são dials que o spec §8 diz que VÃO subir, e
-  // `COMPOSICAO_POR_JOGADOR` ganha carta de raça no Plano 4. Desde que o limite
-  // passou a ser IMPOSTO (a vez não passa acima dele), um dial mal girado não
-  // desbalanceia o jogo — ele MATA o app: o jogador nasce acima do limite,
-  // `vasculhar` é recusado, e a única saída (`entregarCarta`) ainda não tem
-  // botão. Este par de testes é o alarme que dispara aqui em vez de no navegador.
+describe('a composição BASELINE não pode nascer travada', () => {
+  // Guard de fronteira, não de comportamento — mas sobre a composição BASELINE do
+  // pacote `partida` (`COMPOSICAO_POR_JOGADOR`, sem carta de raça), não sobre a
+  // composição de PRODUÇÃO: essa mora em `packages/server/src/app.ts`
+  // (`COMPOSICAO_DE_PRODUCAO`, montada com `RACAS_SACAVEIS` porque é lá que
+  // catálogo e mesa se encontram) e tem o próprio alarme em
+  // `packages/server/src/app.test.ts` ("o baralho de produção TEM carta de
+  // raça"). `MAO_INICIAL_PADRAO` e `LIMITE_BASE_DE_MAO` são dials que o spec §8
+  // diz que VÃO subir. Desde que o limite passou a ser IMPOSTO (a vez não passa
+  // acima dele), um dial mal girado não desbalanceia o jogo — ele MATA o app: o
+  // jogador nasce acima do limite, `vasculhar` é recusado, e a única saída
+  // (`entregarCarta`) fica sendo o único clique legal. Este par de testes é o
+  // alarme que dispara aqui em vez de no navegador.
   const producao = {
     patenteAlvo: 10,
     composicaoPorJogador: COMPOSICAO_POR_JOGADOR,
