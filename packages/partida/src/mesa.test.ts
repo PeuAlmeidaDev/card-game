@@ -481,7 +481,7 @@ describe('aplicarAcao — espiada (Presciência)', () => {
     const p = { ...p0, monte: [salaVazia('v1')], cemiterio: [monstro('m1')] };
     const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])).estado;
     expect(comEspiada.monte).toEqual([]);                      // tirarDoTopo esvaziou o monte
-    expect(comEspiada.espiada?.carta.tipo).toBe('salaVazia');
+    expect(comEspiada.espiada?.carta).toEqual(salaVazia('v1'));
 
     const r = aplicarAcao(comEspiada, { tipo: 'empurrarCarta', jogadorId: 'p1' }, depsVidente([1])).estado;
     expect(r.combate).not.toBeNull();                          // a próxima às cegas foi o monstro
@@ -508,7 +508,7 @@ describe('aplicarAcao — espiada (Presciência)', () => {
     expect(() => aplicarAcao(comEspiada, { tipo: 'empurrarCarta', jogadorId: 'p1' }, depsVidente([1])))
       .toThrow('aplicarAcao: não há outra carta para comprar — a espiada tem que ser mantida');
     // e a espiada continua lá, resolvível por manterCarta
-    expect(comEspiada.espiada?.carta.tipo).toBe('salaVazia');
+    expect(comEspiada.espiada?.carta).toEqual(salaVazia('v1'));
   });
 
   it('recusa vasculhar de novo enquanto há espiada pendente', () => {
