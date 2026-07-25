@@ -1122,4 +1122,37 @@ describe('aplicarAcao — vasculhar com a mão estourada', () => {
 
     expect(() => aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]))).not.toThrow();
   });
+
+  it('sem raça em jogo, jogar a raça é NET-ZERO — a mão continua estourada', () => {
+    // Sem raça em jogo o limite é 5 (o bônus do Adaptável do Humano). Uma mão de
+    // 6 cartas (cinco avulsas + uma raça) excede em 1. Jogar a raça tira 1 carta
+    // da mão (6 → 5) MAS também derruba o próprio limite (5 → 4, a especialização
+    // custa o bônus): o excedente continua o mesmo — não é uma saída, ao
+    // contrário do caso em que o jogador já tem raça em jogo (teste acima), onde
+    // o limite já estava em 4 e só a mão encolhe.
+    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const semRacaEstourado: EstadoPartida = {
+      ...p0,
+      jogadores: p0.jogadores.map((j) => (
+        j.id === 'p1' ? { ...j, mao: [...cinco, raca('r9', 'orc')], emJogo: { raca: null } } : j
+      )),
+    };
+
+    const r = aplicarAcao(
+      semRacaEstourado, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r9' }, deps([]),
+    );
+
+    expect(r.estado.jogadores[0]?.mao).toHaveLength(5);
+    expect(r.estado.jogadores[0]?.emJogo.raca?.id).toBe('r9');
+    // Continua estourado: mão(5) > limite(4), agora que a raça está em jogo.
+    expect(() => aplicarAcao(r.estado, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])))
+      .toThrow('aplicarAcao: sua mão está acima do limite — entregue uma carta');
+
+    // `entregarCarta` continua sendo a saída que sempre funciona.
+    const restante = r.estado.jogadores[0]?.mao[0];
+    expect(restante).toBeDefined();
+    expect(() => aplicarAcao(
+      r.estado, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: restante!.id }, deps([]),
+    )).not.toThrow();
+  });
 });

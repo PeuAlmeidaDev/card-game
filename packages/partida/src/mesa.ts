@@ -424,8 +424,12 @@ function entregarCarta(
  * Põe uma carta de raça da mão na zona em jogo. A anterior vai para o cemitério:
  * a zona é ABERTA, então trocar de raça é jogada pública.
  *
- * A vez NÃO passa — jogar raça é decisão do próprio turno, e estando acima do
- * limite ela é uma das saídas (a outra, entregar).
+ * A vez NÃO passa — jogar raça é decisão do próprio turno. Estando acima do
+ * limite, jogar raça só é saída quando o jogador JÁ tem raça em jogo: a mão
+ * encolhe 1 e o limite (já 4) não se move. Sem raça em jogo é NET-ZERO — o
+ * limite era 5 e cai para 4 junto com a mão, o excedente não muda — porque a
+ * especialização derruba o próprio bônus que ela substitui. `entregarCarta`
+ * é a saída que sempre funciona, nos dois casos.
  */
 function jogarCarta(estado: EstadoPartida, acao: AcaoDeMao): ResultadoAcao {
   const { jogador, carta } = cartaDaMao(estado, acao);
