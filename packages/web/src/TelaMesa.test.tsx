@@ -67,6 +67,22 @@ describe('TelaMesa', () => {
     expect(await screen.findByRole('button', { name: /vasculhar local/i })).toBeDisabled();
   });
 
+  it('as ações de turno respeitam a MESMA guarda — vasculhar e mão bloqueiam juntos', async () => {
+    // `turnoParado` é fonte única: antes existiam duas expressões dizendo "é minha
+    // vez e o turno está parado", e elas já divergiam num termo. A asserção é
+    // CONJUNTA de propósito — quando a janela de interferência da próxima fatia
+    // virar um quarto estado bloqueante, esquecer um dos dois consumidores faz
+    // este teste falhar em vez de deixar um botão aceso numa hora em que o
+    // domínio recusa.
+    await abrirMesa({
+      ...vistaComEspiada,
+      suaMao: [{ id: 'p-9', tipo: 'raca', racaId: 'orc' }],
+    });
+
+    expect(await screen.findByRole('button', { name: 'Vasculhar local' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Jogar' })).toBeDisabled();
+  });
+
   it('encarar manda manterCarta com a versão que está vendo', async () => {
     const agir = vi.spyOn(api, 'agir')
       .mockResolvedValue({ status: 200, body: vistaBase } as never);

@@ -78,12 +78,16 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [] }: {
   // aqui seria reimplementar regra de jogo na UI — e ela divergiria no dia em que
   // um item mexesse no teto.
   const acimaDoLimite = eu !== undefined && vista.suaMao.length > eu.limiteDeMao;
-  // Mão só se mexe com o turno parado: mesma guarda que o domínio aplica. O desfecho
-  // entra aqui porque `fecharCombate` termina a partida SEM passar a vez — sem este
-  // check, `minhaVez` continua true para o vencedor e o botão fica aceso no exato
-  // momento da vitória (o clique leva a um 400, já que `aplicarAcao` recusa tudo
+  // O turno está parado e é meu: a condição que TODA ação de turno compartilha.
+  // Escrita uma vez porque estados bloqueantes novos (a janela de interferência da
+  // próxima fatia) têm que entrar em UM lugar — duas cópias divergem em silêncio, e
+  // a que ficar para trás deixa um botão aceso numa hora em que o domínio recusa.
+  //
+  // O desfecho entra aqui porque `fecharCombate` termina a partida SEM passar a vez —
+  // sem este check, `minhaVez` continua true para o vencedor e o botão fica aceso no
+  // exato momento da vitória (o clique leva a um 400, já que `aplicarAcao` recusa tudo
   // depois do fim).
-  const podeMexerNaMao = minhaVez && vista.desfecho === 'emAndamento'
+  const turnoParado = minhaVez && vista.desfecho === 'emAndamento'
     && vista.combate === null && espiada === null;
 
   return (
@@ -131,7 +135,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [] }: {
           <div>
             <button
               type="button"
-              disabled={!minhaVez || vista.combate !== null || espiada !== null || acimaDoLimite}
+              disabled={!turnoParado || acimaDoLimite}
               onClick={() => void agir({ tipo: 'vasculhar' })}
             >
               Vasculhar local
@@ -187,7 +191,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [] }: {
               {carta.tipo === 'raca' && (
                 <button
                   type="button"
-                  disabled={!podeMexerNaMao}
+                  disabled={!turnoParado}
                   onClick={() => void agir({ tipo: 'jogarCarta', cartaId: carta.id })}
                 >
                   Jogar
@@ -195,7 +199,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [] }: {
               )}
               <button
                 type="button"
-                disabled={!podeMexerNaMao || !acimaDoLimite}
+                disabled={!turnoParado || !acimaDoLimite}
                 onClick={() => void agir({ tipo: 'entregarCarta', cartaId: carta.id })}
               >
                 Entregar
