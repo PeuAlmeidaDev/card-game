@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { narrarCombate } from './narrarCombate';
-import { narrarPorta } from './narrarPorta';
-import { descreverCarta } from './descreverCarta';
+import { narrarEvento } from './narrarEvento';
 import type { Catalogo, EventoDaMesa, JogadorPublico } from '@card-dungeon/shared';
 
 /**
@@ -23,6 +21,11 @@ export function corDoJogador(jogadores: readonly JogadorPublico[], jogadorId: st
  * O log da partida como painel-chat: uma linha por evento, colorida por quem a
  * causou. Componente próprio porque a `TelaMesa` já carrega estado de partida,
  * ações e erro — render de log é outra responsabilidade.
+ *
+ * Aqui ficam só layout, filtro, cor e auto-scroll. O TEXTO de cada evento é de
+ * `narrarEvento`, que tem exaustividade cobrada pelo compilador — quando estava
+ * inline, era uma cadeia de `&&` e um evento novo renderizava `<li>` vazio em
+ * silêncio (foi o que aconteceu com `racaEmJogo`, `entrega` e `descarte`).
  */
 export function PainelLog({ log, jogadores, voce, racas }: {
   readonly log: readonly EventoDaMesa[];
@@ -80,34 +83,7 @@ export function PainelLog({ log, jogadores, voce, racas }: {
           const cor = 'jogadorId' in evento ? corDoJogador(jogadores, evento.jogadorId) : CINZA;
           return (
             <li key={i} style={{ color: cor }}>
-              {evento.tipo === 'porta' && narrarPorta(evento.carta, evento.jogadorId === voce ? 'Você' : nomeDe(evento.jogadorId), nomeDaRaca)}
-              {evento.tipo === 'patente' && `${nomeDe(evento.jogadorId)} subiu para a patente ${String(evento.patente)}.`}
-              {evento.tipo === 'derrota' && `${nomeDe(evento.jogadorId)} foi evacuado.`}
-              {evento.tipo === 'vez' && <small>Vez de {nomeDe(evento.jogadorId)}.</small>}
-              {evento.tipo === 'fim' && 'A partida terminou.'}
-              {evento.tipo === 'racaEmJogo' && `${nomeDe(evento.jogadorId)} entra em campo como ${nomeDaRaca(evento.carta.racaId)}.`}
-              {/* A entrega é PRIVADA: o evento não carrega a carta (spec §5) e a apresentação
-                  não pode inventar o que ele não diz. Só o destinatário descobre o quê, pela
-                  própria mão. A rolagem aparece quando houve empate a desempatar. */}
-              {evento.tipo === 'entrega' && (
-                `${nomeDe(evento.jogadorId)} entregou uma carta a ${nomeDe(evento.paraJogadorId)}.`
-                + (evento.rolagem === null ? '' : ` (1d12: ${String(evento.rolagem)})`)
-              )}
-              {/* O descarte é PÚBLICO: o cemitério já é zona aberta, esconder aqui seria teatro. */}
-              {evento.tipo === 'descarte' && `${nomeDe(evento.jogadorId)} descartou ${descreverCarta(evento.carta, nomeDaRaca)}.`}
-              {evento.tipo === 'combate' && (
-                <>
-                  {evento.jogadorId === voce ? 'Seu combate:' : `Combate de ${nomeDe(evento.jogadorId)}:`}
-                  <ul>
-                    {narrarCombate(
-                      evento.eventos,
-                      evento.jogadorId === voce ? 'Você' : nomeDe(evento.jogadorId),
-                    ).map((linha, j) => (
-                      <li key={j}>{linha}</li>
-                    ))}
-                  </ul>
-                </>
-              )}
+              {narrarEvento(evento, { voce, nomeDe, nomeDaRaca })}
             </li>
           );
         })}
