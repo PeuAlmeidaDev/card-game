@@ -208,28 +208,57 @@ describe('TelaMesa', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/combate em curso/i);
   });
 
+  /** Combate em curso contra o monstro `monstroId`, com 23 de vida. */
+  const emCombateContra = (monstroId: string, proximaDecisao: 'ataque' | 'esquiva'): VistaDaPartida => ({
+    ...vistaBase,
+    combate: {
+      monstroId,
+      proximaDecisao,
+      estado: {
+        jogador: { ...combatente, vida: 6 },
+        monstro: { forca: 4, vida: 23, habilidade: 2, agilidade: 4, level: 5 },
+        vez: proximaDecisao === 'esquiva' ? 'monstro' : 'jogador',
+        turno: 3,
+        ataqueDoMonstro: proximaDecisao === 'esquiva' ? { rolagem: 4 } : null,
+        desfecho: 'emAndamento',
+        vidaInicialJogador: combatente.vida,
+        passiva: null,
+      },
+    },
+  });
+
   it('mostra as vidas do combate em curso', async () => {
     // Sem isto o jogador não sabe se está ganhando. A vida do jogador tem
     // máximo conhecido (o combatenteBase); a do monstro só o valor atual.
-    await abrirMesa({
-      ...vistaBase,
-      combate: {
-        proximaDecisao: 'ataque',
-        estado: {
-          jogador: { ...combatente, vida: 6 },
-          monstro: { forca: 4, vida: 23, habilidade: 2, agilidade: 4, level: 5 },
-          vez: 'jogador',
-          turno: 3,
-          ataqueDoMonstro: null,
-          desfecho: 'emAndamento',
-          vidaInicialJogador: combatente.vida,
-          passiva: null,
-        },
-      },
-    });
+    await abrirMesa(emCombateContra('goblin', 'ataque'));
 
     expect(await screen.findByText(/6\s*\/\s*20/)).toBeInTheDocument();
-    expect(screen.getByText(/monstro:\s*23/i)).toBeInTheDocument();
+    expect(screen.getByText(/Goblin:\s*23/)).toBeInTheDocument();
+  });
+
+  it('nomeia o adversário no painel de combate, não só no log', async () => {
+    // O painel é a única superfície que fica à vista a luta inteira. Com ele
+    // dizendo "Monstro", a identidade da carta só existe no log — e o jogador
+    // passa o combate sem saber contra o que está lutando.
+    await abrirMesa(emCombateContra('goblin', 'ataque'));
+
+    expect(await screen.findByText(/Goblin:\s*23/)).toBeInTheDocument();
+    expect(screen.queryByText(/Monstro:\s*23/)).not.toBeInTheDocument();
+  });
+
+  it('avisa que o monstro acertou usando o nome dele', async () => {
+    await abrirMesa(emCombateContra('goblin', 'esquiva'));
+
+    expect(await screen.findByText(/o Goblin acertou — esquive!/)).toBeInTheDocument();
+  });
+
+  it('cai no id quando o catálogo não conhece o monstro, sem derrubar a tela', async () => {
+    // Skew de versão: bundle antigo recebendo do server um monstro que ele não
+    // conhece. Degradar para o id é feio e legível; lançar apagaria a mesa
+    // inteira por causa de um nome.
+    await abrirMesa(emCombateContra('quimera-que-o-cliente-nao-conhece', 'ataque'));
+
+    expect(await screen.findByText(/quimera-que-o-cliente-nao-conhece:\s*23/)).toBeInTheDocument();
   });
 
   it('narra cada lance do combate com a rolagem do dado', async () => {

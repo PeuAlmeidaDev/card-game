@@ -94,6 +94,30 @@ describe('aplicarAcao — vasculhar', () => {
     expect(r.estado.combate?.estado.jogador.vida).toBe(20);
   });
 
+  it('o combate carrega QUEM é o adversário, não só os stats dele', () => {
+    // O `EstadoCombate` do motor é neutro: ele conhece 'a' e 'b', nunca um
+    // monstro nomeado. Sem o id aqui, a tela sabe a vida do adversário e não
+    // sabe de quem ela é — o painel de combate fica preso em "Monstro", que é
+    // exatamente o que a carta com identidade veio desfazer.
+    const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'monstro', monstroId: 'ogro' }] },
+      { embaralhar: semEmbaralhar });
+    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
+
+    expect(r.estado.combate?.monstroId).toBe('ogro');
+  });
+
+  it('o adversário continua identificado depois de um lance', () => {
+    // A identidade é do COMBATE, não do instante: se cada passo remontasse o
+    // combate a partir do `Passo` do motor, o id se perderia no primeiro ataque
+    // e o painel voltaria a "Monstro" no meio da luta.
+    const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'monstro', monstroId: 'ogro' }] },
+      { embaralhar: semEmbaralhar });
+    const aberto = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
+    const depoisDoAtaque = aplicarAcao(aberto, { tipo: 'atacar', jogadorId: 'p1' }, deps([12, 12]));
+
+    expect(depoisDoAtaque.estado.combate?.monstroId).toBe('ogro');
+  });
+
   it('rejeita vasculhar local com um combate em curso', () => {
     const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'monstro', monstroId: 'm-teste' }] },
       { embaralhar: semEmbaralhar });

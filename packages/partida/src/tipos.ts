@@ -187,6 +187,20 @@ export type AcaoDaMesa =
 export interface CombateNaMesa {
   readonly estado: EstadoCombate;
   readonly proximaDecisao: DecisaoPendente;
+  /**
+   * QUEM é o adversário — o id da carta de monstro que abriu este combate.
+   *
+   * Mora aqui, e não dentro do `EstadoCombate`, porque o `motor` é neutro por
+   * design: ele conhece os lados `a` e `b` e nunca um monstro nomeado, e é isso
+   * que o deixa resolver qualquer duelo sem saber de baralho. A identidade é
+   * conhecimento da MESA, que foi quem virou a carta.
+   *
+   * Sem este campo a vista carrega a vida do adversário sem dizer de quem ela é,
+   * e a tela fica presa em "Monstro" durante a luta inteira — desfazendo, na
+   * única superfície que fica à vista o combate todo, o que a carta com
+   * identidade veio trazer.
+   */
+  readonly monstroId: string;
 }
 
 /**

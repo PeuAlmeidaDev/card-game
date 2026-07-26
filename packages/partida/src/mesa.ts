@@ -186,7 +186,16 @@ function resolverCarta(
   const passo = criarCombate(combatente, adversario, deps.rolar, passiva);
   eventos.push({ tipo: 'combate', jogadorId, eventos: passo.eventos });
   return registrar(
-    { ...revelada, combate: { estado: passo.estado, proximaDecisao: passo.proximaDecisao } },
+    {
+      ...revelada,
+      combate: {
+        estado: passo.estado,
+        proximaDecisao: passo.proximaDecisao,
+        // A identidade sai da CARTA, aqui, e não do `passo`: o motor devolve um
+        // estado neutro (lados 'a' e 'b') e não teria como carregá-la.
+        monstroId: carta.monstroId,
+      },
+    },
     eventos,
   );
 }
@@ -428,7 +437,10 @@ function agirNoCombate(estado: EstadoPartida, acao: AcaoDeCombate, deps: DepsMes
 
   if (passo.estado.desfecho === 'emAndamento') {
     return registrar(
-      { ...estado, combate: { estado: passo.estado, proximaDecisao: passo.proximaDecisao } },
+      // `...combate` primeiro: a identidade do adversário é do COMBATE, não do
+      // instante. O `passo` do motor só traz estado e decisão, então remontar o
+      // objeto do zero a cada lance perderia o `monstroId` no primeiro ataque.
+      { ...estado, combate: { ...combate, estado: passo.estado, proximaDecisao: passo.proximaDecisao } },
       eventos,
     );
   }

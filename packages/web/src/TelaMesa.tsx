@@ -114,10 +114,10 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
           <strong>Combate</strong> — Você: {vista.combate.estado.jogador.vida}
           {vidaMaxima !== null && ` / ${vidaMaxima}`}
           {' · '}
-          Monstro: {vista.combate.estado.monstro.vida} de vida
+          {nomeDoMonstro(vista.combate.monstroId)}: {vista.combate.estado.monstro.vida} de vida
           {' · '}
           {vista.combate.proximaDecisao === 'esquiva'
-            ? 'o monstro acertou — esquive!'
+            ? `o ${nomeDoMonstro(vista.combate.monstroId)} acertou — esquive!`
             : 'sua vez de atacar'}
         </p>
       )}
