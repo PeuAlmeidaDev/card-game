@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { acaoEhLegalNaFase, faseDoTurnoDe } from './fase';
 import { criarPartida } from './montagem';
 import { aplicarAcao } from './mesa';
-import { avancarBots } from './automacao';
 import { escolherAcao } from './bot';
 import { projetarPara } from './projecao';
 import { limiteDeMao, MAO_INICIAL_PADRAO } from './mao';
@@ -99,6 +98,13 @@ describe('a fase nunca mente sobre o estado', () => {
     if (e.fase === 'vasculhar' && estourado) {
       erros.push('fase=vasculhar com a mão de quem tem a vez estourada');
     }
+    // O terceiro valor de `Fase`. Hoje inalcançável — nenhuma ação mexe na mão
+    // durante o combate, e só se entra em combate vindo de `vasculhar` —, mas o
+    // Plano 3 põe o loot do monstro vencido NA MÃO. Sem este caso, um bug de fase
+    // no caminho que a próxima fatia abre não faz este alarme tocar.
+    if (e.fase === 'combate' && estourado) {
+      erros.push('fase=combate com a mão de quem tem a vez estourada');
+    }
     // A fase `descartar` nunca convive com espiada: é o que dispensa o gêmeo do
     // guard de pendência em `entregarCarta`.
     if (e.espiada !== null && e.fase !== 'vasculhar') {
@@ -137,16 +143,62 @@ describe('a fase nunca mente sobre o estado', () => {
 
     const fasesVistas = new Set<Fase>([estado.fase]);
     const erros: string[] = [...violacoes(estado)];
+    // A mensagem crua de uma `AcaoInvalida` é o SINTOMA (ex.: "entregarCarta não é
+    // legal na fase vasculhar"), não a causa. Capturamos abaixo para que a
+    // asserção final reporte a CAUSA (a fase mentiu), não só o sintoma.
+    const mensagemDe = (erro: unknown): string => (erro instanceof Error ? erro.message : String(erro));
 
-    for (let voltas = 0; voltas < 300 && estado.desfecho === 'emAndamento'; voltas += 1) {
+    // Teto local do lote de bots: dirigimos os bots à mão aqui (ver comentário no
+    // laço interno), então o teto anti-loop tem que ser nosso — sem reimportar
+    // `MAX_ACOES_AUTOMATICAS` de `./automacao`.
+    const TETO_ACOES_DE_BOTS = 100;
+
+    let interrompido = false;
+    for (let voltas = 0; voltas < 300 && estado.desfecho === 'emAndamento' && !interrompido; voltas += 1) {
       const acao = escolherAcao(projetarPara('p1', estado), 'p1');
-      estado = aplicarAcao(estado, acao, depsPartida).estado;
+      try {
+        estado = aplicarAcao(estado, acao, depsPartida).estado;
+      } catch (erro) {
+        // Ação ilegal aqui é sintoma de fase mentindo. Capturamos para que a
+        // asserção final reporte QUAL estado mentiu — sem isto a exceção sobe e o
+        // FAIL mostra o sintoma em vez da causa, e o alarme perde justamente o
+        // valor diagnóstico.
+        erros.push(`ação ${acao.tipo} de p1 recusada em fase=${estado.fase}: ${mensagemDe(erro)}`);
+        // Sem `interrompido = true` aqui: este `break` já sai do laço EXTERNO
+        // diretamente, então a condição do `for` nunca seria reavaliada — a
+        // atribuição ficaria morta (é o que o lint aponta como
+        // `no-useless-assignment`). A flag continua existindo para o laço
+        // interno, onde o `break` só sai do lote de bots e a condição externa
+        // É reavaliada.
+        break;
+      }
       fasesVistas.add(estado.fase);
       erros.push(...violacoes(estado));
 
-      estado = avancarBots(estado, depsPartida).estado;
-      fasesVistas.add(estado.fase);
-      erros.push(...violacoes(estado));
+      // Dirigimos os bots aqui em vez de chamar `avancarBots`: ele roda vários
+      // turnos num laço interno sem devolver controle, e só o estado FINAL do lote
+      // seria checado. Uma violação que apareça e se autocorrija dentro do lote
+      // passaria limpa — e nem toda violação estoura sozinha como ação ilegal.
+      for (let acoesDeBots = 0; ; acoesDeBots += 1) {
+        if (estado.desfecho !== 'emAndamento') break;
+        const daVez = estado.jogadores.find((j) => j.id === estado.vezDe);
+        if (daVez === undefined || !daVez.ehBot) break;
+        if (acoesDeBots >= TETO_ACOES_DE_BOTS) {
+          erros.push(`lote de bots excedeu ${String(TETO_ACOES_DE_BOTS)} ações sem devolver a vez a um humano`);
+          interrompido = true;
+          break;
+        }
+        const acaoDoBot = escolherAcao(projetarPara(daVez.id, estado), daVez.id);
+        try {
+          estado = aplicarAcao(estado, acaoDoBot, depsPartida).estado;
+        } catch (erro) {
+          erros.push(`ação ${acaoDoBot.tipo} de ${daVez.id} recusada em fase=${estado.fase}: ${mensagemDe(erro)}`);
+          interrompido = true;
+          break;
+        }
+        fasesVistas.add(estado.fase);
+        erros.push(...violacoes(estado));
+      }
     }
 
     // Lista, não `every`: a falha precisa dizer QUAL estado mentiu e como.
