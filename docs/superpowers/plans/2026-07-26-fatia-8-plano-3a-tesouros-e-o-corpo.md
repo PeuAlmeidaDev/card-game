@@ -330,7 +330,7 @@ Expected: inclui `"@card-dungeon/personagem": "workspace:*"`. Se não incluir, a
 
 - [ ] **Passo 2: escrever o teste que falha (typecheck)**
 
-Criar `packages/partida/src/tipos.test-d.ts` — **não**, este projeto não usa `expect-type`. Em vez disso, o RED é uma asserção de tipo dentro do teste que já existe. Acrescentar em `packages/partida/src/baralho.test.ts`:
+Este projeto não usa `expect-type` nem `.test-d.ts` — o RED de uma mudança só de tipo é uma asserção de tipo dentro de um teste normal, cobrada pelo `pnpm typecheck`. Acrescentar em `packages/partida/src/baralho.test.ts`:
 
 ```ts
 import type { Carta, CartaTesouro, InfoItem } from './tipos';
@@ -411,22 +411,7 @@ export interface InfoItem extends Equipamento {
 }
 ```
 
-Trocar `ZonaEmJogo` por:
-
-```ts
-/**
- * Zona ABERTA do jogador: o que está na mesa, à vista de todos. `raca: null` =
- * Humano baseline — a ausência de especialização É a linha zero.
- *
- * `Record<Slot, …>`, e não um array de itens equipados: com o array, "duas
- * armaduras equipadas" seria um estado representável, e a regra "um por slot"
- * viraria checagem espalhada. Com o Record é o tipo que garante.
- */
-export interface ZonaEmJogo {
-  readonly raca: CartaDeRaca | null;
-  readonly slots: Record<Slot, CartaEquipamento | null>;
-}
-```
+> ⚠️ **`ZonaEmJogo` NÃO é tocada nesta task.** O campo `slots` chega na Task 3. Acrescentá-lo aqui torna obrigatório um campo que dezenas de fixtures não têm, e a Task 2 deixaria de ser revisável isolada — o diff viraria "tipos novos + 40 fixtures consertadas", em que ninguém enxerga os tipos. A Task 3 é dona dessa quebra porque é ela quem tem o motivo (o `combatenteDe` lê os slots).
 
 Acrescentar `tesouros` a `InfoMonstro` e os dois membros a `CatalogoDaMesa`:
 
@@ -453,14 +438,10 @@ export interface CatalogoDaMesa {
 
 Em `packages/partida/src/index.ts`, acrescentar aos tipos exportados: `ReceitaTesouro`, `CartaTesouro`, `CartaEquipamento`, `Carta`, `Slot`, `InfoItem`.
 
-- [ ] **Passo 5: rodar o typecheck e ver passar**
+- [ ] **Passo 5: consertar as duas fábricas de catálogo**
 
 Run: `cd packages/partida && pnpm typecheck`
-Expected: FAIL ainda — mas com **erros diferentes**: `ZonaEmJogo` ganhou `slots` obrigatório, e todo lugar que monta `emJogo: { raca: … }` agora quebra (`montagem.ts`, `mesa.ts`, dezenas de fixtures de teste, `bot.ts`). Isto é esperado e é a Task 3 quem paga.
-
-Para fechar ESTA task verde sem arrastar a Task 3: **adiar a mudança de `ZonaEmJogo`** para a Task 3 e entregar aqui só `ReceitaTesouro`/`CartaTesouro`/`CartaEquipamento`/`Carta`/`Slot`/`InfoItem` + os membros novos de `CatalogoDaMesa` + `InfoMonstro.tesouros`.
-
-> ⚠️ `CatalogoDaMesa` e `InfoMonstro` ganharem membro obrigatório também quebra os call-sites: `catalogoDeTeste()` (`partida/src/testes/catalogo.ts`) e o `catalogo` do `server`. Corrigir os dois **nesta task** — são as duas únicas fábricas, e deixá-las para depois espalharia a quebra.
+Expected: FAIL — `CatalogoDaMesa` e `InfoMonstro` ganharam membro obrigatório, e os call-sites quebram. São exatamente **dois**: `catalogoDeTeste()` (`partida/src/testes/catalogo.ts`) e o `catalogo` do `server`. Corrigir os dois nesta task — deixá-los para depois espalharia a quebra por tasks que não têm motivo para tocá-los.
 
 Em `packages/partida/src/testes/catalogo.ts`, acrescentar ao retorno de `catalogoDeTeste`:
 
@@ -1112,7 +1093,7 @@ Acrescentar em `packages/partida/src/mesa.test.ts`:
   });
 ```
 
-> As três helpers (`mesaComCombateGanhavel`, `jogarAteFecharCombate`, `jogarAtePerderCombate`) **já existem em espírito** em `mesa.test.ts` — o arquivo tem fixtures de combate desde a fatia 5. Reusar as que existem em vez de criar gêmeas; se as existentes não aceitarem `tesouros`, estendê-las com parâmetro opcional, nunca copiá-las.
+> ⚠️ **Os nomes de helper acima são descritivos, não literais.** `mesa.test.ts` tem fixtures de combate desde a fatia 5, mas com outros nomes. **Primeiro passo desta task: ler `mesa.test.ts` e listar as helpers de combate que já existem.** Reusar as que existem — estendendo com parâmetro opcional quando não aceitarem `tesouros` — e só criar helper nova para o que não tiver equivalente. Criar gêmeas de fixtures existentes é o defeito que a fatia 8/P1 já corrigiu uma vez (`composicaoDeTeste` estava triplicada).
 
 - [ ] **Passo 2: rodar o teste e ver falhar**
 
@@ -1547,7 +1528,15 @@ Expected: PASS (todos).
 - [ ] **Passo 5: rodar tudo e ver verde**
 
 Run (na raiz): `pnpm -r test && pnpm -r typecheck && pnpm lint`
-Expected: os três verdes. O `shared` vai falhar o typecheck: `_CoberturaAcao` cobra rota para `equiparCarta`. Isto é o guard funcionando — **não corrigir aqui**, é a Task 7. Se preferir manter a task verde, fazer a Task 7 no mesmo commit não é opção (um commit por task); em vez disso, acrescentar `equiparCarta` ao `acaoDaMesaSchema` **nesta task** e deixar rota/tela para a 7.
+Expected: o `shared` **vai falhar** o typecheck — `_CoberturaAcao` cobra que toda ação do domínio tenha entrada no `acaoDaMesaSchema`, e `equiparCarta` acabou de nascer. **Isto é o guard funcionando, e o conserto é desta task**: acrescentar ao `acaoDaMesaSchema` (em `packages/shared/src/index.ts`) a linha
+
+```ts
+  z.object({ tipo: z.literal('equiparCarta'), cartaId: z.string().min(1).max(64) }),
+```
+
+O teto de 64 chars é o mesmo de `jogarCarta`/`entregarCarta` e pelo mesmo motivo: `cartaId` é campo livre do fio, refletido verbatim no 400 e no log.
+
+**Só a linha do schema entra aqui.** A rota, a tela e o botão são da Task 7 — esta task fecha quando os três comandos ficam verdes com a ação existindo no domínio e no contrato.
 
 - [ ] **Passo 6: commit**
 
@@ -1679,9 +1668,7 @@ export const escolhasSchema = z.object({
 }) satisfies z.ZodType<EscolhasPersonagem>;
 ```
 
-```ts
-  z.object({ tipo: z.literal('equiparCarta'), cartaId: z.string().min(1).max(64) }),
-```
+(A linha do `acaoDaMesaSchema` **já entrou na Task 6** — o `_CoberturaAcao` a cobrou lá. Aqui só se confirma que ela existe.)
 
 ```ts
 /**
