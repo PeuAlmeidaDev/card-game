@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { api } from './api';
 import { PainelLog } from './PainelLog';
 import { descreverCarta } from './descreverCarta';
-import type { AcaoNoFio, Catalogo, Escolhas, VistaDaPartida } from '@card-dungeon/shared';
+import { acaoEhLegalNaFase } from '@card-dungeon/shared';
+import type { AcaoDaMesa, AcaoNoFio, Catalogo, Escolhas, VistaDaPartida } from '@card-dungeon/shared';
 
 /**
  * Usado quando a tela roda sozinha; o `App` passa as escolhas reais do construtor.
@@ -80,17 +81,22 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
   // aqui seria reimplementar regra de jogo na UI — e ela divergiria no dia em que
   // um item mexesse no teto.
   const acimaDoLimite = eu !== undefined && vista.suaMao.length > eu.limiteDeMao;
-  // O turno está parado e é meu: a condição que TODA ação de turno compartilha.
-  // Escrita uma vez porque estados bloqueantes novos (a janela de interferência da
-  // próxima fatia) têm que entrar em UM lugar — duas cópias divergem em silêncio, e
-  // a que ficar para trás deixa um botão aceso numa hora em que o domínio recusa.
+  // A única coisa que a tela ainda decide sozinha: é minha vez e a partida não
+  // acabou. O `desfecho` fica aqui porque `fecharCombate` termina a partida SEM
+  // passar a vez — e os botões da mão são renderizados fora do ramo da
+  // classificação, então sem este check eles acenderiam no instante da vitória.
+  const podeAgir = minhaVez && vista.desfecho === 'emAndamento';
+  // A FASE vem do domínio, pela mesma tabela que o reducer usa. A tela não
+  // recalcula "mão > limite" nem "combate aberto" — a cópia que divergisse
+  // acenderia um botão que só serve para levar 400.
   //
-  // O desfecho entra aqui porque `fecharCombate` termina a partida SEM passar a vez —
-  // sem este check, `minhaVez` continua true para o vencedor e o botão fica aceso no
-  // exato momento da vitória (o clique leva a um 400, já que `aplicarAcao` recusa tudo
-  // depois do fim).
-  const turnoParado = minhaVez && vista.desfecho === 'emAndamento'
-    && vista.combate === null && espiada === null;
+  // ⚠️ `legal()` é um gate GROSSO, não a resposta inteira. O reducer ainda cobra
+  // condições que a tabela não conhece, e cada uma precisa de gêmeo aqui — é o
+  // `|| espiada !== null` de "Vasculhar" e "Jogar", o `carta.tipo === 'raca'` que
+  // decide se "Jogar" existe, e o `decisao !== …` de "Atacar"/"Esquivar". A lista
+  // completa dos pares está no comentário do `aplicarAcao` (pacote `partida`):
+  // botão novo escrito só com `legal(tipo)` acende onde o domínio recusa.
+  const legal = (tipo: AcaoDaMesa['tipo']): boolean => podeAgir && acaoEhLegalNaFase(vista.fase, tipo);
 
   return (
     <section>
@@ -137,7 +143,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
           <div>
             <button
               type="button"
-              disabled={!turnoParado || acimaDoLimite}
+              disabled={!legal('vasculhar') || espiada !== null}
               onClick={() => void agir({ tipo: 'vasculhar' })}
             >
               Vasculhar local
@@ -193,7 +199,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
               {carta.tipo === 'raca' && (
                 <button
                   type="button"
-                  disabled={!turnoParado}
+                  disabled={!legal('jogarCarta') || espiada !== null}
                   onClick={() => void agir({ tipo: 'jogarCarta', cartaId: carta.id })}
                 >
                   Jogar
@@ -201,7 +207,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
               )}
               <button
                 type="button"
-                disabled={!turnoParado || !acimaDoLimite}
+                disabled={!legal('entregarCarta')}
                 onClick={() => void agir({ tipo: 'entregarCarta', cartaId: carta.id })}
               >
                 Entregar

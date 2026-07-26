@@ -115,6 +115,19 @@ describe('projetarPara', () => {
 
     expect(vista.jogadores.map((j) => j.limiteDeMao)).toEqual([5, 4]);
   });
+
+  it('a fase é pública — é dela que o cliente tira quais botões acendem', () => {
+    // Não é segredo: a fase descreve o turno de quem está jogando, e o cliente
+    // que não a tivesse voltaria a reimplementar a regra para acender botão.
+    const p = criarPartida(
+      'm1', entradas,
+      { patenteAlvo: 10, composicaoPorJogador: COMPOSICAO_DE_TESTE },
+      { embaralhar: semEmbaralhar },
+    );
+
+    expect(projetarPara('p1', p).fase).toBe('vasculhar');
+    expect(projetarPara('p2', p).fase).toBe('vasculhar');
+  });
 });
 
 describe('versaoDe — a versão anda quando a espiada abre', () => {

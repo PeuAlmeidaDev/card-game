@@ -258,6 +258,17 @@ quanto para a carta que foi para a mão. Só o monstro pula direto para `combate
 | `jogar` | `equiparCarta` · `guardarCarta` · `passar` — **sem raça** | vitória → saca `monstro.tesouros` cartas de Tesouros **para a mão**; equipa, guarda |
 | `descartar` | `entregarCarta` (caridade, já existe) | cobra o limite de mão enquanto estourar; quando couber, passa a vez |
 
+> **Executado em duas etapas.** O Plano 2 entregou **três** fases —
+> `vasculhar | combate | descartar` — porque `recompor`, `encrenca` e `jogar` só
+> contêm ações que ainda não existem. Sem `passar`, `recompor` seria uma fase da
+> qual não se sai (o jogador com uma raça na mão travaria antes de vasculhar), e
+> hoje ela é indistinguível de `vasculhar`: mesmo ponto de entrada, mesmo ponto de
+> saída. Por isso `jogarCarta` mora na fase `vasculhar`, e `descartar` a mantém
+> legal (é a outra saída do excedente, já afirmada por teste desde a fatia 7).
+> As três fases restantes chegam nos Planos 3 e 4, **junto com os verbos delas**;
+> a decisão #7 ("raça só troca na fase 1") passa a valer quando a fase 1 existir.
+> Decidido em 2026-07-25, para manter o Plano 2 como refactor puro.
+
 `equiparCarta` aceita uma carta da **mão ou da mochila** — uma ação, duas origens. `guardarCarta`
 é sempre mão → mochila. Mochila → mão **não existe** nesta fatia (§11, adiado).
 

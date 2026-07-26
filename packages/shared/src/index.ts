@@ -13,6 +13,7 @@ import type {
   CartaPorta,
   EspiadaPendente,
   EventoDaMesa,
+  Fase,
   JogadorPublico,
   PosicaoFinal,
   VistaDaPartida,
@@ -95,6 +96,11 @@ export const acaoRequisicaoSchema = z.object({
   acao: acaoDaMesaSchema,
   versao: z.number().int().nonnegative(),
 });
+
+// Valor, não tipo: a tabela de legalidade é a MESMA nos dois lados. Duplicá-la no
+// cliente era o que fazia um botão acender numa hora em que o domínio recusa —
+// e a cópia que ficasse para trás só apareceria como 400 na cara do jogador.
+export { acaoEhLegalNaFase } from '@card-dungeon/partida';
 
 const c = initContract();
 
@@ -179,4 +185,5 @@ export type {
   PosicaoFinal,
   CartaPorta,
   EspiadaPendente,
+  Fase,
 };

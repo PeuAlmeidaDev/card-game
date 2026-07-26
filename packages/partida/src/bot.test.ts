@@ -87,6 +87,8 @@ describe('escolherAcao', () => {
             }
           : j
       )),
+      // Forjado direto no estado: a fase tem que vir junto, senão o fixture mente.
+      fase: 'descartar',
     };
 
     expect(escolherAcao(projetarPara('p2', estourado), 'p2'))
@@ -149,6 +151,8 @@ describe('escolherAcao', () => {
             }
           : j
       )),
+      // Forjado direto no estado: a fase tem que vir junto, senão o fixture mente.
+      fase: 'descartar',
     };
 
     expect(escolherAcao(projetarPara('p1', estourado), 'p1').tipo).toBe('entregarCarta');
@@ -170,6 +174,8 @@ describe('escolherAcao', () => {
             }
           : j
       )),
+      // Forjado direto no estado: a fase tem que vir junto, senão o fixture mente.
+      fase: 'descartar',
     };
 
     const r = avancarBots(estourado,

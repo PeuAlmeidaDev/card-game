@@ -16,9 +16,9 @@ export function escolherAcao(vista: VistaDaPartida, jogadorId: string): AcaoDaMe
   // porta única que já segura a vez — a entrega do excedente vem na iteração
   // seguinte. A ordem entre espiada, combate e excedente segue o mesmo
   // princípio nos três: hoje eles são mutuamente exclusivos (não se abre
-  // combate nem se começa uma espiada acima do limite, e o reducer recusa
-  // `entregarCarta` com um combate ou uma espiada em curso), então a ordem
-  // aqui não muda o resultado final — mas se a exclusão mútua quebrar,
+  // combate nem se começa uma espiada acima do limite, e a tabela de fases
+  // recusa `entregarCarta` com um combate ou uma espiada em curso), então a
+  // ordem aqui não muda o resultado final — mas se a exclusão mútua quebrar,
   // resolver o que já está aberto (espiada, depois combate) converge, enquanto
   // tentar entregar primeiro seria recusado e travaria a mesa com um 400.
   // Escolhe-se a ordem que degrada melhor.

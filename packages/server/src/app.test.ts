@@ -335,7 +335,7 @@ describe('mesa', () => {
     });
 
     expect(res.statusCode).toBe(400);
-    expect(res.json<{ erro: string }>().erro).toContain('não há combate em curso');
+    expect(res.json<{ erro: string }>().erro).toContain('atacar não é legal na fase vasculhar');
     await app.close();
   });
 

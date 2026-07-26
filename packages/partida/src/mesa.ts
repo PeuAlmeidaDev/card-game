@@ -7,7 +7,7 @@ import { tirarDoTopo } from './baralho';
 import { destinoDaCaridade } from './caridade';
 import { classificar } from './classificacao';
 import { AcaoInvalida } from './erros';
-import { limiteDeMao } from './mao';
+import { acaoEhLegalNaFase, faseDoTurnoDe } from './fase';
 
 /** As ações que só fazem sentido com um combate aberto. */
 type AcaoDeCombate = Extract<AcaoDaMesa, { readonly tipo: 'atacar' | 'esquivar' }>;
@@ -75,12 +75,20 @@ function encerrarTurno(base: EstadoPartida, eventos: readonly EventoDaMesa[]): R
   // aqui. O limite simplesmente não se aplica a quem não existe, e quem lança
   // por esse estado corrompido continua sendo o `proximoJogador`, logo abaixo —
   // um `throw` próprio aqui só duplicaria o guard com outra mensagem.
-  if (daVez !== undefined && daVez.mao.length > limiteDeMao(daVez)) {
-    return registrar(base, eventos);
+  // A pergunta é `faseDoTurnoDe`, não uma releitura do limite: era a MESMA
+  // expressão que ela encapsula, escrita de novo aqui. O ponto único só é único
+  // se a porta única do turno também passar por ele — no dia em que o teto
+  // deixar de ser `>` (item que muda a contagem, spec §8), esta cópia é a que
+  // ficava para trás, e a vez cairia num jogador estourado sem ação legal.
+  if (daVez !== undefined && faseDoTurnoDe(daVez) === 'descartar') {
+    return registrar({ ...base, fase: 'descartar' }, eventos);
   }
 
   const seguinte = proximoJogador(base);
-  return registrar({ ...base, vezDe: seguinte.id }, [...eventos, { tipo: 'vez', jogadorId: seguinte.id }]);
+  return registrar(
+    { ...base, vezDe: seguinte.id, fase: faseDoTurnoDe(seguinte) },
+    [...eventos, { tipo: 'vez', jogadorId: seguinte.id }],
+  );
 }
 
 /**
@@ -93,6 +101,32 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   }
   if (acao.jogadorId !== estado.vezDe) {
     throw new AcaoInvalida(`aplicarAcao: não é a vez de ${acao.jogadorId}`);
+  }
+
+  // Gate de FASE — resposta única para "em que ponto do turno esta ação cabe?",
+  // não para "posso?" inteiro. Antes a pergunta estava espalhada em cinco
+  // funções, cada uma relendo `combate`, `espiada` e o limite de mão por conta
+  // própria — três booleanos ortogonais, oito combinações, e nenhum lugar que
+  // dissesse a verdade. A ação nova do Plano 3 precisava lembrar de repetir os
+  // guards certos; agora ela precisa entrar na tabela, e o `Record<Fase, …>` cobra.
+  //
+  // ⚠️ O QUE A TABELA NÃO RESPONDE. Passar aqui não garante que a ação será
+  // aceita: a elegibilidade FINA continua em cada função, e hoje são quatro
+  // pares — cada um precisa de gêmeo na tela, porque o `legal()` da `TelaMesa`
+  // lê ESTA tabela e não sabe deles:
+  //
+  //   fase        ação                  segunda condição      quem cobra
+  //   vasculhar   vasculhar/jogarCarta  espiada === null      `vasculhar` / `jogarCarta`
+  //   vasculhar   manterCarta/empurrar  espiada !== null      `resolverEspiada`
+  //   vasculhar   jogarCarta            carta.tipo === 'raca' `jogarCarta`
+  //   descartar   jogarCarta            carta.tipo === 'raca' `jogarCarta`
+  //   combate     atacar/esquivar       `proximaDecisao`      o motor, via `AcaoIlegal`
+  //
+  // Um botão novo escrito só com `legal(tipo)` acende nesses estados e leva 400.
+  // Quando `recompor` e `encrenca` chegarem (Planos 3 e 4), as duas primeiras
+  // linhas somem — a espiada vira fase própria e o par deixa de ser necessário.
+  if (!acaoEhLegalNaFase(estado.fase, acao.tipo)) {
+    throw new AcaoInvalida(`aplicarAcao: ${acao.tipo} não é legal na fase ${estado.fase}`);
   }
 
   if (acao.tipo === 'vasculhar') {
@@ -188,6 +222,7 @@ function resolverCarta(
   return registrar(
     {
       ...revelada,
+      fase: 'combate',
       combate: {
         estado: passo.estado,
         proximaDecisao: passo.proximaDecisao,
@@ -201,22 +236,11 @@ function resolverCarta(
 }
 
 function vasculhar(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): ResultadoAcao {
-  if (estado.combate !== null) {
-    throw new AcaoInvalida('aplicarAcao: há um combate em curso');
-  }
   if (estado.espiada !== null) {
     throw new AcaoInvalida('aplicarAcao: há uma espiada pendente');
   }
 
   const jogador = estado.jogadores.find((j) => j.id === jogadorId);
-
-  // A vez não passa acima do limite (ver `encerrarTurno`). Se vasculhar também
-  // continuasse legal, "não passar a vez" viraria "jogar para sempre": o jogador
-  // sacaria carta atrás de carta sem nunca ter que resolver o excedente. As duas
-  // saídas legais são `entregarCarta` e `jogarCarta`.
-  if (jogador !== undefined && jogador.mao.length > limiteDeMao(jogador)) {
-    throw new AcaoInvalida('aplicarAcao: sua mão está acima do limite — entregue uma carta');
-  }
 
   const temPresciencia = racaDoLutador(deps, jogador)?.espiaTopo ?? false;
 
@@ -282,22 +306,14 @@ function resolverEspiada(estado: EstadoPartida, acao: AcaoDeEspiada, deps: DepsM
 type AcaoDeMao = Extract<AcaoDaMesa, { readonly tipo: 'jogarCarta' | 'entregarCarta' }>;
 
 /**
- * Guards comuns das ações de mão: o turno tem que estar parado (nada de mexer na
- * mão no meio de um combate ou com uma espiada pendente — é a guarda que o spec
- * §4.2 pede, escrita no vocabulário que o reducer já fala, sem inventar máquina
- * de fases) e a carta apontada tem que ser sua.
+ * Guard comum das ações de mão: a carta apontada tem que ser sua. A fase (turno
+ * parado, nada de mexer na mão no meio de um combate) já foi conferida pela
+ * tabela no topo do `aplicarAcao`; o que sobra aqui é achar a carta.
  */
 function cartaDaMao(estado: EstadoPartida, acao: AcaoDeMao): {
   readonly jogador: JogadorNaMesa;
   readonly carta: CartaPorta;
 } {
-  if (estado.combate !== null) {
-    throw new AcaoInvalida('aplicarAcao: há um combate em curso');
-  }
-  if (estado.espiada !== null) {
-    throw new AcaoInvalida('aplicarAcao: há uma espiada pendente');
-  }
-
   const jogador = estado.jogadores.find((j) => j.id === acao.jogadorId);
   if (jogador === undefined) {
     throw new Error(`cartaDaMao: jogador ${acao.jogadorId} não está na mesa`);
@@ -318,8 +334,10 @@ function cartaDaMao(estado: EstadoPartida, acao: AcaoDeMao): {
  * carta; o destino é regra (`destinoDaCaridade`), nunca escolha — é o que impede
  * o kingmaking numa mesa com classificação de 1º a 4º.
  *
- * Só é legal ACIMA do limite: doar por vontade própria seria escolher a quem dar
- * vantagem, exatamente a política que a regra do destino existe para matar.
+ * Só é legal na fase `descartar` (isto é, ACIMA do limite): quem cobra isso não é
+ * mais um guard aqui dentro, e sim o guard único no topo do `aplicarAcao`, via a
+ * tabela de fases. Doar por vontade própria (dentro do limite) seria escolher a
+ * quem dar vantagem, exatamente a política que a regra do destino existe para matar.
  *
  * Termina em `encerrarTurno`, que recobra o limite: com a mão ainda estourada a
  * vez continua parada e o jogador entrega de novo; quando couber, a vez passa.
@@ -331,10 +349,6 @@ function entregarCarta(
   deps: DepsMesa,
 ): ResultadoAcao {
   const { jogador, carta } = cartaDaMao(estado, acao);
-
-  if (jogador.mao.length <= limiteDeMao(jogador)) {
-    throw new AcaoInvalida('aplicarAcao: sua mão não está acima do limite');
-  }
 
   const destino = destinoDaCaridade(estado.jogadores, jogador, deps.rolar);
   const semACarta = jogador.mao.filter((c) => c.id !== carta.id);
@@ -379,6 +393,14 @@ function jogarCarta(
   estado: EstadoPartida,
   acao: Extract<AcaoDaMesa, { readonly tipo: 'jogarCarta' }>,
 ): ResultadoAcao {
+  // Guarda de PENDÊNCIA, não de fase: `jogarCarta` e a espiada convivem na fase
+  // `vasculhar` enquanto `recompor` não existe como fase própria (só existirá
+  // quando o `passar` do Plano 3 a separar — e aí ela some, porque `recompor`
+  // acontece ANTES de qualquer compra e nenhuma espiada pode estar aberta).
+  if (estado.espiada !== null) {
+    throw new AcaoInvalida('aplicarAcao: há uma espiada pendente');
+  }
+
   const { jogador, carta } = cartaDaMao(estado, acao);
   if (carta.tipo !== 'raca') {
     throw new AcaoInvalida('aplicarAcao: só carta de raça entra em jogo nesta fatia');
@@ -399,6 +421,11 @@ function jogarCarta(
         ...estado.portas,
         cemiterio: anterior === null ? estado.portas.cemiterio : [...estado.portas.cemiterio, anterior],
       },
+      // RECALCULADA: jogar a raça tira uma carta da mão e pode ter resolvido o
+      // excedente (quando já havia raça em jogo — o limite não se move e só a mão
+      // encolhe). Sem isto o turno ficaria preso em `descartar` com a mão já
+      // cabendo, e `vasculhar` seguiria recusado sem motivo.
+      fase: faseDoTurnoDe(atualizado),
     },
     [{ tipo: 'racaEmJogo', jogadorId: acao.jogadorId, carta }],
   );
@@ -407,7 +434,10 @@ function jogarCarta(
 function agirNoCombate(estado: EstadoPartida, acao: AcaoDeCombate, deps: DepsMesa): ResultadoAcao {
   const combate = estado.combate;
   if (combate === null) {
-    throw new AcaoInvalida('aplicarAcao: não há combate em curso');
+    // Inalcançável pela tabela (só a fase `combate` deixa `atacar`/`esquivar`
+    // passar). Se acontecer, é invariante NOSSA quebrada — fase dizendo `combate`
+    // sem combate aberto — e sobe como Error cru => 500, não como culpa do cliente.
+    throw new Error('agirNoCombate: fase `combate` sem combate aberto');
   }
 
   // As três recusas do motor ("não é a vez de atacar", "não há ataque do monstro
@@ -472,7 +502,12 @@ function fecharCombate(
       : { tipo: 'derrota', jogadorId, derrotas: atualizado.derrotas },
   ];
 
-  const semCombate: EstadoPartida = { ...estado, jogadores, combate: null };
+  // A fase sai de `combate` junto com o combate. No caminho normal o
+  // `encerrarTurno` logo abaixo a recalcula (`descartar` se o vencedor estourou,
+  // `vasculhar` para quem recebe a vez); no caminho da vitória final ela fica
+  // aqui, neutra — `desfecho: 'terminada'` já recusa toda ação no topo do
+  // `aplicarAcao`, e a partida acabada não tem turno para descrever.
+  const semCombate: EstadoPartida = { ...estado, jogadores, combate: null, fase: 'vasculhar' };
 
   if (atualizado.patente >= estado.patenteAlvo) {
     const classificacao = classificar(jogadores);
