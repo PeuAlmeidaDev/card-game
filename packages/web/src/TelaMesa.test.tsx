@@ -21,6 +21,7 @@ const vistaBase: VistaDaPartida = {
   cartasNoCemiterio: 0,
   combate: null,
   espiada: null,
+  fase: 'vasculhar',
   desfecho: 'emAndamento',
   classificacao: null,
   log: [],
@@ -78,12 +79,12 @@ describe('TelaMesa', () => {
   });
 
   it('as ações de turno respeitam a MESMA guarda — vasculhar e mão bloqueiam juntos', async () => {
-    // `turnoParado` é fonte única: antes existiam duas expressões dizendo "é minha
+    // `legal(...)` é fonte única: antes existiam duas expressões dizendo "é minha
     // vez e o turno está parado", e elas já divergiam num termo. A asserção é
     // CONJUNTA de propósito — quando a janela de interferência da próxima fatia
-    // virar um quarto estado bloqueante, esquecer um dos dois consumidores faz
-    // este teste falhar em vez de deixar um botão aceso numa hora em que o
-    // domínio recusa.
+    // virar uma fase nova, esquecer um dos dois consumidores da tabela faz este
+    // teste falhar em vez de deixar um botão aceso numa hora em que o domínio
+    // recusa.
     await abrirMesa({
       ...vistaComEspiada,
       suaMao: [{ id: 'p-9', tipo: 'raca', racaId: 'orc' }],
@@ -200,17 +201,18 @@ describe('TelaMesa', () => {
 
   it('mostra a mensagem do domínio quando a ação é recusada', async () => {
     vi.spyOn(api, 'agir')
-      .mockResolvedValue({ status: 400, body: { erro: 'aplicarAcao: há um combate em curso' } } as never);
+      .mockResolvedValue({ status: 400, body: { erro: 'aplicarAcao: vasculhar não é legal na fase combate' } } as never);
     await abrirMesa(vistaBase);
 
     await userEvent.click(await screen.findByRole('button', { name: /vasculhar local/i }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/combate em curso/i);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/não é legal na fase combate/i);
   });
 
   /** Combate em curso contra o monstro `monstroId`, com 23 de vida. */
   const emCombateContra = (monstroId: string, proximaDecisao: 'ataque' | 'esquiva'): VistaDaPartida => ({
     ...vistaBase,
+    fase: 'combate',
     combate: {
       monstroId,
       proximaDecisao,
@@ -344,6 +346,7 @@ describe('TelaMesa — a mão', () => {
     const mao = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => ({ id, tipo: 'monstro' as const, monstroId: 'goblin' }));
     await abrirMesa({
       ...vistaBase,
+      fase: 'descartar',
       suaMao: mao,
       jogadores: vistaBase.jogadores.map((j) => (
         j.id === 'p1' ? { ...j, cartasNaMao: mao.length, limiteDeMao: 5 } : j
@@ -384,6 +387,7 @@ describe('TelaMesa — a mão', () => {
     ];
     await abrirMesa({
       ...vistaBase,
+      fase: 'descartar',
       suaMao: mao,
       jogadores: vistaBase.jogadores.map((j) => (
         j.id === 'p1' ? { ...j, cartasNaMao: mao.length, limiteDeMao: 5 } : j
@@ -430,5 +434,35 @@ describe('TelaMesa — a mão', () => {
     });
 
     expect(await screen.findByRole('button', { name: 'Jogar' })).toBeDisabled();
+  });
+
+  it('na fase `descartar`, vasculhar apaga e entregar acende', async () => {
+    // A regra é do domínio e chega pronta na `fase`: a tela não recalcula
+    // "mão > limite" para saber o que é legal.
+    await abrirMesa({
+      ...vistaBase,
+      fase: 'descartar',
+      suaMao: [{ id: 'p-0', tipo: 'salaVazia' }],
+    });
+
+    expect(await screen.findByRole('button', { name: /vasculhar local/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /entregar/i })).toBeEnabled();
+  });
+
+  it('na fase `descartar`, jogar raça continua aceso — é a outra saída', async () => {
+    await abrirMesa({
+      ...vistaBase,
+      fase: 'descartar',
+      suaMao: [{ id: 'p-0', tipo: 'raca', racaId: 'orc' }],
+    });
+
+    expect(await screen.findByRole('button', { name: /^jogar$/i })).toBeEnabled();
+  });
+
+  it('na fase `vasculhar`, entregar fica apagado — a caridade resolve excedente', async () => {
+    await abrirMesa({ ...vistaBase, suaMao: [{ id: 'p-0', tipo: 'salaVazia' }] });
+
+    expect(await screen.findByRole('button', { name: /entregar/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /vasculhar local/i })).toBeEnabled();
   });
 });

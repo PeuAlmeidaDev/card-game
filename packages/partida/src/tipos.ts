@@ -272,6 +272,12 @@ export interface VistaDaPartida {
   readonly combate: CombateNaMesa | null;
   /** A carta espiada, presente SÓ na vista do dono da espiada. `null` para os outros. */
   readonly espiada: EspiadaPendente | null;
+  /**
+   * Em que ponto do turno a mesa está. PÚBLICA: é regra, não segredo — a mesma
+   * decisão do `limiteDeMao`, que já é publicado por jogador. É daqui que o
+   * cliente tira quais botões acendem, em vez de reimplementar a regra.
+   */
+  readonly fase: Fase;
   readonly desfecho: 'emAndamento' | 'terminada';
   readonly classificacao: readonly PosicaoFinal[] | null;
   readonly log: readonly EventoDaMesa[];
