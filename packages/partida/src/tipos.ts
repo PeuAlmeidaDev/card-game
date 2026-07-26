@@ -1,21 +1,25 @@
 import type { Combatente, EstadoCombate, EventoCombate, DecisaoPendente, PassivaCombate } from '@card-dungeon/motor';
 
 /**
- * **Receita** de carta: o que compor, SEM identidade. É o que entra em
- * `ConfigPartida.composicaoPorJogador` — ali a carta ainda não existe, é só a
- * descrição do baralho. União ABERTA: `maldicao`/`classe`/`item` entram depois.
+ * **Receita** de carta do baralho de PORTAS: o que compor, SEM identidade. É o
+ * que entra em `ConfigPartida.composicaoPorJogador` — ali a carta ainda não
+ * existe, é só a descrição do baralho.
+ *
+ * Renomeada de `ReceitaCarta` na fatia 8: com o baralho de Tesouros chegando no
+ * Plano 3, "carta" deixa de identificar uma família só. O nome agora diz de qual
+ * baralho a receita é, e a segunda família nasce ao lado sem ambiguidade.
  */
-export type ReceitaCarta =
-  | { readonly tipo: 'monstro' }
+export type ReceitaPorta =
+  | { readonly tipo: 'monstro'; readonly monstroId: string }
   | { readonly tipo: 'salaVazia' }
   | { readonly tipo: 'raca'; readonly racaId: string };
 
 /**
- * Carta como **instância** no jogo: a receita mais uma identidade estável. O id
- * é o que permite apontar para UMA carta quando existirem cópias iguais na mão
- * (a mão da fatia 7). Circula por `monte`, `cemiterio`, `espiada` e eventos.
+ * Carta como **instância** no jogo: a receita mais uma identidade estável. O id é
+ * o que permite apontar para UMA carta quando existirem cópias iguais na mão.
+ * Circula por `monte`, `cemiterio`, `espiada` e eventos.
  */
-export type CartaPorta = ReceitaCarta & { readonly id: string };
+export type CartaPorta = ReceitaPorta & { readonly id: string };
 
 /**
  * Uma carta de raça como instância. O slot da zona em jogo aceita SÓ esta: tipar
@@ -35,6 +39,17 @@ export interface ZonaEmJogo {
 
 /** Embaralhamento injetado (aleatoriedade na borda). */
 export type Embaralhar = <T>(itens: readonly T[]) => T[];
+
+/**
+ * Um baralho: o monte de onde se compra e o cemitério para onde se descarta.
+ * Genérico porque a fatia 8 tem DOIS baralhos com regras de compra idênticas
+ * (incluindo o reshuffle) e conteúdos de tipo diferente — parametrizar é o que
+ * evita a segunda cópia de `tirarDoTopo` e de todas as suas guardas.
+ */
+export interface Baralho<T> {
+  readonly monte: readonly T[];
+  readonly cemiterio: readonly T[];
+}
 
 export interface JogadorNaMesa {
   readonly id: string;
@@ -81,6 +96,39 @@ export interface InfoRaca {
   readonly passivaCombate: PassivaCombate | null;
   /** A raça espia o topo do baralho antes de resolver (Presciência do Elfo). */
   readonly espiaTopo: boolean;
+}
+
+/**
+ * O que o catálogo sabe de um monstro: exatamente os 5 stats de `Combatente`.
+ * `partida` nunca lê o nome do monstro — quem nomeia é o cliente, via
+ * `Catalogo.monstros` + `monstroId` (o nome mora só em `MonstroCarta`, no
+ * pacote `cartas`). `MonstroCarta` satisfaz este contrato estruturalmente
+ * (tem mais campos que o exigido), por isso `partida` nunca precisa importar
+ * `cartas`.
+ */
+export interface InfoMonstro {
+  readonly forca: number;
+  readonly vida: number;
+  readonly habilidade: number;
+  readonly agilidade: number;
+  readonly level: number;
+}
+
+/**
+ * A porta ÚNICA de `partida` para o catálogo. O pacote de regras continua cego —
+ * ele não sabe quais raças ou monstros existem, só sabe perguntar. Cada categoria
+ * de carta ganha um membro aqui, e não um campo irmão em `DepsMesa`: com monstro,
+ * classe e item chegando, seriam quatro resolvedores soltos viajando juntos por
+ * toda a chamada.
+ *
+ * As cartas do pacote `cartas` satisfazem estes retornos **estruturalmente**, e é
+ * isso que dispensa qualquer import de `cartas` aqui.
+ */
+export interface CatalogoDaMesa {
+  /** `undefined` (id ausente ou desconhecido) = sem raça, o baseline Humano. */
+  readonly raca: (racaId: string | undefined) => InfoRaca | undefined;
+  /** `undefined` = id que não existe no catálogo: invariante quebrada, não pedido inválido. */
+  readonly monstro: (monstroId: string) => InfoMonstro | undefined;
 }
 
 export interface PosicaoFinal {
@@ -139,6 +187,20 @@ export type AcaoDaMesa =
 export interface CombateNaMesa {
   readonly estado: EstadoCombate;
   readonly proximaDecisao: DecisaoPendente;
+  /**
+   * QUEM é o adversário — o id da carta de monstro que abriu este combate.
+   *
+   * Mora aqui, e não dentro do `EstadoCombate`, porque o `motor` é neutro por
+   * design: ele conhece os lados `a` e `b` e nunca um monstro nomeado, e é isso
+   * que o deixa resolver qualquer duelo sem saber de baralho. A identidade é
+   * conhecimento da MESA, que foi quem virou a carta.
+   *
+   * Sem este campo a vista carrega a vida do adversário sem dizer de quem ela é,
+   * e a tela fica presa em "Monstro" durante a luta inteira — desfazendo, na
+   * única superfície que fica à vista o combate todo, o que a carta com
+   * identidade veio trazer.
+   */
+  readonly monstroId: string;
 }
 
 /**
@@ -158,8 +220,7 @@ export interface EstadoPartida {
   readonly jogadores: readonly JogadorNaMesa[];
   readonly vezDe: string;
   readonly patenteAlvo: number;
-  readonly monte: readonly CartaPorta[];
-  readonly cemiterio: readonly CartaPorta[];
+  readonly portas: Baralho<CartaPorta>;
   readonly combate: CombateNaMesa | null;
   readonly espiada: EspiadaPendente | null;
   readonly desfecho: 'emAndamento' | 'terminada';
@@ -195,7 +256,7 @@ export interface VistaDaPartida {
 
 export interface ConfigPartida {
   readonly patenteAlvo: number;
-  readonly composicaoPorJogador: readonly ReceitaCarta[];
+  readonly composicaoPorJogador: readonly ReceitaPorta[];
   /**
    * Cartas distribuídas a cada jogador na abertura. Ausente = 0, para que os
    * testes possam montar mesas de baralho mínimo (1 carta por jogador) sem ter

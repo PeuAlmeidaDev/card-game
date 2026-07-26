@@ -1,7 +1,7 @@
 import type { Combatente, Passo, RolarD12, PassivaCombate } from '@card-dungeon/motor';
 import { AcaoIlegal, criarCombate, proximoPasso } from '@card-dungeon/motor';
 import type {
-  AcaoDaMesa, CartaPorta, Embaralhar, EstadoPartida, EventoDaMesa, InfoRaca, JogadorNaMesa,
+  AcaoDaMesa, CartaPorta, CatalogoDaMesa, Embaralhar, EstadoPartida, EventoDaMesa, InfoRaca, JogadorNaMesa,
 } from './tipos';
 import { tirarDoTopo } from './baralho';
 import { destinoDaCaridade } from './caridade';
@@ -15,16 +15,14 @@ type AcaoDeCombate = Extract<AcaoDaMesa, { readonly tipo: 'atacar' | 'esquivar' 
 export interface DepsMesa {
   readonly rolar: RolarD12;
   readonly embaralhar: Embaralhar;
-  readonly monstro: Combatente;
-  /** Resolve o que a raça de um jogador confere. Ausente/undefined = sem raça (baseline). */
-  readonly resolverRaca?: (racaId: string | undefined) => InfoRaca | undefined;
+  readonly catalogo: CatalogoDaMesa;
 }
 
-/** Resolve a raça de um jogador (via o resolvedor injetado). Central para não repetir a chamada. */
+/** Resolve a raça de um jogador (via o catálogo injetado). Central para não repetir a chamada. */
 function racaDoLutador(deps: DepsMesa, jogador: JogadorNaMesa | undefined): InfoRaca | undefined {
-  // A ZONA é a fonte: quem troca de raça no meio da partida (Task 6) muda de
-  // passiva na hora, sem nenhum campo paralelo para sincronizar.
-  return deps.resolverRaca?.(jogador?.emJogo.raca?.racaId);
+  // A ZONA é a fonte: quem troca de raça no meio da partida muda de passiva na
+  // hora, sem nenhum campo paralelo para sincronizar.
+  return deps.catalogo.raca(jogador?.emJogo.raca?.racaId);
 }
 
 /** A passiva de combate do jogador, `undefined` quando não há raça ou a raça não tem passiva. */
@@ -139,7 +137,10 @@ function resolverCarta(
   // A carta revelada vai para o cemitério AQUI, um lugar só. Antes cada caminho de
   // entrada descartava por conta própria — e a carta que vai para a MÃO (Task 5)
   // teria que ser retirada do cemitério depois de lá colocada.
-  const revelada: EstadoPartida = { ...base, cemiterio: [...base.cemiterio, carta] };
+  const revelada: EstadoPartida = {
+    ...base,
+    portas: { ...base.portas, cemiterio: [...base.portas.cemiterio, carta] },
+  };
 
   switch (carta.tipo) {
     case 'salaVazia':
@@ -169,11 +170,32 @@ function resolverCarta(
   }
   // Vida sempre reseta: o combatente entra no combate com a statline base na patente atual.
   const combatente: Combatente = { ...jogador.combatenteBase, level: jogador.patente };
+  // Os stats do adversário vêm da CARTA, não das deps: é o que faz cada monstro
+  // do baralho ser um adversário diferente. Id que o catálogo não conhece é
+  // invariante nossa quebrada (a carta veio da composição que a borda montou do
+  // próprio catálogo), então sobe como Error cru => 500 sem vazar.
+  const info = deps.catalogo.monstro(carta.monstroId);
+  if (info === undefined) {
+    throw new Error(`resolverCarta: monstro ${carta.monstroId} não está no catálogo`);
+  }
+  const adversario: Combatente = {
+    forca: info.forca, vida: info.vida, habilidade: info.habilidade,
+    agilidade: info.agilidade, level: info.level,
+  };
   const passiva = passivaDoLutador(deps, jogador);
-  const passo = criarCombate(combatente, deps.monstro, deps.rolar, passiva);
+  const passo = criarCombate(combatente, adversario, deps.rolar, passiva);
   eventos.push({ tipo: 'combate', jogadorId, eventos: passo.eventos });
   return registrar(
-    { ...revelada, combate: { estado: passo.estado, proximaDecisao: passo.proximaDecisao } },
+    {
+      ...revelada,
+      combate: {
+        estado: passo.estado,
+        proximaDecisao: passo.proximaDecisao,
+        // A identidade sai da CARTA, aqui, e não do `passo`: o motor devolve um
+        // estado neutro (lados 'a' e 'b') e não teria como carregá-la.
+        monstroId: carta.monstroId,
+      },
+    },
     eventos,
   );
 }
@@ -201,15 +223,15 @@ function vasculhar(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): Re
   if (temPresciencia) {
     // Presciência: espia o topo SEM revelar. Nenhum evento público (o topo é
     // segredo do vidente); manter/empurrar resolvem depois. A vez não passa.
-    const t = tirarDoTopo(estado.monte, estado.cemiterio, deps.embaralhar);
+    const t = tirarDoTopo(estado.portas, deps.embaralhar);
     return registrar(
-      { ...estado, monte: t.monte, cemiterio: t.cemiterio, espiada: { jogadorId, carta: t.carta } },
+      { ...estado, portas: t.baralho, espiada: { jogadorId, carta: t.carta } },
       [],
     );
   }
 
-  const t = tirarDoTopo(estado.monte, estado.cemiterio, deps.embaralhar);
-  const base: EstadoPartida = { ...estado, monte: t.monte, cemiterio: t.cemiterio };
+  const t = tirarDoTopo(estado.portas, deps.embaralhar);
+  const base: EstadoPartida = { ...estado, portas: t.baralho };
   return resolverCarta(base, jogadorId, t.carta, deps);
 }
 
@@ -236,23 +258,22 @@ function resolverEspiada(estado: EstadoPartida, acao: AcaoDeEspiada, deps: DepsM
   // empurrada voltaria como única do monte e sairia revelada na compra às cegas.
   // Recusar é o único desfecho que preserva "a empurrada nunca se torna pública" —
   // o vidente ainda tem `manterCarta` como saída legal.
-  if (estado.monte.length === 0 && estado.cemiterio.length === 0) {
+  if (estado.portas.monte.length === 0 && estado.portas.cemiterio.length === 0) {
     throw new AcaoInvalida('aplicarAcao: não há outra carta para comprar — a espiada tem que ser mantida');
   }
 
   // Se a espiada esvaziou o monte, reembaralha o cemitério ANTES de empurrar — senão
   // a carta empurrada seria a única no monte e voltaria (revelada) na compra às cegas,
   // violando "a empurrada nunca se torna pública".
-  const precisaReembaralhar = estado.monte.length === 0;
-  const monteBase = precisaReembaralhar ? deps.embaralhar(estado.cemiterio) : estado.monte;
-  const cemiterioBase = precisaReembaralhar ? [] : estado.cemiterio;
+  const precisaReembaralhar = estado.portas.monte.length === 0;
+  const monteBase = precisaReembaralhar ? deps.embaralhar(estado.portas.cemiterio) : estado.portas.monte;
+  const cemiterioBase = precisaReembaralhar ? [] : estado.portas.cemiterio;
   const monteComEmpurrada: readonly CartaPorta[] = [...monteBase, espiada.carta];
-  const compra = tirarDoTopo(monteComEmpurrada, cemiterioBase, deps.embaralhar);
+  const compra = tirarDoTopo({ monte: monteComEmpurrada, cemiterio: cemiterioBase }, deps.embaralhar);
   const base: EstadoPartida = {
     ...estado,
     espiada: null,
-    monte: compra.monte,
-    cemiterio: compra.cemiterio,
+    portas: compra.baralho,
   };
   return resolverCarta(base, espiada.jogadorId, compra.carta, deps);
 }
@@ -323,7 +344,7 @@ function entregarCarta(
       j.id === jogador.id ? { ...j, mao: semACarta } : j
     ));
     return encerrarTurno(
-      { ...estado, jogadores, cemiterio: [...estado.cemiterio, carta] },
+      { ...estado, jogadores, portas: { ...estado.portas, cemiterio: [...estado.portas.cemiterio, carta] } },
       [{ tipo: 'descarte', jogadorId: jogador.id, carta }],
     );
   }
@@ -374,7 +395,10 @@ function jogarCarta(
     {
       ...estado,
       jogadores: estado.jogadores.map((j) => (j.id === atualizado.id ? atualizado : j)),
-      cemiterio: anterior === null ? estado.cemiterio : [...estado.cemiterio, anterior],
+      portas: {
+        ...estado.portas,
+        cemiterio: anterior === null ? estado.portas.cemiterio : [...estado.portas.cemiterio, anterior],
+      },
     },
     [{ tipo: 'racaEmJogo', jogadorId: acao.jogadorId, carta }],
   );
@@ -413,7 +437,10 @@ function agirNoCombate(estado: EstadoPartida, acao: AcaoDeCombate, deps: DepsMes
 
   if (passo.estado.desfecho === 'emAndamento') {
     return registrar(
-      { ...estado, combate: { estado: passo.estado, proximaDecisao: passo.proximaDecisao } },
+      // `...combate` primeiro: a identidade do adversário é do COMBATE, não do
+      // instante. O `passo` do motor só traz estado e decisão, então remontar o
+      // objeto do zero a cada lance perderia o `monstroId` no primeiro ataque.
+      { ...estado, combate: { ...combate, estado: passo.estado, proximaDecisao: passo.proximaDecisao } },
       eventos,
     );
   }

@@ -1,5 +1,5 @@
 import type { Combatente } from '@card-dungeon/motor';
-import type { RacaResumo } from '@card-dungeon/cartas';
+import type { RacaResumo, MonstroCarta } from '@card-dungeon/cartas';
 
 /** Modificadores parciais dos 4 stats de combate. `level` nunca é modificado. */
 export interface ModificadoresDeStat {
@@ -21,10 +21,16 @@ export interface Equipamento {
   readonly modificadores: ModificadoresDeStat;
 }
 
-/** O que o `GET /catalogo` entrega: raças (carta), classes, itens + a base para o preview. */
+/** O que o `GET /catalogo` entrega: raças (carta), monstros, classes, itens + a base para o preview. */
 export interface Catalogo {
   readonly base: Combatente;
   readonly racas: readonly RacaResumo[];
+  /**
+   * O bestiário, INTEIRO. Diferente de `racas`, não há projeção `Resumo`: a carta
+   * de monstro é dado puro (nada de código a tirar antes do JSON) e os stats são
+   * informação pública — a carta é revelada com a face para cima.
+   */
+  readonly monstros: readonly MonstroCarta[];
   readonly classes: readonly Classe[];
   readonly itens: readonly Equipamento[];
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { criarPartida } from './montagem';
-import { COMPOSICAO_POR_JOGADOR } from './baralho';
+import { COMPOSICAO_DE_TESTE } from './testes/composicao';
 import type { EntradaJogador } from './tipos';
 import type { Combatente } from '@card-dungeon/motor';
 
@@ -12,7 +12,7 @@ const entradas: readonly EntradaJogador[] = [
   { id: 'p2', nome: 'Bot 1', ehBot: true, combatenteBase: base },
 ];
 
-const config = { patenteAlvo: 3, composicaoPorJogador: COMPOSICAO_POR_JOGADOR };
+const config = { patenteAlvo: 3, composicaoPorJogador: COMPOSICAO_DE_TESTE };
 
 describe('criarPartida', () => {
   it('coloca todos na patente 1, sem derrotas, e dá a vez ao primeiro assento', () => {
@@ -29,8 +29,8 @@ describe('criarPartida', () => {
   it('monta o baralho escalado pelo número de jogadores', () => {
     const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
     // 8 cartas por jogador × 2 jogadores
-    expect(p.monte).toHaveLength(COMPOSICAO_POR_JOGADOR.length * 2);
-    expect(p.cemiterio).toEqual([]);
+    expect(p.portas.monte).toHaveLength(COMPOSICAO_DE_TESTE.length * 2);
+    expect(p.portas.cemiterio).toEqual([]);
   });
 
   it('registra de quem é a vez no log', () => {
@@ -60,9 +60,9 @@ describe('criarPartida', () => {
     // Identidade é o que permite o cliente dizer "jogue ESTA carta" quando a mão
     // tiver duas cópias da mesma raça. Ids repetidos fariam a ação errada acertar.
     const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
-    const ids = p.monte.map((c) => c.id);
+    const ids = p.portas.monte.map((c) => c.id);
 
-    expect(ids).toHaveLength(COMPOSICAO_POR_JOGADOR.length * 2);
+    expect(ids).toHaveLength(COMPOSICAO_DE_TESTE.length * 2);
     expect(new Set(ids).size).toBe(ids.length);
   });
 
@@ -80,9 +80,9 @@ describe('criarPartida', () => {
     const p = criarPartida('m1', entradas, { ...config, maoInicial: 2 }, { embaralhar: semEmbaralhar });
 
     expect(p.jogadores.map((j) => j.mao.length)).toEqual([2, 2]);
-    expect(p.monte).toHaveLength(COMPOSICAO_POR_JOGADOR.length * 2 - 4);
+    expect(p.portas.monte).toHaveLength(COMPOSICAO_DE_TESTE.length * 2 - 4);
     // Nenhuma carta em dois lugares ao mesmo tempo: a mão SAI do baralho.
-    const todas = [...p.jogadores.flatMap((j) => j.mao), ...p.monte].map((c) => c.id);
+    const todas = [...p.jogadores.flatMap((j) => j.mao), ...p.portas.monte].map((c) => c.id);
     expect(new Set(todas).size).toBe(todas.length);
   });
 

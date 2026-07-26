@@ -2,13 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { aplicarAcao } from './mesa';
 import { avancarBots } from './automacao';
 import { criarPartida } from './montagem';
-import { COMPOSICAO_POR_JOGADOR } from './baralho';
 import { MAO_INICIAL_PADRAO, limiteDeMao } from './mao';
 import { escolherAcao } from './bot';
 import { projetarPara } from './projecao';
 import { AcaoInvalida } from './erros';
 import { filaDeDados, criarDadoCiclico } from './testes/dados';
 import { monstro, salaVazia, raca } from './testes/cartas';
+import { catalogoDeTeste } from './testes/catalogo';
+import { COMPOSICAO_DE_TESTE } from './testes/composicao';
 import type { EntradaJogador, CartaPorta, EstadoPartida } from './tipos';
 import type { Combatente, PassivaCombate } from '@card-dungeon/motor';
 
@@ -20,13 +21,12 @@ export const entradas: readonly EntradaJogador[] = [
   { id: 'p2', nome: 'Bot 1', ehBot: true, combatenteBase: base },
 ];
 
-const config = { patenteAlvo: 3, composicaoPorJogador: COMPOSICAO_POR_JOGADOR };
+const config = { patenteAlvo: 3, composicaoPorJogador: COMPOSICAO_DE_TESTE };
 
-const monstroPadrao: Combatente = { forca: 2, vida: 10, habilidade: 6, agilidade: 1, level: 1 };
 const deps = (dados: readonly number[]) => ({
   rolar: filaDeDados(dados),
   embaralhar: semEmbaralhar,
-  monstro: monstroPadrao,
+  catalogo: catalogoDeTeste(),
 });
 
 describe('aplicarAcao — vasculhar', () => {
@@ -34,14 +34,14 @@ describe('aplicarAcao — vasculhar', () => {
     const p = criarPartida('m1', entradas,
       { ...config, composicaoPorJogador: [{ tipo: 'salaVazia' }] },
       { embaralhar: semEmbaralhar });
-    const topo = p.monte[0];
+    const topo = p.portas.monte[0];
 
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
 
     // `[0]` sozinho passa com a carta lá uma OU duas vezes — o tamanho é o que
     // pega um descarte duplicado (o cemitério é escrito só dentro de `resolverCarta`).
-    expect(r.estado.cemiterio).toHaveLength(1);
-    expect(r.estado.cemiterio[0]?.id).toBe(topo?.id);
+    expect(r.estado.portas.cemiterio).toHaveLength(1);
+    expect(r.estado.portas.cemiterio[0]?.id).toBe(topo?.id);
   });
 
   it('rejeita ação de quem não tem a vez', () => {
@@ -79,7 +79,7 @@ describe('aplicarAcao — vasculhar', () => {
   });
 
   it('monstro abre o combate e para no ataque do jogador', () => {
-    const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'monstro' }] },
+    const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'monstro', monstroId: 'm-teste' }] },
       { embaralhar: semEmbaralhar });
     // agilidade do jogador (5) > do monstro (1) => sem rolagem de iniciativa
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
@@ -89,8 +89,44 @@ describe('aplicarAcao — vasculhar', () => {
     expect(r.estado.combate?.estado.jogador.vida).toBe(20);
   });
 
+  // Um bestiário de DOIS ids, para os testes de identidade: com um só, "o id
+  // certo chegou" e "algum id chegou" seriam indistinguíveis.
+  const depsComOgro = (dados: readonly number[]) => ({
+    rolar: filaDeDados(dados),
+    embaralhar: semEmbaralhar,
+    catalogo: catalogoDeTeste({
+      monstro: (id) => (id === 'ogro'
+        ? { forca: 2, vida: 10, habilidade: 6, agilidade: 1, level: 1 }
+        : undefined),
+    }),
+  });
+
+  it('o combate carrega QUEM é o adversário, não só os stats dele', () => {
+    // O `EstadoCombate` do motor é neutro: ele conhece 'a' e 'b', nunca um
+    // monstro nomeado. Sem o id aqui, a tela sabe a vida do adversário e não
+    // sabe de quem ela é — o painel de combate fica preso em "Monstro", que é
+    // exatamente o que a carta com identidade veio desfazer.
+    const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'monstro', monstroId: 'ogro' }] },
+      { embaralhar: semEmbaralhar });
+    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsComOgro([]));
+
+    expect(r.estado.combate?.monstroId).toBe('ogro');
+  });
+
+  it('o adversário continua identificado depois de um lance', () => {
+    // A identidade é do COMBATE, não do instante: se cada passo remontasse o
+    // combate a partir do `Passo` do motor, o id se perderia no primeiro ataque
+    // e o painel voltaria a "Monstro" no meio da luta.
+    const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'monstro', monstroId: 'ogro' }] },
+      { embaralhar: semEmbaralhar });
+    const aberto = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsComOgro([])).estado;
+    const depoisDoAtaque = aplicarAcao(aberto, { tipo: 'atacar', jogadorId: 'p1' }, depsComOgro([12, 12]));
+
+    expect(depoisDoAtaque.estado.combate?.monstroId).toBe('ogro');
+  });
+
   it('rejeita vasculhar local com um combate em curso', () => {
-    const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'monstro' }] },
+    const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'monstro', monstroId: 'm-teste' }] },
       { embaralhar: semEmbaralhar });
     const comCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
 
@@ -109,7 +145,7 @@ describe('aplicarAcao — vasculhar', () => {
 });
 
 describe('aplicarAcao — combate', () => {
-  const soMonstro = { ...config, composicaoPorJogador: [{ tipo: 'monstro' as const }] };
+  const soMonstro = { ...config, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] };
 
   const abrirCombate = (dados: readonly number[]) => {
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
@@ -149,10 +185,12 @@ describe('aplicarAcao — combate', () => {
   });
 
   it('perder o combate conta derrota e passa a vez', () => {
-    const forte: Combatente = { forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1 };
+    const forte = { forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1 };
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
-    const depsForte = (dados: readonly number[]) =>
-      ({ rolar: filaDeDados(dados), embaralhar: semEmbaralhar, monstro: forte });
+    const depsForte = (dados: readonly number[]) => ({
+      rolar: filaDeDados(dados), embaralhar: semEmbaralhar,
+      catalogo: catalogoDeTeste({ monstro: () => forte }),
+    });
 
     // monstro mais ágil ataca primeiro e acerta (rolagem 1 <= habilidade 12)
     const comCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsForte([1])).estado;
@@ -191,9 +229,11 @@ describe('aplicarAcao — combate', () => {
   it('traduz a recusa do motor em AcaoInvalida, preservando a mensagem', () => {
     // O motor recusa `atacar` quando a máquina está pedindo a esquiva. Sem a
     // tradução, esse Error cru viraria 500 na Task 14 em vez do 400 que é.
-    const forte: Combatente = { forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1 };
-    const depsForte = (dados: readonly number[]) =>
-      ({ rolar: filaDeDados(dados), embaralhar: semEmbaralhar, monstro: forte });
+    const forte = { forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1 };
+    const depsForte = (dados: readonly number[]) => ({
+      rolar: filaDeDados(dados), embaralhar: semEmbaralhar,
+      catalogo: catalogoDeTeste({ monstro: () => forte }),
+    });
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const pedindoEsquiva = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsForte([1])).estado;
 
@@ -212,11 +252,70 @@ describe('aplicarAcao — combate', () => {
     const rolarQuebrado = () => {
       throw new TypeError('detalhe interno do servidor');
     };
-    const depsQuebradas = { rolar: rolarQuebrado, embaralhar: semEmbaralhar, monstro: monstroPadrao };
+    const depsQuebradas = {
+      rolar: rolarQuebrado, embaralhar: semEmbaralhar, catalogo: catalogoDeTeste(),
+    };
 
     expect(() => aplicarAcao(comCombate, { tipo: 'atacar', jogadorId: 'p1' }, depsQuebradas))
       .toThrow(TypeError);
     expect(() => aplicarAcao(comCombate, { tipo: 'atacar', jogadorId: 'p1' }, depsQuebradas))
+      .not.toThrow(AcaoInvalida);
+  });
+});
+
+describe('monstro com identidade', () => {
+  it('resolve os stats do monstro pela carta, não por um monstro fixo nas deps', () => {
+    const ogro = { forca: 6, vida: 28, habilidade: 3, agilidade: 2, level: 3 };
+    const estado = criarPartida('m1', entradas,
+      { ...config, composicaoPorJogador: [{ tipo: 'monstro', monstroId: 'ogro' }] },
+      { embaralhar: semEmbaralhar });
+
+    const depois = aplicarAcao(estado, { tipo: 'vasculhar', jogadorId: estado.vezDe }, {
+      rolar: filaDeDados([]),
+      embaralhar: semEmbaralhar,
+      catalogo: catalogoDeTeste({ monstro: (id) => (id === 'ogro' ? ogro : undefined) }),
+    });
+
+    expect(depois.estado.combate?.estado.monstro.vida).toBe(28);
+  });
+
+  it('dois monstros diferentes no mesmo baralho abrem combates com vidas diferentes', () => {
+    const catalogo = catalogoDeTeste({
+      monstro: (id) => (id === 'rato'
+        ? { forca: 1, vida: 6, habilidade: 2, agilidade: 1, level: 1 }
+        : { forca: 6, vida: 28, habilidade: 3, agilidade: 2, level: 3 }),
+    });
+    const base = criarPartida('m1', entradas,
+      { ...config, composicaoPorJogador: [{ tipo: 'monstro', monstroId: 'rato' }] },
+      { embaralhar: semEmbaralhar });
+
+    const comRato = aplicarAcao(base, { tipo: 'vasculhar', jogadorId: base.vezDe },
+      { rolar: filaDeDados([]), embaralhar: semEmbaralhar, catalogo });
+    expect(comRato.estado.combate?.estado.monstro.vida).toBe(6);
+
+    const comOgro = aplicarAcao(
+      { ...base, portas: { ...base.portas, monte: [{ id: 'p-9', tipo: 'monstro', monstroId: 'ogro' }] } },
+      { tipo: 'vasculhar', jogadorId: base.vezDe },
+      { rolar: filaDeDados([]), embaralhar: semEmbaralhar, catalogo },
+    );
+    expect(comOgro.estado.combate?.estado.monstro.vida).toBe(28);
+  });
+
+  it('carta de monstro que o catálogo não conhece é invariante nossa, não pedido inválido', () => {
+    const estado = criarPartida('m1', entradas,
+      { ...config, composicaoPorJogador: [{ tipo: 'monstro', monstroId: 'quimera-fantasma' }] },
+      { embaralhar: semEmbaralhar });
+    // O catálogo DEFAULT já basta: ele conhece só `'m-teste'`. Precisar cegá-lo
+    // à mão para alcançar este caminho seria o sintoma de um catálogo de teste
+    // que aprova qualquer id — e que portanto deixaria passar um typo de
+    // `monstroId` em qualquer outro teste deste arquivo.
+    const padrao = { rolar: filaDeDados([]), embaralhar: semEmbaralhar, catalogo: catalogoDeTeste() };
+
+    // Error cru (=> 500 sem vazar), NUNCA AcaoInvalida: a carta só chegou ao
+    // monte pela composição que a própria borda montou do catálogo.
+    expect(() => aplicarAcao(estado, { tipo: 'vasculhar', jogadorId: estado.vezDe }, padrao))
+      .toThrow(/quimera-fantasma/);
+    expect(() => aplicarAcao(estado, { tipo: 'vasculhar', jogadorId: estado.vezDe }, padrao))
       .not.toThrow(AcaoInvalida);
   });
 });
@@ -232,10 +331,10 @@ describe('partida completa', () => {
     const dadosDeps = {
       rolar: criarDadoCiclico([4, 12]), // sempre acerta e o defensor nunca esquiva
       embaralhar: semEmbaralhar,
-      monstro: monstroPadrao,
+      catalogo: catalogoDeTeste(),
     };
 
-    let estado = criarPartida('m1', quatro, { patenteAlvo: 3, composicaoPorJogador: [{ tipo: 'monstro' }] },
+    let estado = criarPartida('m1', quatro, { patenteAlvo: 3, composicaoPorJogador: [{ tipo: 'monstro', monstroId: 'm-teste' }] },
       { embaralhar: semEmbaralhar });
 
     // Guarda anti-loop: se a partida não terminar em MAX_VOLTAS, o teste falha
@@ -268,8 +367,12 @@ describe('passiva da raça no combate da Mesa', () => {
           ? { dano: base, estado: ctx.estado }
           : { dano: Math.floor(base / 2), estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } },
     };
-    const resolverRaca = (racaId: string | undefined) =>
-      racaId === 'anao' ? { passivaCombate: metade, espiaTopo: false } : undefined;
+    // monstro rápido (ataca primeiro) e forte, para o 1º golpe cair no humano
+    const monstroForte = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 };
+    const catalogo = catalogoDeTeste({
+      raca: (racaId) => (racaId === 'anao' ? { passivaCombate: metade, espiaTopo: false } : undefined),
+      monstro: () => monstroForte,
+    });
 
     const humano: EntradaJogador = {
       id: 'p1', nome: 'Você', ehBot: false,
@@ -280,18 +383,15 @@ describe('passiva da raça no combate da Mesa', () => {
       combatenteBase: { forca: 3, vida: 20, habilidade: 8, agilidade: 1, level: 1 },
     };
 
-    // monstro rápido (ataca primeiro) e forte, para o 1º golpe cair no humano
-    const monstroForte = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 };
     // criar: monstro ataca (dado 1 acerta) -> pede esquiva; esquivar (dado 12 falha)
     // dano base 6; com a passiva -> 3; vida 20 - 3 = 17
     const deps = {
       rolar: filaDeDados([1, 12]),
       embaralhar: <T,>(x: readonly T[]) => [...x],
-      monstro: monstroForte,
-      resolverRaca,
+      catalogo,
     };
 
-    const nascida = criarPartida('m1', [humano, bot], { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' }] }, { embaralhar: deps.embaralhar });
+    const nascida = criarPartida('m1', [humano, bot], { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro', monstroId: 'm-teste' }] }, { embaralhar: deps.embaralhar });
     // A carta de Anão já na zona — o mesmo lugar onde `jogarCarta` a deixaria.
     let estado: EstadoPartida = {
       ...nascida,
@@ -306,13 +406,15 @@ describe('passiva da raça no combate da Mesa', () => {
   });
 });
 
-const monstroFraco: Combatente = { forca: 1, vida: 1, habilidade: 0, agilidade: 0, level: 1 };
+const monstroFraco = { forca: 1, vida: 1, habilidade: 0, agilidade: 0, level: 1 };
 // deps com Presciência ligada e um monstro fraco para o combate resolver rápido.
 const depsVidente = (dados: readonly number[]) => ({
   rolar: filaDeDados(dados),
   embaralhar: semEmbaralhar,
-  monstro: monstroFraco,
-  resolverRaca: () => ({ passivaCombate: null, espiaTopo: true }),
+  catalogo: catalogoDeTeste({
+    raca: () => ({ passivaCombate: null, espiaTopo: true }),
+    monstro: () => monstroFraco,
+  }),
 });
 
 describe('aplicarAcao — espiada (Presciência)', () => {
@@ -336,14 +438,16 @@ describe('aplicarAcao — espiada (Presciência)', () => {
     const deps1 = {
       rolar: filaDeDados([1, 12]),
       embaralhar: semEmbaralhar,
-      monstro: monstroForte,
-      resolverRaca: (racaId: string | undefined) => {
-        chamadas.push(racaId);
-        return { passivaCombate: metade, espiaTopo: true };
-      },
+      catalogo: catalogoDeTeste({
+        raca: (racaId) => {
+          chamadas.push(racaId);
+          return { passivaCombate: metade, espiaTopo: true };
+        },
+        monstro: () => monstroForte,
+      }),
     };
     const p = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const }] },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] },
       { embaralhar: semEmbaralhar });
 
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps1);
@@ -395,7 +499,7 @@ describe('aplicarAcao — espiada (Presciência)', () => {
 
   it('a projeção mostra a carta espiada só a quem está na vez', () => {
     const p = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const }] },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] },
       { embaralhar: semEmbaralhar });
     const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])).estado;
 
@@ -414,7 +518,7 @@ describe('aplicarAcao — espiada (Presciência)', () => {
 
     expect(r.estado.espiada).toBeNull();
     expect(r.estado.vezDe).toBe('p2');            // salaVazia resolvida → vez passou
-    expect(r.estado.cemiterio.map((c) => c.tipo)).toEqual(['salaVazia']); // a mantida foi revelada
+    expect(r.estado.portas.cemiterio.map((c) => c.tipo)).toEqual(['salaVazia']); // a mantida foi revelada
     expect(r.eventos.some((e) => e.tipo === 'porta')).toBe(true);
   });
 
@@ -422,7 +526,7 @@ describe('aplicarAcao — espiada (Presciência)', () => {
     // monte (semEmbaralhar) = [salaVazia, monstro] (composicao construída para o
     // topo ser salaVazia e a próxima monstro).
     const p = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }, { tipo: 'monstro' as const }] },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }, { tipo: 'monstro' as const, monstroId: 'm-teste' }] },
       { embaralhar: semEmbaralhar });
     const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])).estado;
     expect(comEspiada.espiada?.carta.tipo).toBe('salaVazia'); // topo espiado
@@ -432,10 +536,10 @@ describe('aplicarAcao — espiada (Presciência)', () => {
     expect(r.estado.espiada).toBeNull();
     expect(r.estado.combate).not.toBeNull(); // a PRÓXIMA (monstro) foi comprada às cegas e abriu combate
     // a salaVazia empurrada NÃO foi revelada: não está no cemitério (foi pro fundo do monte)
-    expect(r.estado.cemiterio.some((c) => c.tipo === 'salaVazia')).toBe(false);
+    expect(r.estado.portas.cemiterio.some((c) => c.tipo === 'salaVazia')).toBe(false);
     // Só o monstro comprado às cegas foi descartado — o tamanho pega um
     // descarte duplicado que `.some` sozinho deixaria passar.
-    expect(r.estado.cemiterio).toHaveLength(1);
+    expect(r.estado.portas.cemiterio).toHaveLength(1);
   });
 
   it('empurrar com o monte vazio reembaralha o cemitério ANTES (a empurrada não volta pública)', () => {
@@ -443,18 +547,18 @@ describe('aplicarAcao — espiada (Presciência)', () => {
       { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
       { embaralhar: semEmbaralhar });
     // Estado forjado: monte com só 1 carta (salaVazia); cemitério com 1 monstro já revelado.
-    const p = { ...p0, monte: [salaVazia('v1')], cemiterio: [monstro('m1')] };
+    const p = { ...p0, portas: { monte: [salaVazia('v1')], cemiterio: [monstro('m1')] } };
     const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])).estado;
-    expect(comEspiada.monte).toEqual([]);                      // tirarDoTopo esvaziou o monte
+    expect(comEspiada.portas.monte).toEqual([]);                // tirarDoTopo esvaziou o monte
     expect(comEspiada.espiada?.carta).toEqual(salaVazia('v1'));
 
     const r = aplicarAcao(comEspiada, { tipo: 'empurrarCarta', jogadorId: 'p1' }, depsVidente([1])).estado;
     expect(r.combate).not.toBeNull();                          // a próxima às cegas foi o monstro
-    expect(r.cemiterio.some((c) => c.tipo === 'salaVazia')).toBe(false); // a empurrada NÃO virou pública
-    expect(r.cemiterio.some((c) => c.tipo === 'monstro')).toBe(true);
+    expect(r.portas.cemiterio.some((c) => c.tipo === 'salaVazia')).toBe(false); // a empurrada NÃO virou pública
+    expect(r.portas.cemiterio.some((c) => c.tipo === 'monstro')).toBe(true);
     // Só o monstro comprado às cegas foi descartado — o tamanho pega um
     // descarte duplicado que `.some` sozinho deixaria passar.
-    expect(r.cemiterio).toHaveLength(1);
+    expect(r.portas.cemiterio).toHaveLength(1);
   });
 
   it('recusa empurrar quando não há OUTRA carta para comprar', () => {
@@ -466,10 +570,10 @@ describe('aplicarAcao — espiada (Presciência)', () => {
     const p0 = criarPartida('m1', entradas,
       { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
       { embaralhar: semEmbaralhar });
-    const p = { ...p0, monte: [salaVazia('v1')], cemiterio: [] };
+    const p = { ...p0, portas: { monte: [salaVazia('v1')], cemiterio: [] } };
     const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])).estado;
-    expect(comEspiada.monte).toEqual([]);
-    expect(comEspiada.cemiterio).toEqual([]);
+    expect(comEspiada.portas.monte).toEqual([]);
+    expect(comEspiada.portas.cemiterio).toEqual([]);
 
     expect(() => aplicarAcao(comEspiada, { tipo: 'empurrarCarta', jogadorId: 'p1' }, depsVidente([1])))
       .toThrow(AcaoInvalida);
@@ -493,9 +597,35 @@ describe('aplicarAcao — espiada (Presciência)', () => {
     const p = criarPartida('m1', entradas,
       { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
       { embaralhar: semEmbaralhar });
-    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])); // deps() sem resolverRaca
+    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])); // deps() sem catálogo de raça
     expect(r.estado.espiada).toBeNull();
     expect(r.estado.vezDe).toBe('p2'); // resolveu na hora
+  });
+
+  it('lê a passiva da raça pelo catálogo injetado, não por um resolvedor solto', () => {
+    const vistas: (string | undefined)[] = [];
+    const catalogo = catalogoDeTeste({
+      raca: (racaId) => {
+        vistas.push(racaId);
+        return racaId === 'elfo' ? { passivaCombate: null, espiaTopo: true } : undefined;
+      },
+    });
+    const estado = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'salaVazia' }] },
+      { embaralhar: semEmbaralhar });
+    const comElfo: EstadoPartida = {
+      ...estado,
+      jogadores: estado.jogadores.map((j) => (
+        j.id === estado.vezDe ? { ...j, emJogo: { raca: raca('r-1', 'elfo') } } : j
+      )),
+    };
+
+    const depois = aplicarAcao(comElfo, { tipo: 'vasculhar', jogadorId: comElfo.vezDe }, {
+      rolar: filaDeDados([]), embaralhar: semEmbaralhar, catalogo,
+    });
+
+    // Espiada aberta => a Presciência foi lida pelo catálogo, e o racaId chegou lá.
+    expect(depois.estado.espiada).not.toBeNull();
+    expect(vistas).toContain('elfo');
   });
 });
 
@@ -514,7 +644,8 @@ describe('avancarBots — teto de ações automáticas', () => {
       { embaralhar: semEmbaralhar });
 
     expect(() => avancarBots(p, {
-      rolar: criarDadoCiclico([4, 12]), embaralhar: semEmbaralhar, monstro: monstroPadrao,
+      rolar: criarDadoCiclico([4, 12]), embaralhar: semEmbaralhar,
+      catalogo: catalogoDeTeste(),
     })).toThrow('avancarBots: teto de ações automáticas atingido');
   });
 
@@ -554,14 +685,14 @@ describe('vasculhar — carta de raça', () => {
     const p0 = criarPartida('m1', entradas,
       { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
       { embaralhar: semEmbaralhar });
-    const p = { ...p0, monte: [raca('r1', 'elfo')] };
+    const p = { ...p0, portas: { ...p0.portas, monte: [raca('r1', 'elfo')] } };
 
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
 
     expect(r.estado.jogadores[0]?.mao.map((c) => c.id)).toEqual(['r1']);
     expect(r.estado.jogadores[1]?.mao).toEqual([]);
-    expect(r.estado.cemiterio.some((c) => c.id === 'r1')).toBe(false); // está na mão, não no lixo
-    expect(r.estado.cemiterio).toHaveLength(0);                        // raça não passa pelo descarte
+    expect(r.estado.portas.cemiterio.some((c) => c.id === 'r1')).toBe(false); // está na mão, não no lixo
+    expect(r.estado.portas.cemiterio).toHaveLength(0);                        // raça não passa pelo descarte
     expect(r.estado.combate).toBeNull();                               // raça não abre combate
     expect(r.estado.vezDe).toBe('p2');
     expect(r.eventos[0]).toMatchObject({ tipo: 'achado', jogadorId: 'p1' });
@@ -575,7 +706,7 @@ describe('vasculhar — carta de raça', () => {
     const p0 = criarPartida('m1', entradas,
       { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
       { embaralhar: semEmbaralhar });
-    const p = { ...p0, monte: [raca('carta-secreta', 'raca-secreta')] };
+    const p = { ...p0, portas: { ...p0.portas, monte: [raca('carta-secreta', 'raca-secreta')] } };
 
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
 
@@ -604,16 +735,17 @@ describe('a raça vem da ZONA EM JOGO', () => {
           : { dano: Math.floor(dano / 2), estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } },
     };
     // monstro rápido (ataca primeiro) e forte, para o 1º golpe cair no humano
-    const monstroForte: Combatente = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 };
-    const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const }] };
+    const monstroForte = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 };
+    const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] };
 
     const vidaApos = (comRacaNaZona: boolean): number | undefined => {
       const depsAnao = {
         rolar: filaDeDados([1, 12]),   // monstro acerta; jogador falha a esquiva
         embaralhar: semEmbaralhar,
-        monstro: monstroForte,
-        resolverRaca: (racaId: string | undefined) =>
-          racaId === 'anao' ? { passivaCombate: metade, espiaTopo: false } : undefined,
+        catalogo: catalogoDeTeste({
+          raca: (racaId) => (racaId === 'anao' ? { passivaCombate: metade, espiaTopo: false } : undefined),
+          monstro: () => monstroForte,
+        }),
       };
       const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
       const inicial: EstadoPartida = comRacaNaZona
@@ -667,7 +799,7 @@ describe('aplicarAcao — jogarCarta', () => {
     const r = aplicarAcao(comAnterior, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r2' }, deps([]));
 
     expect(r.estado.jogadores[0]?.emJogo.raca?.id).toBe('r2');
-    expect(r.estado.cemiterio.some((c) => c.id === 'r1')).toBe(true);
+    expect(r.estado.portas.cemiterio.some((c) => c.id === 'r1')).toBe(true);
   });
 
   it('recusa carta que não está na sua mão', () => {
@@ -708,7 +840,7 @@ describe('aplicarAcao — jogarCarta', () => {
     // Bible §5: troca de raça só fora do combate. A guarda fala o vocabulário que
     // o reducer já tem (`combate`/`espiada`) — não há máquina de fases aqui.
     const p0 = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const }] },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] },
       { embaralhar: semEmbaralhar });
     const emCombate = aplicarAcao(comMao(p0, [raca('r1', 'anao')]),
       { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
@@ -728,16 +860,17 @@ describe('aplicarAcao — jogarCarta', () => {
           ? { dano, estado: ctx.estado }
           : { dano: Math.floor(dano / 2), estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } },
     };
-    const monstroForte: Combatente = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 };
+    const monstroForte = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 };
     const depsAnao = {
       rolar: filaDeDados([1, 12]),
       embaralhar: semEmbaralhar,
-      monstro: monstroForte,
-      resolverRaca: (racaId: string | undefined) =>
-        racaId === 'anao' ? { passivaCombate: metade, espiaTopo: false } : undefined,
+      catalogo: catalogoDeTeste({
+        raca: (racaId) => (racaId === 'anao' ? { passivaCombate: metade, espiaTopo: false } : undefined),
+        monstro: () => monstroForte,
+      }),
     };
     const p0 = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const }] },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] },
       { embaralhar: semEmbaralhar });
 
     const jogou = aplicarAcao(comMao(p0, [raca('r1', 'anao')]),
@@ -774,7 +907,7 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
     expect(r.estado.jogadores[0]?.mao.map((c) => c.id)).toEqual(['m2', 'm3', 'm4', 'm5']);
     expect(r.estado.jogadores[1]?.mao.map((c) => c.id)).toEqual(['m1']);
     // A carta não fica em dois lugares nem passa pelo cemitério no caminho.
-    expect(r.estado.cemiterio).toEqual([]);
+    expect(r.estado.portas.cemiterio).toEqual([]);
   });
 
   it('o evento de entrega NÃO carrega a carta — o log é público', () => {
@@ -798,7 +931,7 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
 
     const r = aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([]));
 
-    expect(r.estado.cemiterio.map((c) => c.id)).toEqual(['m1']);
+    expect(r.estado.portas.cemiterio.map((c) => c.id)).toEqual(['m1']);
     expect(r.estado.jogadores[1]?.mao).toEqual([]);
     expect(r.eventos).toContainEqual({ tipo: 'descarte', jogadorId: 'p1', carta: monstro('m1') });
   });
@@ -892,7 +1025,7 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
     // de mão — por isso a mão nem precisa estar estourada aqui. (Desde a Task 4,
     // `vasculhar` também recusa abrir combate com a mão já estourada, então usar
     // `estourado` para chegar a este `emCombate` nem seria mais possível.)
-    const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const }] };
+    const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] };
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const emCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
     expect(emCombate.combate).not.toBeNull();
@@ -943,7 +1076,7 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
     // A carta de raça sacada vai para a MÃO (não para a zona) — é ela que estoura
     // o limite como CONSEQUÊNCIA da compra, não como precondição do vasculhar.
     const p0 = comMaoNoLimiteEZona(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }));
-    const p: EstadoPartida = { ...p0, monte: [raca('r9', 'elfo')] };
+    const p: EstadoPartida = { ...p0, portas: { ...p0.portas, monte: [raca('r9', 'elfo')] } };
 
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
 
@@ -957,7 +1090,7 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
     // no server e morreria como 400 no reducer. Foi exatamente o achado A3 da
     // espiada; aqui não se repete porque o evento `porta` já foi emitido.
     const p0 = comMaoNoLimiteEZona(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }));
-    const p: EstadoPartida = { ...p0, monte: [raca('r9', 'elfo')] };
+    const p: EstadoPartida = { ...p0, portas: { ...p0.portas, monte: [raca('r9', 'elfo')] } };
 
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
 
@@ -996,10 +1129,13 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
     // então a mão estourada não pode mais vir de ANTES do vasculhar (senão o
     // combate nem abriria). Ela é forjada DEPOIS que o combate já está aberto,
     // só para provar que `fecharCombate` também passa pela porta única.
-    const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const }] };
+    const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] };
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
-    const fraco: Combatente = { forca: 1, vida: 1, habilidade: 0, agilidade: 0, level: 1 };
-    const depsFraco = { rolar: filaDeDados([1, 12]), embaralhar: semEmbaralhar, monstro: fraco };
+    const fraco = { forca: 1, vida: 1, habilidade: 0, agilidade: 0, level: 1 };
+    const depsFraco = {
+      rolar: filaDeDados([1, 12]), embaralhar: semEmbaralhar,
+      catalogo: catalogoDeTeste({ monstro: () => fraco }),
+    };
 
     const comCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsFraco).estado;
     const estourado: EstadoPartida = comMaoEZona(comCombate);
@@ -1090,10 +1226,10 @@ describe('aplicarAcao — vasculhar com a mão estourada', () => {
 });
 
 describe('a composição BASELINE não pode nascer travada', () => {
-  // Guard de fronteira, não de comportamento — mas sobre a composição BASELINE do
-  // pacote `partida` (`COMPOSICAO_POR_JOGADOR`, sem carta de raça), não sobre a
+  // Guard de fronteira, não de comportamento — mas sobre a composição BASELINE
+  // dos testes (`COMPOSICAO_DE_TESTE`, sem carta de raça), não sobre a
   // composição de PRODUÇÃO: essa mora em `packages/server/src/app.ts`
-  // (`COMPOSICAO_DE_PRODUCAO`, montada com `RACAS_SACAVEIS` porque é lá que
+  // (montada com `MONSTROS_SACAVEIS` e `RACAS_SACAVEIS` porque é lá que
   // catálogo e mesa se encontram) e tem o próprio alarme em
   // `packages/server/src/app.test.ts` ("o baralho de produção TEM carta de
   // raça"). `MAO_INICIAL_PADRAO` e `LIMITE_BASE_DE_MAO` são dials que o spec §8
@@ -1104,7 +1240,7 @@ describe('a composição BASELINE não pode nascer travada', () => {
   // alarme que dispara aqui em vez de no navegador.
   const producao = {
     patenteAlvo: 10,
-    composicaoPorJogador: COMPOSICAO_POR_JOGADOR,
+    composicaoPorJogador: COMPOSICAO_DE_TESTE,
     maoInicial: MAO_INICIAL_PADRAO,
   };
   // A mesa que o `server` monta: 1 humano + 3 bots, todos começando sem raça.

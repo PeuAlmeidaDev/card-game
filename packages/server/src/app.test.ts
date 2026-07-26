@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { RolarD12 } from '@card-dungeon/motor';
 import type { ResultadoDuelo, Catalogo, VistaDaPartida } from '@card-dungeon/shared';
 import type { Embaralhar } from '@card-dungeon/partida';
+import { obterMonstro } from '@card-dungeon/cartas';
 import { buildApp } from './app';
 
 function filaDeDados(rolagens: readonly number[]): RolarD12 {
@@ -23,6 +24,7 @@ describe('GET /catalogo', () => {
     expect(catalogo.racas.map((r) => r.id)).toContain('elfo');
     expect(catalogo.classes.map((c) => c.id)).toContain('guerreiro');
     expect(catalogo.base.level).toBe(1);
+    expect(catalogo.monstros.map((m) => m.id)).toContain('goblin');
     await app.close();
   });
 
@@ -151,7 +153,7 @@ describe('mesa', () => {
         throw new Error('SEGREDO-INTERNO-nao-deveria-vazar');
       },
       embaralhar: semEmbaralhar,
-      monstro: { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 },
+      monstros: [{ id: 'goblin', nome: 'Goblin', forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 }],
     });
     const vista = await criar(app);
 
@@ -224,6 +226,42 @@ describe('mesa', () => {
     expect(vista.cartasNoMonte).toBe(12 * 4 - 4 * 4);
     expect(vista.suaMao.some((c) => c.tipo === 'raca')).toBe(true);
     await app.close();
+  });
+
+  it('toda carta de monstro do baralho de produção resolve pelo catálogo', async () => {
+    // O irmão do alarme acima, sobre a invariante que sustenta o desenho inteiro:
+    // baralho de produção ⊆ catálogo. Hoje ela vale só porque a composição e o
+    // resolvedor derivam da MESMA lista — uma edição futura que costure um id à
+    // mão falharia como 500 no meio de uma partida, não aqui.
+    //
+    // A sonda é o próprio `embaralhar`: `criarPartida` o chama com o baralho
+    // INTEIRO, então ele vê todas as cartas, não só as 4 que caem na mão.
+    const vistas: { readonly tipo: string; readonly monstroId?: string }[] = [];
+    const espiaOBaralho: Embaralhar = (itens) => {
+      for (const item of itens) {
+        if (typeof item === 'object' && item !== null && 'tipo' in item) {
+          vistas.push(item as { tipo: string; monstroId?: string });
+        }
+      }
+      return [...itens];
+    };
+    const app = buildApp({ embaralhar: espiaOBaralho });
+    await criar(app);
+
+    const cartasDeMonstro = vistas.filter((c) => c.tipo === 'monstro');
+    expect(cartasDeMonstro.length).toBeGreaterThan(0);   // senão o loop abaixo passa vazio
+    const orfas = cartasDeMonstro
+      .map((c) => c.monstroId)
+      .filter((id) => id === undefined || obterMonstro(id) === undefined);
+    // Lista, não um `every`: a falha precisa dizer QUAL id ficou órfão.
+    expect(orfas).toEqual([]);
+    await app.close();
+  });
+
+  it('recusa nascer com o bestiário vazio', () => {
+    // Sem monstro no baralho ninguém sobe de patente e a partida não tem como
+    // terminar. O erro pertence à construção do app, não ao primeiro `vasculhar`.
+    expect(() => buildApp({ monstros: [] })).toThrow(/bestiário vazio/);
   });
 
   it('rejeita escolhas inválidas com 400', async () => {
@@ -324,15 +362,15 @@ describe('mesa', () => {
   it('uma partida com raça Anão resolve o combate com a passiva Casca de Pedra', async () => {
     // Prova a borda inteira, agora pelo caminho do jogador: a carta de Anão é
     // sacada, jogada, e só então a passiva vale. obterRaca('anao') tem
-    // passivaCombate real (cartas), e o resolverRaca injetado nas deps da Mesa a
-    // aplica ao humano.
+    // passivaCombate real (cartas), e o catalogo injetado nas deps da Mesa
+    // (catalogo.raca) a aplica ao humano.
     // Monstro rápido e certeiro (agilidade/habilidade máximas) ataca primeiro.
     // dado[0]=1: ataque do monstro acerta (<=12). dado[1]=12: esquiva do humano
     // falha (12 > 1). Dano base = level(1)+forca(5) = 6; a passiva reduz o
     // PRIMEIRO dano sofrido no combate à metade -> 3. Vida do guerreiro Anão
     // (base 10 + guerreiro +5 = 15) cai para 12.
-    const monstro = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 };
-    const app = buildApp({ rolar: filaDeDados([1, 12]), embaralhar: racasNoTopo, monstro });
+    const monstros = [{ id: 'goblin', nome: 'Goblin', forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 }];
+    const app = buildApp({ rolar: filaDeDados([1, 12]), embaralhar: racasNoTopo, monstros });
 
     const vista = await comRacaEmJogo(app, 'anao');
     const abrePorta = await app.inject({

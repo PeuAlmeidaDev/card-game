@@ -3,10 +3,10 @@ import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import { resolverDuelo, type RolarD12, type Combatente } from '@card-dungeon/motor';
 import { contrato } from '@card-dungeon/shared';
 import { CATALOGO, MONSTRO_PADRAO, resolverEscolhas, montarCombatente } from '@card-dungeon/personagem';
-import { RACAS_SACAVEIS, obterRaca } from '@card-dungeon/cartas';
+import { MONSTROS_SACAVEIS, RACAS_SACAVEIS, obterRaca, type MonstroCarta } from '@card-dungeon/cartas';
 import {
   AcaoInvalida, MAO_INICIAL_PADRAO, aplicarAcao, avancarBots, criarPartida, montarComposicao,
-  projetarPara, versaoDe, type Embaralhar, type EntradaJogador, type EstadoPartida,
+  projetarPara, versaoDe, type CatalogoDaMesa, type Embaralhar, type EntradaJogador, type EstadoPartida,
 } from '@card-dungeon/partida';
 import { initServer } from '@ts-rest/fastify';
 import { criarDadoReal } from './dado';
@@ -14,16 +14,6 @@ import { criarEmbaralhamentoReal } from './embaralhar';
 import { criarRepositorio } from './repositorio';
 
 export const PATENTE_ALVO_PADRAO = 10;
-
-/**
- * Baralho de produção (spec §8): 5 monstros · 3 salas vazias · **uma carta para
- * cada raça sacável**, por jogador. Numa mesa de 4 isso dá 48 cartas com 4 cópias
- * de cada raça — a repetição vem da multiplicação por assento, não daqui.
- *
- * Montado no `server` porque é aqui que catálogo e mesa se encontram: `partida`
- * não conhece `cartas` de propósito, e as regras não devem conhecer.
- */
-const COMPOSICAO_DE_PRODUCAO = montarComposicao(5, 3, RACAS_SACAVEIS.map((r) => r.id));
 
 /**
  * Quem está agindo. Enquanto não houver contas, a mesa tem exatamente um humano
@@ -38,8 +28,14 @@ function humanoDa(estado: EstadoPartida): string | undefined {
 export interface OpcoesApp {
   /** Fonte de rolagem injetada; default = dado real. Testes injetam um dado determinístico. */
   readonly rolar?: RolarD12;
-  /** Monstro adversário (lado b); default = MONSTRO_PADRAO. Testes injetam um monstro fixo. */
+  /** Monstro adversário do `/duelo` (lado b); default = MONSTRO_PADRAO. Testes injetam um monstro fixo. */
   readonly monstro?: Combatente;
+  /**
+   * Bestiário da mesa; default = catálogo real. Os testes injetam um roster de
+   * um monstro só para forçar o desfecho do combate — o que antes era a opção
+   * `monstro` (que agora serve só à rota `/duelo`, da fatia 2).
+   */
+  readonly monstros?: readonly MonstroCarta[];
   /**
    * Embaralhamento injetado; default = Fisher-Yates real (`./embaralhar`).
    * Sem consumidor entre esta task e a Task 14, quando as rotas da mesa chegam —
@@ -55,12 +51,48 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
   const app = Fastify();
   const s = initServer();
   const repositorio = criarRepositorio();
-  // UM resolvedor para tudo que a raça confere. O server RESOLVE (pergunta à
-  // carta), nunca DECIDE (`racaId === 'elfo'` seria regra de jogo na borda).
-  // `RacaCarta` satisfaz `InfoRaca` estruturalmente, então não há tradução aqui.
-  const resolverRaca = (racaId: string | undefined) =>
-    racaId === undefined ? undefined : obterRaca(racaId);
-  const deps = { rolar, embaralhar, monstro, resolverRaca };
+  const monstros = opcoes.monstros ?? MONSTROS_SACAVEIS;
+  if (monstros.length === 0) {
+    // Invariante da borda: com a composição derivando as cartas de monstro do
+    // bestiário, um bestiário vazio produz ZERO monstro — e um baralho sem
+    // monstro é uma partida que ninguém pode vencer, porque a patente só sobe por
+    // abate. Falhar na construção é melhor do que abrir uma mesa insolúvel.
+    throw new Error('buildApp: bestiário vazio');
+  }
+  const acharMonstro = (id: string) => monstros.find((m) => m.id === id);
+
+  /**
+   * Baralho de produção (spec §8): **uma carta para cada monstro do bestiário**,
+   * 3 salas vazias, e **uma carta para cada raça sacável** — por jogador. Numa
+   * mesa de 4 isso dá 48 cartas com 4 cópias de cada uma; a repetição vem da
+   * multiplicação por assento, não daqui.
+   *
+   * A regra é a MESMA para monstro e para raça de propósito. A alternativa — uma
+   * contagem fixa de cartas de monstro preenchida em rodízio pelo bestiário —
+   * fazia a densidade depender do tamanho do catálogo: 5 cartas sobre 4 monstros
+   * punha o mais fraco em dobro, uma decisão de balanceamento que ninguém tomou e
+   * que nada no código declarava. Derivar a quantidade do catálogo faz a
+   * repetição desaparecer em vez de precisar ser escolhida, e o dial que passa a
+   * existir (quantos monstros o jogo tem) mora onde ele é visível: em `MONSTROS`.
+   *
+   * Montado no `server` porque é aqui que catálogo e mesa se encontram: `partida`
+   * não conhece `cartas` de propósito, e as regras não devem conhecer.
+   */
+  const composicaoDeProducao = montarComposicao(
+    3,
+    monstros.map((m) => m.id),
+    RACAS_SACAVEIS.map((r) => r.id),
+  );
+
+  // O server RESOLVE (pergunta à carta), nunca DECIDE (`racaId === 'elfo'` seria
+  // regra de jogo na borda). As cartas do pacote `cartas` satisfazem
+  // `InfoRaca`/`InfoMonstro` estruturalmente, então não há tradução aqui — só o
+  // casamento entre catálogo e mesa, que é exatamente o trabalho da borda.
+  const catalogo: CatalogoDaMesa = {
+    raca: (racaId) => (racaId === undefined ? undefined : obterRaca(racaId)),
+    monstro: acharMonstro,
+  };
+  const deps = { rolar, embaralhar, catalogo };
 
   const montarBots = (): readonly EntradaJogador[] => {
     const classes = embaralhar(CATALOGO.classes);
@@ -109,7 +141,7 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
       const estado = criarPartida(
         randomUUID(),
         [humano, ...montarBots()],
-        { patenteAlvo: PATENTE_ALVO_PADRAO, composicaoPorJogador: COMPOSICAO_DE_PRODUCAO, maoInicial: MAO_INICIAL_PADRAO },
+        { patenteAlvo: PATENTE_ALVO_PADRAO, composicaoPorJogador: composicaoDeProducao, maoInicial: MAO_INICIAL_PADRAO },
         { embaralhar },
       );
       repositorio.salvar(estado);

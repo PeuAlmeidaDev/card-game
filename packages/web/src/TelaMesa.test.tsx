@@ -39,22 +39,32 @@ const RACAS_PADRAO: Catalogo['racas'] = [
   { id: 'elfo', nome: 'Elfo', texto: '…' },
 ];
 
-const abrirMesa = async (vista: VistaDaPartida, racas: Catalogo['racas'] = RACAS_PADRAO) => {
+// Mesma ideia de RACAS_PADRAO, para o bestiário: os fixtures desta suíte usam
+// `monstroId: 'goblin'`, e sem o catálogo o nome cairia no fallback `?? id`.
+const MONSTROS_PADRAO: Catalogo['monstros'] = [
+  { id: 'goblin', nome: 'Goblin', forca: 4, vida: 20, habilidade: 2, agilidade: 4, level: 1 },
+];
+
+const abrirMesa = async (
+  vista: VistaDaPartida,
+  racas: Catalogo['racas'] = RACAS_PADRAO,
+  monstros: Catalogo['monstros'] = MONSTROS_PADRAO,
+) => {
   vi.spyOn(api, 'criarPartida').mockResolvedValue({ status: 200, body: vista } as never);
-  render(<TelaMesa racas={racas} />);
+  render(<TelaMesa racas={racas} monstros={monstros} />);
   await userEvent.click(screen.getByRole('button', { name: /nova partida/i }));
 };
 
 describe('TelaMesa', () => {
   const vistaComEspiada: VistaDaPartida = {
     ...vistaBase,
-    espiada: { jogadorId: 'p1', carta: { id: 'p-0', tipo: 'monstro' } },
+    espiada: { jogadorId: 'p1', carta: { id: 'p-0', tipo: 'monstro', monstroId: 'goblin' } },
   };
 
   it('mostra o que o vidente pressentiu e oferece encarar ou empurrar', async () => {
     await abrirMesa(vistaComEspiada);
 
-    expect(await screen.findByText(/pressente.*monstro/i)).toBeInTheDocument();
+    expect(await screen.findByText(/pressente.*goblin/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /encarar/i })).toBeEnabled();
     expect(screen.getByRole('button', { name: /empurrar/i })).toBeEnabled();
   });
@@ -198,28 +208,57 @@ describe('TelaMesa', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/combate em curso/i);
   });
 
+  /** Combate em curso contra o monstro `monstroId`, com 23 de vida. */
+  const emCombateContra = (monstroId: string, proximaDecisao: 'ataque' | 'esquiva'): VistaDaPartida => ({
+    ...vistaBase,
+    combate: {
+      monstroId,
+      proximaDecisao,
+      estado: {
+        jogador: { ...combatente, vida: 6 },
+        monstro: { forca: 4, vida: 23, habilidade: 2, agilidade: 4, level: 5 },
+        vez: proximaDecisao === 'esquiva' ? 'monstro' : 'jogador',
+        turno: 3,
+        ataqueDoMonstro: proximaDecisao === 'esquiva' ? { rolagem: 4 } : null,
+        desfecho: 'emAndamento',
+        vidaInicialJogador: combatente.vida,
+        passiva: null,
+      },
+    },
+  });
+
   it('mostra as vidas do combate em curso', async () => {
     // Sem isto o jogador não sabe se está ganhando. A vida do jogador tem
     // máximo conhecido (o combatenteBase); a do monstro só o valor atual.
-    await abrirMesa({
-      ...vistaBase,
-      combate: {
-        proximaDecisao: 'ataque',
-        estado: {
-          jogador: { ...combatente, vida: 6 },
-          monstro: { forca: 4, vida: 23, habilidade: 2, agilidade: 4, level: 5 },
-          vez: 'jogador',
-          turno: 3,
-          ataqueDoMonstro: null,
-          desfecho: 'emAndamento',
-          vidaInicialJogador: combatente.vida,
-          passiva: null,
-        },
-      },
-    });
+    await abrirMesa(emCombateContra('goblin', 'ataque'));
 
     expect(await screen.findByText(/6\s*\/\s*20/)).toBeInTheDocument();
-    expect(screen.getByText(/monstro:\s*23/i)).toBeInTheDocument();
+    expect(screen.getByText(/Goblin:\s*23/)).toBeInTheDocument();
+  });
+
+  it('nomeia o adversário no painel de combate, não só no log', async () => {
+    // O painel é a única superfície que fica à vista a luta inteira. Com ele
+    // dizendo "Monstro", a identidade da carta só existe no log — e o jogador
+    // passa o combate sem saber contra o que está lutando.
+    await abrirMesa(emCombateContra('goblin', 'ataque'));
+
+    expect(await screen.findByText(/Goblin:\s*23/)).toBeInTheDocument();
+    expect(screen.queryByText(/Monstro:\s*23/)).not.toBeInTheDocument();
+  });
+
+  it('avisa que o monstro acertou usando o nome dele', async () => {
+    await abrirMesa(emCombateContra('goblin', 'esquiva'));
+
+    expect(await screen.findByText(/o Goblin acertou — esquive!/)).toBeInTheDocument();
+  });
+
+  it('cai no id quando o catálogo não conhece o monstro, sem derrubar a tela', async () => {
+    // Skew de versão: bundle antigo recebendo do server um monstro que ele não
+    // conhece. Degradar para o id é feio e legível; lançar apagaria a mesa
+    // inteira por causa de um nome.
+    await abrirMesa(emCombateContra('quimera-que-o-cliente-nao-conhece', 'ataque'));
+
+    expect(await screen.findByText(/quimera-que-o-cliente-nao-conhece:\s*23/)).toBeInTheDocument();
   });
 
   it('narra cada lance do combate com a rolagem do dado', async () => {
@@ -269,20 +308,20 @@ describe('TelaMesa', () => {
 });
 
 describe('TelaMesa — a mão', () => {
-  it('lista as cartas da sua mão, nomeando a raça', async () => {
+  it('lista as cartas da sua mão, nomeando a raça e o monstro', async () => {
     await abrirMesa({
       ...vistaBase,
-      suaMao: [{ id: 'p-1', tipo: 'monstro' }, { id: 'p-2', tipo: 'raca', racaId: 'orc' }],
+      suaMao: [{ id: 'p-1', tipo: 'monstro', monstroId: 'goblin' }, { id: 'p-2', tipo: 'raca', racaId: 'orc' }],
     });
 
-    expect(screen.getByText(/um monstro/)).toBeInTheDocument();
+    expect(screen.getByText(/um Goblin/)).toBeInTheDocument();
     expect(screen.getByText(/uma carta de Orc/)).toBeInTheDocument();
   });
 
   it('só carta de raça tem botão de jogar', async () => {
     await abrirMesa({
       ...vistaBase,
-      suaMao: [{ id: 'p-1', tipo: 'monstro' }, { id: 'p-2', tipo: 'raca', racaId: 'orc' }],
+      suaMao: [{ id: 'p-1', tipo: 'monstro', monstroId: 'goblin' }, { id: 'p-2', tipo: 'raca', racaId: 'orc' }],
     });
 
     expect(screen.getAllByRole('button', { name: 'Jogar' })).toHaveLength(1);
@@ -292,7 +331,7 @@ describe('TelaMesa — a mão', () => {
     // A caridade resolve um EXCEDENTE; doar por vontade própria é escolher a quem
     // dar vantagem — o kingmaking que a regra do destino existe para matar. O
     // domínio recusa; a tela não oferece.
-    await abrirMesa({ ...vistaBase, suaMao: [{ id: 'p-1', tipo: 'monstro' }] });
+    await abrirMesa({ ...vistaBase, suaMao: [{ id: 'p-1', tipo: 'monstro', monstroId: 'goblin' }] });
 
     for (const b of screen.getAllByRole('button', { name: 'Entregar' })) {
       expect(b).toBeDisabled();
@@ -302,7 +341,7 @@ describe('TelaMesa — a mão', () => {
   it('acima do limite: avisa, habilita entregar e DESABILITA vasculhar', async () => {
     // Espelha a recusa do domínio. Deixar o botão aceso só para o servidor
     // responder 400 é ensinar o jogador a errar.
-    const mao = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => ({ id, tipo: 'monstro' as const }));
+    const mao = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => ({ id, tipo: 'monstro' as const, monstroId: 'goblin' }));
     await abrirMesa({
       ...vistaBase,
       suaMao: mao,
@@ -340,7 +379,7 @@ describe('TelaMesa — a mão', () => {
     // (achado 3 do review final: este clique não tinha teste nenhum).
     const agir = vi.spyOn(api, 'agir').mockResolvedValue({ status: 200, body: vistaBase } as never);
     const mao = [
-      ...['a', 'b', 'c', 'd', 'e'].map((id) => ({ id, tipo: 'monstro' as const })),
+      ...['a', 'b', 'c', 'd', 'e'].map((id) => ({ id, tipo: 'monstro' as const, monstroId: 'goblin' })),
       { id: 'p-alvo', tipo: 'raca' as const, racaId: 'orc' },
     ];
     await abrirMesa({
@@ -352,7 +391,7 @@ describe('TelaMesa — a mão', () => {
     });
 
     // Escopa pela carta-alvo (a única de Orc), não por índice: com cinco cópias
-    // idênticas de "um monstro" na lista, `getAllByRole('button', ...)[n]` afirmaria
+    // idênticas de "um Goblin" na lista, `getAllByRole('button', ...)[n]` afirmaria
     // a ordem do DOM, não QUAL carta foi clicada.
     const linhaDaCartaAlvo = (await screen.findByText(/carta de Orc/)).closest('li');
     if (linhaDaCartaAlvo === null) throw new Error('linha da carta-alvo não encontrada no DOM');
