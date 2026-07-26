@@ -432,10 +432,19 @@ function entregarCarta(
  *
  * A vez NÃO passa — jogar raça é decisão do próprio turno. Estando acima do
  * limite, jogar raça só é saída quando o jogador JÁ tem raça em jogo: a mão
- * encolhe 1 e o limite (já 4) não se move. Sem raça em jogo é NET-ZERO — o
- * limite era 5 e cai para 4 junto com a mão, o excedente não muda — porque a
- * especialização derruba o próprio bônus que ela substitui. `entregarCarta`
- * é a saída que sempre funciona, nos dois casos.
+ * encolhe 1 e o limite (`LIMITE_BASE_DE_MAO`, hoje 7) não se move. Sem raça em
+ * jogo é NET-ZERO — o limite era `LIMITE_BASE_DE_MAO + 1` (hoje 8) e cai para o
+ * base junto com a mão, o excedente não muda — porque a especialização derruba o
+ * próprio bônus que ela substitui (o Adaptável do Humano, em `./mao`).
+ *
+ * A conta está escrita em cima das CONSTANTES, não dos números: os "hoje 7/8" são
+ * cortesia para quem lê, e a razão sobrevive ao próximo giro do dial. Ela já
+ * apodreceu uma vez — o comentário ficou dizendo 4 e 5 depois que o teto subiu
+ * para 7, e quem refizesse a conta pelos números chegaria a outra conclusão.
+ *
+ * `entregarCarta` e `equiparCarta` são as saídas que sempre funcionam, nos dois
+ * casos: as duas tiram uma carta da mão sem mexer no limite. As três juntas são
+ * o conjunto que a tabela de `./fase` declara legal em `descartar`.
  */
 function jogarCarta(
   estado: EstadoPartida,
