@@ -127,6 +127,13 @@ describe('a fase nunca mente sobre o estado', () => {
         // próxima fatia abre não faz este alarme tocar.
         if (estourado) erros.push('fase=combate com a mão de quem tem a vez estourada');
         break;
+      case 'recompor':
+      case 'jogar':
+        // Inalcançáveis nesta task: o conjunto de ações de ambas está vazio em
+        // `fase.ts` (Task 1), então nenhuma transição desta suíte cai aqui. O
+        // `switch` exaustivo cobra o caso mesmo assim — a invariante de excedente
+        // de cada uma é decisão das Tasks 2 e 3, que preenchem as fases.
+        break;
       default: {
         const naoTratada: never = e.fase;
         throw new Error(`violacoes: fase não tratada: ${JSON.stringify(naoTratada)}`);

@@ -134,4 +134,20 @@ describe('narrarEvento — linhas com marcação', () => {
     render(<>{narrarEvento({ tipo: 'combate', jogadorId: 'p1', eventos: [] }, ctx)}</>);
     expect(screen.getByText(/Seu combate:/)).toBeInTheDocument();
   });
+
+  it('passou de `recompor` é discreto e diz que o jogador segue sem se recompor', () => {
+    // A fase é pública, então nomeá-la não vaza nada — e é o que separa esta
+    // linha da de `jogar`, que fecha o turno.
+    render(<>{narrarEvento({ tipo: 'passou', jogadorId: 'p2', de: 'recompor' }, ctx)}</>);
+    const linha = screen.getByText(/segue sem se recompor/);
+    expect(linha.tagName).toBe('SMALL');
+    expect(linha).toHaveTextContent('Bot 1 segue sem se recompor.');
+  });
+
+  it('passou de `jogar` diz que o jogador encerra o turno', () => {
+    render(<>{narrarEvento({ tipo: 'passou', jogadorId: 'p1', de: 'jogar' }, ctx)}</>);
+    const linha = screen.getByText(/encerra o turno/);
+    expect(linha.tagName).toBe('SMALL');
+    expect(linha).toHaveTextContent('Você encerra o turno.');
+  });
 });

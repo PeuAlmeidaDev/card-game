@@ -162,6 +162,13 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
     return equiparCarta(estado, acao, deps);
   }
 
+  if (acao.tipo === 'passar') {
+    // Inalcançável: nenhuma fase declara `passar` legal ainda, então o gate acima
+    // já recusou. O ramo existe para o compilador — e o `Error` cru denuncia,
+    // como 500, a tabela que declarar `passar` legal numa fase que não é parada.
+    throw new Error('aplicarAcao: `passar` sem fase parada — a tabela e as fases divergiram');
+  }
+
   return agirNoCombate(estado, acao, deps);
 }
 

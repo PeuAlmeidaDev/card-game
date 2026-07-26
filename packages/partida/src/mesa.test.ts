@@ -1918,4 +1918,21 @@ describe('o guard de fase é ponto único', () => {
     expect(() => aplicarAcao(comEspiada, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])))
       .toThrow('aplicarAcao: há uma espiada pendente');
   });
+
+  it('`passar` ainda não tem fase que o aceite — o gate recusa nas três', () => {
+    // A ação existe no vocabulário antes de existir a fase que a consome: é o que
+    // permite `recompor` e `jogar` nascerem já com saída, em vez de nascerem como
+    // fase da qual não se sai (o erro que o Plano 2 evitou adiando as duas).
+    const soSalaVazia = {
+      patenteAlvo: 10,
+      composicaoPorJogador: [{ tipo: 'salaVazia' as const }],
+      composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE,
+    };
+    const p = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+
+    expect(() => aplicarAcao(p, { tipo: 'passar', jogadorId: 'p1' }, deps([])))
+      .toThrow(AcaoInvalida);
+    expect(() => aplicarAcao(p, { tipo: 'passar', jogadorId: 'p1' }, deps([])))
+      .toThrow('aplicarAcao: passar não é legal na fase vasculhar');
+  });
 });

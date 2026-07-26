@@ -294,7 +294,18 @@ export type EventoDaMesa =
    * fez, e o corpo resultante já viaja aberto na projeção.
    */
   | { readonly tipo: 'equipou'; readonly jogadorId: string;
-      readonly slot: Slot; readonly carta: CartaEquipamento };
+      readonly slot: Slot; readonly carta: CartaEquipamento }
+  /**
+   * O jogador declinou de agir numa fase parada. Emite evento — e não silêncio —
+   * porque `versaoDe` é `log.length`: sem mover a versão, um duplo-clique em
+   * "Passar" escaparia do guard de 409 do server e morreria como 400 na cara do
+   * jogador, que é o modo de falha que aquele guard existe para matar.
+   *
+   * O auto-pulo (spec §6.1) NÃO emite: nele o jogador não declinou de nada, a
+   * fase é que não tinha o que oferecer. Linha de log para isso seria ruído em
+   * praticamente todo turno.
+   */
+  | { readonly tipo: 'passou'; readonly jogadorId: string; readonly de: FaseParada };
 
 export type AcaoDaMesa =
   | { readonly tipo: 'vasculhar'; readonly jogadorId: string }
@@ -305,7 +316,14 @@ export type AcaoDaMesa =
   | { readonly tipo: 'jogarCarta'; readonly jogadorId: string; readonly cartaId: string }
   | { readonly tipo: 'entregarCarta'; readonly jogadorId: string; readonly cartaId: string }
   /** Tira um tesouro da mão e o encaixa no corpo. O slot vem do ITEM, nunca do cliente. */
-  | { readonly tipo: 'equiparCarta'; readonly jogadorId: string; readonly cartaId: string };
+  | { readonly tipo: 'equiparCarta'; readonly jogadorId: string; readonly cartaId: string }
+  /**
+   * Encerra uma fase PARADA (`recompor`/`jogar`) sem fazer mais nada nela. É o
+   * verbo que dá SAÍDA às duas — sem ele, `recompor` seria uma fase da qual não
+   * se sai (o jogador com uma raça na mão travaria antes de vasculhar), que é
+   * exatamente por que o Plano 2 as adiou. Fase parada e `passar` entram juntos.
+   */
+  | { readonly tipo: 'passar'; readonly jogadorId: string };
 
 export interface CombateNaMesa {
   readonly estado: EstadoCombate;
@@ -341,19 +359,28 @@ export interface EspiadaPendente {
  * `combate !== null`, `espiada !== null` e `mao.length > limite` que estava
  * repetida em cinco funções do reducer.
  *
- * **Três valores nesta fatia, não os seis do spec §6** — só as fases que têm
- * ação existente. `recompor`, `encrenca` e `jogar` chegam junto com os VERBOS
- * delas (Planos 3 e 4): sem a ação `passar`, `recompor` seria uma fase da qual
- * não se sai (o jogador com uma raça na mão travaria antes de vasculhar), e hoje
- * ela é indistinguível de `vasculhar` — mesmo ponto de entrada, mesmo ponto de
- * saída. Por isso `jogarCarta` mora na fase `vasculhar` aqui: é onde ela de fato
- * acontece enquanto `recompor` não existe.
+ * **Cinco valores.** `encrenca` é a única do spec §6 que ainda falta — ela chega
+ * no Plano 4 com os verbos dela (`procurarEncrenca`/`saquear`), pela mesma regra
+ * que segurou `recompor` e `jogar` até aqui: fase entra JUNTO com o verbo que a
+ * esvazia. Enquanto ela não existe, quem sai de `vasculhar` sem combate vai
+ * direto para `jogar`.
  *
  * O `Record<Fase, …>` do `fase.ts` é o que obriga o valor novo a chegar com o
  * conjunto de ações dele — acrescentar uma fase sem legalidade é erro de
  * compilação, não uma fase silenciosamente sem saída.
  */
-export type Fase = 'vasculhar' | 'combate' | 'descartar';
+export type Fase = 'recompor' | 'vasculhar' | 'combate' | 'jogar' | 'descartar';
+
+/**
+ * As fases de turno PARADO: nelas nada é comprado, e a única saída garantida é
+ * `passar`. Tipo próprio porque o evento `passou` e o auto-pulo só fazem sentido
+ * nelas — com `Fase` cru, um `passou` de dentro do combate seria representável.
+ *
+ * `Extract`, e não uma união escrita à mão: um dia em que `Fase` renomear um
+ * valor, este tipo vira `never` e o compilador cobra, em vez de ficar apontando
+ * para um nome que não existe mais.
+ */
+export type FaseParada = Extract<Fase, 'recompor' | 'jogar'>;
 
 /** Estado autoritativo da partida. Vive no servidor e NUNCA sai inteiro — ver `projetarPara`. */
 export interface EstadoPartida {

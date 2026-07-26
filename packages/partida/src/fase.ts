@@ -35,6 +35,11 @@ const LEGAL: Record<Fase, ReadonlySet<AcaoDaMesa['tipo']>> = {
   // fica de fora: se continuasse legal, "a vez não passa" viraria "jogue para
   // sempre" — o jogador sacaria carta atrás de carta sem nunca resolver o excedente.
   descartar: new Set<AcaoDaMesa['tipo']>(['entregarCarta', 'jogarCarta', 'equiparCarta']),
+  // Nascem INERTES: a ação `passar` existe (Task 1) mas nenhuma transição leva a
+  // estas fases ainda, e conjunto vazio é o que garante que uma fase inalcançável
+  // não aceite nada por engano. As Tasks 2 e 3 as preenchem.
+  recompor: new Set<AcaoDaMesa['tipo']>([]),
+  jogar: new Set<AcaoDaMesa['tipo']>([]),
 };
 
 /** A tabela como pergunta. O `LEGAL` não é exportado: quem lê, lê por aqui. */

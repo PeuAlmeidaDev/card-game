@@ -87,6 +87,16 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
           </ul>
         </>
       );
+    // A fase é pública (viaja na vista), então nomear de qual delas o jogador
+    // saiu não vaza nada — e é o que separa "não vou me recompor" de "encerrei o
+    // turno" numa crônica que, sem isso, teria duas linhas idênticas.
+    case 'passou':
+      return (
+        <small>
+          {evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId)}
+          {evento.de === 'recompor' ? ' segue sem se recompor.' : ' encerra o turno.'}
+        </small>
+      );
     default: {
       const naoTratado: never = evento;
       void naoTratado;

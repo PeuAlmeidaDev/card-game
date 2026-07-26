@@ -78,6 +78,9 @@ export const acaoDaMesaSchema = z.discriminatedUnion('tipo', [
   // capacete no pé, e a checagem viraria mais um guard no reducer em vez de ser
   // impossível por construção. Mesmo teto de 64 e pelo mesmo motivo.
   z.object({ tipo: z.literal('equiparCarta'), cartaId: z.string().min(1).max(64) }),
+  // Sem campo nenhum além do tipo: `passar` é a intenção de não fazer nada nesta
+  // fase, e QUAL fase é ela vem do estado autoritativo, nunca do cliente.
+  z.object({ tipo: z.literal('passar') }),
 ]) satisfies z.ZodType<{ tipo: AcaoDaMesa['tipo'] }>;
 
 /** A intenção validada. A rota completa com o `jogadorId` da sessão. */
