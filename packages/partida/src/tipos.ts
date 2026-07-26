@@ -213,6 +213,25 @@ export interface EspiadaPendente {
   readonly carta: CartaPorta;
 }
 
+/**
+ * Em que ponto do turno a mesa está. Substitui a leitura cruzada de
+ * `combate !== null`, `espiada !== null` e `mao.length > limite` que estava
+ * repetida em cinco funções do reducer.
+ *
+ * **Três valores nesta fatia, não os seis do spec §6** — só as fases que têm
+ * ação existente. `recompor`, `encrenca` e `jogar` chegam junto com os VERBOS
+ * delas (Planos 3 e 4): sem a ação `passar`, `recompor` seria uma fase da qual
+ * não se sai (o jogador com uma raça na mão travaria antes de vasculhar), e hoje
+ * ela é indistinguível de `vasculhar` — mesmo ponto de entrada, mesmo ponto de
+ * saída. Por isso `jogarCarta` mora na fase `vasculhar` aqui: é onde ela de fato
+ * acontece enquanto `recompor` não existe.
+ *
+ * O `Record<Fase, …>` do `fase.ts` é o que obriga o valor novo a chegar com o
+ * conjunto de ações dele — acrescentar uma fase sem legalidade é erro de
+ * compilação, não uma fase silenciosamente sem saída.
+ */
+export type Fase = 'vasculhar' | 'combate' | 'descartar';
+
 /** Estado autoritativo da partida. Vive no servidor e NUNCA sai inteiro — ver `projetarPara`. */
 export interface EstadoPartida {
   readonly id: string;
