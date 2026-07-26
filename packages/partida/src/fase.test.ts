@@ -92,18 +92,31 @@ describe('a fase nunca mente sobre o estado', () => {
     if ((e.fase === 'combate') !== (e.combate !== null)) {
       erros.push(`fase=${e.fase} com combate ${e.combate === null ? 'fechado' : 'aberto'}`);
     }
-    if (e.fase === 'descartar' && !estourado) {
-      erros.push('fase=descartar sem excedente na mão de quem tem a vez');
-    }
-    if (e.fase === 'vasculhar' && estourado) {
-      erros.push('fase=vasculhar com a mão de quem tem a vez estourada');
-    }
-    // O terceiro valor de `Fase`. Hoje inalcançável — nenhuma ação mexe na mão
-    // durante o combate, e só se entra em combate vindo de `vasculhar` —, mas o
-    // Plano 3 põe o loot do monstro vencido NA MÃO. Sem este caso, um bug de fase
-    // no caminho que a próxima fatia abre não faz este alarme tocar.
-    if (e.fase === 'combate' && estourado) {
-      erros.push('fase=combate com a mão de quem tem a vez estourada');
+    // `switch` exaustivo, não uma lista de `if (e.fase === '…')`: os `if`s eram uma
+    // permissão POR NOME de fase, e uma fase nova (`recompor`, `encrenca`, `jogar`
+    // — todas "turno parado", todas fases em que a mão muda) cai fora de todos
+    // eles em silêncio — a `Record<Fase, …>` da tabela de ações cobra a fase nova,
+    // mas nada cobrava a COERÊNCIA dela com o estado. O `default` com `never` move
+    // esse esquecimento de "passa quieto" para erro de compilação: quem escrever o
+    // Plano 3 é obrigado a decidir o que a fase nova significa para o excedente.
+    switch (e.fase) {
+      case 'descartar':
+        if (!estourado) erros.push('fase=descartar sem excedente na mão de quem tem a vez');
+        break;
+      case 'vasculhar':
+        if (estourado) erros.push('fase=vasculhar com a mão de quem tem a vez estourada');
+        break;
+      case 'combate':
+        // Hoje inalcançável — nenhuma ação mexe na mão durante o combate, e só se
+        // entra em combate vindo de `vasculhar` —, mas o Plano 3 põe o loot do
+        // monstro vencido NA MÃO. Sem este caso, um bug de fase no caminho que a
+        // próxima fatia abre não faz este alarme tocar.
+        if (estourado) erros.push('fase=combate com a mão de quem tem a vez estourada');
+        break;
+      default: {
+        const naoTratada: never = e.fase;
+        throw new Error(`violacoes: fase não tratada: ${JSON.stringify(naoTratada)}`);
+      }
     }
     // A fase `descartar` nunca convive com espiada: é o que dispensa o gêmeo do
     // guard de pendência em `entregarCarta`.
@@ -151,7 +164,15 @@ describe('a fase nunca mente sobre o estado', () => {
     // Teto local do lote de bots: dirigimos os bots à mão aqui (ver comentário no
     // laço interno), então o teto anti-loop tem que ser nosso — sem reimportar
     // `MAX_ACOES_AUTOMATICAS` de `./automacao`.
-    const TETO_ACOES_DE_BOTS = 100;
+    //
+    // O pior caso LEGÍTIMO não é pequeno: `MAX_TURNOS` do motor é 1000 (a unidade
+    // é o turno de UM lado) e o jogador decide a cada ~2 turnos, então um único
+    // combate arrastado de bot pode custar ~500 ações — e o laço interno atravessa
+    // os 3 bots da mesa antes de devolver a vez a p1, então o pior caso real é
+    // ~3 × 500. 1500 fica acima disso: é rede contra laço fugitivo, não limite do
+    // jogo (mesma ideia do `MAX_ACOES_AUTOMATICAS` em `./limites.ts`, calibrado
+    // para a mesa inteira em vez de um lote só).
+    const TETO_ACOES_DE_BOTS = 1500;
 
     let interrompido = false;
     for (let voltas = 0; voltas < 300 && estado.desfecho === 'emAndamento' && !interrompido; voltas += 1) {
@@ -184,7 +205,14 @@ describe('a fase nunca mente sobre o estado', () => {
         const daVez = estado.jogadores.find((j) => j.id === estado.vezDe);
         if (daVez === undefined || !daVez.ehBot) break;
         if (acoesDeBots >= TETO_ACOES_DE_BOTS) {
-          erros.push(`lote de bots excedeu ${String(TETO_ACOES_DE_BOTS)} ações sem devolver a vez a um humano`);
+          // Prefixo deliberado: isto é o TESTE desistindo de esperar (teto
+          // anti-loop), não a fase mentindo. As duas coisas empurram para a mesma
+          // lista `erros` (a falha precisa mostrar tudo o que deu errado, na
+          // ordem), então sem a etiqueta um FAIL aqui lia como violação de
+          // invariante em vez de "o combate só demorou".
+          erros.push(
+            `TESTE (teto anti-loop, não violação de fase): lote de bots excedeu ${String(TETO_ACOES_DE_BOTS)} ações sem devolver a vez a um humano`,
+          );
           interrompido = true;
           break;
         }
