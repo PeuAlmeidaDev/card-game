@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { projetarPara, versaoDe } from './projecao';
 import { aplicarAcao } from './mesa';
 import { criarPartida } from './montagem';
-import { COMPOSICAO_DE_TESTE } from './testes/composicao';
+import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import { AcaoInvalida } from './erros';
 import { filaDeDados } from './testes/dados';
 import { raca } from './testes/cartas';
@@ -24,7 +24,7 @@ const entradas: readonly EntradaJogador[] = [
 describe('projetarPara', () => {
   const partida = criarPartida(
     'm1', entradas,
-    { patenteAlvo: 10, composicaoPorJogador: COMPOSICAO_DE_TESTE },
+    { patenteAlvo: 10, composicaoPorJogador: COMPOSICAO_DE_TESTE, composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
     { embaralhar: semEmbaralhar },
   );
 
@@ -44,6 +44,9 @@ describe('projetarPara', () => {
     expect('cemiterio' in vista).toBe(false);
     expect(vista.cartasNoMonte).toBe(COMPOSICAO_DE_TESTE.length * 2);
     expect(vista.cartasNoCemiterio).toBe(0);
+    // O segundo baralho segue a MESMA regra de contagem pública — nada saca dele
+    // ainda, mas a vista já precisa saber que ele existe.
+    expect(vista.tesourosNoMonte).toBe(COMPOSICAO_TESOURO_DE_TESTE.length * 2);
   });
 
   it('continua sem expor o monte depois de uma porta revelada', () => {
@@ -139,7 +142,7 @@ describe('projetarPara', () => {
     // que não a tivesse voltaria a reimplementar a regra para acender botão.
     const p = criarPartida(
       'm1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: COMPOSICAO_DE_TESTE },
+      { patenteAlvo: 10, composicaoPorJogador: COMPOSICAO_DE_TESTE, composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
       { embaralhar: semEmbaralhar },
     );
 
@@ -160,7 +163,11 @@ describe('versaoDe — a versão anda quando a espiada abre', () => {
     catalogo: catalogoDeTeste({ raca: () => ({ passivaCombate: null, espiaTopo: true }) }),
   };
   const criar = () => criarPartida('m1', entradas,
-    { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
+    {
+      patenteAlvo: 10,
+      composicaoPorJogador: [{ tipo: 'salaVazia' as const }],
+      composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE,
+    },
     { embaralhar: semEmbaralhar });
 
   it('sem espiada pendente, a versão É o tamanho do log', () => {

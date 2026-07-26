@@ -327,6 +327,8 @@ export interface EstadoPartida {
   readonly vezDe: string;
   readonly patenteAlvo: number;
   readonly portas: Baralho<CartaPorta>;
+  /** O segundo baralho. Mesma estrutura e mesmo `tirarDoTopo` (com reshuffle) do de Portas. */
+  readonly tesouros: Baralho<CartaTesouro>;
   readonly combate: CombateNaMesa | null;
   readonly espiada: EspiadaPendente | null;
   /**
@@ -356,6 +358,8 @@ export interface VistaDaPartida {
   readonly patenteAlvo: number;
   readonly cartasNoMonte: number;
   readonly cartasNoCemiterio: number;
+  /** Tamanho do monte de Tesouros. Nada saca dele ainda — só a contagem já é pública. */
+  readonly tesourosNoMonte: number;
   readonly combate: CombateNaMesa | null;
   /** A carta espiada, presente SÓ na vista do dono da espiada. `null` para os outros. */
   readonly espiada: EspiadaPendente | null;
@@ -375,6 +379,12 @@ export interface VistaDaPartida {
 export interface ConfigPartida {
   readonly patenteAlvo: number;
   readonly composicaoPorJogador: readonly ReceitaPorta[];
+  /**
+   * Receitas do baralho de Tesouros, por jogador — multiplicadas pelo número de
+   * assentos, como a de Portas. Obrigatória: uma mesa sem baralho de Tesouros é
+   * uma mesa em que vencer não paga nada, e defaultar para `[]` esconderia isso.
+   */
+  readonly composicaoTesouros: readonly ReceitaTesouro[];
   /**
    * Cartas distribuídas a cada jogador na abertura. Ausente = 0, para que os
    * testes possam montar mesas de baralho mínimo (1 carta por jogador) sem ter

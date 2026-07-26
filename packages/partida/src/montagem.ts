@@ -1,5 +1,5 @@
 import type {
-  CartaPorta, ConfigPartida, EntradaJogador, Embaralhar, EstadoPartida, EventoDaMesa, JogadorNaMesa,
+  CartaPorta, CartaTesouro, ConfigPartida, EntradaJogador, Embaralhar, EstadoPartida, EventoDaMesa, JogadorNaMesa,
 } from './tipos';
 import { SLOTS_VAZIOS } from './corpo';
 import { faseDoTurnoDe } from './fase';
@@ -57,6 +57,14 @@ export function criarPartida(
   // entregar qual carta era. Carimbar depois do embaralho quebra essa correlação.
   const cartas: readonly CartaPorta[] = deps.embaralhar(receitas).map((r, i) => ({ ...r, id: `p-${String(i)}` }));
 
+  // Prefixo `t-` contra o `p-` das Portas: as duas famílias convivem NA MESMA
+  // MÃO, e `equiparCarta` resolve a carta por id. Ids colidindo fariam um
+  // `cartaId` apontar para duas cartas diferentes — e o `find` pegaria a
+  // primeira, silenciosamente.
+  const receitasTesouro = Array.from({ length: jogadores.length }, () => config.composicaoTesouros).flat();
+  const tesouros: readonly CartaTesouro[] = deps.embaralhar(receitasTesouro)
+    .map((r, i) => ({ ...r, id: `t-${String(i)}` }));
+
   // A mão sai do TOPO do baralho já embaralhado — mesmo lugar de onde sairia se
   // fosse comprada carta a carta. Bloco contíguo por jogador em vez de round-robin
   // porque o baralho já está aleatório: alternar não acrescentaria aleatoriedade.
@@ -90,6 +98,7 @@ export function criarPartida(
     vezDe: primeiro.id,
     patenteAlvo: config.patenteAlvo,
     portas: { monte, cemiterio: [] },
+    tesouros: { monte: tesouros, cemiterio: [] },
     combate: null,
     espiada: null,
     // CALCULADA, nunca a constante `'vasculhar'`: `MAO_INICIAL_PADRAO` e

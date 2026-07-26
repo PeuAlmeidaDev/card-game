@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { criarPartida } from './montagem';
-import { COMPOSICAO_DE_TESTE } from './testes/composicao';
+import { montarComposicaoTesouros } from './baralho';
+import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import { MAO_INICIAL_PADRAO } from './mao';
 import { SLOTS_VAZIOS } from './corpo';
 import { ID_DA_CLASSE_DE_TESTE } from './testes/catalogo';
@@ -13,7 +14,11 @@ const entradas: readonly EntradaJogador[] = [
   { id: 'p2', nome: 'Bot 1', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
 ];
 
-const config = { patenteAlvo: 3, composicaoPorJogador: COMPOSICAO_DE_TESTE };
+const config = {
+  patenteAlvo: 3,
+  composicaoPorJogador: COMPOSICAO_DE_TESTE,
+  composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE,
+};
 
 describe('criarPartida', () => {
   it('coloca todos na patente 1, sem derrotas, e dá a vez ao primeiro assento', () => {
@@ -111,13 +116,40 @@ describe('criarPartida', () => {
       { embaralhar: semEmbaralhar }))
       .toThrow('criarPartida: o baralho não tem cartas para a mão inicial');
   });
+
+  it('a mesa nasce com o baralho de Tesouros montado e embaralhado', () => {
+    const estado = criarPartida('m1', entradas, {
+      patenteAlvo: 4,
+      composicaoPorJogador: COMPOSICAO_DE_TESTE,
+      composicaoTesouros: montarComposicaoTesouros(['i-teste', 'i-teste']),
+    }, { embaralhar: semEmbaralhar });
+
+    // 2 receitas × 2 assentos: a multiplicação por assento é a MESMA regra do
+    // baralho de Portas — o baralho de uma mesa de 4 não pode ter o tamanho do
+    // baralho de uma mesa de 2.
+    expect(estado.tesouros.monte).toHaveLength(4);
+    expect(estado.tesouros.cemiterio).toEqual([]);
+  });
+
+  it('os ids de Tesouro não colidem com os de Porta', () => {
+    // Os dois baralhos convivem NA MESMA MÃO. Id colidindo faria `cartaId`
+    // apontar para duas cartas, e `equiparCarta` pegaria a errada.
+    const estado = criarPartida('m1', entradas, {
+      patenteAlvo: 4,
+      composicaoPorJogador: COMPOSICAO_DE_TESTE,
+      composicaoTesouros: montarComposicaoTesouros(['i-teste']),
+    }, { embaralhar: semEmbaralhar });
+
+    const idsDePorta = new Set(estado.portas.monte.map((c) => c.id));
+    for (const t of estado.tesouros.monte) {
+      expect(idsDePorta.has(t.id)).toBe(false);
+    }
+  });
 });
 
 describe('criarPartida — a fase inicial', () => {
   it('a mesa nasce na fase de vasculhar', () => {
-    const p = criarPartida('m1', entradas,
-      { patenteAlvo: 3, composicaoPorJogador: COMPOSICAO_DE_TESTE, maoInicial: MAO_INICIAL_PADRAO },
-      { embaralhar: semEmbaralhar });
+    const p = criarPartida('m1', entradas, { ...config, maoInicial: MAO_INICIAL_PADRAO }, { embaralhar: semEmbaralhar });
 
     expect(p.fase).toBe('vasculhar');
   });
@@ -129,7 +161,7 @@ describe('criarPartida — a fase inicial', () => {
     // o excedente proíbe — tela morta no primeiro clique, agora sem nem o guard
     // antigo para recusar. A fase inicial tem que ser CALCULADA.
     const p = criarPartida('m1', entradas,
-      { patenteAlvo: 3, composicaoPorJogador: COMPOSICAO_DE_TESTE, maoInicial: MAO_INICIAL_PADRAO + 2 },
+      { ...config, maoInicial: MAO_INICIAL_PADRAO + 2 },
       { embaralhar: semEmbaralhar });
 
     expect(p.fase).toBe('descartar');

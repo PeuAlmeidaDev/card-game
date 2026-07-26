@@ -7,6 +7,7 @@ import { projetarPara } from './projecao';
 import { filaDeDados } from './testes/dados';
 import { monstro as cartaMonstro, raca } from './testes/cartas';
 import { catalogoDeTeste, ID_DA_CLASSE_DE_TESTE } from './testes/catalogo';
+import { COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import type { EntradaJogador, EstadoPartida } from './tipos';
 
 /** A projeção calcula `combatente`, então precisa do catálogo. Um só para o arquivo. */
@@ -16,7 +17,11 @@ const entradas: readonly EntradaJogador[] = [
   { id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE },
   { id: 'p2', nome: 'Bot 1', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
 ];
-const soMonstro = { patenteAlvo: 5, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] };
+const soMonstro = {
+  patenteAlvo: 5,
+  composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }],
+  composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE,
+};
 
 describe('escolherAcao', () => {
   it('sem combate em curso, chuta a porta', () => {

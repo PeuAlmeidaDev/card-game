@@ -4,11 +4,12 @@ import { resolverDuelo, type RolarD12, type Combatente } from '@card-dungeon/mot
 import { contrato } from '@card-dungeon/shared';
 import { CATALOGO, MONSTRO_PADRAO, resolverEscolhas, montarCombatente } from '@card-dungeon/personagem';
 import {
-  MONSTROS_SACAVEIS, RACAS_SACAVEIS, obterRaca, obterItem, type MonstroCarta,
+  MONSTROS_SACAVEIS, RACAS_SACAVEIS, ITENS_SACAVEIS, obterRaca, obterItem, type MonstroCarta,
 } from '@card-dungeon/cartas';
 import {
   AcaoInvalida, MAO_INICIAL_PADRAO, aplicarAcao, avancarBots, criarPartida, montarComposicao,
-  projetarPara, versaoDe, type CatalogoDaMesa, type Embaralhar, type EntradaJogador, type EstadoPartida,
+  montarComposicaoTesouros, projetarPara, versaoDe,
+  type CatalogoDaMesa, type Embaralhar, type EntradaJogador, type EstadoPartida,
 } from '@card-dungeon/partida';
 import { initServer } from '@ts-rest/fastify';
 import { criarDadoReal } from './dado';
@@ -86,6 +87,14 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
     RACAS_SACAVEIS.map((r) => r.id),
   );
 
+  /**
+   * Baralho de Tesouros de produção: **uma carta para cada item do catálogo**,
+   * por jogador — a mesma regra que o baralho de Portas usa para monstro e raça
+   * (spec §8). Derivar do catálogo em vez de fixar uma contagem é o que faz a
+   * repetição desaparecer em vez de precisar ser escolhida.
+   */
+  const composicaoTesourosDeProducao = montarComposicaoTesouros(ITENS_SACAVEIS.map((i) => i.id));
+
   // O server RESOLVE (pergunta à carta), nunca DECIDE (`racaId === 'elfo'` seria
   // regra de jogo na borda). As cartas do pacote `cartas` satisfazem
   // `InfoRaca`/`InfoMonstro` estruturalmente, então não há tradução aqui — só o
@@ -153,7 +162,12 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
       const estado = criarPartida(
         randomUUID(),
         [humano, ...montarBots()],
-        { patenteAlvo: PATENTE_ALVO_PADRAO, composicaoPorJogador: composicaoDeProducao, maoInicial: MAO_INICIAL_PADRAO },
+        {
+          patenteAlvo: PATENTE_ALVO_PADRAO,
+          composicaoPorJogador: composicaoDeProducao,
+          composicaoTesouros: composicaoTesourosDeProducao,
+          maoInicial: MAO_INICIAL_PADRAO,
+        },
         { embaralhar },
       );
       repositorio.salvar(estado);

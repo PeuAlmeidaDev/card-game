@@ -20,6 +20,7 @@ const vistaBase: VistaDaPartida = {
   patenteAlvo: 10,
   cartasNoMonte: 16,
   cartasNoCemiterio: 0,
+  tesourosNoMonte: 0,
   combate: null,
   espiada: null,
   fase: 'vasculhar',

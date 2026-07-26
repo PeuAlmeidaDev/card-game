@@ -8,6 +8,7 @@ import { limiteDeMao, MAO_INICIAL_PADRAO } from './mao';
 import { montarComposicao } from './baralho';
 import { criarDadoCiclico } from './testes/dados';
 import { catalogoDeTeste, ID_DA_CLASSE_DE_TESTE } from './testes/catalogo';
+import { COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import { monstro, raca } from './testes/cartas';
 import { SLOTS_VAZIOS } from './corpo';
 import type { JogadorNaMesa, EntradaJogador, EstadoPartida, Fase } from './tipos';
@@ -152,7 +153,12 @@ describe('a fase nunca mente sobre o estado', () => {
     // estourava e `descartar` nunca era visitada — a asserção de cobertura falhava.
     // +1 basta para a partida realmente passar pelas três fases.
     let estado = criarPartida('m1', quatro,
-      { patenteAlvo: 4, composicaoPorJogador: composicao, maoInicial: MAO_INICIAL_PADRAO + 1 },
+      {
+        patenteAlvo: 4,
+        composicaoPorJogador: composicao,
+        composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE,
+        maoInicial: MAO_INICIAL_PADRAO + 1,
+      },
       { embaralhar: semEmbaralhar });
 
     const fasesVistas = new Set<Fase>([estado.fase]);

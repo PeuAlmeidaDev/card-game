@@ -58,6 +58,9 @@ export function projetarPara(
     patenteAlvo: estado.patenteAlvo,
     cartasNoMonte: estado.portas.monte.length,
     cartasNoCemiterio: estado.portas.cemiterio.length,
+    // A ordem do monte de Tesouros também é segredo — a contagem já basta:
+    // nada saca dele ainda, então não há mais nada a publicar por enquanto.
+    tesourosNoMonte: estado.tesouros.monte.length,
     combate: estado.combate,
     // Segredo do vidente: a carta espiada só aparece na vista de quem está com ela.
     espiada: estado.espiada && estado.espiada.jogadorId === jogadorId ? estado.espiada : null,

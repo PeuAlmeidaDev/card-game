@@ -4,7 +4,7 @@ export type {
   JogadorPublico, ZonaEmJogo, PosicaoFinal, EventoDaMesa, AcaoDaMesa, CombateNaMesa, EspiadaPendente,
   EstadoPartida, VistaDaPartida, ConfigPartida, EntradaJogador, Baralho, Fase,
 } from './tipos';
-export { montarComposicao, tirarDoTopo } from './baralho';
+export { montarComposicao, montarComposicaoTesouros, tirarDoTopo } from './baralho';
 export { combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
 export { aplicarAcao } from './mesa';
 export { avancarBots } from './automacao';

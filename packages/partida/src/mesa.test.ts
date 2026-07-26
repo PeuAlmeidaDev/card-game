@@ -9,7 +9,7 @@ import { AcaoInvalida } from './erros';
 import { filaDeDados, criarDadoCiclico } from './testes/dados';
 import { monstro, salaVazia, raca } from './testes/cartas';
 import { catalogoDeTeste, ID_DA_CLASSE_DE_TESTE } from './testes/catalogo';
-import { COMPOSICAO_DE_TESTE } from './testes/composicao';
+import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import type { EntradaJogador, CartaPorta, EstadoPartida } from './tipos';
 import type { PassivaCombate } from '@card-dungeon/motor';
 
@@ -28,7 +28,11 @@ export const entradas: readonly EntradaJogador[] = [
   { id: 'p2', nome: 'Bot 1', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
 ];
 
-const config = { patenteAlvo: 3, composicaoPorJogador: COMPOSICAO_DE_TESTE };
+const config = {
+  patenteAlvo: 3,
+  composicaoPorJogador: COMPOSICAO_DE_TESTE,
+  composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE,
+};
 
 const deps = (dados: readonly number[]) => ({
   rolar: filaDeDados(dados),
@@ -341,7 +345,12 @@ describe('partida completa', () => {
       catalogo: catalogoDeTeste(),
     };
 
-    let estado = criarPartida('m1', quatro, { patenteAlvo: 3, composicaoPorJogador: [{ tipo: 'monstro', monstroId: 'm-teste' }] },
+    let estado = criarPartida('m1', quatro,
+      {
+        patenteAlvo: 3,
+        composicaoPorJogador: [{ tipo: 'monstro', monstroId: 'm-teste' }],
+        composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE,
+      },
       { embaralhar: semEmbaralhar });
 
     // Guarda anti-loop: se a partida não terminar em MAX_VOLTAS, o teste falha
@@ -396,7 +405,13 @@ describe('passiva da raça no combate da Mesa', () => {
       catalogo,
     };
 
-    const nascida = criarPartida('m1', [humano, bot], { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro', monstroId: 'm-teste' }] }, { embaralhar: deps.embaralhar });
+    const nascida = criarPartida('m1', [humano, bot],
+      {
+        patenteAlvo: 10,
+        composicaoPorJogador: [{ tipo: 'monstro', monstroId: 'm-teste' }],
+        composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE,
+      },
+      { embaralhar: deps.embaralhar });
     // A carta de Anão já na zona — o mesmo lugar onde `jogarCarta` a deixaria.
     let estado: EstadoPartida = {
       ...nascida,
@@ -452,7 +467,7 @@ describe('aplicarAcao — espiada (Presciência)', () => {
       }),
     };
     const p = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
       { embaralhar: semEmbaralhar });
 
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps1);
@@ -488,7 +503,7 @@ describe('aplicarAcao — espiada (Presciência)', () => {
   it('com Presciência, vasculhar ESPIA o topo em vez de resolver (sem evento, sem gastar a vez)', () => {
     // composicaoPorJogador = [salaVazia] → monte = [salaVazia, salaVazia] (× 2 jogadores)
     const p = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
       { embaralhar: semEmbaralhar });
     const antesVersao = p.log.length;
 
@@ -504,7 +519,7 @@ describe('aplicarAcao — espiada (Presciência)', () => {
 
   it('a projeção mostra a carta espiada só a quem está na vez', () => {
     const p = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
       { embaralhar: semEmbaralhar });
     const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])).estado;
 
@@ -515,7 +530,7 @@ describe('aplicarAcao — espiada (Presciência)', () => {
 
   it('manterCarta revela e resolve o topo espiado (salaVazia passa a vez)', () => {
     const p = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
       { embaralhar: semEmbaralhar });
     const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])).estado;
 
@@ -531,7 +546,11 @@ describe('aplicarAcao — espiada (Presciência)', () => {
     // monte (semEmbaralhar) = [salaVazia, monstro] (composicao construída para o
     // topo ser salaVazia e a próxima monstro).
     const p = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }, { tipo: 'monstro' as const, monstroId: 'm-teste' }] },
+      {
+        patenteAlvo: 10,
+        composicaoPorJogador: [{ tipo: 'salaVazia' as const }, { tipo: 'monstro' as const, monstroId: 'm-teste' }],
+        composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE,
+      },
       { embaralhar: semEmbaralhar });
     const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])).estado;
     expect(comEspiada.espiada?.carta.tipo).toBe('salaVazia'); // topo espiado
@@ -549,7 +568,7 @@ describe('aplicarAcao — espiada (Presciência)', () => {
 
   it('empurrar com o monte vazio reembaralha o cemitério ANTES (a empurrada não volta pública)', () => {
     const p0 = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
       { embaralhar: semEmbaralhar });
     // Estado forjado: monte com só 1 carta (salaVazia); cemitério com 1 monstro já revelado.
     const p = { ...p0, portas: { monte: [salaVazia('v1')], cemiterio: [monstro('m1')] } };
@@ -573,7 +592,7 @@ describe('aplicarAcao — espiada (Presciência)', () => {
     // inalcançável só porque as cartas se conservam; a mão de 7 da fatia 8
     // (cartas saem do baralho para as mãos) o torna real.
     const p0 = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
       { embaralhar: semEmbaralhar });
     const p = { ...p0, portas: { monte: [salaVazia('v1')], cemiterio: [] } };
     const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])).estado;
@@ -590,7 +609,7 @@ describe('aplicarAcao — espiada (Presciência)', () => {
 
   it('recusa vasculhar de novo enquanto há espiada pendente', () => {
     const p = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
       { embaralhar: semEmbaralhar });
     const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])).estado;
 
@@ -600,7 +619,7 @@ describe('aplicarAcao — espiada (Presciência)', () => {
 
   it('SEM Presciência, vasculhar continua atômico (nenhuma espiada)', () => {
     const p = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
       { embaralhar: semEmbaralhar });
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])); // deps() sem catálogo de raça
     expect(r.estado.espiada).toBeNull();
@@ -645,7 +664,11 @@ describe('avancarBots — teto de ações automáticas', () => {
       { id: 'b2', nome: 'Bot 2', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
     ];
     const p = criarPartida('m1', soBots,
-      { patenteAlvo: 3, composicaoPorJogador: [{ tipo: 'salaVazia' }] },
+      {
+        patenteAlvo: 3,
+        composicaoPorJogador: [{ tipo: 'salaVazia' }],
+        composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE,
+      },
       { embaralhar: semEmbaralhar });
 
     expect(() => avancarBots(p, {
@@ -660,7 +683,7 @@ describe('avancarBots — teto de ações automáticas', () => {
     // do server como 400 CULPANDO O HUMANO, com a partida morta (a espiada é do
     // bot, a vez é do bot, o humano não tem ação legal).
     const p0 = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
       { embaralhar: semEmbaralhar });
     const vezDoBot = { ...p0, vezDe: 'p2' };
 
@@ -688,7 +711,7 @@ describe('vasculhar — carta de raça', () => {
     // A carta vai para uma zona OCULTA, então o evento é `achado` (porta fechada):
     // diz que aconteceu, nunca o quê. Quem sacou descobre pela própria mão.
     const p0 = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
       { embaralhar: semEmbaralhar });
     const p = { ...p0, portas: { ...p0.portas, monte: [raca('r1', 'elfo')] } };
 
@@ -709,7 +732,7 @@ describe('vasculhar — carta de raça', () => {
     // o log. Foi assim que a sonda que motivou este teste montou um "trapaceador"
     // que acertou as raças sacadas dos 4 jogadores da mesa.
     const p0 = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
       { embaralhar: semEmbaralhar });
     const p = { ...p0, portas: { ...p0.portas, monte: [raca('carta-secreta', 'raca-secreta')] } };
 
@@ -741,7 +764,7 @@ describe('a raça vem da ZONA EM JOGO', () => {
     };
     // monstro rápido (ataca primeiro) e forte, para o 1º golpe cair no humano
     const monstroForte = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1, tesouros: 1 };
-    const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] };
+    const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
 
     const vidaApos = (comRacaNaZona: boolean): number | undefined => {
       const depsAnao = {
@@ -773,7 +796,7 @@ describe('a raça vem da ZONA EM JOGO', () => {
 });
 
 describe('aplicarAcao — jogarCarta', () => {
-  const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] };
+  const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
   const comMao = (estado: EstadoPartida, cartas: readonly CartaPorta[]): EstadoPartida => ({
     ...estado,
     jogadores: estado.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao: cartas } : j)),
@@ -846,7 +869,7 @@ describe('aplicarAcao — jogarCarta', () => {
     // `jogarCarta` não está no conjunto legal da fase `combate`, e é a tabela
     // (não mais um guard próprio) quem recusa.
     const p0 = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
       { embaralhar: semEmbaralhar });
     const emCombate = aplicarAcao(comMao(p0, [raca('r1', 'anao')]),
       { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
@@ -876,7 +899,7 @@ describe('aplicarAcao — jogarCarta', () => {
       }),
     };
     const p0 = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
       { embaralhar: semEmbaralhar });
 
     const jogou = aplicarAcao(comMao(p0, [raca('r1', 'anao')]),
@@ -889,7 +912,7 @@ describe('aplicarAcao — jogarCarta', () => {
 });
 
 describe('aplicarAcao — entregarCarta (a caridade)', () => {
-  const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] };
+  const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
 
   /** p1 com a mão estourada (5 cartas, raça em jogo => limite 4). */
   const estourado = (estado: EstadoPartida, mao = [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5')]): EstadoPartida => ({
@@ -1033,7 +1056,7 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
     // checagem de mão — por isso a mão nem precisa estar estourada aqui. (Desde
     // que `vasculhar` recusa abrir combate com a mão já estourada, usar
     // `estourado` para chegar a este `emCombate` nem seria mais possível.)
-    const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] };
+    const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const emCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
     expect(emCombate.combate).not.toBeNull();
@@ -1053,7 +1076,7 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
 });
 
 describe('encerrarTurno — o limite de mão segura a vez', () => {
-  const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] };
+  const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
   // 5 cartas com raça em jogo = limite 4 => estourado por 1.
   const maoEstourada = [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5')];
   // 4 cartas com raça em jogo = EXATAMENTE o limite — ainda não estourada. Ponto
@@ -1137,7 +1160,7 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
     // pode mais vir de ANTES do vasculhar (senão o combate nem abriria). Ela é
     // forjada DEPOIS que o combate já está aberto, só para provar que
     // `fecharCombate` também passa pela porta única.
-    const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] };
+    const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const fraco = { forca: 1, vida: 1, habilidade: 0, agilidade: 0, level: 1, tesouros: 1 };
     const depsFraco = {
@@ -1155,7 +1178,7 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
 });
 
 describe('aplicarAcao — vasculhar com a mão estourada', () => {
-  const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] };
+  const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
   const cinco = [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5')];
   const estourado = (estado: EstadoPartida): EstadoPartida => ({
     ...estado,
@@ -1253,6 +1276,7 @@ describe('a composição BASELINE não pode nascer travada', () => {
   const producao = {
     patenteAlvo: 10,
     composicaoPorJogador: COMPOSICAO_DE_TESTE,
+    composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE,
     maoInicial: MAO_INICIAL_PADRAO,
   };
   // A mesa que o `server` monta: 1 humano + 3 bots, todos começando sem raça.
@@ -1294,8 +1318,8 @@ describe('a composição BASELINE não pode nascer travada', () => {
 });
 
 describe('a fase acompanha o que o turno fez', () => {
-  const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] };
-  const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] };
+  const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
+  const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
 
   it('carta de monstro leva a mesa para `combate`', () => {
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
@@ -1412,7 +1436,7 @@ describe('a fase acompanha o que o turno fez', () => {
 });
 
 describe('o guard de fase é ponto único', () => {
-  const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] };
+  const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
 
   it('recusa fora de fase como AcaoInvalida, nomeando a ação e a fase', () => {
     // A mensagem entra verbatim no corpo do 400. Nomear as duas pontas é o que
@@ -1441,7 +1465,7 @@ describe('o guard de fase é ponto único', () => {
   it('a espiada pendente continua sendo guarda DENTRO da fase, não fase', () => {
     // `vasculhar` e `manterCarta` são legais na MESMA fase; o que as separa é o
     // campo `espiada`. Estes dois guards são os únicos que sobrevivem à tabela.
-    const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] };
+    const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
     const p = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
 
     expect(() => aplicarAcao(p, { tipo: 'manterCarta', jogadorId: 'p1' }, deps([])))
