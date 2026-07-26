@@ -1040,13 +1040,34 @@ EOF
 ### Task 5: vencer larga tesouro na mão
 
 **Files:**
-- Modify: `packages/partida/src/tipos.ts` (evento `loot`)
-- Modify: `packages/partida/src/mesa.ts` (`fecharCombate`)
+- Modify: `packages/partida/src/tipos.ts` (evento `loot`; `JogadorNaMesa.mao` e `VistaDaPartida.suaMao` alargam para `Carta`; o evento `descarte` também)
+- Modify: `packages/partida/src/mesa.ts` (`fecharCombate` e `entregarCarta`)
 - Modify: `packages/partida/src/mesa.test.ts`
 
 **Interfaces:**
 - Consumes: `tirarDoTopo`, `InfoMonstro.tesouros`.
-- Produces: evento `{ readonly tipo: 'loot'; readonly jogadorId: string; readonly quantidade: number }`
+- Produces:
+  - evento `{ readonly tipo: 'loot'; readonly jogadorId: string; readonly quantidade: number }`
+  - `JogadorNaMesa.mao: readonly Carta[]` e `VistaDaPartida.suaMao: readonly Carta[]`
+  - `descartarNoBaralhoCerto(estado: EstadoPartida, carta: Carta): EstadoPartida`
+
+> ### ⚠️ Correção do plano (2026-07-26, depois da Task 3)
+>
+> **Esta task herda o alargamento da mão, e ele traz um bug que o plano original não previa.**
+>
+> A Task 3 deliberadamente NÃO alargou `JogadorNaMesa.mao` para `readonly Carta[]`, e a decisão estava certa: sem `EstadoPartida.tesouros` existindo (Task 4), um tesouro descartado pela caridade iria para o cemitério de **Portas** e voltaria como carta de Porta na próxima compra. Agora o baralho existe, o loot põe tesouro na mão, e o alargamento tem que acontecer aqui — **junto com o roteamento do descarte**.
+>
+> O caminho quebrado é `entregarCarta` com `destino.destinatario === null` (ninguém atrás do doador: a carta vai para o cemitério, regra do Munchkin). Ele faz hoje:
+>
+> ```ts
+> portas: { ...estado.portas, cemiterio: [...estado.portas.cemiterio, carta] }
+> ```
+>
+> Com a mão heterogênea isso enfia um `CartaTesouro` no baralho de Portas — e `tirarDoTopo` a devolve como Porta, onde `resolverCarta` cai no `default: never` e lança `Error` cru: **500 numa partida legítima**. O `never` que a fatia 8/P1 pôs lá é o alarme; esta task é quem impede o alarme de tocar.
+>
+> Acrescentar `descartarNoBaralhoCerto` em `mesa.ts` e usá-la nos dois pontos que descartam (`entregarCarta` e, na Task 6, `destinoDoDesequipado` — que já nasce apontando para `tesouros.cemiterio` e portanto não precisa dela).
+>
+> O evento `descarte` carrega a carta (cemitério é zona aberta), então `EventoDaMesa` também alarga: `carta: CartaPorta` → `carta: Carta`. Isso cobra o `never` de `descreverCarta` e `narrarEvento` no `web` — que é trabalho da Task 7, e onde ele já estava previsto.
 
 - [ ] **Passo 1: escrever o teste que falha**
 
@@ -1080,6 +1101,27 @@ Acrescentar em `packages/partida/src/mesa.test.ts`:
   it('PERDER não larga tesouro nenhum', () => {
     const depois = jogarAtePerderCombate(mesaComCombatePerdivel({ tesouros: 2 }));
     expect(depois.log.some((e) => e.tipo === 'loot')).toBe(false);
+  });
+
+  it('descartar um TESOURO pela caridade manda para o cemitério de Tesouros', () => {
+    // O caminho que o alargamento da mão abre: sem rotear por família, o tesouro
+    // entraria no baralho de PORTAS e voltaria como Porta na próxima compra —
+    // onde `resolverCarta` cai no `default: never` e lança Error cru (500 numa
+    // partida legítima). O `never` da fatia 8/P1 é o alarme; este teste é o que
+    // impede o alarme de tocar.
+    const estado = mesaComTesouroNaMaoDoUltimo('t-1'); // ninguém atrás => cemitério
+    const { estado: depois } = aplicarAcao(estado, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 't-1' }, deps);
+
+    expect(depois.tesouros.cemiterio.map((c) => c.id)).toContain('t-1');
+    expect(depois.portas.cemiterio.map((c) => c.id)).not.toContain('t-1');
+  });
+
+  it('descartar uma PORTA continua indo para o cemitério de Portas', () => {
+    const estado = mesaComPortaNaMaoDoUltimo('p-9');
+    const { estado: depois } = aplicarAcao(estado, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'p-9' }, deps);
+
+    expect(depois.portas.cemiterio.map((c) => c.id)).toContain('p-9');
+    expect(depois.tesouros.cemiterio.map((c) => c.id)).not.toContain('p-9');
   });
 
   it('o loot pode estourar a mão, e aí a fase vira `descartar`', () => {
@@ -1157,7 +1199,39 @@ function sacarTesouros(
 }
 ```
 
-e dentro de `fecharCombate`, logo depois de montar `semCombate`:
+O roteamento do descarte, no mesmo arquivo:
+
+```ts
+/**
+ * Manda a carta para o cemitério do baralho A QUE ELA PERTENCE. Ponto único, e
+ * exaustivo por construção: o `switch` sobre a união fecha em `never`, então a
+ * terceira família de carta (maldição, classe — spec §4) não consegue nascer sem
+ * alguém decidir para onde ela é descartada.
+ *
+ * Sem isto, um tesouro descartado pela caridade entraria no baralho de PORTAS e
+ * voltaria como Porta na compra seguinte, onde `resolverCarta` lança `Error` cru
+ * — 500 numa partida legítima. A mão virou heterogênea nesta task; o descarte
+ * tinha que virar junto.
+ */
+function descartarNoBaralhoCerto(estado: EstadoPartida, carta: Carta): EstadoPartida {
+  switch (carta.tipo) {
+    case 'monstro':
+    case 'salaVazia':
+    case 'raca':
+      return { ...estado, portas: { ...estado.portas, cemiterio: [...estado.portas.cemiterio, carta] } };
+    case 'equipamento':
+      return { ...estado, tesouros: { ...estado.tesouros, cemiterio: [...estado.tesouros.cemiterio, carta] } };
+    default: {
+      const naoTratada: never = carta;
+      throw new Error(`descartarNoBaralhoCerto: carta não tratada: ${JSON.stringify(naoTratada)}`);
+    }
+  }
+}
+```
+
+e `entregarCarta` passa a usá-la no ramo do cemitério, em vez de escrever em `portas.cemiterio` à mão.
+
+E dentro de `fecharCombate`, logo depois de montar `semCombate`:
 
 ```ts
   // O loot vem ANTES do `encerrarTurno` de propósito: é ele quem recobra o
