@@ -23,12 +23,18 @@ const LEGAL: Record<Fase, ReadonlySet<AcaoDaMesa['tipo']>> = {
   // A espiada da Presciência continua sendo PENDÊNCIA dentro desta fase, não fase
   // própria (spec §6): `vasculhar` e `manterCarta`/`empurrarCarta` são legais na
   // mesma fase e se excluem pelo campo `espiada`, que o reducer ainda consulta.
-  vasculhar: new Set<AcaoDaMesa['tipo']>(['vasculhar', 'manterCarta', 'empurrarCarta', 'jogarCarta']),
+  vasculhar: new Set<AcaoDaMesa['tipo']>([
+    'vasculhar', 'manterCarta', 'empurrarCarta', 'jogarCarta', 'equiparCarta',
+  ]),
+  // `equiparCarta` fica de FORA: o motor recebe um snapshot imutável dos stats na
+  // abertura do combate, então remontar o corpo no meio da luta ou não teria
+  // efeito nenhum (mentindo para quem clicou) ou furaria o snapshot.
   combate: new Set<AcaoDaMesa['tipo']>(['atacar', 'esquivar']),
-  // As DUAS saídas do excedente. `vasculhar` fica de fora: se continuasse legal,
-  // "a vez não passa" viraria "jogue para sempre" — o jogador sacaria carta atrás
-  // de carta sem nunca resolver o excedente.
-  descartar: new Set<AcaoDaMesa['tipo']>(['entregarCarta', 'jogarCarta']),
+  // As TRÊS saídas do excedente. `equiparCarta` entra pelo mesmo motivo que
+  // `jogarCarta`: ela tira uma carta da mão, logo resolve o estouro. `vasculhar`
+  // fica de fora: se continuasse legal, "a vez não passa" viraria "jogue para
+  // sempre" — o jogador sacaria carta atrás de carta sem nunca resolver o excedente.
+  descartar: new Set<AcaoDaMesa['tipo']>(['entregarCarta', 'jogarCarta', 'equiparCarta']),
 };
 
 /** A tabela como pergunta. O `LEGAL` não é exportado: quem lê, lê por aqui. */

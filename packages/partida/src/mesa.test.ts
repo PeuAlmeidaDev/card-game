@@ -10,8 +10,12 @@ import { filaDeDados, criarDadoCiclico } from './testes/dados';
 import { monstro, salaVazia, raca, equipamento } from './testes/cartas';
 import { catalogoDeTeste, ID_DA_CLASSE_DE_TESTE, MONSTRO_DE_TESTE } from './testes/catalogo';
 import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
+import { combatenteDe, SLOTS_VAZIOS } from './corpo';
 import type { DepsMesa } from './mesa';
-import type { Carta, EntradaJogador, CartaPorta, EstadoPartida, InfoMonstro } from './tipos';
+import type {
+  Carta, ConfigPartida, EntradaJogador, CartaPorta, EstadoPartida, InfoMonstro, JogadorNaMesa,
+  ZonaEmJogo,
+} from './tipos';
 import type { PassivaCombate } from '@card-dungeon/motor';
 
 /**
@@ -73,9 +77,19 @@ const venceOCombate = (
   return atual;
 };
 
+/**
+ * O jogador por id. Lança em vez de devolver `undefined`: id errado num teste tem
+ * que falhar alto, e `combatenteDe` (que os testes de equipar chamam) precisa do
+ * jogador inteiro, não de um `?.` que some.
+ */
+const jogadorDe = (estado: EstadoPartida, id: string): JogadorNaMesa => {
+  const jogador = estado.jogadores.find((j) => j.id === id);
+  if (jogador === undefined) throw new Error(`jogadorDe: ${id} não está na mesa`);
+  return jogador;
+};
+
 /** A mão de um jogador, por id. Ela é `readonly Carta[]` desde o loot. */
-const maoDe = (estado: EstadoPartida, id: string): readonly Carta[] =>
-  estado.jogadores.find((j) => j.id === id)?.mao ?? [];
+const maoDe = (estado: EstadoPartida, id: string): readonly Carta[] => jogadorDe(estado, id).mao;
 
 describe('aplicarAcao — vasculhar', () => {
   it('o id acompanha a carta quando ela sai do monte', () => {
@@ -1102,6 +1116,135 @@ describe('aplicarAcao — jogarCarta', () => {
     const depois = aplicarAcao(comCombate, { tipo: 'esquivar', jogadorId: 'p1' }, depsAnao).estado;
 
     expect(depois.combate?.estado.jogador.vida).toBe(17);
+  });
+});
+
+describe('aplicarAcao — equiparCarta', () => {
+  const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
+  const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
+
+  // `ConfigPartida` explícito: sem a anotação o TS infere o tipo do DEFAULT
+  // (`salaVazia`) e passar `soMonstro` vira erro de compilação — que o vitest não
+  // mostra, porque o esbuild apaga os tipos.
+  const nascida = (cfg: ConfigPartida = soSalaVazia): EstadoPartida =>
+    criarPartida('m1', entradas, cfg, { embaralhar: semEmbaralhar });
+
+  /** Mesa com a mão de p1 forjada. A mão é heterogênea, então aceita as duas famílias. */
+  const comMao = (estado: EstadoPartida, mao: readonly Carta[]): EstadoPartida => ({
+    ...estado,
+    jogadores: estado.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao } : j)),
+  });
+
+  /** Mesa com o corpo de p1 forjado. Espalha `SLOTS_VAZIOS` para não escrever os 5 slots à mão. */
+  const comSlots = (estado: EstadoPartida, slots: Partial<ZonaEmJogo['slots']>): EstadoPartida => ({
+    ...estado,
+    jogadores: estado.jogadores.map((j) => (
+      j.id === 'p1' ? { ...j, emJogo: { ...j.emJogo, slots: { ...SLOTS_VAZIOS, ...slots } } } : j
+    )),
+  });
+
+  it('equipar tira da mão, põe no slot e muda os stats', () => {
+    // O critério de sucesso da fatia: a carta sai da zona oculta, entra na aberta,
+    // e o combatente muda NA HORA — porque `combatenteDe` lê a zona, não um campo
+    // denormalizado que alguém teria que lembrar de recalcular.
+    const p = comMao(nascida(), [equipamento('t-1')]);
+    const antes = combatenteDe(jogadorDe(p, 'p1'), catalogoPadrao).forca;
+
+    const { estado: depois } = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+
+    expect(maoDe(depois, 'p1').some((c) => c.id === 't-1')).toBe(false);
+    expect(depois.jogadores[0]?.emJogo.slots.maoDireita?.id).toBe('t-1');
+    expect(combatenteDe(jogadorDe(depois, 'p1'), catalogoPadrao).forca).toBe(antes + 1);
+  });
+
+  it('o item deslocado vai para o cemitério de Tesouros', () => {
+    // Sem mochila nesta fatia (Plano 4). O ponto único que muda lá é
+    // `destinoDoDesequipado`, não este teste — que continua valendo para o ramo
+    // "mochila cheia".
+    const p = comSlots(comMao(nascida(), [equipamento('t-1')]), { maoDireita: equipamento('t-0') });
+
+    const { estado: depois } = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+
+    expect(depois.tesouros.cemiterio.map((c) => c.id)).toContain('t-0');
+    // E no cemitério de TESOUROS, não no de Portas: o roteamento por família vale
+    // para o que sai do corpo tanto quanto para o que sai da mão.
+    expect(depois.portas.cemiterio.map((c) => c.id)).not.toContain('t-0');
+    expect(depois.jogadores[0]?.emJogo.slots.maoDireita?.id).toBe('t-1');
+  });
+
+  it('o evento `equipou` CARREGA a carta — o slot é zona aberta', () => {
+    const p = comMao(nascida(), [equipamento('t-1')]);
+
+    const { eventos } = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+
+    expect(eventos).toContainEqual({
+      tipo: 'equipou', jogadorId: 'p1', slot: 'maoDireita',
+      carta: { id: 't-1', tipo: 'equipamento', itemId: 'i-teste' },
+    });
+  });
+
+  it('carta de PORTA não pode ser equipada', () => {
+    const p = comMao(nascida(), [monstro('m9')]);
+
+    expect(() => aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 'm9' }, deps([])))
+      .toThrow(AcaoInvalida);
+    expect(() => aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 'm9' }, deps([])))
+      .toThrow('aplicarAcao: só carta de equipamento vai para o corpo');
+  });
+
+  it('recusa equipar com uma espiada pendente', () => {
+    // Guarda de PENDÊNCIA, não de fase: a espiada mora DENTRO de `vasculhar`, e a
+    // tabela não a conhece. Gêmeo do guard que `jogarCarta` já carrega — sem ele
+    // daria para remontar o corpo no meio de uma Presciência aberta.
+    const comEspiada = aplicarAcao(comMao(nascida(), [equipamento('t-1')]),
+      { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])).estado;
+    expect(comEspiada.espiada).not.toBeNull();
+
+    expect(() => aplicarAcao(comEspiada, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([])))
+      .toThrow('aplicarAcao: há uma espiada pendente');
+  });
+
+  it('equipar é ilegal durante o combate', () => {
+    const emCombate = aplicarAcao(comMao(nascida(soMonstro), [equipamento('t-1')]),
+      { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
+    expect(emCombate.combate).not.toBeNull();
+
+    expect(() => aplicarAcao(emCombate, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([])))
+      .toThrow('aplicarAcao: equiparCarta não é legal na fase combate');
+  });
+
+  it('equipar é a TERCEIRA saída do excedente: legal em `descartar`, e recalcula a fase', () => {
+    // Mesmo princípio de `jogarCarta` (fatia 7): a ação tira uma carta da mão,
+    // logo pode resolver o excedente. Sem o recálculo o turno ficaria preso em
+    // `descartar` com a mão já cabendo.
+    //
+    // 5 cartas com raça em jogo => limite 4, estourado por 1. Equipar deixa 4.
+    const p0 = comMao(nascida(), [equipamento('t-1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5')]);
+    const estourado: EstadoPartida = {
+      ...p0,
+      jogadores: p0.jogadores.map((j) => (
+        j.id === 'p1' ? { ...j, emJogo: { ...j.emJogo, raca: raca('r1', 'anao') } } : j
+      )),
+      // Forjado direto no estado: a fase tem que vir junto, senão o fixture mente.
+      fase: 'descartar',
+    };
+
+    const { estado: depois } = aplicarAcao(estourado, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+
+    expect(maoDe(depois, 'p1')).toHaveLength(4);
+    expect(depois.fase).toBe('vasculhar');
+  });
+
+  it('item que o catálogo não conhece é Error cru, nunca AcaoInvalida', () => {
+    // A carta só chegou à mão pelo baralho que a borda montou do próprio
+    // catálogo: id órfão é invariante NOSSA quebrada => 500 sem vazar, nunca 400
+    // culpando o cliente. Mesma cadeia do monstro órfão.
+    const p = comMao(nascida(), [equipamento('t-1', 'item-fantasma')]);
+
+    expect(() => aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([])))
+      .toThrow(/item-fantasma/);
+    expect(() => aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([])))
+      .not.toThrow(AcaoInvalida);
   });
 });
 

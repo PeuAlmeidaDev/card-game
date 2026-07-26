@@ -67,6 +67,11 @@ export const acaoDaMesaSchema = z.discriminatedUnion('tipo', [
   // borda de verdade.
   z.object({ tipo: z.literal('jogarCarta'), cartaId: z.string().min(1).max(64) }),
   z.object({ tipo: z.literal('entregarCarta'), cartaId: z.string().min(1).max(64) }),
+  // Só o `cartaId`: o SLOT não viaja no fio. Ele sai do item, pelo catálogo do
+  // servidor — deixar o cliente escolher onde encaixar seria deixá-lo pôr o
+  // capacete no pé, e a checagem viraria mais um guard no reducer em vez de ser
+  // impossível por construção. Mesmo teto de 64 e pelo mesmo motivo.
+  z.object({ tipo: z.literal('equiparCarta'), cartaId: z.string().min(1).max(64) }),
 ]) satisfies z.ZodType<{ tipo: AcaoDaMesa['tipo'] }>;
 
 /** A intenção validada. A rota completa com o `jogadorId` da sessão. */

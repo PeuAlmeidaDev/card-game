@@ -22,11 +22,12 @@ const jogador = (mao: JogadorNaMesa['mao'], comRaca: boolean): JogadorNaMesa => 
 });
 
 describe('acaoEhLegalNaFase', () => {
-  it('em `vasculhar` valem a compra, a decisão da espiada e jogar raça', () => {
+  it('em `vasculhar` valem a compra, a decisão da espiada, jogar raça e equipar', () => {
     expect(acaoEhLegalNaFase('vasculhar', 'vasculhar')).toBe(true);
     expect(acaoEhLegalNaFase('vasculhar', 'manterCarta')).toBe(true);
     expect(acaoEhLegalNaFase('vasculhar', 'empurrarCarta')).toBe(true);
     expect(acaoEhLegalNaFase('vasculhar', 'jogarCarta')).toBe(true);
+    expect(acaoEhLegalNaFase('vasculhar', 'equiparCarta')).toBe(true);
   });
 
   it('em `vasculhar` NÃO valem as de combate nem a caridade', () => {
@@ -44,14 +45,20 @@ describe('acaoEhLegalNaFase', () => {
     expect(acaoEhLegalNaFase('combate', 'jogarCarta')).toBe(false);
     expect(acaoEhLegalNaFase('combate', 'entregarCarta')).toBe(false);
     expect(acaoEhLegalNaFase('combate', 'manterCarta')).toBe(false);
+    // Remontar o corpo no meio da luta mudaria os stats do combatente que o motor
+    // já congelou na abertura — o snapshot imutável deixaria de ser snapshot.
+    expect(acaoEhLegalNaFase('combate', 'equiparCarta')).toBe(false);
   });
 
-  it('em `descartar` valem as DUAS saídas do excedente, e vasculhar não', () => {
-    // Jogar uma raça tira uma carta da mão; é a outra saída, e o `mesa.test.ts`
-    // já a afirma ("jogar uma raça continua liberado"). Vasculhar precisa ficar
-    // fora: se continuasse legal, "a vez não passa" viraria "jogue para sempre".
+  it('em `descartar` valem as TRÊS saídas do excedente, e vasculhar não', () => {
+    // Jogar uma raça e equipar um tesouro tiram uma carta da mão; são as outras
+    // duas saídas, e o `mesa.test.ts` já as afirma ("jogar uma raça continua
+    // liberado", "equipar é a TERCEIRA saída do excedente"). Vasculhar precisa
+    // ficar fora: se continuasse legal, "a vez não passa" viraria "jogue para
+    // sempre".
     expect(acaoEhLegalNaFase('descartar', 'entregarCarta')).toBe(true);
     expect(acaoEhLegalNaFase('descartar', 'jogarCarta')).toBe(true);
+    expect(acaoEhLegalNaFase('descartar', 'equiparCarta')).toBe(true);
     expect(acaoEhLegalNaFase('descartar', 'vasculhar')).toBe(false);
     expect(acaoEhLegalNaFase('descartar', 'atacar')).toBe(false);
   });

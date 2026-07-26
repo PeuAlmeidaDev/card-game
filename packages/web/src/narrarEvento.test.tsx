@@ -82,6 +82,18 @@ describe('narrarEvento — linhas de texto puro', () => {
     )).toBe('Bot 1 descartou um tesouro.');
   });
 
+  it('equipou MOSTRA a carta — o slot é zona aberta', () => {
+    // Assimetria deliberada em relação ao `loot`: o que decide se o evento pode
+    // ser narrado é a zona de DESTINO, e o corpo está à vista da mesa inteira. O
+    // NOME do item ainda não tem de onde vir (o catálogo de itens chega na Task
+    // 7), então a linha é a mesma genérica do `descarte` de tesouro.
+    expect(narrarEvento(
+      { tipo: 'equipou', jogadorId: 'p2', slot: 'maoDireita',
+        carta: { id: 't-1', tipo: 'equipamento', itemId: 'espada-curta' } },
+      ctx,
+    )).toBe('Bot 1 equipa um tesouro.');
+  });
+
   it('loot diz QUANTAS, nunca QUAIS — a mão é zona oculta', () => {
     // Mesmo princípio do `achado`: a carta caiu numa zona que só o dono vê, e o
     // evento nem carrega a carta para a narração poder nomeá-la. Vale também

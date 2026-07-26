@@ -283,7 +283,18 @@ export type EventoDaMesa =
    * `quantidade` é sempre ≥ 1: baralho esgotado não emite evento, porque uma
    * linha de log dizendo que nada aconteceu é ruído na crônica.
    */
-  | { readonly tipo: 'loot'; readonly jogadorId: string; readonly quantidade: number };
+  | { readonly tipo: 'loot'; readonly jogadorId: string; readonly quantidade: number }
+  /**
+   * Equipou. CARREGA a carta: o slot é zona ABERTA, e esconder o que a mesa
+   * inteira passa a ver seria teatro. Assimetria deliberada em relação ao `loot`
+   * (zona oculta, só a contagem) — o que decide é a zona de DESTINO.
+   *
+   * `slot` é o que o ITEM declara. Uma arma de duas mãos ocupa as duas e mesmo
+   * assim sai um evento só, com o slot declarado: o log conta o que o jogador
+   * fez, e o corpo resultante já viaja aberto na projeção.
+   */
+  | { readonly tipo: 'equipou'; readonly jogadorId: string;
+      readonly slot: Slot; readonly carta: CartaEquipamento };
 
 export type AcaoDaMesa =
   | { readonly tipo: 'vasculhar'; readonly jogadorId: string }
@@ -292,7 +303,9 @@ export type AcaoDaMesa =
   | { readonly tipo: 'atacar'; readonly jogadorId: string }
   | { readonly tipo: 'esquivar'; readonly jogadorId: string }
   | { readonly tipo: 'jogarCarta'; readonly jogadorId: string; readonly cartaId: string }
-  | { readonly tipo: 'entregarCarta'; readonly jogadorId: string; readonly cartaId: string };
+  | { readonly tipo: 'entregarCarta'; readonly jogadorId: string; readonly cartaId: string }
+  /** Tira um tesouro da mão e o encaixa no corpo. O slot vem do ITEM, nunca do cliente. */
+  | { readonly tipo: 'equiparCarta'; readonly jogadorId: string; readonly cartaId: string };
 
 export interface CombateNaMesa {
   readonly estado: EstadoCombate;

@@ -59,6 +59,17 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
     case 'loot':
       return `${evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId)} saqueia o cadáver e leva `
         + `${String(evento.quantidade)} ${evento.quantidade === 1 ? 'tesouro' : 'tesouros'}.`;
+    // O slot é zona ABERTA — o corpo equipado viaja inteiro na projeção —, então
+    // o evento carrega a carta e a narração pode mostrá-la. Assimetria deliberada
+    // em relação ao `loot`, que cai na mão e só conta.
+    //
+    // O NOME do item ainda não tem de onde vir: exige um `nomeDoItem` injetado, e
+    // ele só existe quando a tela receber o catálogo de itens (Task 7, junto com
+    // o botão de equipar). Até lá `descreverCarta` dá a linha genérica e honesta —
+    // a mesma do descarte de tesouro.
+    case 'equipou':
+      return `${evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId)} equipa `
+        + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro)}.`;
     // O descarte é PÚBLICO: o cemitério já é zona aberta, esconder aqui seria teatro.
     case 'descarte':
       return `${ctx.nomeDe(evento.jogadorId)} descartou ${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro)}.`;

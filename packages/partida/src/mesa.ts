@@ -7,6 +7,7 @@ import type {
 import { tirarDoTopo } from './baralho';
 import { destinoDaCaridade } from './caridade';
 import { combatenteDe } from './corpo';
+import { colocarNoSlot, destinoDoDesequipado } from './equipar';
 import { classificar } from './classificacao';
 import { AcaoInvalida } from './erros';
 import { acaoEhLegalNaFase, faseDoTurnoDe } from './fase';
@@ -119,9 +120,12 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   //
   //   fase        ação                  segunda condição      quem cobra
   //   vasculhar   vasculhar/jogarCarta  espiada === null      `vasculhar` / `jogarCarta`
+  //   vasculhar   equiparCarta          espiada === null      `equiparCarta`
   //   vasculhar   manterCarta/empurrar  espiada !== null      `resolverEspiada`
   //   vasculhar   jogarCarta            carta.tipo === 'raca' `jogarCarta`
   //   descartar   jogarCarta            carta.tipo === 'raca' `jogarCarta`
+  //   vasculhar   equiparCarta          carta.tipo ===        `equiparCarta`
+  //   descartar                         'equipamento'
   //   combate     atacar/esquivar       `proximaDecisao`      o motor, via `AcaoIlegal`
   //
   // Um botão novo escrito só com `legal(tipo)` acende nesses estados e leva 400.
@@ -145,6 +149,10 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
 
   if (acao.tipo === 'entregarCarta') {
     return entregarCarta(estado, acao, deps);
+  }
+
+  if (acao.tipo === 'equiparCarta') {
+    return equiparCarta(estado, acao, deps);
   }
 
   return agirNoCombate(estado, acao, deps);
@@ -307,7 +315,7 @@ function resolverEspiada(estado: EstadoPartida, acao: AcaoDeEspiada, deps: DepsM
 }
 
 /** As ações que apontam para uma carta da própria mão. */
-type AcaoDeMao = Extract<AcaoDaMesa, { readonly tipo: 'jogarCarta' | 'entregarCarta' }>;
+type AcaoDeMao = Extract<AcaoDaMesa, { readonly tipo: 'jogarCarta' | 'entregarCarta' | 'equiparCarta' }>;
 
 /**
  * Guard comum das ações de mão: a carta apontada tem que ser sua. A fase (turno
@@ -466,6 +474,62 @@ function jogarCarta(
       fase: faseDoTurnoDe(atualizado),
     },
     [{ tipo: 'racaEmJogo', jogadorId: acao.jogadorId, carta }],
+  );
+}
+
+/**
+ * Tira um tesouro da mão e o encaixa no corpo. É o verbo que faz a fatia 8 valer
+ * para quem joga: até aqui o vencedor acumulava tesouro sem poder usá-lo.
+ *
+ * O SLOT não vem do cliente — vem do item, pelo catálogo. Deixar o cliente
+ * escolher onde encaixar seria deixá-lo pôr o capacete no pé, e a checagem viraria
+ * mais um guard aqui em vez de ser impossível por construção.
+ *
+ * A vez NÃO passa: equipar é decisão do próprio turno, como jogar raça.
+ */
+function equiparCarta(
+  estado: EstadoPartida,
+  acao: Extract<AcaoDaMesa, { readonly tipo: 'equiparCarta' }>,
+  deps: DepsMesa,
+): ResultadoAcao {
+  // Guarda de PENDÊNCIA, não de fase — gêmeo do que `jogarCarta` já carrega:
+  // `equiparCarta` e a espiada convivem na fase `vasculhar` enquanto `recompor`
+  // não existe como fase própria (Plano 3b).
+  if (estado.espiada !== null) {
+    throw new AcaoInvalida('aplicarAcao: há uma espiada pendente');
+  }
+
+  const { jogador, carta } = cartaDaMao(estado, acao);
+  if (carta.tipo !== 'equipamento') {
+    throw new AcaoInvalida('aplicarAcao: só carta de equipamento vai para o corpo');
+  }
+  // Id que o catálogo não conhece: a carta veio da composição que a borda montou
+  // do próprio catálogo, então é invariante nossa => Error cru, 500 sem vazar.
+  const info = deps.catalogo.item(carta.itemId);
+  if (info === undefined) {
+    throw new Error(`equiparCarta: item ${carta.itemId} não está no catálogo`);
+  }
+
+  const { slots, deslocados } = colocarNoSlot(jogador.emJogo.slots, carta, info);
+  const atualizado: JogadorNaMesa = {
+    ...jogador,
+    mao: jogador.mao.filter((c) => c.id !== carta.id),
+    // ESPALHA a zona; não a remonta — mesmo motivo de `jogarCarta`: a raça que
+    // esta função não conhece precisa sobreviver a ela.
+    emJogo: { ...jogador.emJogo, slots },
+  };
+  const comJogador: EstadoPartida = {
+    ...estado,
+    jogadores: estado.jogadores.map((j) => (j.id === atualizado.id ? atualizado : j)),
+    // RECALCULADA pelo mesmo motivo que em `jogarCarta`: equipar tira uma carta
+    // da mão e pode ter resolvido o excedente. Sem isto o turno ficaria preso em
+    // `descartar` com a mão já cabendo.
+    fase: faseDoTurnoDe(atualizado),
+  };
+
+  return registrar(
+    destinoDoDesequipado(comJogador, deslocados),
+    [{ tipo: 'equipou', jogadorId: acao.jogadorId, slot: info.slot, carta }],
   );
 }
 
