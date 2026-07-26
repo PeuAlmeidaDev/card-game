@@ -23,25 +23,26 @@ autoral a definir**. Inspirado nas *mecânicas* do Munchkin; tema, nomes e arte 
 Os specs anteriores a 2026-07-22 foram escritos quando o jogo era uma **run solo**. Onde eles
 divergirem do game bible, **o game bible vence**.
 
-## Estado atual (2026-07-22)
+## Estado atual (2026-07-26)
 
 Visão do jogo **fechada** em 2 sessões de `grilling` (9 + 13 decisões) — ver §19 do game bible.
 
-**Construído e mergeado:** `motor` (combate 1d12, máquina de passos), `personagem` (composição
-estática), `progressao` (run solo), `shared` (contrato ts-rest), `server` (Fastify), `web`
-(React+Vite). Fatias 1–4 completas.
+**Construído e mergeado:** `motor`, `personagem`, `progressao`, `cartas`, `partida`, `shared`,
+`server`, `web`. Fatias 1–7 completas. **Fatia 8 "TESOUROS": Planos 1 e 2 mergeados.**
 
-**Próximo passo: fatia 5 — "A MESA".** Partida de N jogadores (N=4) **autoritativa no server**:
-sala, ordem de turno, chutar a porta, combate com o `motor` existente, +1 patente, primeiro ao
-alvo vence, **classificação 1º–4º**. Sem interferência, sem itens novos, personagem ainda
-simples. **Bot burro** preenchendo assentos para permitir teste solo. O passo formal é
-`superpowers:brainstorming` → spec → `writing-plans` → TDD. **Nada de código antes do plano.**
+O Plano 2 trocou os guards espalhados do reducer por uma **máquina de fases**:
+`EstadoPartida.fase` (`vasculhar | combate | descartar`) mais a tabela
+`Record<Fase, ReadonlySet<AcaoDaMesa['tipo']>>` em `packages/partida/src/fase.ts`, que
+responde "posso?" num ponto só — no topo do `aplicarAcao` — e é lida **também pela
+`TelaMesa`** (os botões acendem pela fase que vem na vista, o cliente não recalcula regra).
+As outras três fases do spec §6 (`recompor`, `encrenca`, `jogar`) chegam com os verbos
+delas nos Planos 3 e 4.
+
+**Próximo passo: Plano 3 — "Tesouros e o corpo".** Baralho de Tesouros, loot ao vencer,
+os 5 slots, `combatenteBase` morre e `combatenteDe` nasce, o construtor perde `itemIds`.
 
 Roteiro completo e justificativa em §17 do game bible (Mesa → Interferência → Personagem
 dinâmico → Habilidades → Contas/ranking/crônica).
-
-⚠️ **Dívida vencida:** o estado da run vive **no cliente** (fatia 4). Ranking exige **server
-autoritativo** — a fatia da Mesa é onde isso se paga.
 
 ## Stack (alvo)
 
