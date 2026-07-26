@@ -408,6 +408,21 @@ describe('TelaMesa — a mão', () => {
     expect(screen.getByRole('status')).toHaveTextContent(/acima do limite/i);
   });
 
+  it('a faixa do excedente nomeia as TRÊS saídas, não só a caridade', async () => {
+    // A mesa nasce EXATAMENTE no teto (4 Portas + 4 Tesouros = 8 para quem está
+    // sem raça em jogo), então o turno 1 de produção já começa em `descartar` e
+    // esta faixa é a única instrução na tela. Dizendo só "entregue uma carta",
+    // ela mandava o jogador DOAR o tesouro que a fatia inteira existe para ele
+    // vestir — e doar para quem está atrás, porque a caridade segue a patente
+    // menor. As três saídas são as que `fase.ts` declara legais em `descartar`.
+    await abrirMesa(emDescartar([tesouro('t-9'), { id: 'p-8', tipo: 'raca', racaId: 'orc' }]));
+
+    const faixa = screen.getByRole('status');
+    expect(faixa).toHaveTextContent(/equipe/i);
+    expect(faixa).toHaveTextContent(/jogue/i);
+    expect(faixa).toHaveTextContent(/entregue/i);
+  });
+
   it('jogar uma carta manda a ação com o id DELA', async () => {
     // O `cartaId` é o único campo livre do fio; mandar o id errado joga a carta
     // errada, e com duas cópias da mesma raça na mão isso é invisível na tela.

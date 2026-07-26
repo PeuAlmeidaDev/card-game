@@ -238,8 +238,22 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
       <section>
         <h3>Sua mão — {vista.suaMao.length} de {eu?.limiteDeMao ?? 0}</h3>
         {acimaDoLimite && (
+          /* As TRÊS saídas do excedente — o conjunto exato que `fase.ts` declara
+             legal em `descartar` —, e nesta ordem. A faixa é a única instrução da
+             tela, e a mesa NASCE no teto (4 Portas + 4 Tesouros = 8, o limite de
+             quem está sem raça): o turno 1 já cai aqui. Nomeando só a caridade,
+             ela mandava doar o tesouro que o jogador deveria estar vestindo — e
+             doar para quem está atrás, porque o destino da caridade é a patente
+             menor. Equipar vem primeiro por ser a saída que o desenho da mão
+             inicial pressupõe (ver `mao.ts`).
+
+             "a vez só passa quando ela couber", e não "para encerrar o turno":
+             jogar raça sem ter raça em jogo é NET-ZERO (a mão cai 1 e o limite
+             cai junto), então nenhuma das três pode prometer que UMA ação basta.
+             Quem recobra é `encerrarTurno`, a cada ação. */
           <p role="status">
-            Sua mão está acima do limite: entregue uma carta para encerrar o turno.
+            Sua mão está acima do limite: equipe um tesouro, jogue uma raça ou
+            entregue uma carta — a vez só passa quando ela couber.
           </p>
         )}
         <ul>
