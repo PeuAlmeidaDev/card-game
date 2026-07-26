@@ -1,4 +1,5 @@
 import type { Combatente, EstadoCombate, EventoCombate, DecisaoPendente, PassivaCombate } from '@card-dungeon/motor';
+import type { Classe, Equipamento } from '@card-dungeon/personagem';
 
 /**
  * **Receita** de carta do baralho de PORTAS: o que compor, SEM identidade. É o
@@ -27,6 +28,55 @@ export type CartaPorta = ReceitaPorta & { readonly id: string };
  * e a checagem viraria runtime em vez de compilação.
  */
 export type CartaDeRaca = Extract<CartaPorta, { readonly tipo: 'raca' }>;
+
+/**
+ * **Receita** de carta do baralho de TESOUROS. Uma variante só nesta fatia;
+ * maldição e classe (spec §4) entram quando tiverem verbo.
+ *
+ * Família SEPARADA de `ReceitaPorta`, e não um `tipo` a mais na mesma união com
+ * um campo `baralho`: com o campo, nada impediria um monstro etiquetado como
+ * tesouro, e "esta carta pode ir para o baralho de Tesouros?" viraria checagem de
+ * runtime. Com dois tipos, quem recusa é o compilador.
+ */
+export type ReceitaTesouro =
+  | { readonly tipo: 'equipamento'; readonly itemId: string };
+
+export type CartaTesouro = ReceitaTesouro & { readonly id: string };
+
+/**
+ * A MÃO é heterogênea: um monstro guardado para o Plano 4 e um tesouro por
+ * equipar convivem nela. Todo consumidor fecha por exaustividade (`never`) —
+ * `resolverCarta`, `jogarCarta`, `descreverCarta` (web), `narrarEvento` (web).
+ */
+export type Carta = CartaPorta | CartaTesouro;
+
+/**
+ * Uma carta de equipamento como instância. O slot da zona aceita SÓ esta: tipar
+ * o slot com `Carta` deixaria um monstro entrar num slot de armadura, e a
+ * checagem viraria runtime em vez de compilação. Mesma jogada de `CartaDeRaca`.
+ */
+export type CartaEquipamento = Extract<CartaTesouro, { readonly tipo: 'equipamento' }>;
+
+/**
+ * Onde uma peça se encaixa no corpo. Cinco slots (bible §5).
+ *
+ * ⚠️ Gêmea da união em `cartas/src/itens.ts` — `partida` é cego ao catálogo e
+ * `cartas` não pode importá-lo (a direção é `cartas ← personagem ← partida`).
+ * Quem impede as duas de divergirem é o guard `_CoberturaSlot` em
+ * `shared/src/index.ts`, que enxerga os dois lados. Slot novo => os dois arquivos.
+ */
+export type Slot = 'capacete' | 'armadura' | 'maoDireita' | 'maoEsquerda' | 'pes';
+
+/**
+ * O que o catálogo sabe de um item: o `Equipamento` que o `montarCombatente` já
+ * consome, mais os dois campos que só a MESA usa (onde encaixa, e se toma as duas
+ * mãos). `ItemCarta` (pacote `cartas`) satisfaz este contrato estruturalmente —
+ * por isso `partida` nunca precisa importar `cartas`.
+ */
+export interface InfoItem extends Equipamento {
+  readonly slot: Slot;
+  readonly duasMaos: boolean;
+}
 
 /**
  * Zona ABERTA do jogador: o que está na mesa, à vista de todos. Um slot nesta
@@ -112,6 +162,8 @@ export interface InfoMonstro {
   readonly habilidade: number;
   readonly agilidade: number;
   readonly level: number;
+  /** Quantas cartas de Tesouro o cadáver larga na mão do vencedor. */
+  readonly tesouros: number;
 }
 
 /**
@@ -129,6 +181,10 @@ export interface CatalogoDaMesa {
   readonly raca: (racaId: string | undefined) => InfoRaca | undefined;
   /** `undefined` = id que não existe no catálogo: invariante quebrada, não pedido inválido. */
   readonly monstro: (monstroId: string) => InfoMonstro | undefined;
+  /** `undefined` = id que não existe: invariante quebrada, não pedido inválido. */
+  readonly classe: (classeId: string) => Classe | undefined;
+  /** `undefined` = id que não existe: invariante quebrada, não pedido inválido. */
+  readonly item: (itemId: string) => InfoItem | undefined;
 }
 
 export interface PosicaoFinal {

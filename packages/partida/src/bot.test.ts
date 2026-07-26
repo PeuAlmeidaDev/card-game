@@ -34,7 +34,7 @@ describe('escolherAcao', () => {
 
   it('com esquiva pendente, esquiva', () => {
     // monstro mais ágil ataca primeiro e acerta => a máquina para pedindo a esquiva
-    const rapido = { nome: 'Veloz', forca: 2, vida: 10, habilidade: 6, agilidade: 12, level: 1 };
+    const rapido = { nome: 'Veloz', forca: 2, vida: 10, habilidade: 6, agilidade: 12, level: 1, tesouros: 1 };
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const pedindoEsquiva = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' },
       { rolar: filaDeDados([1]), embaralhar: semEmbaralhar,

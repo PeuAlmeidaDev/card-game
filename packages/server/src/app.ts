@@ -3,7 +3,9 @@ import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import { resolverDuelo, type RolarD12, type Combatente } from '@card-dungeon/motor';
 import { contrato } from '@card-dungeon/shared';
 import { CATALOGO, MONSTRO_PADRAO, resolverEscolhas, montarCombatente } from '@card-dungeon/personagem';
-import { MONSTROS_SACAVEIS, RACAS_SACAVEIS, obterRaca, type MonstroCarta } from '@card-dungeon/cartas';
+import {
+  MONSTROS_SACAVEIS, RACAS_SACAVEIS, obterRaca, obterItem, type MonstroCarta,
+} from '@card-dungeon/cartas';
 import {
   AcaoInvalida, MAO_INICIAL_PADRAO, aplicarAcao, avancarBots, criarPartida, montarComposicao,
   projetarPara, versaoDe, type CatalogoDaMesa, type Embaralhar, type EntradaJogador, type EstadoPartida,
@@ -91,6 +93,8 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
   const catalogo: CatalogoDaMesa = {
     raca: (racaId) => (racaId === undefined ? undefined : obterRaca(racaId)),
     monstro: acharMonstro,
+    classe: (classeId) => CATALOGO.classes.find((c) => c.id === classeId),
+    item: obterItem,
   };
   const deps = { rolar, embaralhar, catalogo };
 
