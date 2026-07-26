@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { criarPartida } from './montagem';
 import { montarComposicaoTesouros } from './baralho';
 import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
-import { MAO_INICIAL_PADRAO } from './mao';
+import { MAO_INICIAL_PADRAO, MAO_INICIAL_TESOUROS } from './mao';
 import { SLOTS_VAZIOS } from './corpo';
 import { ID_DA_CLASSE_DE_TESTE } from './testes/catalogo';
 import type { EntradaJogador } from './tipos';
@@ -117,6 +117,37 @@ describe('criarPartida', () => {
       .toThrow('criarPartida: o baralho não tem cartas para a mão inicial');
   });
 
+  it('distribui a mão inicial de TESOUROS junto com a de Portas', () => {
+    // A abertura tem duas correntes desde os dials desta fatia (spec §7.1). Sem
+    // esta distribuição o jogador nasceria com o corpo vazio E sem nada para
+    // equipar — teria que esperar o primeiro abate para sair do zero.
+    const p = criarPartida('m1', entradas, {
+      ...config,
+      composicaoTesouros: montarComposicaoTesouros(['i-1', 'i-2', 'i-3']),
+      maoInicial: 2,
+      maoInicialTesouros: 2,
+    }, { embaralhar: semEmbaralhar });
+
+    expect(p.jogadores.map((j) => j.mao.length)).toEqual([4, 4]);
+    // 3 receitas × 2 assentos = 6, menos as 4 distribuídas.
+    expect(p.tesouros.monte).toHaveLength(2);
+    // As duas famílias convivem na MESMA mão, e nenhuma carta fica em dois
+    // lugares: o tesouro SAI do baralho de Tesouros.
+    const todas = [...p.jogadores.flatMap((j) => j.mao), ...p.portas.monte, ...p.tesouros.monte];
+    expect(new Set(todas.map((c) => c.id)).size).toBe(todas.length);
+    expect(p.jogadores[0]?.mao.filter((c) => c.tipo === 'equipamento')).toHaveLength(2);
+  });
+
+  it('recusa distribuir mais Tesouros do que o baralho de Tesouros tem', () => {
+    // O gêmeo do guard de Portas, e pela mesma razão: com o monte de Tesouros
+    // zerado na abertura, o primeiro combate vencido chamaria `tirarDoTopo` sobre
+    // um cemitério vazio — 500 numa mesa que a criação acabou de aprovar.
+    expect(() => criarPartida('m1', entradas,
+      { ...config, composicaoTesouros: montarComposicaoTesouros(['i-1']), maoInicialTesouros: 1 },
+      { embaralhar: semEmbaralhar }))
+      .toThrow('criarPartida: o baralho de Tesouros não tem cartas para a mão inicial');
+  });
+
   it('a mesa nasce com o baralho de Tesouros montado e embaralhado', () => {
     const estado = criarPartida('m1', entradas, {
       patenteAlvo: 4,
@@ -160,8 +191,19 @@ describe('criarPartida — a fase inicial', () => {
     // dial mal girado deixaria a mesa nascer numa fase cuja única ação (vasculhar)
     // o excedente proíbe — tela morta no primeiro clique, agora sem nem o guard
     // antigo para recusar. A fase inicial tem que ser CALCULADA.
+    // 🎚️ O dial girado é o de TESOUROS, e `+ 1` basta: com os dials desta fatia
+    // a abertura (4 Portas + 4 Tesouros) já nasce EXATAMENTE no teto de quem está
+    // sem raça em jogo (`LIMITE_BASE_DE_MAO + 1` = 8), então uma carta a mais
+    // estoura. Girar `maoInicial` até estourar não caberia: o baseline de Portas
+    // tem 8 cartas por jogador e o guard do baralho recusaria a mesa antes.
     const p = criarPartida('m1', entradas,
-      { ...config, maoInicial: MAO_INICIAL_PADRAO + 2 },
+      {
+        ...config,
+        // 6 por jogador: 4 na mão de cada um dos 2 assentos precisa sobrar monte.
+        composicaoTesouros: montarComposicaoTesouros(Array.from({ length: 6 }, () => 'i-teste')),
+        maoInicial: MAO_INICIAL_PADRAO,
+        maoInicialTesouros: MAO_INICIAL_TESOUROS + 1,
+      },
       { embaralhar: semEmbaralhar });
 
     expect(p.fase).toBe('descartar');

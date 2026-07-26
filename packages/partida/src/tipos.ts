@@ -434,6 +434,16 @@ export interface ConfigPartida {
    * que financiar mãos. Produção passa `MAO_INICIAL_PADRAO`.
    */
   readonly maoInicial?: number;
+  /**
+   * Cartas de TESOURO distribuídas a cada jogador na abertura. Ausente = 0, pelo
+   * mesmo motivo de `maoInicial`: a maioria dos testes monta baralho mínimo e não
+   * quer financiar mãos. Produção passa `MAO_INICIAL_TESOUROS`.
+   *
+   * Campo próprio, e não um total somado a `maoInicial`: são dois baralhos com
+   * dois montes, e "8 cartas" não diz de onde cada uma sai. Separado, girar um
+   * dial não mexe no outro.
+   */
+  readonly maoInicialTesouros?: number;
 }
 
 export interface EntradaJogador {

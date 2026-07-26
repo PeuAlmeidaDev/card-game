@@ -120,7 +120,12 @@ describe('projetarPara', () => {
     };
     const vista = projetarPara('p1', comEspecializado, catalogoPadrao);
 
-    expect(vista.jogadores.map((j) => j.limiteDeMao)).toEqual([5, 4]);
+    // Números CRAVADOS de propósito, não `LIMITE_BASE_DE_MAO + 1` / `+ 0`: a
+    // projeção existe para publicar o valor que a mesa calculou, e derivá-lo aqui
+    // faria a asserção repetir a mesma conta do código sob teste. 🎚️ Quando o
+    // dial girar (era `[5, 4]` antes desta fatia), é para este teste falhar e
+    // alguém confirmar que a UI passou a mostrar outro teto.
+    expect(vista.jogadores.map((j) => j.limiteDeMao)).toEqual([8, 7]);
   });
 
   it('publica os stats CALCULADOS de cada um, não a classe crua', () => {

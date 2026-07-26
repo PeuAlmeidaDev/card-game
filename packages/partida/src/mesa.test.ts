@@ -2,12 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { aplicarAcao } from './mesa';
 import { avancarBots } from './automacao';
 import { criarPartida } from './montagem';
-import { MAO_INICIAL_PADRAO, limiteDeMao } from './mao';
+import { montarComposicaoTesouros } from './baralho';
+import { LIMITE_BASE_DE_MAO, MAO_INICIAL_PADRAO, MAO_INICIAL_TESOUROS, limiteDeMao } from './mao';
 import { escolherAcao } from './bot';
 import { projetarPara } from './projecao';
 import { AcaoInvalida } from './erros';
 import { filaDeDados, criarDadoCiclico } from './testes/dados';
-import { monstro, salaVazia, raca, equipamento } from './testes/cartas';
+import { monstro, monstros, salaVazia, salasVazias, raca, equipamento } from './testes/cartas';
 import { catalogoDeTeste, ID_DA_CLASSE_DE_TESTE, MONSTRO_DE_TESTE } from './testes/catalogo';
 import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import { combatenteDe, SLOTS_VAZIOS } from './corpo';
@@ -408,16 +409,18 @@ describe('vencer larga tesouro na mão', () => {
     // preciso — mas o caminho precisa estar afirmado, porque é ele que faz a
     // fatia inteira encaixar sem mexer no Plano 2.
     //
-    // 4 cartas e nenhuma raça em jogo => limite 5: cabe para vasculhar (senão o
-    // combate nem abriria) e é o loot de 3 que estoura.
+    // 🎚️ Derivada do dial: a mão nasce EXATAMENTE no teto de quem está sem raça
+    // em jogo (`LIMITE_BASE_DE_MAO + 1`) — cabe para vasculhar (senão o combate
+    // nem abriria) e é o loot de 3 que estoura. Cravada em 4, ela parou de
+    // estourar quando o teto subiu para 7.
     const valendo3 = depsValendo(3);
-    const mao = [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4')];
-    const aberto = comCombateAberto(valendo3, mao);
+    const noTeto = monstros(LIMITE_BASE_DE_MAO + 1);
+    const aberto = comCombateAberto(valendo3, noTeto);
     expect(aberto.fase).toBe('combate');
 
     const depois = venceOCombate(aberto, valendo3);
 
-    expect(maoDe(depois, 'p1')).toHaveLength(7);
+    expect(maoDe(depois, 'p1')).toHaveLength(noTeto.length + 3);
     expect(depois.vezDe).toBe('p1');       // a vez ficou presa no vencedor
     expect(depois.fase).toBe('descartar');
   });
@@ -1218,8 +1221,13 @@ describe('aplicarAcao — equiparCarta', () => {
     // logo pode resolver o excedente. Sem o recálculo o turno ficaria preso em
     // `descartar` com a mão já cabendo.
     //
-    // 5 cartas com raça em jogo => limite 4, estourado por 1. Equipar deixa 4.
-    const p0 = comMao(nascida(), [equipamento('t-1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5')]);
+    // 🎚️ Derivado do dial: `LIMITE_BASE_DE_MAO + 1` cartas com raça em jogo
+    // (limite = o base) => estourado por 1, e equipar deixa a mão exatamente no
+    // teto. Cravado em 5, este fixture parou de estourar quando o teto subiu para
+    // 7 — e como a fase vem forjada, o teste seguiria verde afirmando a "terceira
+    // saída do excedente" sobre uma mão que já cabia.
+    const maoEstourada = [equipamento('t-1'), ...monstros(LIMITE_BASE_DE_MAO)];
+    const p0 = comMao(nascida(), maoEstourada);
     const estourado: EstadoPartida = {
       ...p0,
       jogadores: p0.jogadores.map((j) => (
@@ -1231,7 +1239,7 @@ describe('aplicarAcao — equiparCarta', () => {
 
     const { estado: depois } = aplicarAcao(estourado, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
 
-    expect(maoDe(depois, 'p1')).toHaveLength(4);
+    expect(maoDe(depois, 'p1')).toHaveLength(maoEstourada.length - 1);
     expect(depois.fase).toBe('vasculhar');
   });
 
@@ -1252,11 +1260,19 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
   const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
 
   /**
-   * p1 com a mão estourada (5 cartas, raça em jogo => limite 4). A mão é
-   * `readonly Carta[]` — heterogênea desde o loot —, então o fixture aceita
-   * tesouro junto com porta sem precisar de um gêmeo só para a outra família.
+   * Mão estourada por UMA carta com raça em jogo (limite = `LIMITE_BASE_DE_MAO`).
+   * 🎚️ Derivada do dial: cravada em 5, ela parou de estourar quando o teto subiu
+   * para 7 — e como o fixture forja `fase: 'descartar'` junto, todo este bloco
+   * seguiria VERDE afirmando a caridade sobre uma mão que cabia.
    */
-  const estourado = (estado: EstadoPartida, mao: readonly Carta[] = [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5')]): EstadoPartida => ({
+  const ACIMA_DO_TETO = monstros(LIMITE_BASE_DE_MAO + 1);
+
+  /**
+   * p1 com a mão estourada. A mão é `readonly Carta[]` — heterogênea desde o
+   * loot —, então o fixture aceita tesouro junto com porta sem precisar de um
+   * gêmeo só para a outra família.
+   */
+  const estourado = (estado: EstadoPartida, mao: readonly Carta[] = ACIMA_DO_TETO): EstadoPartida => ({
     ...estado,
     jogadores: estado.jogadores.map((j) => (
       j.id === 'p1' ? { ...j, mao, emJogo: { ...j.emJogo, raca: raca('r1', 'anao') } } : j
@@ -1276,7 +1292,7 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
 
     const r = aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([]));
 
-    expect(r.estado.jogadores[0]?.mao.map((c) => c.id)).toEqual(['m2', 'm3', 'm4', 'm5']);
+    expect(r.estado.jogadores[0]?.mao.map((c) => c.id)).toEqual(['m2', 'm3', 'm4', 'm5', 'm6', 'm7', 'm8']);
     expect(r.estado.jogadores[1]?.mao.map((c) => c.id)).toEqual(['m1']);
     // A carta não fica em dois lugares nem passa pelo cemitério no caminho.
     expect(r.estado.portas.cemiterio).toEqual([]);
@@ -1314,7 +1330,7 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
     // onde `resolverCarta` cai no `default: never` e lança Error cru (500 numa
     // partida legítima). O `never` da fatia 8/P1 é o alarme; este teste é o que
     // impede o alarme de tocar.
-    const comTesouro = [equipamento('t-1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5')];
+    const comTesouro = [equipamento('t-1'), ...monstros(LIMITE_BASE_DE_MAO)];
     const p = comPatentes(
       estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }), comTesouro),
       { p1: 1, p2: 1 },   // ninguém atrás => cemitério
@@ -1341,7 +1357,7 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
   it('entregar um tesouro a quem está atrás não passa por cemitério nenhum', () => {
     // O roteamento é do DESCARTE. A doação move a carta de mão para mão, e um
     // `descartarNoBaralhoCerto` chamado no ramo errado duplicaria a carta.
-    const comTesouro = [equipamento('t-1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5')];
+    const comTesouro = [equipamento('t-1'), ...monstros(LIMITE_BASE_DE_MAO)];
     const p = comPatentes(
       estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }), comTesouro),
       { p1: 5, p2: 1 },
@@ -1383,8 +1399,8 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
   });
 
   it('estourado por duas cartas, a vez só passa na segunda entrega', () => {
-    const seis = [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5'), monstro('m6')];
-    const p = comPatentes(estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }), seis),
+    const acimaPorDois = monstros(LIMITE_BASE_DE_MAO + 2);
+    const p = comPatentes(estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }), acimaPorDois),
       { p1: 5, p2: 1 });
 
     const uma = aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([]));
@@ -1399,19 +1415,19 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
     // acerta as contas no fim do PRÓPRIO turno.
     const p = comPatentes(estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar })),
       { p1: 5, p2: 1 });
-    // p2 já está NO teto dele (5 cartas, sem raça em jogo => limite 5).
+    // p2 já está NO teto dele: sem raça em jogo o limite é `LIMITE_BASE_DE_MAO + 1`.
+    // 🎚️ Derivado do dial — cravado em 5 cartas, o "teto" virou folga quando o
+    // limite subiu para 8, e o teste passaria sem o destinatário estourar nada.
+    const noTetoDeP2 = salasVazias(LIMITE_BASE_DE_MAO + 1);
     const cheio: EstadoPartida = {
       ...p,
-      jogadores: p.jogadores.map((j) => (
-        j.id === 'p2'
-          ? { ...j, mao: [salaVazia('s1'), salaVazia('s2'), salaVazia('s3'), salaVazia('s4'), salaVazia('s5')] }
-          : j
-      )),
+      jogadores: p.jogadores.map((j) => (j.id === 'p2' ? { ...j, mao: noTetoDeP2 } : j)),
     };
 
     const r = aplicarAcao(cheio, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([]));
 
-    expect(r.estado.jogadores[1]?.mao).toHaveLength(6);   // acima do limite dele (5)
+    // acima do limite dele, que é `noTetoDeP2.length`
+    expect(r.estado.jogadores[1]?.mao).toHaveLength(noTetoDeP2.length + 1);
     expect(r.estado.vezDe).toBe('p2');                    // e a vez passa mesmo assim
   });
 
@@ -1464,13 +1480,15 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
 
 describe('encerrarTurno — o limite de mão segura a vez', () => {
   const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
-  // 5 cartas com raça em jogo = limite 4 => estourado por 1.
-  const maoEstourada = [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5')];
-  // 4 cartas com raça em jogo = EXATAMENTE o limite — ainda não estourada. Ponto
+  // 🎚️ As duas derivadas do dial (cravadas em 5 e 4, pararam de valer quando
+  // `LIMITE_BASE_DE_MAO` subiu para 7): `base + 1` cartas com raça em jogo
+  // (limite = o base) estoura por 1, e `base` cartas fica exatamente no teto.
+  const maoEstourada = monstros(LIMITE_BASE_DE_MAO + 1);
+  // Com raça em jogo = EXATAMENTE o limite — ainda não estourada. Ponto
   // de partida dos dois testes abaixo: desde que `vasculhar` recusa abrir combate
   // com a mão estourada, a mão estourada não pode mais ser precondição do
   // vasculhar — ela tem que nascer da própria compra.
-  const maoNoLimite = [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4')];
+  const maoNoLimite = monstros(LIMITE_BASE_DE_MAO);
 
   const comMaoEZona = (estado: EstadoPartida): EstadoPartida => ({
     ...estado,
@@ -1498,7 +1516,7 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
 
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
 
-    expect(r.estado.jogadores[0]?.mao).toHaveLength(5); // a compra estourou a mão
+    expect(r.estado.jogadores[0]?.mao).toHaveLength(maoNoLimite.length + 1); // a compra estourou a mão
     expect(r.estado.vezDe).toBe('p1');
     expect(r.eventos.some((e) => e.tipo === 'vez')).toBe(false);
   });
@@ -1525,8 +1543,9 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
   });
 
   it('exatamente NO limite passa a vez — o teto é `>`, não `>=`', () => {
-    // Sem raça em jogo o limite é 5 (o Adaptável do Humano). Com 5 cartas o
-    // jogador está no teto, não acima dele.
+    // A MESMA mão que estoura com raça em jogo fica exatamente no teto sem ela:
+    // o Adaptável do Humano vale `+ 1`, e `maoEstourada` tem `base + 1` cartas.
+    // O jogador está no teto, não acima dele.
     const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
     const p: EstadoPartida = {
       ...p0,
@@ -1566,11 +1585,13 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
 
 describe('aplicarAcao — vasculhar com a mão estourada', () => {
   const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
-  const cinco = [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5')];
+  // 🎚️ Derivada do dial: `base + 1` cartas com raça em jogo (limite = o base)
+  // estoura por 1. Cravada em 5, parou de estourar quando o teto subiu para 7.
+  const acimaDoTeto = monstros(LIMITE_BASE_DE_MAO + 1);
   const estourado = (estado: EstadoPartida): EstadoPartida => ({
     ...estado,
     jogadores: estado.jogadores.map((j) => (
-      j.id === 'p1' ? { ...j, mao: cinco, emJogo: { ...j.emJogo, raca: raca('r1', 'anao') } } : j
+      j.id === 'p1' ? { ...j, mao: acimaDoTeto, emJogo: { ...j.emJogo, raca: raca('r1', 'anao') } } : j
     )),
     // Forjado direto no estado: a fase tem que vir junto, senão o fixture mente.
     fase: 'descartar',
@@ -1595,14 +1616,14 @@ describe('aplicarAcao — vasculhar com a mão estourada', () => {
     const comRacaNaMao: EstadoPartida = {
       ...p0,
       jogadores: p0.jogadores.map((j) => (
-        j.id === 'p1' ? { ...j, mao: [...cinco, raca('r9', 'orc')] } : j
+        j.id === 'p1' ? { ...j, mao: [...acimaDoTeto, raca('r9', 'orc')] } : j
       )),
     };
 
     const r = aplicarAcao(comRacaNaMao, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r9' }, deps([]));
 
     expect(r.estado.jogadores[0]?.emJogo.raca?.id).toBe('r9');
-    expect(r.estado.jogadores[0]?.mao).toHaveLength(5);
+    expect(r.estado.jogadores[0]?.mao).toHaveLength(acimaDoTeto.length);
   });
 
   it('dentro do limite, vasculhar segue normal', () => {
@@ -1612,17 +1633,17 @@ describe('aplicarAcao — vasculhar com a mão estourada', () => {
   });
 
   it('sem raça em jogo, jogar a raça é NET-ZERO — a mão continua estourada', () => {
-    // Sem raça em jogo o limite é 5 (o bônus do Adaptável do Humano). Uma mão de
-    // 6 cartas (cinco avulsas + uma raça) excede em 1. Jogar a raça tira 1 carta
-    // da mão (6 → 5) MAS também derruba o próprio limite (5 → 4, a especialização
+    // Sem raça em jogo o limite é `base + 1` (o bônus do Adaptável do Humano).
+    // Uma mão de `base + 2` (as avulsas mais uma raça) excede em 1. Jogar a raça
+    // tira 1 carta da mão MAS também derruba o próprio limite (a especialização
     // custa o bônus): o excedente continua o mesmo — não é uma saída, ao
     // contrário do caso em que o jogador já tem raça em jogo (teste acima), onde
-    // o limite já estava em 4 e só a mão encolhe.
+    // o limite já estava no base e só a mão encolhe.
     const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
     const semRacaEstourado: EstadoPartida = {
       ...p0,
       jogadores: p0.jogadores.map((j) => (
-        j.id === 'p1' ? { ...j, mao: [...cinco, raca('r9', 'orc')], emJogo: { ...j.emJogo, raca: null } } : j
+        j.id === 'p1' ? { ...j, mao: [...acimaDoTeto, raca('r9', 'orc')], emJogo: { ...j.emJogo, raca: null } } : j
       )),
       // Forjado direto no estado: a fase tem que vir junto, senão o fixture mente.
       fase: 'descartar',
@@ -1632,9 +1653,9 @@ describe('aplicarAcao — vasculhar com a mão estourada', () => {
       semRacaEstourado, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r9' }, deps([]),
     );
 
-    expect(r.estado.jogadores[0]?.mao).toHaveLength(5);
+    expect(r.estado.jogadores[0]?.mao).toHaveLength(acimaDoTeto.length);
     expect(r.estado.jogadores[0]?.emJogo.raca?.id).toBe('r9');
-    // Continua estourado: mão(5) > limite(4), agora que a raça está em jogo.
+    // Continua estourado: mão(base + 1) > limite(base), agora que a raça está em jogo.
     expect(() => aplicarAcao(r.estado, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])))
       .toThrow('aplicarAcao: vasculhar não é legal na fase descartar');
 
@@ -1660,11 +1681,19 @@ describe('a composição BASELINE não pode nascer travada', () => {
   // jogador nasce acima do limite, `vasculhar` é recusado, e a única saída
   // (`entregarCarta`) fica sendo o único clique legal. Este par de testes é o
   // alarme que dispara aqui em vez de no navegador.
+  // Baralho de Tesouros PRÓPRIO (6 por jogador) em vez do baseline de 2: desde
+  // que a mão inicial tem duas correntes (4 Portas + 4 Tesouros), 2 tesouros por
+  // jogador não financiam nem a abertura, e `criarPartida` recusaria a mesa.
+  const tesourosDaMesa = montarComposicaoTesouros(Array.from({ length: 6 }, () => 'i-teste'));
   const producao = {
     patenteAlvo: 10,
     composicaoPorJogador: COMPOSICAO_DE_TESTE,
-    composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE,
+    composicaoTesouros: tesourosDaMesa,
     maoInicial: MAO_INICIAL_PADRAO,
+    // As DUAS mãos iniciais, como o `server` monta. Um guard que só distribuísse
+    // Portas testaria uma mesa que não existe mais — e é justamente a segunda
+    // corrente que aperta o teto.
+    maoInicialTesouros: MAO_INICIAL_TESOUROS,
   };
   // A mesa que o `server` monta: 1 humano + 3 bots, todos começando sem raça.
   const mesaDeProducao: readonly EntradaJogador[] = [
@@ -1686,15 +1715,18 @@ describe('a composição BASELINE não pode nascer travada', () => {
   });
 
   it('nascer acima do limite deixaria o jogador SEM nenhuma ação legal', () => {
-    // O porquê do teste acima, escrito como comportamento. Com DOIS a mais na mão
-    // inicial, o humano não pode vasculhar (recusado) e não pode jogar carta
-    // nenhuma (esta composição não tem raça) — tela morta no primeiro clique.
+    // O porquê do teste acima, escrito como comportamento. Com UMA carta a mais
+    // na mão inicial, o humano não pode vasculhar (recusado) e não pode jogar
+    // carta nenhuma (esta composição não tem raça, e sem os itens no catálogo de
+    // teste equipar não é saída aqui) — tela morta no primeiro clique.
     //
-    // `+ 2`, não `+ 1`: sem raça em jogo o limite é 5 (`LIMITE_BASE_DE_MAO` mais o
-    // bônus de quem está sem especialização), então 5 cartas ficariam NO teto, e
-    // o teste passaria por não estourar nada — falhando pelo motivo errado.
+    // `+ 1` basta agora, onde antes eram `+ 2`: com os dials desta fatia a mesa
+    // já nasce EXATAMENTE no teto (4 Portas + 4 Tesouros = 8 = o limite de quem
+    // está sem raça em jogo), então uma única carta a mais estoura. É também o
+    // que este teste registra sobre a economia nova: a folga da abertura é zero,
+    // e quem a devolve é `equiparCarta`.
     const p = criarPartida('m1', mesaDeProducao,
-      { ...producao, maoInicial: MAO_INICIAL_PADRAO + 2 }, { embaralhar: semEmbaralhar });
+      { ...producao, maoInicialTesouros: MAO_INICIAL_TESOUROS + 1 }, { embaralhar: semEmbaralhar });
     const humano = p.jogadores[0];
 
     expect(humano!.mao.length).toBeGreaterThan(limiteDeMao(humano!));
@@ -1752,13 +1784,15 @@ describe('a fase acompanha o que o turno fez', () => {
 
   it('a compra que estoura a mão prende o turno em `descartar`', () => {
     // A mesma situação de "com a mão acima do limite, a vez NÃO passa", agora
-    // dita pela fase: 4 cartas com raça em jogo = NO limite; a raça sacada é a 5ª.
+    // dita pela fase: `LIMITE_BASE_DE_MAO` cartas com raça em jogo = NO limite; a
+    // raça sacada é a que passa dele. 🎚️ Derivado do dial pelo mesmo motivo dos
+    // outros: cravado em 4, virava folga quando o teto subiu.
     const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
     const noLimite: EstadoPartida = {
       ...p0,
       jogadores: p0.jogadores.map((j) => (
         j.id === 'p1'
-          ? { ...j, mao: [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4')],
+          ? { ...j, mao: monstros(LIMITE_BASE_DE_MAO),
               emJogo: { ...j.emJogo, raca: raca('r1', 'anao') } }
           : j
       )),
@@ -1780,13 +1814,14 @@ describe('a fase acompanha o que o turno fez', () => {
       ...p0,
       jogadores: p0.jogadores.map((j) => {
         if (j.id === 'p1') {
+          // Estourado por DUAS com raça em jogo (limite = o base).
           return { ...j, patente: 5,
-            mao: [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5'), monstro('m6')],
+            mao: monstros(LIMITE_BASE_DE_MAO + 2),
             emJogo: { ...j.emJogo, raca: raca('r1', 'anao') } };
         }
-        // p2 já NO teto dele (5 cartas, sem raça em jogo => limite 5): a carta
-        // doada é a que o estoura.
-        return { ...j, mao: [salaVazia('s1'), salaVazia('s2'), salaVazia('s3'), salaVazia('s4'), salaVazia('s5')] };
+        // p2 já NO teto dele (sem raça em jogo => limite `base + 1`): as cartas
+        // doadas são as que o estouram.
+        return { ...j, mao: salasVazias(LIMITE_BASE_DE_MAO + 1) };
       }),
       // Forjado direto no estado: a fase tem que vir junto, senão o fixture mente.
       fase: 'descartar',
@@ -1796,18 +1831,20 @@ describe('a fase acompanha o que o turno fez', () => {
     const segunda = aplicarAcao(primeira.estado, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm2' }, deps([]));
 
     expect(segunda.estado.vezDe).toBe('p2');
-    expect(segunda.estado.jogadores[1]?.mao.length).toBe(7);
+    // O teto dele (`base + 1`) mais as duas cartas que recebeu.
+    expect(segunda.estado.jogadores[1]?.mao.length).toBe(LIMITE_BASE_DE_MAO + 3);
     expect(segunda.estado.fase).toBe('descartar');
   });
 
   it('jogar a raça que resolve o excedente devolve o turno a `vasculhar`', () => {
-    // Com raça JÁ em jogo o limite está em 4 e só a mão encolhe: 5 → 4 cabe.
+    // Com raça JÁ em jogo o limite está no base e só a mão encolhe: `base + 1` →
+    // `base` cabe.
     const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
     const estourado: EstadoPartida = {
       ...p0,
       jogadores: p0.jogadores.map((j) => (
         j.id === 'p1'
-          ? { ...j, mao: [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4'), raca('r9', 'orc')],
+          ? { ...j, mao: [...monstros(LIMITE_BASE_DE_MAO), raca('r9', 'orc')],
               emJogo: { ...j.emJogo, raca: raca('r1', 'anao') } }
           : j
       )),
@@ -1817,7 +1854,7 @@ describe('a fase acompanha o que o turno fez', () => {
 
     const r = aplicarAcao(estourado, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r9' }, deps([]));
 
-    expect(r.estado.jogadores[0]?.mao).toHaveLength(4);
+    expect(r.estado.jogadores[0]?.mao).toHaveLength(LIMITE_BASE_DE_MAO);
     expect(r.estado.fase).toBe('vasculhar');
   });
 });

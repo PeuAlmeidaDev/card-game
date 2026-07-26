@@ -7,7 +7,7 @@ import {
   MONSTROS_SACAVEIS, RACAS_SACAVEIS, ITENS_SACAVEIS, obterRaca, obterItem, type MonstroCarta,
 } from '@card-dungeon/cartas';
 import {
-  AcaoInvalida, MAO_INICIAL_PADRAO, aplicarAcao, avancarBots, criarPartida, montarComposicao,
+  AcaoInvalida, MAO_INICIAL_PADRAO, MAO_INICIAL_TESOUROS, aplicarAcao, avancarBots, criarPartida, montarComposicao,
   montarComposicaoTesouros, projetarPara, versaoDe,
   type CatalogoDaMesa, type Embaralhar, type EntradaJogador, type EstadoPartida,
 } from '@card-dungeon/partida';
@@ -166,6 +166,7 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
           composicaoPorJogador: composicaoDeProducao,
           composicaoTesouros: composicaoTesourosDeProducao,
           maoInicial: MAO_INICIAL_PADRAO,
+          maoInicialTesouros: MAO_INICIAL_TESOUROS,
         },
         { embaralhar },
       );

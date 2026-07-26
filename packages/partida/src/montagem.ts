@@ -77,11 +77,30 @@ export function criarPartida(
   if (distribuidas >= cartas.length) {
     throw new Error('criarPartida: o baralho não tem cartas para a mão inicial');
   }
+  // Mesma regra para o segundo baralho: bloco contíguo do topo, por jogador. A
+  // mão é HETEROGÊNEA desde o Plano 3a (`readonly Carta[]`), então as duas fatias
+  // entram na mesma mão — Portas primeiro só para a ordem ficar estável e legível
+  // na tela, não porque alguma regra dependa disso.
+  const porJogadorTesouro = config.maoInicialTesouros ?? 0;
+  const distribuidasTesouro = porJogadorTesouro * jogadores.length;
+  // Mesmo `>=` do baralho de Portas, e pela mesma razão: o primeiro loot precisa
+  // achar carta no monte. Com `distribuidasTesouro === tesouros.length` a mesa
+  // nasceria com o monte de Tesouros vazio e `tirarDoTopo` reembaralharia um
+  // cemitério vazio no primeiro combate vencido — 500 na mesa que este guard
+  // acabou de aprovar. Condicionado a distribuir alguma coisa porque uma mesa que
+  // não distribui tesouro nenhum não é assunto deste guard.
+  if (distribuidasTesouro > 0 && distribuidasTesouro >= tesouros.length) {
+    throw new Error('criarPartida: o baralho de Tesouros não tem cartas para a mão inicial');
+  }
   const comMao: readonly JogadorNaMesa[] = jogadores.map((j, i) => ({
     ...j,
-    mao: cartas.slice(i * porJogador, (i + 1) * porJogador),
+    mao: [
+      ...cartas.slice(i * porJogador, (i + 1) * porJogador),
+      ...tesouros.slice(i * porJogadorTesouro, (i + 1) * porJogadorTesouro),
+    ],
   }));
   const monte = cartas.slice(distribuidas);
+  const monteTesouros = tesouros.slice(distribuidasTesouro);
 
   const primeiro = jogadores[0];
   if (primeiro === undefined) {
@@ -98,7 +117,7 @@ export function criarPartida(
     vezDe: primeiro.id,
     patenteAlvo: config.patenteAlvo,
     portas: { monte, cemiterio: [] },
-    tesouros: { monte: tesouros, cemiterio: [] },
+    tesouros: { monte: monteTesouros, cemiterio: [] },
     combate: null,
     espiada: null,
     // CALCULADA, nunca a constante `'vasculhar'`: `MAO_INICIAL_PADRAO` e

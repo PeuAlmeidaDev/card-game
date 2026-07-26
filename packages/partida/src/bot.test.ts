@@ -5,7 +5,8 @@ import { avancarBots } from './automacao';
 import { criarPartida } from './montagem';
 import { projetarPara } from './projecao';
 import { filaDeDados } from './testes/dados';
-import { monstro as cartaMonstro, raca } from './testes/cartas';
+import { monstro as cartaMonstro, monstros, raca } from './testes/cartas';
+import { LIMITE_BASE_DE_MAO } from './mao';
 import { catalogoDeTeste, ID_DA_CLASSE_DE_TESTE } from './testes/catalogo';
 import { COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import type { EntradaJogador, EstadoPartida } from './tipos';
@@ -22,6 +23,14 @@ const soMonstro = {
   composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }],
   composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE,
 };
+
+/**
+ * Mão que estoura o teto de quem TEM raça em jogo (limite = `LIMITE_BASE_DE_MAO`).
+ * 🎚️ Derivada do dial: cravada em 6, ela parou de estourar quando o teto subiu
+ * para 7 — e como estes fixtures forjam `fase: 'descartar'` junto, o bot
+ * continuaria entregando e o teste seguiria verde sobre uma mão que cabia.
+ */
+const ACIMA_DO_TETO = monstros(LIMITE_BASE_DE_MAO + 1);
 
 describe('escolherAcao', () => {
   it('sem combate em curso, chuta a porta', () => {
@@ -87,7 +96,7 @@ describe('escolherAcao', () => {
         j.id === 'p2'
           ? {
               ...j,
-              mao: [cartaMonstro('c1'), cartaMonstro('c2'), cartaMonstro('c3'), cartaMonstro('c4'), cartaMonstro('c5'), cartaMonstro('c6')],
+              mao: ACIMA_DO_TETO,
               emJogo: { ...j.emJogo, raca: raca('r1', 'anao') },
             }
           : j
@@ -97,7 +106,7 @@ describe('escolherAcao', () => {
     };
 
     expect(escolherAcao(projetarPara('p2', estourado, catalogoPadrao), 'p2'))
-      .toEqual({ tipo: 'entregarCarta', jogadorId: 'p2', cartaId: 'c1' });
+      .toEqual({ tipo: 'entregarCarta', jogadorId: 'p2', cartaId: 'm1' });
   });
 
   it('dentro do limite, ignora a mão e joga normalmente', () => {
@@ -151,8 +160,9 @@ describe('escolherAcao', () => {
         j.id === 'p1'
           ? {
               ...j,
-              mao: [cartaMonstro('c1'), cartaMonstro('c2'), cartaMonstro('c3'),
-                    cartaMonstro('c4'), cartaMonstro('c5'), raca('r7', 'orc')],
+              // Sem raça em jogo o teto é `LIMITE_BASE_DE_MAO + 1`; a raça da mão
+              // é a carta que o ultrapassa.
+              mao: [...ACIMA_DO_TETO, raca('r7', 'orc')],
             }
           : j
       )),
@@ -174,7 +184,7 @@ describe('escolherAcao', () => {
           ? {
               ...j,
               patente: 5,
-              mao: [cartaMonstro('c1'), cartaMonstro('c2'), cartaMonstro('c3'), cartaMonstro('c4'), cartaMonstro('c5'), cartaMonstro('c6')],
+              mao: ACIMA_DO_TETO,
               emJogo: { ...j.emJogo, raca: raca('r1', 'anao') },
             }
           : j

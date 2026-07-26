@@ -207,24 +207,39 @@ describe('mesa', () => {
     await app.close();
   });
 
-  it('a mesa abre com a mão inicial distribuída', async () => {
-    // O dial da mão vive no domínio (`MAO_INICIAL_PADRAO`); a borda só o passa.
-    // Este teste é o que prova que ele chegou — sem ele, a mesa de produção
-    // poderia abrir com mão zero e todos os testes de `partida` seguiriam verdes.
+  it('a mesa abre com as DUAS mãos iniciais distribuídas', async () => {
+    // Os dials da mão vivem no domínio (`MAO_INICIAL_PADRAO` e
+    // `MAO_INICIAL_TESOUROS`); a borda só os passa. Este teste é o que prova que
+    // eles chegaram — sem ele, a mesa de produção poderia abrir com mão zero e
+    // todos os testes de `partida` seguiriam verdes.
+    //
+    // 🎚️ 4 + 4 = 8 (spec §7.1). Os números estão cravados de propósito: derivar
+    // das constantes faria a asserção repetir a conta da borda e ela passaria
+    // qualquer que fosse o dial.
     const app = buildApp({ embaralhar: semEmbaralhar });
     const res = await app.inject({ method: 'POST', url: '/api/partida', payload: escolhas });
     const vista = res.json<VistaDaPartida>();
 
-    expect(vista.suaMao).toHaveLength(4);
-    expect(vista.jogadores.map((j) => j.cartasNaMao)).toEqual([4, 4, 4, 4]);
+    expect(vista.suaMao).toHaveLength(8);
+    expect(vista.jogadores.map((j) => j.cartasNaMao)).toEqual([8, 8, 8, 8]);
+    // A CONTAGEM sozinha não prova que a segunda corrente chegou: 8 Portas
+    // passariam igual. A separação por família é o que prende o segundo dial.
+    expect(vista.suaMao.filter((c) => c.tipo === 'equipamento')).toHaveLength(4);
+    expect(vista.suaMao.filter((c) => c.tipo !== 'equipamento')).toHaveLength(4);
     await app.close();
   });
 
-  it('a mesa de produção nasce SEM raça em jogo e com folga na mão', async () => {
+  it('a mesa de produção nasce SEM raça em jogo e sem estourar a mão', async () => {
     // O guard que impede o app de nascer morto, no lugar onde a config de produção
     // de fato é montada. Se um dial for girado errado, o jogador nasce acima do
     // limite: `vasculhar` é recusado e a única saída é entregar — um clique que
     // existe, mas num turno que nunca deveria ter começado assim.
+    //
+    // 🎚️ "Sem estourar", e não mais "com folga": com os dials desta fatia a mesa
+    // nasce EXATAMENTE no teto (4 Portas + 4 Tesouros = 8 = `LIMITE_BASE_DE_MAO`
+    // mais o Adaptável de quem está sem raça). Quem devolve a folga é
+    // `equiparCarta` — é para isso que os 4 tesouros existem na abertura. O `<=`
+    // sempre foi o que a asserção afirmava; o título é que prometia mais.
     const app = buildApp({ embaralhar: semEmbaralhar });
     const vista = await criar(app);
 

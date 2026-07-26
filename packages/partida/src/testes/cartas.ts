@@ -22,3 +22,19 @@ export const raca = (id: string, racaId: string): CartaDeRaca => ({ id, tipo: 'r
 // o `catalogoDeTeste()` conhece — carta forjada resolve pelo catálogo default em
 // vez de depender de ele aprovar qualquer coisa.
 export const equipamento = (id: string, itemId = 'i-teste'): CartaEquipamento => ({ id, tipo: 'equipamento', itemId });
+
+/**
+ * `n` cartas numeradas (`m1`, `m2`, … / `s1`, `s2`, …). Existe para que uma mão
+ * forjada seja DERIVADA do teto (`LIMITE_BASE_DE_MAO`) em vez de escrita à mão.
+ *
+ * O porquê é o modo de falha desta fatia: 🎚️ o teto subiu de 4 para 7, e toda
+ * mão de 5 cartas cravada num fixture parou de estourar — sem quebrar teste
+ * nenhum, porque esses mesmos fixtures forjam `fase: 'descartar'` junto. Eles
+ * continuariam VERDES afirmando o excedente sobre uma mão que cabia. Derivado, o
+ * cenário ("estourado por 1") sobrevive ao próximo giro do dial.
+ */
+export const monstros = (n: number): CartaPorta[] =>
+  Array.from({ length: n }, (_, i) => monstro(`m${String(i + 1)}`));
+
+export const salasVazias = (n: number): CartaPorta[] =>
+  Array.from({ length: n }, (_, i) => salaVazia(`s${String(i + 1)}`));
