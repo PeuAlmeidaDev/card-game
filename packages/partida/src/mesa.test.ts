@@ -1025,9 +1025,9 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
 
   it('recusa entregar com combate em curso', () => {
     // O guard de fase mora no topo do `aplicarAcao` e roda ANTES de qualquer
-    // checagem de mão — por isso a mão nem precisa estar estourada aqui. (Desde a
-    // Task 4, `vasculhar` também recusa abrir combate com a mão já estourada,
-    // então usar `estourado` para chegar a este `emCombate` nem seria mais possível.)
+    // checagem de mão — por isso a mão nem precisa estar estourada aqui. (Desde
+    // que `vasculhar` recusa abrir combate com a mão já estourada, usar
+    // `estourado` para chegar a este `emCombate` nem seria mais possível.)
     const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] };
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const emCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
@@ -1052,9 +1052,9 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
   // 5 cartas com raça em jogo = limite 4 => estourado por 1.
   const maoEstourada = [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5')];
   // 4 cartas com raça em jogo = EXATAMENTE o limite — ainda não estourada. Ponto
-  // de partida dos dois testes abaixo: desde a Task 4, `vasculhar` recusa ABRIR
-  // com a mão já estourada, então a mão estourada não pode mais ser precondição
-  // do vasculhar — ela tem que nascer da própria compra.
+  // de partida dos dois testes abaixo: desde que `vasculhar` recusa abrir combate
+  // com a mão estourada, a mão estourada não pode mais ser precondição do
+  // vasculhar — ela tem que nascer da própria compra.
   const maoNoLimite = [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4')];
 
   const comMaoEZona = (estado: EstadoPartida): EstadoPartida => ({
@@ -1128,10 +1128,10 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
     // saída, este aqui seria o esquecido — ele é o único que passa por
     // `fecharCombate` antes de encerrar.
     //
-    // Desde a Task 4, `vasculhar` recusa ABRIR combate com a mão já estourada —
-    // então a mão estourada não pode mais vir de ANTES do vasculhar (senão o
-    // combate nem abriria). Ela é forjada DEPOIS que o combate já está aberto,
-    // só para provar que `fecharCombate` também passa pela porta única.
+    // Desde que `vasculhar` recusa abrir combate com a mão já estourada, ela não
+    // pode mais vir de ANTES do vasculhar (senão o combate nem abriria). Ela é
+    // forjada DEPOIS que o combate já está aberto, só para provar que
+    // `fecharCombate` também passa pela porta única.
     const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] };
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const fraco = { forca: 1, vida: 1, habilidade: 0, agilidade: 0, level: 1 };

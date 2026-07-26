@@ -314,8 +314,10 @@ function cartaDaMao(estado: EstadoPartida, acao: AcaoDeMao): {
  * carta; o destino é regra (`destinoDaCaridade`), nunca escolha — é o que impede
  * o kingmaking numa mesa com classificação de 1º a 4º.
  *
- * Só é legal ACIMA do limite: doar por vontade própria seria escolher a quem dar
- * vantagem, exatamente a política que a regra do destino existe para matar.
+ * Só é legal na fase `descartar` (isto é, ACIMA do limite): quem cobra isso não é
+ * mais um guard aqui dentro, e sim o guard único no topo do `aplicarAcao`, via a
+ * tabela de fases. Doar por vontade própria (dentro do limite) seria escolher a
+ * quem dar vantagem, exatamente a política que a regra do destino existe para matar.
  *
  * Termina em `encerrarTurno`, que recobra o limite: com a mão ainda estourada a
  * vez continua parada e o jogador entrega de novo; quando couber, a vez passa.

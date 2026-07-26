@@ -18,8 +18,11 @@ export const MAO_INICIAL_PADRAO = 4;
  * que todo teto seja alterável por carta, e este já nasce assim — o bônus de
  * quem não tem raça em jogo é o Adaptável do Humano.
  *
- * Nesta fatia o limite é publicado, não imposto: a checagem no fim do turno
- * chega no Plano 3, junto com o `entregarCarta` que dá saída a quem estourar.
+ * O limite é IMPOSTO desde a fatia 7: `encerrarTurno` (em `./mesa`) segura a vez
+ * enquanto a mão de quem tem a vez exceder este valor, e `entregarCarta` já
+ * existe como a saída que resolve o excedente (a caridade). Este plano passou a
+ * depender deste cálculo de outro jeito: é ele que `faseDoTurnoDe` (em `./fase`)
+ * consulta para decidir se o turno nasce em `descartar` ou em `vasculhar`.
  */
 export function limiteDeMao(jogador: JogadorNaMesa): number {
   return LIMITE_BASE_DE_MAO + (jogador.emJogo.raca === null ? 1 : 0);
