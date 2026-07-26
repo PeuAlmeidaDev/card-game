@@ -66,7 +66,7 @@ Entrega o vocabulário de dados sozinho, no pacote mais externo. Nada em `partid
 - Consumes: nada de outros pacotes (`cartas` é folha, só depende de `motor` para as passivas já existentes).
 - Produces:
   - `type Slot = 'capacete' | 'armadura' | 'maoDireita' | 'maoEsquerda' | 'pes'`
-  - `interface ItemCarta { id: string; nome: string; slot: Slot; duasMaos: boolean; modificadores: ModificadoresDeStat }` — onde `modificadores` é escrito campo a campo (`{ forca?: number; vida?: number; habilidade?: number; agilidade?: number }`) para não importar `personagem` (direção errada).
+  - `interface ItemCarta { id: string; nome: string; slot: Slot; duasMaos: boolean; modificadores: ModificadoresDeStat }` — onde `modificadores: ModificadoresDeItem` é escrito campo a campo (`{ forca?: number; vida?: number; habilidade?: number; agilidade?: number }`) para não importar `personagem` (direção errada).
   - `const ITENS: readonly ItemCarta[]`, `const ITENS_SACAVEIS: readonly ItemCarta[]`, `function obterItem(id: string): ItemCarta | undefined`
   - `MonstroCarta.tesouros: number`
 
