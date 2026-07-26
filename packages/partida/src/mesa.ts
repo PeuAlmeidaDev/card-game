@@ -103,12 +103,28 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
     throw new AcaoInvalida(`aplicarAcao: não é a vez de ${acao.jogadorId}`);
   }
 
-  // Resposta ÚNICA para "posso?". Antes a pergunta estava espalhada em cinco
+  // Gate de FASE — resposta única para "em que ponto do turno esta ação cabe?",
+  // não para "posso?" inteiro. Antes a pergunta estava espalhada em cinco
   // funções, cada uma relendo `combate`, `espiada` e o limite de mão por conta
   // própria — três booleanos ortogonais, oito combinações, e nenhum lugar que
-  // dissesse a verdade inteira. A ação nova do Plano 3 precisava lembrar de
-  // repetir os guards certos; agora ela precisa entrar na tabela, e o
-  // `Record<Fase, …>` cobra.
+  // dissesse a verdade. A ação nova do Plano 3 precisava lembrar de repetir os
+  // guards certos; agora ela precisa entrar na tabela, e o `Record<Fase, …>` cobra.
+  //
+  // ⚠️ O QUE A TABELA NÃO RESPONDE. Passar aqui não garante que a ação será
+  // aceita: a elegibilidade FINA continua em cada função, e hoje são quatro
+  // pares — cada um precisa de gêmeo na tela, porque o `legal()` da `TelaMesa`
+  // lê ESTA tabela e não sabe deles:
+  //
+  //   fase        ação                  segunda condição      quem cobra
+  //   vasculhar   vasculhar/jogarCarta  espiada === null      `vasculhar` / `jogarCarta`
+  //   vasculhar   manterCarta/empurrar  espiada !== null      `resolverEspiada`
+  //   vasculhar   jogarCarta            carta.tipo === 'raca' `jogarCarta`
+  //   descartar   jogarCarta            carta.tipo === 'raca' `jogarCarta`
+  //   combate     atacar/esquivar       `proximaDecisao`      o motor, via `AcaoIlegal`
+  //
+  // Um botão novo escrito só com `legal(tipo)` acende nesses estados e leva 400.
+  // Quando `recompor` e `encrenca` chegarem (Planos 3 e 4), as duas primeiras
+  // linhas somem — a espiada vira fase própria e o par deixa de ser necessário.
   if (!acaoEhLegalNaFase(estado.fase, acao.tipo)) {
     throw new AcaoInvalida(`aplicarAcao: ${acao.tipo} não é legal na fase ${estado.fase}`);
   }

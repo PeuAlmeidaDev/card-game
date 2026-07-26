@@ -2,8 +2,15 @@ import type { AcaoDaMesa, Fase, JogadorNaMesa } from './tipos';
 import { limiteDeMao } from './mao';
 
 /**
- * Quais ações são legais em cada fase. Resposta ÚNICA para "posso?", lida pelo
- * reducer (no topo do `aplicarAcao`) e pela tela (quais botões acendem).
+ * Quais ações cabem em cada FASE. Lida pelo reducer (no topo do `aplicarAcao`) e
+ * pela tela (quais botões acendem), sempre pelas duas — é o que impede a tela de
+ * manter uma cópia própria que diverge.
+ *
+ * **É um gate grosso, não a resposta inteira de "posso?".** Passar aqui não
+ * garante aceitação: a elegibilidade fina (espiada pendente, tipo da carta,
+ * `proximaDecisao` do combate) continua em cada função do reducer. Os pares
+ * exatos estão tabelados no `aplicarAcao` (`./mesa`) — quem for acender um botão
+ * novo lê aquela lista, não só esta tabela.
  *
  * `Record<Fase, …>`, e não um objeto solto: fase nova sem conjunto de ações vira
  * erro de compilação. Foi o modo de falha que fechou a fatia 7 — regra sem

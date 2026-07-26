@@ -32,11 +32,17 @@ Visão do jogo **fechada** em 2 sessões de `grilling` (9 + 13 decisões) — ve
 
 O Plano 2 trocou os guards espalhados do reducer por uma **máquina de fases**:
 `EstadoPartida.fase` (`vasculhar | combate | descartar`) mais a tabela
-`Record<Fase, ReadonlySet<AcaoDaMesa['tipo']>>` em `packages/partida/src/fase.ts`, que
-responde "posso?" num ponto só — no topo do `aplicarAcao` — e é lida **também pela
-`TelaMesa`** (os botões acendem pela fase que vem na vista, o cliente não recalcula regra).
+`Record<Fase, ReadonlySet<AcaoDaMesa['tipo']>>` em `packages/partida/src/fase.ts`, lida num
+ponto só — no topo do `aplicarAcao` — e **também pela `TelaMesa`** (os botões acendem pela
+fase que vem na vista, o cliente não mantém cópia da regra de fase).
 As outras três fases do spec §6 (`recompor`, `encrenca`, `jogar`) chegam com os verbos
 delas nos Planos 3 e 4.
+
+⚠️ **A tabela é um gate de fase, não a resposta inteira de "posso?".** A elegibilidade fina
+(espiada pendente, tipo da carta, `proximaDecisao` do combate) continua em cada função do
+reducer, e **cada uma dessas condições precisa de gêmeo na tela**. Os pares estão tabelados
+no comentário do `aplicarAcao` — botão novo escrito só com `legal(tipo)` acende onde o
+domínio recusa e leva 400.
 
 **Próximo passo: Plano 3 — "Tesouros e o corpo".** Baralho de Tesouros, loot ao vencer,
 os 5 slots, `combatenteBase` morre e `combatenteDe` nasce, o construtor perde `itemIds`.

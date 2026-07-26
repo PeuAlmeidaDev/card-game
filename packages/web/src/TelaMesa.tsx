@@ -86,9 +86,16 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
   // passar a vez — e os botões da mão são renderizados fora do ramo da
   // classificação, então sem este check eles acenderiam no instante da vitória.
   const podeAgir = minhaVez && vista.desfecho === 'emAndamento';
-  // O QUE é legal vem do domínio, pela mesma tabela que o reducer usa. A tela não
+  // A FASE vem do domínio, pela mesma tabela que o reducer usa. A tela não
   // recalcula "mão > limite" nem "combate aberto" — a cópia que divergisse
   // acenderia um botão que só serve para levar 400.
+  //
+  // ⚠️ `legal()` é um gate GROSSO, não a resposta inteira. O reducer ainda cobra
+  // condições que a tabela não conhece, e cada uma precisa de gêmeo aqui — é o
+  // `|| espiada !== null` de "Vasculhar" e "Jogar", o `carta.tipo === 'raca'` que
+  // decide se "Jogar" existe, e o `decisao !== …` de "Atacar"/"Esquivar". A lista
+  // completa dos pares está no comentário do `aplicarAcao` (pacote `partida`):
+  // botão novo escrito só com `legal(tipo)` acende onde o domínio recusa.
   const legal = (tipo: AcaoDaMesa['tipo']): boolean => podeAgir && acaoEhLegalNaFase(vista.fase, tipo);
 
   return (
