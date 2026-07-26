@@ -8,7 +8,6 @@ import { destinoDaCaridade } from './caridade';
 import { classificar } from './classificacao';
 import { AcaoInvalida } from './erros';
 import { acaoEhLegalNaFase, faseDoTurnoDe } from './fase';
-import { limiteDeMao } from './mao';
 
 /** As ações que só fazem sentido com um combate aberto. */
 type AcaoDeCombate = Extract<AcaoDaMesa, { readonly tipo: 'atacar' | 'esquivar' }>;
@@ -76,7 +75,12 @@ function encerrarTurno(base: EstadoPartida, eventos: readonly EventoDaMesa[]): R
   // aqui. O limite simplesmente não se aplica a quem não existe, e quem lança
   // por esse estado corrompido continua sendo o `proximoJogador`, logo abaixo —
   // um `throw` próprio aqui só duplicaria o guard com outra mensagem.
-  if (daVez !== undefined && daVez.mao.length > limiteDeMao(daVez)) {
+  // A pergunta é `faseDoTurnoDe`, não uma releitura do limite: era a MESMA
+  // expressão que ela encapsula, escrita de novo aqui. O ponto único só é único
+  // se a porta única do turno também passar por ele — no dia em que o teto
+  // deixar de ser `>` (item que muda a contagem, spec §8), esta cópia é a que
+  // ficava para trás, e a vez cairia num jogador estourado sem ação legal.
+  if (daVez !== undefined && faseDoTurnoDe(daVez) === 'descartar') {
     return registrar({ ...base, fase: 'descartar' }, eventos);
   }
 
