@@ -28,9 +28,8 @@ divergirem do game bible, **o game bible vence**.
 Visão do jogo **fechada** em 2 sessões de `grilling` (9 + 13 decisões) — ver §19 do game bible.
 
 **Construído e mergeado:** `motor`, `personagem`, `progressao`, `cartas`, `partida`, `shared`,
-`server`, `web`. Fatias 1–7 completas. **Fatia 8 "TESOUROS": Planos 1 e 2 mergeados. Plano 3a
-("Tesouros e o corpo") completo — Tasks 1–9 — na branch `feat/fatia-8-plano-3a-tesouros`,
-aguardando merge.**
+`server`, `web`. Fatias 1–7 completas. **Fatia 8 "TESOUROS": Planos 1, 2 e 3a ("Tesouros e o
+corpo", Tasks 1–9) mergeados.**
 
 O Plano 2 trocou os guards espalhados do reducer por uma **máquina de fases**:
 `EstadoPartida.fase` (`vasculhar | combate | descartar`) mais a tabela
