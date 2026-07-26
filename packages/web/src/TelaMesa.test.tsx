@@ -564,6 +564,89 @@ describe('TelaMesa — o corpo', () => {
   });
 });
 
+describe('TelaMesa — os stats na lista', () => {
+  /**
+   * O `<li>` de um assento. Escopar é OBRIGATÓRIO aqui: os quatro stats saem uma
+   * vez por jogador, e um `screen.getByText(/força/)` global acharia todos sem
+   * dizer de QUEM é o número — que é justamente o que estes testes afirmam.
+   */
+  const linhaDe = (nome: string): HTMLElement => {
+    const linha = screen.getByText(nome, { selector: 'strong' }).closest('li');
+    if (linha === null) throw new Error(`linha de ${nome} não encontrada no DOM`);
+    return linha;
+  };
+
+  it('equipar um tesouro MUDA o número na tela', async () => {
+    // O ponto da fatia inteira: o personagem deixou de ser congelado. Duas vistas
+    // que diferem SÓ pelo item no corpo (a Espada Curta dá +2 de força, e é isso
+    // que `combatenteDe` soma) têm que produzir números diferentes na lista.
+    // Sem esta asserção o ganho existe no domínio, viaja no fio e morre antes dos
+    // olhos do jogador — foi exatamente o que aconteceu no navegador.
+    await abrirMesa(vistaBase);
+    expect(linhaDe('Você')).toHaveTextContent(/força 3/);
+
+    cleanup();
+
+    await abrirMesa({
+      ...vistaBase,
+      jogadores: vistaBase.jogadores.map((j) => (
+        j.id === 'p1'
+          ? {
+              ...j,
+              // O `combatente` vem PRONTO do servidor; a espada no corpo é o que
+              // o justifica. Mexer num sem o outro seria uma vista que o domínio
+              // não consegue produzir.
+              combatente: { ...combatente, forca: 5 },
+              emJogo: { raca: null, slots: { ...SLOTS_VAZIOS, maoDireita: tesouro('t-1') } },
+            }
+          : j
+      )),
+    });
+
+    expect(linhaDe('Você')).toHaveTextContent(/força 5/);
+    expect(linhaDe('Você')).not.toHaveTextContent(/força 3/);
+  });
+
+  it('mostra os QUATRO stats com o valor que veio na vista', async () => {
+    // Os quatro valores do fixture são distintos (3/20/8/5) de propósito: com
+    // rótulos trocados — força mostrando a agilidade — a asserção falha. Um teste
+    // que só afirmasse "a palavra força aparece" passaria com os números errados.
+    await abrirMesa(vistaBase);
+
+    const linha = linhaDe('Você');
+    expect(linha).toHaveTextContent(/força 3/);
+    expect(linha).toHaveTextContent(/vida 20/);
+    expect(linha).toHaveTextContent(/habilidade 8/);
+    expect(linha).toHaveTextContent(/agilidade 5/);
+  });
+
+  it('publica os stats de TODOS os assentos, não só os do humano', async () => {
+    // `JogadorPublico.combatente` é público de propósito: a zona em jogo (raça e
+    // slots) já é aberta, então esconder o total derivado dela seria teatro — e é
+    // dele que sai a decisão de encarar ou não quem está na frente. O bot entra
+    // com a espada equipada para que os números DIFIRAM: com os dois iguais, uma
+    // tela que renderizasse o combatente do humano em todas as linhas passaria
+    // verde.
+    await abrirMesa({
+      ...vistaBase,
+      jogadores: vistaBase.jogadores.map((j) => (
+        j.id === 'p2'
+          ? {
+              ...j,
+              // `level: 2` porque o level É a patente (`combatenteDe`), e o p2
+              // está na patente 2 — um level 1 aqui seria vista impossível.
+              combatente: { ...combatente, forca: 5, level: 2 },
+              emJogo: { raca: null, slots: { ...SLOTS_VAZIOS, maoDireita: tesouro('t-2') } },
+            }
+          : j
+      )),
+    });
+
+    expect(linhaDe('Você')).toHaveTextContent(/força 3/);
+    expect(linhaDe('Bot 1')).toHaveTextContent(/força 5/);
+  });
+});
+
 describe('TelaMesa — equipar', () => {
   const maoHeterogenea: VistaDaPartida = {
     ...vistaBase,

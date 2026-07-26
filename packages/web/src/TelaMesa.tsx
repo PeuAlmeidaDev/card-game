@@ -131,11 +131,32 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
     <section>
       <h2>Mesa — alvo: patente {vista.patenteAlvo}</h2>
 
+      {/* Os stats de TODOS os assentos, não só os do humano: a zona em jogo (raça
+          e slots) já é pública, então o total derivado dela não é segredo —
+          esconder seria teatro, e é dele que sai a decisão de encarar ou não quem
+          está na frente. É o argumento escrito no `JogadorPublico.combatente`.
+
+          Os quatro números vêm PRONTOS da vista. A tela não soma classe + itens:
+          quem monta é `combatenteDe`, no domínio. Uma soma aqui seria regra de
+          jogo na UI, e ela divergiria no dia em que uma maldição virasse o sinal.
+
+          Sem esta linha a fatia inteira era invisível — o jogador equipava, via o
+          slot preencher e não tinha onde conferir se valeu a pena.
+
+          O `level` fica de fora de propósito: ele É a patente (ver `combatenteDe`),
+          que já abre a linha. Repeti-lo com outro nome só ensinaria o jogador a
+          procurar dois números para a mesma coisa.
+
+          Os stats entram logo depois da raça — causa e efeito juntos — e a vida
+          aqui é sempre o TOTAL do corpo, nunca a corrente da luta: o `atual/máximo`
+          já mora no painel de combate, e trocar o significado desta linha no meio
+          do combate deixaria a comparação entre assentos incomparável. */}
       <ul>
         {vista.jogadores.map((j) => (
           <li key={j.id}>
             <strong>{j.nome}</strong> — patente {j.patente} · {j.derrotas} derrota(s)
             {j.emJogo.raca !== null && ` · ${nomeDaRaca(j.emJogo.raca.racaId)}`}
+            {' · '}força {j.combatente.forca} · vida {j.combatente.vida} · habilidade {j.combatente.habilidade} · agilidade {j.combatente.agilidade}
             {' · '}{j.cartasNaMao}/{j.limiteDeMao} cartas
             {j.id === vista.vezDe && ' ← jogando'}
           </li>
