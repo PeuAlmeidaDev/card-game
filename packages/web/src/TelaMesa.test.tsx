@@ -439,10 +439,18 @@ describe('TelaMesa — a mão', () => {
   it('na fase `descartar`, vasculhar apaga e entregar acende', async () => {
     // A regra é do domínio e chega pronta na `fase`: a tela não recalcula
     // "mão > limite" para saber o que é legal.
+    //
+    // `limiteDeMao: 0` para p1 é o que torna esta vista PRODUZÍVEL: a fase
+    // `descartar` só existe quando a mão de quem tem a vez excede o limite —
+    // com o `limiteDeMao: 5` padrão do fixture, 1 carta nunca estouraria, e o
+    // teste estaria afirmando um estado que o domínio nunca gera.
     await abrirMesa({
       ...vistaBase,
       fase: 'descartar',
       suaMao: [{ id: 'p-0', tipo: 'salaVazia' }],
+      jogadores: vistaBase.jogadores.map((j) => (
+        j.id === 'p1' ? { ...j, cartasNaMao: 1, limiteDeMao: 0 } : j
+      )),
     });
 
     expect(await screen.findByRole('button', { name: /vasculhar local/i })).toBeDisabled();
@@ -450,10 +458,15 @@ describe('TelaMesa — a mão', () => {
   });
 
   it('na fase `descartar`, jogar raça continua aceso — é a outra saída', async () => {
+    // Mesmo ajuste do teste acima: sem baixar o limite de p1, 1 carta na mão
+    // nunca estouraria e a fase `descartar` seria uma vista impossível.
     await abrirMesa({
       ...vistaBase,
       fase: 'descartar',
       suaMao: [{ id: 'p-0', tipo: 'raca', racaId: 'orc' }],
+      jogadores: vistaBase.jogadores.map((j) => (
+        j.id === 'p1' ? { ...j, cartasNaMao: 1, limiteDeMao: 0 } : j
+      )),
     });
 
     expect(await screen.findByRole('button', { name: /^jogar$/i })).toBeEnabled();
