@@ -10,6 +10,7 @@ import type {
 } from '@card-dungeon/personagem';
 import type {
   AcaoDaMesa,
+  Carta,
   CartaPorta,
   EspiadaPendente,
   EventoDaMesa,
@@ -188,6 +189,11 @@ export type {
   EventoDaMesa,
   PosicaoFinal,
   CartaPorta,
+  // A carta como ela chega na MÃO: heterogênea (porta ou tesouro) desde que
+  // vencer larga loot. `CartaPorta` continua exportada porque a espiada e o
+  // evento `porta` só carregam essa família — quem espia o topo do baralho de
+  // Portas nunca vê um tesouro, e estreitar ali é informação, não cerimônia.
+  Carta,
   EspiadaPendente,
   Fase,
 };

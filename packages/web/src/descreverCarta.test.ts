@@ -31,6 +31,16 @@ describe('descreverCarta', () => {
     expect(descreverCarta(cartaDesconhecida, nomeDaRaca, nomeDoMonstro)).toBe('uma carta desconhecida');
   });
 
+  it('descreve o tesouro sem nomear o item (ainda)', () => {
+    // A mão virou heterogênea com o loot, então esta função passou a receber
+    // tesouro. Nomear o item exige um `nomeDoItem` injetado, e ele só tem de
+    // onde vir quando a tela receber o catálogo de itens (Task 7) — até lá a
+    // linha é genérica de propósito, e este teste é o que registra a dívida em
+    // vez de deixá-la calada.
+    expect(descreverCarta({ id: 't-1', tipo: 'equipamento', itemId: 'espada-curta' }, nomeDaRaca, nomeDoMonstro))
+      .toBe('um tesouro');
+  });
+
   it('descreve o monstro pelo nome do catálogo', () => {
     expect(descreverCarta(
       { id: 'p-1', tipo: 'monstro', monstroId: 'lobo-sombrio' },

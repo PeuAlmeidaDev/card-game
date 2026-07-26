@@ -71,6 +71,26 @@ describe('narrarEvento — linhas de texto puro', () => {
       ctx,
     )).toBe('Bot 1 descartou uma carta de Elfo.');
   });
+
+  it('descarte de TESOURO também é narrado — a mão é heterogênea', () => {
+    // O evento `descarte` alargou junto com a mão: o que se dispensa pode ser um
+    // tesouro. Sem esta linha, a cadeia de `never` do `descreverCarta` estaria
+    // satisfeita e a tela ainda assim renderizaria uma frase que ninguém viu.
+    expect(narrarEvento(
+      { tipo: 'descarte', jogadorId: 'p2', carta: { id: 't-1', tipo: 'equipamento', itemId: 'espada-curta' } },
+      ctx,
+    )).toBe('Bot 1 descartou um tesouro.');
+  });
+
+  it('loot diz QUANTAS, nunca QUAIS — a mão é zona oculta', () => {
+    // Mesmo princípio do `achado`: a carta caiu numa zona que só o dono vê, e o
+    // evento nem carrega a carta para a narração poder nomeá-la. Vale também
+    // para quem venceu — ele descobre o quê pela própria mão.
+    expect(narrarEvento({ tipo: 'loot', jogadorId: 'p1', quantidade: 2 }, ctx))
+      .toBe('Você saqueia o cadáver e leva 2 tesouros.');
+    expect(narrarEvento({ tipo: 'loot', jogadorId: 'p2', quantidade: 1 }, ctx))
+      .toBe('Bot 1 saqueia o cadáver e leva 1 tesouro.');
+  });
 });
 
 describe('narrarEvento — linhas com marcação', () => {

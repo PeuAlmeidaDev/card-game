@@ -1,9 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
 import { catalogoDeTeste, CLASSE_DE_TESTE } from './testes/catalogo';
-import type { CartaEquipamento, JogadorNaMesa } from './tipos';
-
-const equipamento = (id: string, itemId: string): CartaEquipamento => ({ id, tipo: 'equipamento', itemId });
+import { equipamento } from './testes/cartas';
+import type { JogadorNaMesa } from './tipos';
 
 const jogador = (over: Partial<JogadorNaMesa> = {}): JogadorNaMesa => ({
   id: 'p1', nome: 'Você', ehBot: false, classeId: CLASSE_DE_TESTE.id,

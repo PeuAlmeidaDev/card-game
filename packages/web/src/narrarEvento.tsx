@@ -53,6 +53,12 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
     case 'entrega':
       return `${ctx.nomeDe(evento.jogadorId)} entregou uma carta a ${ctx.nomeDe(evento.paraJogadorId)}.`
         + (evento.rolagem === null ? '' : ` (1d12: ${String(evento.rolagem)})`);
+    // O loot cai na MÃO, que é zona oculta: o evento traz a quantidade e nunca a
+    // carta, então a narração só pode contar. Quem venceu descobre o quê pela
+    // própria mão — mesma regra do `achado`.
+    case 'loot':
+      return `${evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId)} saqueia o cadáver e leva `
+        + `${String(evento.quantidade)} ${evento.quantidade === 1 ? 'tesouro' : 'tesouros'}.`;
     // O descarte é PÚBLICO: o cemitério já é zona aberta, esconder aqui seria teatro.
     case 'descarte':
       return `${ctx.nomeDe(evento.jogadorId)} descartou ${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro)}.`;

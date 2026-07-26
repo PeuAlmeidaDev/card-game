@@ -7,10 +7,11 @@ import { escolherAcao } from './bot';
 import { projetarPara } from './projecao';
 import { AcaoInvalida } from './erros';
 import { filaDeDados, criarDadoCiclico } from './testes/dados';
-import { monstro, salaVazia, raca } from './testes/cartas';
-import { catalogoDeTeste, ID_DA_CLASSE_DE_TESTE } from './testes/catalogo';
+import { monstro, salaVazia, raca, equipamento } from './testes/cartas';
+import { catalogoDeTeste, ID_DA_CLASSE_DE_TESTE, MONSTRO_DE_TESTE } from './testes/catalogo';
 import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
-import type { EntradaJogador, CartaPorta, EstadoPartida } from './tipos';
+import type { DepsMesa } from './mesa';
+import type { Carta, EntradaJogador, CartaPorta, EstadoPartida, InfoMonstro } from './tipos';
 import type { PassivaCombate } from '@card-dungeon/motor';
 
 /**
@@ -39,6 +40,42 @@ const deps = (dados: readonly number[]) => ({
   embaralhar: semEmbaralhar,
   catalogo: catalogoDeTeste(),
 });
+
+/**
+ * As `deps` do arquivo com o bestiário trocado por UM monstro que responde a
+ * qualquer id. FÁBRICA, e não deps prontas: `filaDeDados` é consumida por
+ * chamada, então cada ação precisa da própria fila.
+ */
+const depsComMonstro = (info: InfoMonstro) => (dados: readonly number[]): DepsMesa => ({
+  rolar: filaDeDados(dados),
+  embaralhar: semEmbaralhar,
+  catalogo: catalogoDeTeste({ monstro: () => info }),
+});
+
+/**
+ * Ataca até o `MONSTRO_DE_TESTE` cair. São sempre TRÊS golpes: dano =
+ * `patente 1 + força 3 = 4` contra vida 10. Cada lance gasta `[4, 12, 12]` —
+ * acerto (4 ≤ habilidade 8), esquiva falha do monstro (12 > 4) e contra-ataque
+ * errado (12 > habilidade 6). Ver a "regra do orçamento de dados" no plano.
+ *
+ * Recebe a FÁBRICA de deps (default: as do arquivo) para que os testes de loot
+ * possam girar só o `tesouros` do monstro sem duplicar o laço — a statline
+ * continua a mesma, e é ela que fixa os três golpes.
+ */
+const venceOCombate = (
+  estado: EstadoPartida,
+  fabricaDeDeps: (dados: readonly number[]) => DepsMesa = deps,
+): EstadoPartida => {
+  let atual = estado;
+  for (let i = 0; i < 3; i += 1) {
+    atual = aplicarAcao(atual, { tipo: 'atacar', jogadorId: 'p1' }, fabricaDeDeps([4, 12, 12])).estado;
+  }
+  return atual;
+};
+
+/** A mão de um jogador, por id. Ela é `readonly Carta[]` desde o loot. */
+const maoDe = (estado: EstadoPartida, id: string): readonly Carta[] =>
+  estado.jogadores.find((j) => j.id === id)?.mao ?? [];
 
 describe('aplicarAcao — vasculhar', () => {
   it('o id acompanha a carta quando ela sai do monte', () => {
@@ -164,15 +201,9 @@ describe('aplicarAcao — combate', () => {
   };
 
   it('vencer o combate sobe a patente e passa a vez', () => {
-    const comCombate = abrirCombate([]);
-    // ataque do jogador = 4 (acerta, habilidade 8); esquiva do monstro = 12 (falha)
-    // dano = patente 1 + forca 3 = 4 ... precisa de 3 golpes para tirar 10 de vida
-    // 3o dado = contra-ataque do monstro (12 > habilidade 6 => erra). Ver a
-    // "regra do orçamento de dados" no topo do plano.
-    let estado = comCombate;
-    for (let i = 0; i < 3; i += 1) {
-      estado = aplicarAcao(estado, { tipo: 'atacar', jogadorId: 'p1' }, deps([4, 12, 12])).estado;
-    }
+    // Os três golpes e o orçamento de dados de cada lance moram no
+    // `venceOCombate` (topo do arquivo), que os testes de loot também usam.
+    const estado = venceOCombate(abrirCombate([]));
 
     expect(estado.combate).toBeNull();
     expect(estado.jogadores.find((j) => j.id === 'p1')?.patente).toBe(2);
@@ -183,10 +214,8 @@ describe('aplicarAcao — combate', () => {
   it('atingir a patente-alvo termina a partida e preenche a classificação', () => {
     const alvo2 = { ...soMonstro, patenteAlvo: 2 };
     const p = criarPartida('m1', entradas, alvo2, { embaralhar: semEmbaralhar });
-    let estado = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
-    for (let i = 0; i < 3; i += 1) {
-      estado = aplicarAcao(estado, { tipo: 'atacar', jogadorId: 'p1' }, deps([4, 12, 12])).estado;
-    }
+    const aberto = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
+    const estado = venceOCombate(aberto);
 
     expect(estado.desfecho).toBe('terminada');
     expect(estado.classificacao).toEqual([
@@ -198,10 +227,7 @@ describe('aplicarAcao — combate', () => {
   it('perder o combate conta derrota e passa a vez', () => {
     const forte = { forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1, tesouros: 1 };
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
-    const depsForte = (dados: readonly number[]) => ({
-      rolar: filaDeDados(dados), embaralhar: semEmbaralhar,
-      catalogo: catalogoDeTeste({ monstro: () => forte }),
-    });
+    const depsForte = depsComMonstro(forte);
 
     // monstro mais ágil ataca primeiro e acerta (rolagem 1 <= habilidade 12)
     const comCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsForte([1])).estado;
@@ -241,10 +267,7 @@ describe('aplicarAcao — combate', () => {
     // O motor recusa `atacar` quando a máquina está pedindo a esquiva. Sem a
     // tradução, esse Error cru viraria 500 na Task 14 em vez do 400 que é.
     const forte = { forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1, tesouros: 1 };
-    const depsForte = (dados: readonly number[]) => ({
-      rolar: filaDeDados(dados), embaralhar: semEmbaralhar,
-      catalogo: catalogoDeTeste({ monstro: () => forte }),
-    });
+    const depsForte = depsComMonstro(forte);
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const pedindoEsquiva = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsForte([1])).estado;
 
@@ -271,6 +294,177 @@ describe('aplicarAcao — combate', () => {
       .toThrow(TypeError);
     expect(() => aplicarAcao(comCombate, { tipo: 'atacar', jogadorId: 'p1' }, depsQuebradas))
       .not.toThrow(AcaoInvalida);
+  });
+});
+
+describe('vencer larga tesouro na mão', () => {
+  const soMonstro = { ...config, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] };
+
+  /**
+   * O `MONSTRO_DE_TESTE` com UM dial girado: quanto o cadáver vale. Os outros
+   * cinco stats ficam intactos de propósito — são eles que fazem `venceOCombate`
+   * fechar em três golpes.
+   */
+  const depsValendo = (tesouros: number) => depsComMonstro({ ...MONSTRO_DE_TESTE, tesouros });
+
+  /**
+   * Mesa com o combate JÁ aberto contra o monstro de teste. `mao` é a de p1
+   * ANTES da luta: é o dial que decide se o loot estoura o limite ou não.
+   */
+  const comCombateAberto = (
+    fabricaDeDeps: (dados: readonly number[]) => DepsMesa,
+    mao: readonly Carta[] = [],
+  ): EstadoPartida => {
+    const p0 = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const p: EstadoPartida = {
+      ...p0,
+      jogadores: p0.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao } : j)),
+    };
+    // agilidade do jogador (5) > do monstro (1) => a abertura não gasta dado.
+    return aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, fabricaDeDeps([])).estado;
+  };
+
+  it('vencer larga na MÃO tantos tesouros quanto o monstro vale', () => {
+    // A quantidade vem da CARTA de monstro, não de uma constante: é o que faz
+    // encarar o Ogro pagar mais que o Rato.
+    const valendo2 = depsValendo(2);
+    const aberto = comCombateAberto(valendo2);
+    const maoAntes = maoDe(aberto, 'p1').length;
+
+    const depois = venceOCombate(aberto, valendo2);
+
+    expect(maoDe(depois, 'p1')).toHaveLength(maoAntes + 2);
+    expect(depois.tesouros.monte).toHaveLength(aberto.tesouros.monte.length - 2);
+    // As cartas saíram do baralho para a mão — não foram clonadas nem passaram
+    // pelo cemitério no caminho.
+    expect(depois.tesouros.cemiterio).toEqual([]);
+    expect(maoDe(depois, 'p1').every((c) => c.tipo === 'equipamento')).toBe(true);
+  });
+
+  it('o monstro que vale MAIS larga mais — a quantidade não é constante', () => {
+    // Mutação: as MESMAS deps, a mesma statline, o mesmo laço. Só `tesouros`
+    // muda. Sem esta comparação, "larga 2" e "larga um número fixo" seriam
+    // indistinguíveis.
+    const comValor = (tesouros: number): number => {
+      const d = depsValendo(tesouros);
+      return maoDe(venceOCombate(comCombateAberto(d), d), 'p1').length;
+    };
+
+    expect(comValor(1)).toBe(1);
+    expect(comValor(3)).toBe(3);
+  });
+
+  it('o evento de loot diz QUANTAS, nunca QUAIS', () => {
+    // A mão é zona OCULTA e o `log` viaja inteiro para todos na projeção.
+    // Carregar a carta aqui anunciaria à mesa o conteúdo de uma mão que o
+    // `JogadorPublico` existe para esconder — a mesma assimetria de `achado`
+    // contra `porta`, e de `entrega` contra `descarte` (spec §7.2).
+    const valendo2 = depsValendo(2);
+    const depois = venceOCombate(comCombateAberto(valendo2), valendo2);
+    const loot = depois.log.find((e) => e.tipo === 'loot');
+
+    expect(loot).toEqual({ tipo: 'loot', jogadorId: 'p1', quantidade: 2 });
+    expect(JSON.stringify(loot)).not.toContain('itemId');
+    // A vista INTEIRA do adversário, e não só o evento: o `log` viaja dentro
+    // dela, e é por lá que o vazamento apareceria — não por `suaMao`.
+    const vistaDoAdversario = JSON.stringify(projetarPara('p2', depois, catalogoPadrao));
+    for (const carta of maoDe(depois, 'p1')) {
+      expect(vistaDoAdversario).not.toContain(carta.id);
+    }
+  });
+
+  it('PERDER não larga tesouro nenhum', () => {
+    // O cadáver vale 2 e mesmo assim nada sai do baralho: o loot é do VENCEDOR.
+    const forte = { forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1, tesouros: 2 };
+    const depsForte = depsComMonstro(forte);
+    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    // monstro mais ágil ataca primeiro e acerta (1 <= habilidade 12); a esquiva
+    // 2 > 1 falha e o dano 1 + 30 = 31 passa da vida 20.
+    const comCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsForte([1])).estado;
+    const depois = aplicarAcao(comCombate, { tipo: 'esquivar', jogadorId: 'p1' }, depsForte([2])).estado;
+
+    expect(depois.log.some((e) => e.tipo === 'loot')).toBe(false);
+    expect(maoDe(depois, 'p1')).toEqual([]);
+    expect(depois.tesouros.monte).toHaveLength(p.tesouros.monte.length);
+  });
+
+  it('o loot pode estourar a mão, e aí a fase vira `descartar`', () => {
+    // O caminho que liga esta task à máquina de fases: `fecharCombate` entrega a
+    // `encerrarTurno`, que recobra o limite. Nenhuma linha nova de fase é
+    // preciso — mas o caminho precisa estar afirmado, porque é ele que faz a
+    // fatia inteira encaixar sem mexer no Plano 2.
+    //
+    // 4 cartas e nenhuma raça em jogo => limite 5: cabe para vasculhar (senão o
+    // combate nem abriria) e é o loot de 3 que estoura.
+    const valendo3 = depsValendo(3);
+    const mao = [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4')];
+    const aberto = comCombateAberto(valendo3, mao);
+    expect(aberto.fase).toBe('combate');
+
+    const depois = venceOCombate(aberto, valendo3);
+
+    expect(maoDe(depois, 'p1')).toHaveLength(7);
+    expect(depois.vezDe).toBe('p1');       // a vez ficou presa no vencedor
+    expect(depois.fase).toBe('descartar');
+  });
+
+  it('baralho de Tesouros no fim: leva-se o que houver, sem derrubar a partida', () => {
+    // Baralho esgotado (monte E cemitério) não é erro: é a mesa que já distribuiu
+    // tudo. Lançar aqui derrubaria uma partida legítima por causa de um dial de
+    // composição — 500 numa mesa que só ficou sem tesouro.
+    const valendo3 = depsValendo(3);
+    const aberto = comCombateAberto(valendo3);
+    const quaseVazio: EstadoPartida = { ...aberto, tesouros: { monte: [equipamento('t-9')], cemiterio: [] } };
+
+    const depois = venceOCombate(quaseVazio, valendo3);
+
+    expect(maoDe(depois, 'p1').map((c) => c.id)).toEqual(['t-9']);
+    expect(depois.log).toContainEqual({ tipo: 'loot', jogadorId: 'p1', quantidade: 1 });
+  });
+
+  it('baralho de Tesouros VAZIO não emite evento nenhum de loot', () => {
+    // `quantidade: 0` seria uma linha de log dizendo que nada aconteceu.
+    const valendo2 = depsValendo(2);
+    const aberto = comCombateAberto(valendo2);
+    const vazio: EstadoPartida = { ...aberto, tesouros: { monte: [], cemiterio: [] } };
+
+    const depois = venceOCombate(vazio, valendo2);
+
+    expect(depois.log.some((e) => e.tipo === 'loot')).toBe(false);
+    expect(maoDe(depois, 'p1')).toEqual([]);
+    expect(depois.desfecho).toBe('emAndamento');
+  });
+
+  it('monstro fora do catálogo na hora do loot é Error cru, nunca AcaoInvalida', () => {
+    // O loot precisa da CARTA para saber quanto o cadáver vale, e ele a resolve
+    // pelo `monstroId` do combate. Id órfão é invariante NOSSA quebrada (a carta
+    // só chegou ao monte pela composição que a borda montou do próprio
+    // catálogo): 500 sem vazar, nunca 400 culpando o cliente. Mesma cadeia da
+    // abertura do combate, agora no fechamento.
+    const aberto = comCombateAberto(deps);   // catálogo default: só conhece `m-teste`
+    const comCombate = aberto.combate;
+    expect(comCombate).not.toBeNull();
+    const orfao: EstadoPartida = { ...aberto, combate: { ...comCombate!, monstroId: 'quimera-fantasma' } };
+
+    expect(() => venceOCombate(orfao)).toThrow(/quimera-fantasma/);
+    expect(() => venceOCombate(orfao)).not.toThrow(AcaoInvalida);
+  });
+
+  it('o saque puxa do cemitério de Tesouros quando o monte acaba', () => {
+    // O reshuffle é do `tirarDoTopo`, e o laço do saque tem que respeitá-lo —
+    // por isso ele é laço e não um `map`: cada compra muda o baralho.
+    const valendo2 = depsValendo(2);
+    const aberto = comCombateAberto(valendo2);
+    const soCemiterio: EstadoPartida = {
+      ...aberto,
+      tesouros: { monte: [equipamento('t-8')], cemiterio: [equipamento('t-9')] },
+    };
+
+    const depois = venceOCombate(soCemiterio, valendo2);
+
+    expect(maoDe(depois, 'p1').map((c) => c.id).sort()).toEqual(['t-8', 't-9']);
+    expect(depois.tesouros.monte).toEqual([]);
+    expect(depois.tesouros.cemiterio).toEqual([]);
   });
 });
 
@@ -914,8 +1108,12 @@ describe('aplicarAcao — jogarCarta', () => {
 describe('aplicarAcao — entregarCarta (a caridade)', () => {
   const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
 
-  /** p1 com a mão estourada (5 cartas, raça em jogo => limite 4). */
-  const estourado = (estado: EstadoPartida, mao = [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5')]): EstadoPartida => ({
+  /**
+   * p1 com a mão estourada (5 cartas, raça em jogo => limite 4). A mão é
+   * `readonly Carta[]` — heterogênea desde o loot —, então o fixture aceita
+   * tesouro junto com porta sem precisar de um gêmeo só para a outra família.
+   */
+  const estourado = (estado: EstadoPartida, mao: readonly Carta[] = [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5')]): EstadoPartida => ({
     ...estado,
     jogadores: estado.jogadores.map((j) => (
       j.id === 'p1' ? { ...j, mao, emJogo: { ...j.emJogo, raca: raca('r1', 'anao') } } : j
@@ -965,6 +1163,52 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
     expect(r.estado.portas.cemiterio.map((c) => c.id)).toEqual(['m1']);
     expect(r.estado.jogadores[1]?.mao).toEqual([]);
     expect(r.eventos).toContainEqual({ tipo: 'descarte', jogadorId: 'p1', carta: monstro('m1') });
+  });
+
+  it('descartar um TESOURO pela caridade manda para o cemitério de Tesouros', () => {
+    // O caminho que o alargamento da mão abre: sem rotear por família, o tesouro
+    // entraria no baralho de PORTAS e voltaria como Porta na próxima compra —
+    // onde `resolverCarta` cai no `default: never` e lança Error cru (500 numa
+    // partida legítima). O `never` da fatia 8/P1 é o alarme; este teste é o que
+    // impede o alarme de tocar.
+    const comTesouro = [equipamento('t-1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5')];
+    const p = comPatentes(
+      estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }), comTesouro),
+      { p1: 1, p2: 1 },   // ninguém atrás => cemitério
+    );
+
+    const r = aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+
+    expect(r.estado.tesouros.cemiterio.map((c) => c.id)).toContain('t-1');
+    expect(r.estado.portas.cemiterio.map((c) => c.id)).not.toContain('t-1');
+  });
+
+  it('descartar uma PORTA continua indo para o cemitério de Portas', () => {
+    // O gêmeo do teste acima. Sem ele, um roteamento que mandasse TUDO para
+    // Tesouros passaria — e o baralho de Portas nunca mais se recomporia.
+    const p = comPatentes(estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar })),
+      { p1: 1, p2: 1 });
+
+    const r = aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([]));
+
+    expect(r.estado.portas.cemiterio.map((c) => c.id)).toContain('m1');
+    expect(r.estado.tesouros.cemiterio.map((c) => c.id)).not.toContain('m1');
+  });
+
+  it('entregar um tesouro a quem está atrás não passa por cemitério nenhum', () => {
+    // O roteamento é do DESCARTE. A doação move a carta de mão para mão, e um
+    // `descartarNoBaralhoCerto` chamado no ramo errado duplicaria a carta.
+    const comTesouro = [equipamento('t-1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5')];
+    const p = comPatentes(
+      estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }), comTesouro),
+      { p1: 5, p2: 1 },
+    );
+
+    const r = aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+
+    expect(r.estado.jogadores[1]?.mao.map((c) => c.id)).toEqual(['t-1']);
+    expect(r.estado.tesouros.cemiterio).toEqual([]);
+    expect(r.estado.portas.cemiterio).toEqual([]);
   });
 
   it('havendo empate entre candidatos, o 1d12 decide e a rolagem entra no log', () => {

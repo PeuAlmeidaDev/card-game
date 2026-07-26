@@ -1,4 +1,4 @@
-import type { CartaPorta, CartaDeRaca } from '../tipos';
+import type { CartaPorta, CartaDeRaca, CartaEquipamento } from '../tipos';
 
 /**
  * Cartas-instância para testes que forjam monte/cemitério. O id é EXPLÍCITO (não
@@ -16,3 +16,9 @@ export const salaVazia = (id: string): CartaPorta => ({ id, tipo: 'salaVazia' })
 // lugar que espera `CartaPorta` (inclusive `monte: [...]`), mas agora também
 // encaixa direto em `emJogo.raca` (`CartaDeRaca | null`) sem precisar de `as`.
 export const raca = (id: string, racaId: string): CartaDeRaca => ({ id, tipo: 'raca', racaId });
+// A segunda família. Anotada como `CartaEquipamento` (não `CartaTesouro`) pelo
+// mesmo motivo da `raca`: continua atribuível a tudo que espera `Carta` e ainda
+// encaixa direto num slot do corpo. O `itemId` default é `'i-teste'`, o único que
+// o `catalogoDeTeste()` conhece — carta forjada resolve pelo catálogo default em
+// vez de depender de ele aprovar qualquer coisa.
+export const equipamento = (id: string, itemId = 'i-teste'): CartaEquipamento => ({ id, tipo: 'equipamento', itemId });

@@ -1,4 +1,4 @@
-import type { CartaPorta } from '@card-dungeon/shared';
+import type { Carta } from '@card-dungeon/shared';
 
 /**
  * O **substantivo** de uma carta ("um monstro"), para encaixar numa frase que a
@@ -20,7 +20,7 @@ import type { CartaPorta } from '@card-dungeon/shared';
  * id faria a tela dizer "uma carta de anao" sem ninguém perceber.
  */
 export function descreverCarta(
-  carta: CartaPorta,
+  carta: Carta,
   nomeDaRaca: (racaId: string) => string,
   nomeDoMonstro: (monstroId: string) => string,
 ): string {
@@ -31,6 +31,12 @@ export function descreverCarta(
       return 'uma sala vazia';
     case 'raca':
       return `uma carta de ${nomeDaRaca(carta.racaId)}`;
+    // Sem nome próprio AINDA: nomear o item exige um `nomeDoItem` injetado, e
+    // ele só tem de onde vir quando a tela receber o catálogo de itens — o
+    // trabalho da Task 7, junto com os botões de equipar. Até lá, uma linha
+    // genérica e honesta; o `never` abaixo é quem impede que ela seja esquecida.
+    case 'equipamento':
+      return 'um tesouro';
     default: {
       const naoTratada: never = carta;
       void naoTratada;

@@ -1,7 +1,8 @@
 import type { Combatente, Passo, RolarD12, PassivaCombate } from '@card-dungeon/motor';
 import { AcaoIlegal, criarCombate, proximoPasso } from '@card-dungeon/motor';
 import type {
-  AcaoDaMesa, CartaPorta, CatalogoDaMesa, Embaralhar, EstadoPartida, EventoDaMesa, InfoRaca, JogadorNaMesa,
+  AcaoDaMesa, Carta, CartaPorta, CartaTesouro, CatalogoDaMesa, Embaralhar, EstadoPartida, EventoDaMesa,
+  InfoRaca, JogadorNaMesa,
 } from './tipos';
 import { tirarDoTopo } from './baralho';
 import { destinoDaCaridade } from './caridade';
@@ -315,7 +316,7 @@ type AcaoDeMao = Extract<AcaoDaMesa, { readonly tipo: 'jogarCarta' | 'entregarCa
  */
 function cartaDaMao(estado: EstadoPartida, acao: AcaoDeMao): {
   readonly jogador: JogadorNaMesa;
-  readonly carta: CartaPorta;
+  readonly carta: Carta;
 } {
   const jogador = estado.jogadores.find((j) => j.id === acao.jogadorId);
   if (jogador === undefined) {
@@ -330,6 +331,32 @@ function cartaDaMao(estado: EstadoPartida, acao: AcaoDeMao): {
   }
 
   return { jogador, carta };
+}
+
+/**
+ * Manda a carta para o cemitério do baralho A QUE ELA PERTENCE. Ponto único, e
+ * exaustivo por construção: o `switch` sobre a união fecha em `never`, então a
+ * terceira família de carta (maldição, classe — spec §4) não consegue nascer sem
+ * alguém decidir para onde ela é descartada.
+ *
+ * Sem isto, um tesouro descartado pela caridade entraria no baralho de PORTAS e
+ * voltaria como Porta na compra seguinte, onde `resolverCarta` lança `Error` cru
+ * — 500 numa partida legítima. A mão virou heterogênea junto com o loot; o
+ * descarte tinha que virar junto.
+ */
+function descartarNoBaralhoCerto(estado: EstadoPartida, carta: Carta): EstadoPartida {
+  switch (carta.tipo) {
+    case 'monstro':
+    case 'salaVazia':
+    case 'raca':
+      return { ...estado, portas: { ...estado.portas, cemiterio: [...estado.portas.cemiterio, carta] } };
+    case 'equipamento':
+      return { ...estado, tesouros: { ...estado.tesouros, cemiterio: [...estado.tesouros.cemiterio, carta] } };
+    default: {
+      const naoTratada: never = carta;
+      throw new Error(`descartarNoBaralhoCerto: carta não tratada: ${JSON.stringify(naoTratada)}`);
+    }
+  }
 }
 
 /**
@@ -360,8 +387,11 @@ function entregarCarta(
     const jogadores = estado.jogadores.map((j) => (
       j.id === jogador.id ? { ...j, mao: semACarta } : j
     ));
+    // O cemitério é escolhido pela FAMÍLIA da carta, nunca fixo em `portas`: a
+    // mão é heterogênea desde o loot, e o tesouro dispensado aqui voltaria como
+    // Porta na próxima compra.
     return encerrarTurno(
-      { ...estado, jogadores, portas: { ...estado.portas, cemiterio: [...estado.portas.cemiterio, carta] } },
+      descartarNoBaralhoCerto({ ...estado, jogadores }, carta),
       [{ tipo: 'descarte', jogadorId: jogador.id, carta }],
     );
   }
@@ -483,15 +513,68 @@ function agirNoCombate(estado: EstadoPartida, acao: AcaoDeCombate, deps: DepsMes
     );
   }
 
-  return fecharCombate(estado, acao.jogadorId, passo.estado.desfecho === 'vitoriaJogador', eventos);
+  // O `monstroId` é lido AQUI, do combate que ainda está aberto: `fecharCombate`
+  // recebe um estado em que `combate` já vai virar `null`, e é a carta do
+  // adversário que diz quanto o cadáver vale.
+  return fecharCombate(
+    estado, acao.jogadorId, passo.estado.desfecho === 'vitoriaJogador', eventos, combate.monstroId, deps,
+  );
 }
 
-/** Aplica o resultado do combate ao jogador, decide o fim da partida e passa a vez. */
+/**
+ * Saca `quantidade` cartas do baralho de Tesouros para a mão do vencedor.
+ *
+ * Laço e não `Array.from`: cada saque muda o baralho (e pode disparar o reshuffle
+ * do cemitério dentro do `tirarDoTopo`), então as compras são sequenciais por
+ * natureza — mapear sobre um array sacaria a mesma carta N vezes.
+ */
+function sacarTesouros(
+  estado: EstadoPartida,
+  jogadorId: string,
+  quantidade: number,
+  deps: DepsMesa,
+): { readonly estado: EstadoPartida; readonly quantidade: number } {
+  let baralho = estado.tesouros;
+  const sacadas: CartaTesouro[] = [];
+  for (let i = 0; i < quantidade; i += 1) {
+    // Baralho de Tesouros vazio (monte E cemitério) não é erro: é a mesa que já
+    // distribuiu tudo. O vencedor leva o que houver e a partida segue — lançar
+    // aqui derrubaria uma partida legítima por causa de um dial de composição.
+    if (baralho.monte.length === 0 && baralho.cemiterio.length === 0) break;
+    const t = tirarDoTopo(baralho, deps.embaralhar);
+    baralho = t.baralho;
+    sacadas.push(t.carta);
+  }
+  if (sacadas.length === 0) {
+    return { estado, quantidade: 0 };
+  }
+  return {
+    estado: {
+      ...estado,
+      tesouros: baralho,
+      jogadores: estado.jogadores.map((j) => (
+        j.id === jogadorId ? { ...j, mao: [...j.mao, ...sacadas] } : j
+      )),
+    },
+    quantidade: sacadas.length,
+  };
+}
+
+/**
+ * Aplica o resultado do combate ao jogador, larga o loot do cadáver na mão do
+ * vencedor, decide o fim da partida e passa a vez.
+ *
+ * Precisa do `monstroId` e das `deps` por causa do loot: a quantidade vem da
+ * CARTA de monstro (`InfoMonstro.tesouros`), não de uma constante — é o que faz
+ * encarar o Ogro pagar mais que o Rato.
+ */
 function fecharCombate(
   estado: EstadoPartida,
   jogadorId: string,
   venceu: boolean,
   eventosAcumulados: readonly EventoDaMesa[],
+  monstroId: string,
+  deps: DepsMesa,
 ): ResultadoAcao {
   const anterior = estado.jogadores.find((j) => j.id === jogadorId);
   if (anterior === undefined) {
@@ -517,11 +600,39 @@ function fecharCombate(
   // `aplicarAcao`, e a partida acabada não tem turno para descrever.
   const semCombate: EstadoPartida = { ...estado, jogadores, combate: null, fase: 'vasculhar' };
 
+  // O loot vem ANTES do `encerrarTurno` de propósito: é ele quem recobra o
+  // limite de mão, e o tesouro que estoura a mão tem que cair na conta do mesmo
+  // turno. Depois, a fase `descartar` seria dada com a mão de antes do saque.
+  //
+  // E vem DEPOIS de `combate: null`: a invariante de fase (`fase.test.ts`) cobra
+  // que ninguém fique em `fase: 'combate'` com a mão estourada. Somar o loot com
+  // o combate ainda aberto faria esse alarme tocar — e com razão.
+  let comLoot = semCombate;
+  if (venceu) {
+    // Id que o catálogo não conhece é invariante NOSSA quebrada (a carta veio da
+    // composição que a borda montou do próprio catálogo), então sobe como Error
+    // cru => 500 sem vazar. Mesma cadeia de `resolverCarta`.
+    const info = deps.catalogo.monstro(monstroId);
+    if (info === undefined) {
+      throw new Error(`fecharCombate: monstro ${monstroId} não está no catálogo`);
+    }
+    const saque = sacarTesouros(semCombate, jogadorId, info.tesouros, deps);
+    comLoot = saque.estado;
+    // Só emite se algo saiu do baralho: `quantidade: 0` seria uma linha de log
+    // dizendo que nada aconteceu.
+    if (saque.quantidade > 0) {
+      eventos.push({ tipo: 'loot', jogadorId, quantidade: saque.quantidade });
+    }
+  }
+
   if (atualizado.patente >= estado.patenteAlvo) {
     const classificacao = classificar(jogadores);
     eventos.push({ tipo: 'fim', classificacao });
-    return registrar({ ...semCombate, desfecho: 'terminada', classificacao }, eventos);
+    // `comLoot`, não `semCombate`: a vitória final também paga. A classificação
+    // é por patente e derrotas, então o loot não a move — mas a mão do vencedor
+    // é a que a crônica da partida vai mostrar.
+    return registrar({ ...comLoot, desfecho: 'terminada', classificacao }, eventos);
   }
 
-  return encerrarTurno(semCombate, eventos);
+  return encerrarTurno(comLoot, eventos);
 }

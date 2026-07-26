@@ -133,8 +133,16 @@ export interface JogadorNaMesa {
   readonly classeId: string;
   readonly patente: number;
   readonly derrotas: number;
-  /** Zona OCULTA: só o dono vê o conteúdo. A projeção publica só a contagem. */
-  readonly mao: readonly CartaPorta[];
+  /**
+   * Zona OCULTA: só o dono vê o conteúdo. A projeção publica só a contagem.
+   *
+   * `Carta`, e não `CartaPorta`: desde que vencer larga tesouro aqui, a mão é
+   * HETEROGÊNEA — um monstro guardado e um tesouro por equipar convivem nela. É
+   * o alargamento que obriga o descarte a rotear por família
+   * (`descartarNoBaralhoCerto`, em `./mesa`): sem ele um tesouro dispensado
+   * entraria no baralho de Portas e voltaria como Porta na compra seguinte.
+   */
+  readonly mao: readonly Carta[];
   /** Zona ABERTA. É daqui que sai a raça do lutador — não mais da criação da partida. */
   readonly emJogo: ZonaEmJogo;
 }
@@ -259,8 +267,23 @@ export type EventoDaMesa =
    * Descarte PÚBLICO: carrega a carta, porque o cemitério já é zona aberta e
    * esconder aqui seria teatro. Assimetria deliberada em relação à `entrega`
    * (spec §5): quem está em último revela o que dispensa.
+   *
+   * `Carta` e não `CartaPorta`: a mão é heterogênea, então o que se dispensa
+   * pode ser um tesouro. **Qual cemitério** recebe a carta é outra pergunta, e
+   * quem a responde é `descartarNoBaralhoCerto` (em `./mesa`) — o evento só
+   * conta o que foi jogado fora.
    */
-  | { readonly tipo: 'descarte'; readonly jogadorId: string; readonly carta: CartaPorta };
+  | { readonly tipo: 'descarte'; readonly jogadorId: string; readonly carta: Carta }
+  /**
+   * Saque do cadáver. Cai em zona OCULTA (a mão do vencedor), então o evento diz
+   * QUANTAS e **nunca QUAIS** — mesma assimetria de `achado` contra `porta`:
+   * quem decide se o evento carrega a carta é a zona de DESTINO, não a ação.
+   * Quem venceu descobre o quê pela própria mão (`suaMao`).
+   *
+   * `quantidade` é sempre ≥ 1: baralho esgotado não emite evento, porque uma
+   * linha de log dizendo que nada aconteceu é ruído na crônica.
+   */
+  | { readonly tipo: 'loot'; readonly jogadorId: string; readonly quantidade: number };
 
 export type AcaoDaMesa =
   | { readonly tipo: 'vasculhar'; readonly jogadorId: string }
@@ -358,7 +381,11 @@ export interface VistaDaPartida {
   readonly patenteAlvo: number;
   readonly cartasNoMonte: number;
   readonly cartasNoCemiterio: number;
-  /** Tamanho do monte de Tesouros. Nada saca dele ainda — só a contagem já é pública. */
+  /**
+   * Tamanho do monte de Tesouros. Só a CONTAGEM: a ordem do monte é segredo
+   * pelo mesmo motivo que a do de Portas — quem a vê sabe o que o próximo
+   * vencedor vai sacar.
+   */
   readonly tesourosNoMonte: number;
   readonly combate: CombateNaMesa | null;
   /** A carta espiada, presente SÓ na vista do dono da espiada. `null` para os outros. */
@@ -372,8 +399,11 @@ export interface VistaDaPartida {
   readonly desfecho: 'emAndamento' | 'terminada';
   readonly classificacao: readonly PosicaoFinal[] | null;
   readonly log: readonly EventoDaMesa[];
-  /** A SUA mão. A dos outros não existe nesta vista — só a contagem, em `jogadores`. */
-  readonly suaMao: readonly CartaPorta[];
+  /**
+   * A SUA mão. A dos outros não existe nesta vista — só a contagem, em
+   * `jogadores`. Heterogênea (`Carta`) desde que vencer larga tesouro nela.
+   */
+  readonly suaMao: readonly Carta[];
 }
 
 export interface ConfigPartida {
