@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { projetarPara, versaoDe } from './projecao';
 import { aplicarAcao } from './mesa';
 import { criarPartida } from './montagem';
-import { montarComposicao } from './baralho';
+import { COMPOSICAO_DE_TESTE } from './testes/composicao';
 import { AcaoInvalida } from './erros';
 import { filaDeDados } from './testes/dados';
 import { raca } from './testes/cartas';
@@ -11,9 +11,6 @@ import type { EntradaJogador } from './tipos';
 import type { Combatente } from '@card-dungeon/motor';
 
 const base: Combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
-// 5 monstros + 3 salas vazias por jogador. Os ids são explícitos porque, com o
-// monstro tendo stats próprios, a QUANTIDADE sozinha não descreve o baralho.
-const composicaoDeTeste = montarComposicao(3, Array.from({ length: 5 }, () => 'm-teste'));
 const semEmbaralhar = <T,>(itens: readonly T[]): T[] => [...itens];
 const entradas: readonly EntradaJogador[] = [
   { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base },
@@ -23,7 +20,7 @@ const entradas: readonly EntradaJogador[] = [
 describe('projetarPara', () => {
   const partida = criarPartida(
     'm1', entradas,
-    { patenteAlvo: 10, composicaoPorJogador: composicaoDeTeste },
+    { patenteAlvo: 10, composicaoPorJogador: COMPOSICAO_DE_TESTE },
     { embaralhar: semEmbaralhar },
   );
 
@@ -41,7 +38,7 @@ describe('projetarPara', () => {
     // reintroduzi-los, mas `portas` acima é quem sustenta o alarme agora.
     expect('monte' in vista).toBe(false);
     expect('cemiterio' in vista).toBe(false);
-    expect(vista.cartasNoMonte).toBe(composicaoDeTeste.length * 2);
+    expect(vista.cartasNoMonte).toBe(COMPOSICAO_DE_TESTE.length * 2);
     expect(vista.cartasNoCemiterio).toBe(0);
   });
 
@@ -54,7 +51,7 @@ describe('projetarPara', () => {
     const vista = projetarPara('p1', depois);
 
     expect('portas' in vista).toBe(false);
-    expect(vista.cartasNoMonte).toBe(composicaoDeTeste.length * 2 - 1);
+    expect(vista.cartasNoMonte).toBe(COMPOSICAO_DE_TESTE.length * 2 - 1);
   });
 
   it('marca quem está vendo', () => {

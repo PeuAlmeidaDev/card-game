@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { aplicarAcao } from './mesa';
 import { avancarBots } from './automacao';
 import { criarPartida } from './montagem';
-import { montarComposicao } from './baralho';
 import { MAO_INICIAL_PADRAO, limiteDeMao } from './mao';
 import { escolherAcao } from './bot';
 import { projetarPara } from './projecao';
@@ -10,6 +9,7 @@ import { AcaoInvalida } from './erros';
 import { filaDeDados, criarDadoCiclico } from './testes/dados';
 import { monstro, salaVazia, raca } from './testes/cartas';
 import { catalogoDeTeste } from './testes/catalogo';
+import { COMPOSICAO_DE_TESTE } from './testes/composicao';
 import type { EntradaJogador, CartaPorta, EstadoPartida } from './tipos';
 import type { Combatente, PassivaCombate } from '@card-dungeon/motor';
 
@@ -21,12 +21,7 @@ export const entradas: readonly EntradaJogador[] = [
   { id: 'p2', nome: 'Bot 1', ehBot: true, combatenteBase: base },
 ];
 
-// A composição vive aqui, e não numa constante do pacote: com o monstro tendo
-// identidade, "5 monstros" sem dizer QUAIS só seria correto conhecendo o
-// catálogo — que `partida` não conhece. `'m-teste'` funciona porque o
-// `catalogoDeTeste()` default responde `MONSTRO_DE_TESTE` para qualquer id.
-const composicaoDeTeste = montarComposicao(3, Array.from({ length: 5 }, () => 'm-teste'));
-const config = { patenteAlvo: 3, composicaoPorJogador: composicaoDeTeste };
+const config = { patenteAlvo: 3, composicaoPorJogador: COMPOSICAO_DE_TESTE };
 
 const deps = (dados: readonly number[]) => ({
   rolar: filaDeDados(dados),
@@ -1221,7 +1216,7 @@ describe('aplicarAcao — vasculhar com a mão estourada', () => {
 
 describe('a composição BASELINE não pode nascer travada', () => {
   // Guard de fronteira, não de comportamento — mas sobre a composição BASELINE
-  // deste arquivo (`composicaoDeTeste`, sem carta de raça), não sobre a
+  // dos testes (`COMPOSICAO_DE_TESTE`, sem carta de raça), não sobre a
   // composição de PRODUÇÃO: essa mora em `packages/server/src/app.ts`
   // (montada com `MONSTROS_SACAVEIS` e `RACAS_SACAVEIS` porque é lá que
   // catálogo e mesa se encontram) e tem o próprio alarme em
@@ -1234,7 +1229,7 @@ describe('a composição BASELINE não pode nascer travada', () => {
   // alarme que dispara aqui em vez de no navegador.
   const producao = {
     patenteAlvo: 10,
-    composicaoPorJogador: composicaoDeTeste,
+    composicaoPorJogador: COMPOSICAO_DE_TESTE,
     maoInicial: MAO_INICIAL_PADRAO,
   };
   // A mesa que o `server` monta: 1 humano + 3 bots, todos começando sem raça.

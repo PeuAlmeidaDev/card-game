@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { criarPartida } from './montagem';
-import { montarComposicao } from './baralho';
+import { COMPOSICAO_DE_TESTE } from './testes/composicao';
 import type { EntradaJogador } from './tipos';
 import type { Combatente } from '@card-dungeon/motor';
 
@@ -12,11 +12,7 @@ const entradas: readonly EntradaJogador[] = [
   { id: 'p2', nome: 'Bot 1', ehBot: true, combatenteBase: base },
 ];
 
-// 5 monstros + 3 salas vazias por jogador — a densidade que a fatia 5 calibrou.
-// Os ids são explícitos porque, com o monstro tendo stats próprios, a QUANTIDADE
-// sozinha não descreve mais o baralho.
-const composicaoDeTeste = montarComposicao(3, Array.from({ length: 5 }, () => 'm-teste'));
-const config = { patenteAlvo: 3, composicaoPorJogador: composicaoDeTeste };
+const config = { patenteAlvo: 3, composicaoPorJogador: COMPOSICAO_DE_TESTE };
 
 describe('criarPartida', () => {
   it('coloca todos na patente 1, sem derrotas, e dá a vez ao primeiro assento', () => {
@@ -33,7 +29,7 @@ describe('criarPartida', () => {
   it('monta o baralho escalado pelo número de jogadores', () => {
     const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
     // 8 cartas por jogador × 2 jogadores
-    expect(p.portas.monte).toHaveLength(composicaoDeTeste.length * 2);
+    expect(p.portas.monte).toHaveLength(COMPOSICAO_DE_TESTE.length * 2);
     expect(p.portas.cemiterio).toEqual([]);
   });
 
@@ -66,7 +62,7 @@ describe('criarPartida', () => {
     const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
     const ids = p.portas.monte.map((c) => c.id);
 
-    expect(ids).toHaveLength(composicaoDeTeste.length * 2);
+    expect(ids).toHaveLength(COMPOSICAO_DE_TESTE.length * 2);
     expect(new Set(ids).size).toBe(ids.length);
   });
 
@@ -84,7 +80,7 @@ describe('criarPartida', () => {
     const p = criarPartida('m1', entradas, { ...config, maoInicial: 2 }, { embaralhar: semEmbaralhar });
 
     expect(p.jogadores.map((j) => j.mao.length)).toEqual([2, 2]);
-    expect(p.portas.monte).toHaveLength(composicaoDeTeste.length * 2 - 4);
+    expect(p.portas.monte).toHaveLength(COMPOSICAO_DE_TESTE.length * 2 - 4);
     // Nenhuma carta em dois lugares ao mesmo tempo: a mão SAI do baralho.
     const todas = [...p.jogadores.flatMap((j) => j.mao), ...p.portas.monte].map((c) => c.id);
     expect(new Set(todas).size).toBe(todas.length);
