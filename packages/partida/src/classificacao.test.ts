@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { classificar } from './classificacao';
+import { SLOTS_VAZIOS } from './corpo';
+import { ID_DA_CLASSE_DE_TESTE } from './testes/catalogo';
 import type { JogadorNaMesa } from './tipos';
-import type { Combatente } from '@card-dungeon/motor';
 
-const base: Combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
-const j = (id: string, patente: number, derrotas: number): JogadorNaMesa =>
-  ({ id, nome: id, ehBot: true, combatenteBase: base, patente, derrotas, mao: [], emJogo: { raca: null } });
+const j = (id: string, patente: number, derrotas: number): JogadorNaMesa => ({
+  id, nome: id, ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE, patente, derrotas, mao: [],
+  emJogo: { raca: null, slots: { ...SLOTS_VAZIOS } },
+});
 
 describe('classificar', () => {
   it('ordena por patente decrescente', () => {

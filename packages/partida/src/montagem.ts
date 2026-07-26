@@ -1,6 +1,7 @@
 import type {
   CartaPorta, ConfigPartida, EntradaJogador, Embaralhar, EstadoPartida, EventoDaMesa, JogadorNaMesa,
 } from './tipos';
+import { SLOTS_VAZIOS } from './corpo';
 import { faseDoTurnoDe } from './fase';
 
 /**
@@ -31,7 +32,7 @@ export function criarPartida(
     id: e.id,
     nome: e.nome,
     ehBot: e.ehBot,
-    combatenteBase: e.combatenteBase,
+    classeId: e.classeId,
     patente: 1,
     derrotas: 0,
     mao: [],
@@ -39,7 +40,11 @@ export function criarPartida(
     // (`jogarCarta`). Nascer com uma raça em jogo era o andaime do construtor —
     // e ele custava caro: a carta semeada nunca tinha saído do baralho, então
     // trocá-la fazia o baralho CRESCER 1.
-    emJogo: { raca: null },
+    //
+    // Corpo VAZIO pelo mesmo motivo: os 5 slots existem desde o nascimento,
+    // todos `null`. Nascer equipado é o andaime que sai nesta fatia — item agora
+    // é carta que se saca, como a raça saiu na 7.
+    emJogo: { raca: null, slots: { ...SLOTS_VAZIOS } },
   }));
 
   // Baralho da MESA: a composição por jogador multiplicada pelo tamanho da mesa.

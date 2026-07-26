@@ -79,12 +79,30 @@ export interface InfoItem extends Equipamento {
 }
 
 /**
- * Zona ABERTA do jogador: o que está na mesa, à vista de todos. Um slot nesta
- * fatia; os 5 de equipamento (bible §5) encaixam aqui depois, sem redesenho.
+ * Zona ABERTA do jogador: o que está na mesa, à vista de todos.
  * `raca: null` = Humano baseline — a ausência de especialização É a linha zero.
+ *
+ * É esta zona que `combatenteDe` (em `./corpo`) lê para montar os stats. Por isso
+ * os 5 slots existem desde o nascimento com `null` em vez de serem opcionais: um
+ * `slots?` deixaria "corpo vazio" e "corpo ausente" indistinguíveis, e cada leitor
+ * teria que decidir de novo o que fazer com o `undefined`.
  */
 export interface ZonaEmJogo {
   readonly raca: CartaDeRaca | null;
+  /**
+   * Os 5 encaixes do corpo (bible §5). `Record<Slot, …>`, e não um array de
+   * cartas com o slot dentro: assim "duas armaduras equipadas" não é um estado
+   * representável, e quem quiser um 6º slot é obrigado pelo compilador a visitar
+   * todo mundo que constrói a zona.
+   *
+   * A arma de duas mãos põe a MESMA instância em `maoDireita` e `maoEsquerda` —
+   * ver a dedup em `itensEquipados`.
+   *
+   * `Readonly<>` e não `Record` cru: sem ele, `zona.slots.capacete = carta`
+   * compilaria e mutaria o estado no lugar, furando a imutabilidade que o resto
+   * do pacote sustenta com spread. Quem equipa monta um `slots` novo.
+   */
+  readonly slots: Readonly<Record<Slot, CartaEquipamento | null>>;
 }
 
 /** Embaralhamento injetado (aleatoriedade na borda). */
@@ -105,8 +123,14 @@ export interface JogadorNaMesa {
   readonly id: string;
   readonly nome: string;
   readonly ehBot: boolean;
-  /** Statline de patente 1 (vida = máximo). A vida reseta a cada combate. */
-  readonly combatenteBase: Combatente;
+  /**
+   * A classe escolhida na criação. Substitui o `combatenteBase` congelado: os
+   * stats agora são CALCULADOS por `combatenteDe` (em `./corpo`) a partir daqui
+   * mais a zona em jogo. Um campo denormalizado ao lado da zona seria um campo
+   * para dessincronizar — equipar e esquecer de recalcular não quebraria teste
+   * nenhum, só deixaria o combatente mentindo.
+   */
+  readonly classeId: string;
   readonly patente: number;
   readonly derrotas: number;
   /** Zona OCULTA: só o dono vê o conteúdo. A projeção publica só a contagem. */
@@ -125,10 +149,17 @@ export interface JogadorPublico {
   readonly id: string;
   readonly nome: string;
   readonly ehBot: boolean;
-  readonly combatenteBase: Combatente;
+  /**
+   * Os stats DELE AGORA — calculados por `combatenteDe`, não guardados. Público
+   * porque a zona em jogo (raça e itens equipados) já é aberta: esconder o total
+   * seria teatro, e é dele que sai a decisão de encarar ou não quem está na
+   * frente. Publicar `classeId` cru e deixar o cliente somar seria reimplementar
+   * regra de jogo na UI.
+   */
+  readonly combatente: Combatente;
   readonly patente: number;
   readonly derrotas: number;
-  /** Zona ABERTA: a raça em jogo é informação pública. */
+  /** Zona ABERTA: a raça em jogo e o corpo equipado são informação pública. */
   readonly emJogo: ZonaEmJogo;
   /** QUANTAS cartas ele tem — nunca QUAIS. */
   readonly cartasNaMao: number;
@@ -356,5 +387,10 @@ export interface EntradaJogador {
   readonly id: string;
   readonly nome: string;
   readonly ehBot: boolean;
-  readonly combatenteBase: Combatente;
+  /**
+   * A classe, não a statline pronta. A borda para de montar o combatente: quem
+   * monta é `combatenteDe`, a cada consulta, com a zona da hora. Entregar um
+   * `Combatente` aqui era entregar um retrato tirado antes de o corpo existir.
+   */
+  readonly classeId: string;
 }

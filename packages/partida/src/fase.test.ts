@@ -7,15 +7,17 @@ import { projetarPara } from './projecao';
 import { limiteDeMao, MAO_INICIAL_PADRAO } from './mao';
 import { montarComposicao } from './baralho';
 import { criarDadoCiclico } from './testes/dados';
-import { catalogoDeTeste } from './testes/catalogo';
+import { catalogoDeTeste, ID_DA_CLASSE_DE_TESTE } from './testes/catalogo';
 import { monstro, raca } from './testes/cartas';
+import { SLOTS_VAZIOS } from './corpo';
 import type { JogadorNaMesa, EntradaJogador, EstadoPartida, Fase } from './tipos';
 
-const base = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
+/** A projeção calcula `combatente`, então precisa do catálogo. Um só para o arquivo. */
+const catalogoPadrao = catalogoDeTeste();
 const jogador = (mao: JogadorNaMesa['mao'], comRaca: boolean): JogadorNaMesa => ({
-  id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base,
+  id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE,
   patente: 1, derrotas: 0, mao,
-  emJogo: { raca: comRaca ? raca('r1', 'anao') : null },
+  emJogo: { raca: comRaca ? raca('r1', 'anao') : null, slots: { ...SLOTS_VAZIOS } },
 });
 
 describe('acaoEhLegalNaFase', () => {
@@ -127,12 +129,11 @@ describe('a fase nunca mente sobre o estado', () => {
   };
 
   it('vale em todo estado de uma partida inteira, e as três fases aparecem', () => {
-    const base = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
     const quatro: readonly EntradaJogador[] = [
-      { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base },
-      { id: 'p2', nome: 'Bot 1', ehBot: true, combatenteBase: base },
-      { id: 'p3', nome: 'Bot 2', ehBot: true, combatenteBase: base },
-      { id: 'p4', nome: 'Bot 3', ehBot: true, combatenteBase: base },
+      { id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE },
+      { id: 'p2', nome: 'Bot 1', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
+      { id: 'p3', nome: 'Bot 2', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
+      { id: 'p4', nome: 'Bot 3', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
     ];
     const semEmbaralhar = <T,>(itens: readonly T[]): T[] => [...itens];
     const depsPartida = {
@@ -176,7 +177,7 @@ describe('a fase nunca mente sobre o estado', () => {
 
     let interrompido = false;
     for (let voltas = 0; voltas < 300 && estado.desfecho === 'emAndamento' && !interrompido; voltas += 1) {
-      const acao = escolherAcao(projetarPara('p1', estado), 'p1');
+      const acao = escolherAcao(projetarPara('p1', estado, catalogoPadrao), 'p1');
       try {
         estado = aplicarAcao(estado, acao, depsPartida).estado;
       } catch (erro) {
@@ -216,7 +217,7 @@ describe('a fase nunca mente sobre o estado', () => {
           interrompido = true;
           break;
         }
-        const acaoDoBot = escolherAcao(projetarPara(daVez.id, estado), daVez.id);
+        const acaoDoBot = escolherAcao(projetarPara(daVez.id, estado, catalogoPadrao), daVez.id);
         try {
           estado = aplicarAcao(estado, acaoDoBot, depsPartida).estado;
         } catch (erro) {

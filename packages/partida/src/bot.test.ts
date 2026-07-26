@@ -6,22 +6,22 @@ import { criarPartida } from './montagem';
 import { projetarPara } from './projecao';
 import { filaDeDados } from './testes/dados';
 import { monstro as cartaMonstro, raca } from './testes/cartas';
-import { catalogoDeTeste } from './testes/catalogo';
+import { catalogoDeTeste, ID_DA_CLASSE_DE_TESTE } from './testes/catalogo';
 import type { EntradaJogador, EstadoPartida } from './tipos';
-import type { Combatente } from '@card-dungeon/motor';
 
-const base: Combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
+/** A projeção calcula `combatente`, então precisa do catálogo. Um só para o arquivo. */
+const catalogoPadrao = catalogoDeTeste();
 const semEmbaralhar = <T,>(itens: readonly T[]): T[] => [...itens];
 const entradas: readonly EntradaJogador[] = [
-  { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base },
-  { id: 'p2', nome: 'Bot 1', ehBot: true, combatenteBase: base },
+  { id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE },
+  { id: 'p2', nome: 'Bot 1', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
 ];
 const soMonstro = { patenteAlvo: 5, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] };
 
 describe('escolherAcao', () => {
   it('sem combate em curso, chuta a porta', () => {
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
-    expect(escolherAcao(projetarPara('p1', p), 'p1')).toEqual({ tipo: 'vasculhar', jogadorId: 'p1' });
+    expect(escolherAcao(projetarPara('p1', p, catalogoPadrao), 'p1')).toEqual({ tipo: 'vasculhar', jogadorId: 'p1' });
   });
 
   it('com decisão de ataque pendente, ataca', () => {
@@ -29,7 +29,7 @@ describe('escolherAcao', () => {
     const comCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' },
       { rolar: filaDeDados([]), embaralhar: semEmbaralhar, catalogo: catalogoDeTeste() }).estado;
 
-    expect(escolherAcao(projetarPara('p1', comCombate), 'p1')).toEqual({ tipo: 'atacar', jogadorId: 'p1' });
+    expect(escolherAcao(projetarPara('p1', comCombate, catalogoPadrao), 'p1')).toEqual({ tipo: 'atacar', jogadorId: 'p1' });
   });
 
   it('com esquiva pendente, esquiva', () => {
@@ -41,7 +41,7 @@ describe('escolherAcao', () => {
         catalogo: catalogoDeTeste({ monstro: () => rapido }) }).estado;
     expect(pedindoEsquiva.combate?.proximaDecisao).toBe('esquiva');
 
-    expect(escolherAcao(projetarPara('p1', pedindoEsquiva), 'p1'))
+    expect(escolherAcao(projetarPara('p1', pedindoEsquiva, catalogoPadrao), 'p1'))
       .toEqual({ tipo: 'esquivar', jogadorId: 'p1' });
   });
 
@@ -57,7 +57,7 @@ describe('escolherAcao', () => {
     }).estado;
     expect(comEspiada.espiada).not.toBeNull();
 
-    expect(escolherAcao(projetarPara('p1', comEspiada), 'p1'))
+    expect(escolherAcao(projetarPara('p1', comEspiada, catalogoPadrao), 'p1'))
       .toEqual({ tipo: 'manterCarta', jogadorId: 'p1' });
   });
 
@@ -66,7 +66,7 @@ describe('escolherAcao', () => {
     // a projeção viraria decoração: bastaria um bot esperto para provar que o
     // segredo não é segredo. Esta asserção é o que torna a projeção verificável.
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
-    const vista = projetarPara('p1', p);
+    const vista = projetarPara('p1', p, catalogoPadrao);
     expect('monte' in vista).toBe(false);
   });
 
@@ -83,7 +83,7 @@ describe('escolherAcao', () => {
           ? {
               ...j,
               mao: [cartaMonstro('c1'), cartaMonstro('c2'), cartaMonstro('c3'), cartaMonstro('c4'), cartaMonstro('c5'), cartaMonstro('c6')],
-              emJogo: { raca: raca('r1', 'anao') },
+              emJogo: { ...j.emJogo, raca: raca('r1', 'anao') },
             }
           : j
       )),
@@ -91,7 +91,7 @@ describe('escolherAcao', () => {
       fase: 'descartar',
     };
 
-    expect(escolherAcao(projetarPara('p2', estourado), 'p2'))
+    expect(escolherAcao(projetarPara('p2', estourado, catalogoPadrao), 'p2'))
       .toEqual({ tipo: 'entregarCarta', jogadorId: 'p2', cartaId: 'c1' });
   });
 
@@ -102,7 +102,7 @@ describe('escolherAcao', () => {
       jogadores: p.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao: [cartaMonstro('c1')] } : j)),
     };
 
-    expect(escolherAcao(projetarPara('p1', comMao), 'p1')).toEqual({ tipo: 'vasculhar', jogadorId: 'p1' });
+    expect(escolherAcao(projetarPara('p1', comMao, catalogoPadrao), 'p1')).toEqual({ tipo: 'vasculhar', jogadorId: 'p1' });
   });
 
   it('sem raça em jogo e com raça na mão, joga a raça', () => {
@@ -116,7 +116,7 @@ describe('escolherAcao', () => {
       )),
     };
 
-    expect(escolherAcao(projetarPara('p1', comRacaNaMao), 'p1'))
+    expect(escolherAcao(projetarPara('p1', comRacaNaMao, catalogoPadrao), 'p1'))
       .toEqual({ tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r7' });
   });
 
@@ -127,11 +127,11 @@ describe('escolherAcao', () => {
     const jaEspecializado: EstadoPartida = {
       ...p,
       jogadores: p.jogadores.map((j) => (
-        j.id === 'p1' ? { ...j, mao: [raca('r7', 'orc')], emJogo: { raca: raca('r1', 'anao') } } : j
+        j.id === 'p1' ? { ...j, mao: [raca('r7', 'orc')], emJogo: { ...j.emJogo, raca: raca('r1', 'anao') } } : j
       )),
     };
 
-    expect(escolherAcao(projetarPara('p1', jaEspecializado), 'p1'))
+    expect(escolherAcao(projetarPara('p1', jaEspecializado, catalogoPadrao), 'p1'))
       .toEqual({ tipo: 'vasculhar', jogadorId: 'p1' });
   });
 
@@ -155,7 +155,7 @@ describe('escolherAcao', () => {
       fase: 'descartar',
     };
 
-    expect(escolherAcao(projetarPara('p1', estourado), 'p1').tipo).toBe('entregarCarta');
+    expect(escolherAcao(projetarPara('p1', estourado, catalogoPadrao), 'p1').tipo).toBe('entregarCarta');
   });
 
   it('uma mesa de bots com a mão estourada não trava `avancarBots`', () => {
@@ -170,7 +170,7 @@ describe('escolherAcao', () => {
               ...j,
               patente: 5,
               mao: [cartaMonstro('c1'), cartaMonstro('c2'), cartaMonstro('c3'), cartaMonstro('c4'), cartaMonstro('c5'), cartaMonstro('c6')],
-              emJogo: { raca: raca('r1', 'anao') },
+              emJogo: { ...j.emJogo, raca: raca('r1', 'anao') },
             }
           : j
       )),

@@ -73,9 +73,11 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
   const nomeDe = (id: string): string => vista.jogadores.find((j) => j.id === id)?.nome ?? id;
   const nomeDaRaca = (id: string): string => racas.find((r) => r.id === id)?.nome ?? id;
   const nomeDoMonstro = (id: string): string => monstros.find((m) => m.id === id)?.nome ?? id;
-  // A vida máxima do jogador é a do combatente base — a patente muda o dano, não a vida.
-  // Do monstro só temos o valor corrente: a vista não carrega o máximo dele.
-  const vidaMaxima = vista.jogadores.find((j) => j.id === vista.voce)?.combatenteBase.vida ?? null;
+  // A vida máxima do jogador vem PRONTA da vista: `combatente` já é o total
+  // calculado pelo domínio (classe + itens equipados), com a patente no `level`.
+  // A patente muda o dano, não a vida. Do monstro só temos o valor corrente: a
+  // vista não carrega o máximo dele.
+  const vidaMaxima = vista.jogadores.find((j) => j.id === vista.voce)?.combatente.vida ?? null;
   const eu = vista.jogadores.find((j) => j.id === vista.voce);
   // O limite vem PRONTO da vista (`limiteDeMao` é publicado por jogador). Recalcular
   // aqui seria reimplementar regra de jogo na UI — e ela divergiria no dia em que

@@ -3,6 +3,7 @@ import { render, screen, waitFor, cleanup, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event';
 import { TelaMesa } from './TelaMesa';
 import { api } from './api';
+import { SLOTS_VAZIOS } from '@card-dungeon/shared';
 import type { Catalogo, VistaDaPartida } from '@card-dungeon/shared';
 
 const combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
@@ -12,8 +13,8 @@ const vistaBase: VistaDaPartida = {
   voce: 'p1',
   versao: 1,
   jogadores: [
-    { id: 'p1', nome: 'Você', ehBot: false, patente: 1, derrotas: 0, combatenteBase: combatente, emJogo: { raca: null }, cartasNaMao: 0, limiteDeMao: 5 },
-    { id: 'p2', nome: 'Bot 1', ehBot: true, patente: 2, derrotas: 1, combatenteBase: combatente, emJogo: { raca: null }, cartasNaMao: 0, limiteDeMao: 5 },
+    { id: 'p1', nome: 'Você', ehBot: false, patente: 1, derrotas: 0, combatente, emJogo: { raca: null, slots: SLOTS_VAZIOS }, cartasNaMao: 0, limiteDeMao: 5 },
+    { id: 'p2', nome: 'Bot 1', ehBot: true, patente: 2, derrotas: 1, combatente, emJogo: { raca: null, slots: SLOTS_VAZIOS }, cartasNaMao: 0, limiteDeMao: 5 },
   ],
   vezDe: 'p1',
   patenteAlvo: 10,
@@ -231,7 +232,7 @@ describe('TelaMesa', () => {
 
   it('mostra as vidas do combate em curso', async () => {
     // Sem isto o jogador não sabe se está ganhando. A vida do jogador tem
-    // máximo conhecido (o combatenteBase); a do monstro só o valor atual.
+    // máximo conhecido (o `combatente` da vista); a do monstro só o valor atual.
     await abrirMesa(emCombateContra('goblin', 'ataque'));
 
     expect(await screen.findByText(/6\s*\/\s*20/)).toBeInTheDocument();
@@ -411,7 +412,7 @@ describe('TelaMesa — a mão', () => {
     await abrirMesa({
       ...vistaBase,
       jogadores: vistaBase.jogadores.map((j) => (
-        j.id === 'p2' ? { ...j, emJogo: { raca: { id: 'r1', tipo: 'raca', racaId: 'orc' } } } : j
+        j.id === 'p2' ? { ...j, emJogo: { ...j.emJogo, raca: { id: 'r1', tipo: 'raca', racaId: 'orc' } } } : j
       )),
     });
 

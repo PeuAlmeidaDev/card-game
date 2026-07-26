@@ -2,15 +2,15 @@ import { describe, it, expect } from 'vitest';
 import { criarPartida } from './montagem';
 import { COMPOSICAO_DE_TESTE } from './testes/composicao';
 import { MAO_INICIAL_PADRAO } from './mao';
+import { SLOTS_VAZIOS } from './corpo';
+import { ID_DA_CLASSE_DE_TESTE } from './testes/catalogo';
 import type { EntradaJogador } from './tipos';
-import type { Combatente } from '@card-dungeon/motor';
 
-const base: Combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
 const semEmbaralhar = <T,>(itens: readonly T[]): T[] => [...itens];
 
 const entradas: readonly EntradaJogador[] = [
-  { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base },
-  { id: 'p2', nome: 'Bot 1', ehBot: true, combatenteBase: base },
+  { id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE },
+  { id: 'p2', nome: 'Bot 1', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
 ];
 
 const config = { patenteAlvo: 3, composicaoPorJogador: COMPOSICAO_DE_TESTE };
@@ -50,8 +50,8 @@ describe('criarPartida', () => {
     // a vez nunca sairia do assento 0 e a classificação teria duas linhas do mesmo
     // jogador. Zod na borda valida a forma de cada entrada, não a unicidade entre elas.
     const repetido: readonly EntradaJogador[] = [
-      { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base },
-      { id: 'p1', nome: 'Bot 1', ehBot: true, combatenteBase: base },
+      { id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE },
+      { id: 'p1', nome: 'Bot 1', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
     ];
     expect(() => criarPartida('m1', repetido, config, { embaralhar: semEmbaralhar }))
       .toThrow('criarPartida: ids de jogador repetidos');
@@ -67,14 +67,19 @@ describe('criarPartida', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('todo jogador nasce com a mão vazia e sem raça em jogo', () => {
-    // Ninguém nasce especializado: a zona só se preenche por `jogarCarta`. Era
-    // aqui que a escolha do construtor era semeada — e ela semeava uma carta que
-    // nunca tinha saído do baralho, então trocá-la fazia o baralho CRESCER 1.
+  it('todo jogador nasce com a mão vazia, sem raça em jogo e com o corpo VAZIO', () => {
+    // Ninguém nasce especializado nem equipado: a zona só se preenche por
+    // `jogarCarta` (raça) e, do Plano 3a em diante, por `equiparCarta` (item).
+    // Era aqui que a escolha do construtor era semeada — e ela semeava uma carta
+    // que nunca tinha saído do baralho, então trocá-la fazia o baralho CRESCER 1.
     const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
 
     expect(p.jogadores.map((j) => j.mao)).toEqual([[], []]);
     expect(p.jogadores.map((j) => j.emJogo.raca)).toEqual([null, null]);
+    // Os 5 slots EXISTEM e estão vazios — não é `undefined`. "Corpo vazio" e
+    // "corpo ausente" não podem ser o mesmo estado, senão cada leitor decide
+    // por conta própria o que fazer com a ausência.
+    expect(p.jogadores.map((j) => j.emJogo.slots)).toEqual([SLOTS_VAZIOS, SLOTS_VAZIOS]);
   });
 
   it('distribui a mão inicial do topo do baralho', () => {

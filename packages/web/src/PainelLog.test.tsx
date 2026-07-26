@@ -2,12 +2,13 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { PainelLog, corDoJogador } from './PainelLog';
+import { SLOTS_VAZIOS } from '@card-dungeon/shared';
 import type { EventoDaMesa, JogadorPublico } from '@card-dungeon/shared';
 
 const combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
 const jogadores: readonly JogadorPublico[] = [
-  { id: 'p1', nome: 'Você', ehBot: false, patente: 1, derrotas: 0, combatenteBase: combatente, emJogo: { raca: null }, cartasNaMao: 0, limiteDeMao: 5 },
-  { id: 'p2', nome: 'Bot 1', ehBot: true, patente: 1, derrotas: 0, combatenteBase: combatente, emJogo: { raca: null }, cartasNaMao: 0, limiteDeMao: 5 },
+  { id: 'p1', nome: 'Você', ehBot: false, patente: 1, derrotas: 0, combatente, emJogo: { raca: null, slots: SLOTS_VAZIOS }, cartasNaMao: 0, limiteDeMao: 5 },
+  { id: 'p2', nome: 'Bot 1', ehBot: true, patente: 1, derrotas: 0, combatente, emJogo: { raca: null, slots: SLOTS_VAZIOS }, cartasNaMao: 0, limiteDeMao: 5 },
 ];
 const racas = [
   { id: 'elfo', nome: 'Elfo', texto: 'Presciência: vê o perigo antes de encará-lo.' },

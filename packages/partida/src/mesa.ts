@@ -5,6 +5,7 @@ import type {
 } from './tipos';
 import { tirarDoTopo } from './baralho';
 import { destinoDaCaridade } from './caridade';
+import { combatenteDe } from './corpo';
 import { classificar } from './classificacao';
 import { AcaoInvalida } from './erros';
 import { acaoEhLegalNaFase, faseDoTurnoDe } from './fase';
@@ -202,8 +203,10 @@ function resolverCarta(
   if (jogador === undefined) {
     throw new Error(`resolverCarta: jogador ${jogadorId} não está na mesa`);
   }
-  // Vida sempre reseta: o combatente entra no combate com a statline base na patente atual.
-  const combatente: Combatente = { ...jogador.combatenteBase, level: jogador.patente };
+  // Os stats saem da ZONA, calculados na hora — inclusive a patente, que entra
+  // como `level`. Vida sempre reseta: o combatente entra no combate com a
+  // statline ATUAL, não com a de quando ele sentou à mesa.
+  const combatente: Combatente = combatenteDe(jogador, deps.catalogo);
   // Os stats do adversário vêm da CARTA, não das deps: é o que faz cada monstro
   // do baralho ser um adversário diferente. Id que o catálogo não conhece é
   // invariante nossa quebrada (a carta veio da composição que a borda montou do
@@ -410,7 +413,12 @@ function jogarCarta(
   const atualizado: JogadorNaMesa = {
     ...jogador,
     mao: jogador.mao.filter((c) => c.id !== carta.id),
-    emJogo: { raca: carta },
+    // ESPALHA a zona; não a remonta. Trocar de raça mexe num campo da zona, não
+    // na zona inteira — escrever `{ raca: carta, slots: { ...SLOTS_VAZIOS } }`
+    // aqui desequiparia o corpo a cada troca de raça, e o compilador aceitaria
+    // (o campo estaria lá, só com o valor errado). O spread é o que faz o campo
+    // que esta função não conhece sobreviver a ela.
+    emJogo: { ...jogador.emJogo, raca: carta },
   };
 
   return registrar(

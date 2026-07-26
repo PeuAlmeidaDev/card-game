@@ -105,11 +105,13 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
       if (classe === undefined) {
         throw new Error('montarBots: catálogo vazio');
       }
+      // A CLASSE, não a statline pronta: quem monta o combatente é `combatenteDe`,
+      // no domínio, a cada consulta. A borda parou de tirar o retrato.
       return {
         id: randomUUID(),
         nome: `Bot ${String(i + 1)}`,
         ehBot: true,
-        combatenteBase: montarCombatente(classe, []),
+        classeId: classe.id,
       };
     });
   };
@@ -136,11 +138,17 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
       if (!resolvido) {
         return { status: 400 as const, body: { erro: 'classe ou item inexistente' } };
       }
+      // ⚠️ `resolvido.itens` é validado e DESCARTADO aqui. Nascer equipado era o
+      // andaime do construtor, e ele saiu junto com o `combatenteBase`: item
+      // agora é carta que se saca do baralho de Tesouros e se equipa em jogo.
+      // O `itemIds` do corpo some do contrato numa task adiante — deixá-lo
+      // aceito e inerte por uma task é melhor que quebrar a borda no meio da
+      // troca da fonte dos stats.
       const humano: EntradaJogador = {
         id: randomUUID(),
         nome: 'Você',
         ehBot: false,
-        combatenteBase: montarCombatente(resolvido.classe, resolvido.itens),
+        classeId: resolvido.classe.id,
       };
       const estado = criarPartida(
         randomUUID(),
@@ -149,7 +157,7 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
         { embaralhar },
       );
       repositorio.salvar(estado);
-      return { status: 200 as const, body: projetarPara(humano.id, estado) };
+      return { status: 200 as const, body: projetarPara(humano.id, estado, catalogo) };
     },
 
     agir: async ({ params, body }) => {
@@ -174,14 +182,14 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
           { partidaId: params.id, recebida: body.versao, atual: versaoAtual },
           'ação com versão velha descartada',
         );
-        return { status: 409 as const, body: projetarPara(jogadorId, atual) };
+        return { status: 409 as const, body: projetarPara(jogadorId, atual, catalogo) };
       }
 
       try {
         const depois = aplicarAcao(atual, { ...body.acao, jogadorId }, deps);
         const comBots = avancarBots(depois.estado, deps);
         repositorio.salvar(comBots.estado);
-        return { status: 200 as const, body: projetarPara(jogadorId, comBots.estado) };
+        return { status: 200 as const, body: projetarPara(jogadorId, comBots.estado, catalogo) };
       } catch (erro) {
         // DUAS classes de erro, dois destinos:
         // - AcaoInvalida = as regras recusaram o pedido do cliente => 400 com a
@@ -210,7 +218,7 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
       if (jogadorId === undefined) {
         return { status: 404 as const, body: { erro: 'partida sem jogador humano' } };
       }
-      return { status: 200 as const, body: projetarPara(jogadorId, atual) };
+      return { status: 200 as const, body: projetarPara(jogadorId, atual, catalogo) };
     },
   });
   /* eslint-enable @typescript-eslint/require-await */

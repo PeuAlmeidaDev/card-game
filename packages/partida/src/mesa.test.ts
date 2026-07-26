@@ -8,17 +8,24 @@ import { projetarPara } from './projecao';
 import { AcaoInvalida } from './erros';
 import { filaDeDados, criarDadoCiclico } from './testes/dados';
 import { monstro, salaVazia, raca } from './testes/cartas';
-import { catalogoDeTeste } from './testes/catalogo';
+import { catalogoDeTeste, ID_DA_CLASSE_DE_TESTE } from './testes/catalogo';
 import { COMPOSICAO_DE_TESTE } from './testes/composicao';
 import type { EntradaJogador, CartaPorta, EstadoPartida } from './tipos';
-import type { Combatente, PassivaCombate } from '@card-dungeon/motor';
+import type { PassivaCombate } from '@card-dungeon/motor';
 
-const base: Combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
+/**
+ * A statline do jogador não é mais carimbada aqui: ela sai de `combatenteDe`, que
+ * soma a `CLASSE_DE_TESTE` sobre o `BASE` do `personagem`. Os números continuam
+ * os mesmos de antes (`{ forca: 3, vida: 20, habilidade: 8, agilidade: 5 }`) —
+ * é a calibragem daquela classe que segura todas as contagens de turno deste
+ * arquivo. Ver o aviso load-bearing em `testes/catalogo.ts`.
+ */
+const catalogoPadrao = catalogoDeTeste();
 const semEmbaralhar = <T,>(itens: readonly T[]): T[] => [...itens];
 
 export const entradas: readonly EntradaJogador[] = [
-  { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base },
-  { id: 'p2', nome: 'Bot 1', ehBot: true, combatenteBase: base },
+  { id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE },
+  { id: 'p2', nome: 'Bot 1', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
 ];
 
 const config = { patenteAlvo: 3, composicaoPorJogador: COMPOSICAO_DE_TESTE };
@@ -323,10 +330,10 @@ describe('monstro com identidade', () => {
 describe('partida completa', () => {
   it('roda do início ao fim e produz classificação com todos os jogadores', () => {
     const quatro: readonly EntradaJogador[] = [
-      { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base },
-      { id: 'p2', nome: 'Bot 1', ehBot: true, combatenteBase: base },
-      { id: 'p3', nome: 'Bot 2', ehBot: true, combatenteBase: base },
-      { id: 'p4', nome: 'Bot 3', ehBot: true, combatenteBase: base },
+      { id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE },
+      { id: 'p2', nome: 'Bot 1', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
+      { id: 'p3', nome: 'Bot 2', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
+      { id: 'p4', nome: 'Bot 3', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
     ];
     const dadosDeps = {
       rolar: criarDadoCiclico([4, 12]), // sempre acerta e o defensor nunca esquiva
@@ -342,7 +349,7 @@ describe('partida completa', () => {
     const MAX_VOLTAS = 500;
     let voltas = 0;
     while (estado.desfecho === 'emAndamento' && voltas < MAX_VOLTAS) {
-      const acao = escolherAcao(projetarPara('p1', estado), 'p1');
+      const acao = escolherAcao(projetarPara('p1', estado, catalogoPadrao), 'p1');
       estado = aplicarAcao(estado, acao, dadosDeps).estado;
       estado = avancarBots(estado, dadosDeps).estado;
       voltas += 1;
@@ -374,14 +381,12 @@ describe('passiva da raça no combate da Mesa', () => {
       monstro: () => monstroForte,
     });
 
-    const humano: EntradaJogador = {
-      id: 'p1', nome: 'Você', ehBot: false,
-      combatenteBase: { forca: 3, vida: 20, habilidade: 8, agilidade: 1, level: 1 },
-    };
-    const bot: EntradaJogador = {
-      id: 'p2', nome: 'Bot', ehBot: true,
-      combatenteBase: { forca: 3, vida: 20, habilidade: 8, agilidade: 1, level: 1 },
-    };
+    // A entrada carimbava `agilidade: 1` para garantir que o monstro atacasse
+    // primeiro. A `CLASSE_DE_TESTE` dá 5 — e é inerte aqui: o `monstroForte`
+    // tem agilidade 12, então a iniciativa é dele de qualquer jeito. Os outros
+    // quatro stats são idênticos aos de antes.
+    const humano: EntradaJogador = { id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE };
+    const bot: EntradaJogador = { id: 'p2', nome: 'Bot', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE };
 
     // criar: monstro ataca (dado 1 acerta) -> pede esquiva; esquivar (dado 12 falha)
     // dano base 6; com a passiva -> 3; vida 20 - 3 = 17
@@ -396,7 +401,7 @@ describe('passiva da raça no combate da Mesa', () => {
     let estado: EstadoPartida = {
       ...nascida,
       jogadores: nascida.jogadores.map((j) => (
-        j.id === 'p1' ? { ...j, emJogo: { raca: raca('r-anao', 'anao') } } : j
+        j.id === 'p1' ? { ...j, emJogo: { ...j.emJogo, raca: raca('r-anao', 'anao') } } : j
       )),
     };
     estado = aplicarAcao(estado, { tipo: 'vasculhar', jogadorId: 'p1' }, deps).estado;
@@ -503,9 +508,9 @@ describe('aplicarAcao — espiada (Presciência)', () => {
       { embaralhar: semEmbaralhar });
     const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])).estado;
 
-    expect(projetarPara('p1', comEspiada).espiada?.jogadorId).toBe('p1');
-    expect(projetarPara('p1', comEspiada).espiada?.carta.tipo).toBe('monstro');
-    expect(projetarPara('p2', comEspiada).espiada).toBeNull();
+    expect(projetarPara('p1', comEspiada, catalogoPadrao).espiada?.jogadorId).toBe('p1');
+    expect(projetarPara('p1', comEspiada, catalogoPadrao).espiada?.carta.tipo).toBe('monstro');
+    expect(projetarPara('p2', comEspiada, catalogoPadrao).espiada).toBeNull();
   });
 
   it('manterCarta revela e resolve o topo espiado (salaVazia passa a vez)', () => {
@@ -615,7 +620,7 @@ describe('aplicarAcao — espiada (Presciência)', () => {
     const comElfo: EstadoPartida = {
       ...estado,
       jogadores: estado.jogadores.map((j) => (
-        j.id === estado.vezDe ? { ...j, emJogo: { raca: raca('r-1', 'elfo') } } : j
+        j.id === estado.vezDe ? { ...j, emJogo: { ...j.emJogo, raca: raca('r-1', 'elfo') } } : j
       )),
     };
 
@@ -636,8 +641,8 @@ describe('avancarBots — teto de ações automáticas', () => {
     // congela o processo inteiro — Node é single-threaded, então o servidor
     // todo para, não só esta requisição.
     const soBots: readonly EntradaJogador[] = [
-      { id: 'b1', nome: 'Bot 1', ehBot: true, combatenteBase: base },
-      { id: 'b2', nome: 'Bot 2', ehBot: true, combatenteBase: base },
+      { id: 'b1', nome: 'Bot 1', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
+      { id: 'b2', nome: 'Bot 2', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
     ];
     const p = criarPartida('m1', soBots,
       { patenteAlvo: 3, composicaoPorJogador: [{ tipo: 'salaVazia' }] },
@@ -712,11 +717,11 @@ describe('vasculhar — carta de raça', () => {
 
     // A vista INTEIRA serializada, não campo a campo: o vazamento anterior estava no
     // `log`, um campo que nenhuma asserção sobre `jogadores`/`suaMao` alcançaria.
-    const vistaDoAdversario = JSON.stringify(projetarPara('p2', r.estado));
+    const vistaDoAdversario = JSON.stringify(projetarPara('p2', r.estado, catalogoPadrao));
     expect(vistaDoAdversario).not.toContain('carta-secreta');
     expect(vistaDoAdversario).not.toContain('raca-secreta');
     // Não é perda de informação: quem sacou descobre o quê pela própria mão.
-    expect(projetarPara('p1', r.estado).suaMao.map((c) => c.id)).toEqual(['carta-secreta']);
+    expect(projetarPara('p1', r.estado, catalogoPadrao).suaMao.map((c) => c.id)).toEqual(['carta-secreta']);
   });
 });
 
@@ -752,7 +757,7 @@ describe('a raça vem da ZONA EM JOGO', () => {
         ? {
             ...p,
             jogadores: p.jogadores.map((j) => (
-              j.id === 'p1' ? { ...j, emJogo: { raca: raca('r1', 'anao') } } : j
+              j.id === 'p1' ? { ...j, emJogo: { ...j.emJogo, raca: raca('r1', 'anao') } } : j
             )),
           }
         : p;
@@ -792,7 +797,7 @@ describe('aplicarAcao — jogarCarta', () => {
     const comAnterior: EstadoPartida = {
       ...comMao(p0, [raca('r2', 'orc')]),
       jogadores: comMao(p0, [raca('r2', 'orc')]).jogadores.map((j) => (
-        j.id === 'p1' ? { ...j, emJogo: { raca: raca('r1', 'anao') } } : j
+        j.id === 'p1' ? { ...j, emJogo: { ...j.emJogo, raca: raca('r1', 'anao') } } : j
       )),
     };
 
@@ -890,7 +895,7 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
   const estourado = (estado: EstadoPartida, mao = [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5')]): EstadoPartida => ({
     ...estado,
     jogadores: estado.jogadores.map((j) => (
-      j.id === 'p1' ? { ...j, mao, emJogo: { raca: raca('r1', 'anao') } } : j
+      j.id === 'p1' ? { ...j, mao, emJogo: { ...j.emJogo, raca: raca('r1', 'anao') } } : j
     )),
     // Forjado direto no estado: a fase tem que vir junto, senão o fixture mente.
     fase: 'descartar',
@@ -941,10 +946,10 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
 
   it('havendo empate entre candidatos, o 1d12 decide e a rolagem entra no log', () => {
     const quatro: readonly EntradaJogador[] = [
-      { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base },
-      { id: 'p2', nome: 'Bot 1', ehBot: true, combatenteBase: base },
-      { id: 'p3', nome: 'Bot 2', ehBot: true, combatenteBase: base },
-      { id: 'p4', nome: 'Bot 3', ehBot: true, combatenteBase: base },
+      { id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE },
+      { id: 'p2', nome: 'Bot 1', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
+      { id: 'p3', nome: 'Bot 2', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
+      { id: 'p4', nome: 'Bot 3', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
     ];
     const p = comPatentes(estourado(criarPartida('m1', quatro, soSalaVazia, { embaralhar: semEmbaralhar })),
       { p1: 5, p2: 4, p3: 1, p4: 1 });
@@ -1061,7 +1066,7 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
     ...estado,
     jogadores: estado.jogadores.map((j) => (
       j.id === 'p1'
-        ? { ...j, mao: maoEstourada, emJogo: { raca: raca('r1', 'anao') } }
+        ? { ...j, mao: maoEstourada, emJogo: { ...j.emJogo, raca: raca('r1', 'anao') } }
         : j
     )),
   });
@@ -1070,7 +1075,7 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
     ...estado,
     jogadores: estado.jogadores.map((j) => (
       j.id === 'p1'
-        ? { ...j, mao: maoNoLimite, emJogo: { raca: raca('r1', 'anao') } }
+        ? { ...j, mao: maoNoLimite, emJogo: { ...j.emJogo, raca: raca('r1', 'anao') } }
         : j
     )),
   });
@@ -1155,7 +1160,7 @@ describe('aplicarAcao — vasculhar com a mão estourada', () => {
   const estourado = (estado: EstadoPartida): EstadoPartida => ({
     ...estado,
     jogadores: estado.jogadores.map((j) => (
-      j.id === 'p1' ? { ...j, mao: cinco, emJogo: { raca: raca('r1', 'anao') } } : j
+      j.id === 'p1' ? { ...j, mao: cinco, emJogo: { ...j.emJogo, raca: raca('r1', 'anao') } } : j
     )),
     // Forjado direto no estado: a fase tem que vir junto, senão o fixture mente.
     fase: 'descartar',
@@ -1207,7 +1212,7 @@ describe('aplicarAcao — vasculhar com a mão estourada', () => {
     const semRacaEstourado: EstadoPartida = {
       ...p0,
       jogadores: p0.jogadores.map((j) => (
-        j.id === 'p1' ? { ...j, mao: [...cinco, raca('r9', 'orc')], emJogo: { raca: null } } : j
+        j.id === 'p1' ? { ...j, mao: [...cinco, raca('r9', 'orc')], emJogo: { ...j.emJogo, raca: null } } : j
       )),
       // Forjado direto no estado: a fase tem que vir junto, senão o fixture mente.
       fase: 'descartar',
@@ -1252,10 +1257,10 @@ describe('a composição BASELINE não pode nascer travada', () => {
   };
   // A mesa que o `server` monta: 1 humano + 3 bots, todos começando sem raça.
   const mesaDeProducao: readonly EntradaJogador[] = [
-    { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base },
-    { id: 'p2', nome: 'Bot 1', ehBot: true, combatenteBase: base },
-    { id: 'p3', nome: 'Bot 2', ehBot: true, combatenteBase: base },
-    { id: 'p4', nome: 'Bot 3', ehBot: true, combatenteBase: base },
+    { id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE },
+    { id: 'p2', nome: 'Bot 1', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
+    { id: 'p3', nome: 'Bot 2', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
+    { id: 'p4', nome: 'Bot 3', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
   ];
 
   it('ninguém nasce acima do limite de mão', () => {
@@ -1343,7 +1348,7 @@ describe('a fase acompanha o que o turno fez', () => {
       jogadores: p0.jogadores.map((j) => (
         j.id === 'p1'
           ? { ...j, mao: [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4')],
-              emJogo: { raca: raca('r1', 'anao') } }
+              emJogo: { ...j.emJogo, raca: raca('r1', 'anao') } }
           : j
       )),
       portas: { ...p0.portas, monte: [raca('r9', 'elfo')] },
@@ -1366,7 +1371,7 @@ describe('a fase acompanha o que o turno fez', () => {
         if (j.id === 'p1') {
           return { ...j, patente: 5,
             mao: [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5'), monstro('m6')],
-            emJogo: { raca: raca('r1', 'anao') } };
+            emJogo: { ...j.emJogo, raca: raca('r1', 'anao') } };
         }
         // p2 já NO teto dele (5 cartas, sem raça em jogo => limite 5): a carta
         // doada é a que o estoura.
@@ -1392,7 +1397,7 @@ describe('a fase acompanha o que o turno fez', () => {
       jogadores: p0.jogadores.map((j) => (
         j.id === 'p1'
           ? { ...j, mao: [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4'), raca('r9', 'orc')],
-              emJogo: { raca: raca('r1', 'anao') } }
+              emJogo: { ...j.emJogo, raca: raca('r1', 'anao') } }
           : j
       )),
       // Forjado direto no estado: a fase tem que vir junto, senão o fixture mente.

@@ -5,6 +5,7 @@ export type {
   EstadoPartida, VistaDaPartida, ConfigPartida, EntradaJogador, Baralho, Fase,
 } from './tipos';
 export { montarComposicao, tirarDoTopo } from './baralho';
+export { combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
 export { aplicarAcao } from './mesa';
 export { avancarBots } from './automacao';
 export { criarPartida } from './montagem';

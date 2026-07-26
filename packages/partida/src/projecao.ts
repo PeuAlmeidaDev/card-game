@@ -1,4 +1,5 @@
-import type { EstadoPartida, VistaDaPartida } from './tipos';
+import type { CatalogoDaMesa, EstadoPartida, VistaDaPartida } from './tipos';
+import { combatenteDe } from './corpo';
 import { AcaoInvalida } from './erros';
 import { limiteDeMao } from './mao';
 
@@ -17,11 +18,19 @@ export function versaoDe(estado: EstadoPartida): number {
 }
 
 /**
- * ÚNICA saída de estado do servidor. Nesta fatia esconde a ORDEM DO BARALHO
- * (quem vê o monte sabe o que vem na próxima porta). Na fatia 8 esta mesma
- * função passa a esconder a mão dos outros jogadores.
+ * ÚNICA saída de estado do servidor: esconde a ORDEM DO BARALHO (quem vê o monte
+ * sabe o que vem na próxima porta) e a mão dos outros jogadores.
+ *
+ * Ganhou o `catalogo` porque `JogadorPublico.combatente` é CALCULADO. A
+ * alternativa era publicar `classeId` cru e fazer o cliente remontar os stats —
+ * isto é, reimplementar regra de jogo na UI, com uma segunda soma para divergir
+ * da do domínio.
  */
-export function projetarPara(jogadorId: string, estado: EstadoPartida): VistaDaPartida {
+export function projetarPara(
+  jogadorId: string,
+  estado: EstadoPartida,
+  catalogo: CatalogoDaMesa,
+): VistaDaPartida {
   if (!estado.jogadores.some((j) => j.id === jogadorId)) {
     throw new AcaoInvalida(`projetarPara: jogador ${jogadorId} não está na mesa`);
   }
@@ -38,7 +47,7 @@ export function projetarPara(jogadorId: string, estado: EstadoPartida): VistaDaP
       id: j.id,
       nome: j.nome,
       ehBot: j.ehBot,
-      combatenteBase: j.combatenteBase,
+      combatente: combatenteDe(j, catalogo),
       patente: j.patente,
       derrotas: j.derrotas,
       emJogo: j.emJogo,

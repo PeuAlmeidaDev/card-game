@@ -1,15 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { candidatosACaridade, destinoDaCaridade } from './caridade';
+import { SLOTS_VAZIOS } from './corpo';
 import { filaDeDados } from './testes/dados';
+import { ID_DA_CLASSE_DE_TESTE } from './testes/catalogo';
 import type { JogadorNaMesa } from './tipos';
-import type { Combatente } from '@card-dungeon/motor';
-
-const base: Combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
 
 /** Jogador mínimo: nesta regra só a patente importa. */
 const jogador = (id: string, patente: number): JogadorNaMesa => ({
-  id, nome: id, ehBot: true, combatenteBase: base,
-  patente, derrotas: 0, mao: [], emJogo: { raca: null },
+  id, nome: id, ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE,
+  patente, derrotas: 0, mao: [], emJogo: { raca: null, slots: { ...SLOTS_VAZIOS } },
 });
 
 describe('candidatosACaridade', () => {

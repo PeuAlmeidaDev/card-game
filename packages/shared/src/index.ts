@@ -102,6 +102,10 @@ export const acaoRequisicaoSchema = z.object({
 // e a cópia que ficasse para trás só apareceria como 400 na cara do jogador.
 export { acaoEhLegalNaFase } from '@card-dungeon/partida';
 
+// Valor, pelo mesmo motivo: o corpo vazio é um `Record` com os cinco slots, e a
+// cópia escrita à mão no cliente é a que fica para trás quando o sexto nascer.
+export { SLOTS_VAZIOS } from '@card-dungeon/partida';
+
 const c = initContract();
 
 /**
