@@ -89,6 +89,18 @@ describe('aplicarAcao — vasculhar', () => {
     expect(r.estado.combate?.estado.jogador.vida).toBe(20);
   });
 
+  // Um bestiário de DOIS ids, para os testes de identidade: com um só, "o id
+  // certo chegou" e "algum id chegou" seriam indistinguíveis.
+  const depsComOgro = (dados: readonly number[]) => ({
+    rolar: filaDeDados(dados),
+    embaralhar: semEmbaralhar,
+    catalogo: catalogoDeTeste({
+      monstro: (id) => (id === 'ogro'
+        ? { forca: 2, vida: 10, habilidade: 6, agilidade: 1, level: 1 }
+        : undefined),
+    }),
+  });
+
   it('o combate carrega QUEM é o adversário, não só os stats dele', () => {
     // O `EstadoCombate` do motor é neutro: ele conhece 'a' e 'b', nunca um
     // monstro nomeado. Sem o id aqui, a tela sabe a vida do adversário e não
@@ -96,7 +108,7 @@ describe('aplicarAcao — vasculhar', () => {
     // exatamente o que a carta com identidade veio desfazer.
     const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'monstro', monstroId: 'ogro' }] },
       { embaralhar: semEmbaralhar });
-    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
+    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsComOgro([]));
 
     expect(r.estado.combate?.monstroId).toBe('ogro');
   });
@@ -107,8 +119,8 @@ describe('aplicarAcao — vasculhar', () => {
     // e o painel voltaria a "Monstro" no meio da luta.
     const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'monstro', monstroId: 'ogro' }] },
       { embaralhar: semEmbaralhar });
-    const aberto = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
-    const depoisDoAtaque = aplicarAcao(aberto, { tipo: 'atacar', jogadorId: 'p1' }, deps([12, 12]));
+    const aberto = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsComOgro([])).estado;
+    const depoisDoAtaque = aplicarAcao(aberto, { tipo: 'atacar', jogadorId: 'p1' }, depsComOgro([12, 12]));
 
     expect(depoisDoAtaque.estado.combate?.monstroId).toBe('ogro');
   });
@@ -293,18 +305,17 @@ describe('monstro com identidade', () => {
     const estado = criarPartida('m1', entradas,
       { ...config, composicaoPorJogador: [{ tipo: 'monstro', monstroId: 'quimera-fantasma' }] },
       { embaralhar: semEmbaralhar });
-    // Um bestiário que NÃO conhece a carta: o `catalogoDeTeste()` default responde
-    // `MONSTRO_DE_TESTE` para qualquer id (é o que carrega as dezenas de asserções
-    // de combate deste arquivo), então é preciso dizer explicitamente que este
-    // catálogo não conhece nada para chegar ao caminho do id órfão.
-    const semBestiario = { rolar: filaDeDados([]), embaralhar: semEmbaralhar,
-      catalogo: catalogoDeTeste({ monstro: () => undefined }) };
+    // O catálogo DEFAULT já basta: ele conhece só `'m-teste'`. Precisar cegá-lo
+    // à mão para alcançar este caminho seria o sintoma de um catálogo de teste
+    // que aprova qualquer id — e que portanto deixaria passar um typo de
+    // `monstroId` em qualquer outro teste deste arquivo.
+    const padrao = { rolar: filaDeDados([]), embaralhar: semEmbaralhar, catalogo: catalogoDeTeste() };
 
     // Error cru (=> 500 sem vazar), NUNCA AcaoInvalida: a carta só chegou ao
     // monte pela composição que a própria borda montou do catálogo.
-    expect(() => aplicarAcao(estado, { tipo: 'vasculhar', jogadorId: estado.vezDe }, semBestiario))
+    expect(() => aplicarAcao(estado, { tipo: 'vasculhar', jogadorId: estado.vezDe }, padrao))
       .toThrow(/quimera-fantasma/);
-    expect(() => aplicarAcao(estado, { tipo: 'vasculhar', jogadorId: estado.vezDe }, semBestiario))
+    expect(() => aplicarAcao(estado, { tipo: 'vasculhar', jogadorId: estado.vezDe }, padrao))
       .not.toThrow(AcaoInvalida);
   });
 });
