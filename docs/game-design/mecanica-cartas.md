@@ -25,7 +25,7 @@ estrutura; monstros/itens depois.
 - A renomeação **"chutar a porta" → "vasculhar local"** (§2), porque a passiva do Elfo depende
   da compra do baralho.
 
-**Não entra** (fatias seguintes): classes, monstros, maldições, mochila, interferência (fatia
+**Não entra** (fatias seguintes): classes, maldições, mochila, interferência (fatia
 7), online (fatia 6). Rodamos em **hotseat** (a identidade do jogador é `estado.vezDe`; valida a
 *mecânica*, não valida blefe nem simultaneidade).
 
