@@ -1386,6 +1386,8 @@ describe('a fase acompanha o que o turno fez', () => {
               emJogo: { raca: raca('r1', 'anao') } }
           : j
       )),
+      // Forjado direto no estado: a fase tem que vir junto, senão o fixture mente.
+      fase: 'descartar',
     };
 
     const r = aplicarAcao(estourado, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r9' }, deps([]));
