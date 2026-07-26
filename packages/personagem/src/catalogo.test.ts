@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { RACAS_PUBLICAS } from '@card-dungeon/cartas';
+import { ITENS, RACAS_PUBLICAS } from '@card-dungeon/cartas';
 import { CATALOGO, resolverEscolhas } from './catalogo';
 
 describe('CATALOGO', () => {
@@ -9,10 +9,22 @@ describe('CATALOGO', () => {
     expect(CATALOGO.racas).toHaveLength(5);
   });
 
-  it('tem as classes e itens semente + a base', () => {
+  it('tem as classes semente + a base', () => {
     expect(CATALOGO.classes.map((c) => c.id)).toEqual(['guerreiro', 'ladino']);
-    expect(CATALOGO.itens.map((i) => i.id)).toEqual(['espada', 'escudo']);
     expect(CATALOGO.base.level).toBe(1);
+  });
+
+  it('os itens do catálogo SÃO as cartas de Tesouro, com slot e nome', () => {
+    // O array semente local morreu: o item virou carta, e um segundo catálogo
+    // aqui seria uma fonte paralela — o cliente desenharia o corpo com um slot
+    // que o baralho nunca produz. O `slot` e o `nome` são o que o cliente precisa
+    // para pintar os cinco encaixes; por isso o tipo alargou de `Equipamento`.
+    expect(CATALOGO.itens).toBe(ITENS);
+    expect(CATALOGO.itens.map((i) => i.id)).toContain('espada-curta');
+    for (const item of CATALOGO.itens) {
+      expect(typeof item.slot).toBe('string');
+      expect(typeof item.nome).toBe('string');
+    }
   });
 
   it('entrega os monstros com stats, para o cliente nomear e avaliar o perigo', () => {
@@ -24,17 +36,15 @@ describe('CATALOGO', () => {
 });
 
 describe('resolverEscolhas', () => {
-  it('resolverEscolhas devolve a classe + os itens (a raça não é mais escolha)', () => {
-    const r = resolverEscolhas(CATALOGO, { classeId: 'guerreiro', itemIds: ['espada'] });
-    expect(r?.classe.id).toBe('guerreiro');
-    expect(r?.itens.map((i) => i.id)).toEqual(['espada']);
+  it('devolve SÓ a classe — o item saiu do construtor', () => {
+    // Nascer equipado era andaime: desde a fatia 8 o item é carta de Tesouro,
+    // sacada do baralho. Duas fontes para o mesmo stat distorceriam uma corrida
+    // ranqueada, e é a mesma jogada que a raça sofreu na fatia 7.
+    const r = resolverEscolhas(CATALOGO, { classeId: 'guerreiro' });
+    expect(r).toEqual({ classe: CATALOGO.classes.find((c) => c.id === 'guerreiro') });
   });
 
   it('devolve null se a classe não existe', () => {
-    expect(resolverEscolhas(CATALOGO, { classeId: 'xxx', itemIds: [] })).toBeNull();
-  });
-
-  it('devolve null se um item não existe', () => {
-    expect(resolverEscolhas(CATALOGO, { classeId: 'guerreiro', itemIds: ['bazuca'] })).toBeNull();
+    expect(resolverEscolhas(CATALOGO, { classeId: 'xxx' })).toBeNull();
   });
 });

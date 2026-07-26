@@ -128,6 +128,12 @@ Composto pela zona **em jogo**, que é **persistente entre turnos**:
 - **5 slots de equipamento:** **Capacete · Armadura · Mão direita · Mão esquerda · Pés**.
   - Arma de **duas mãos** ocupa **os dois slots de mão**.
 
+✅ **Implementado** (fatia 8, Plano 3a "Tesouros e o corpo"): 8 itens cobrindo os 5 slots
+(`packages/cartas/src/itens.ts`) — o Montante é a única arma de duas mãos, e ocupa os dois
+slots de mão com a **mesma instância**. `combatenteDe(jogador, catalogo)`
+(`packages/partida/src/corpo.ts`) calcula o `Combatente` **lendo a zona em jogo a cada
+consulta** — não existe mais campo denormalizado (`combatenteBase` morreu) para dessincronizar.
+
 **Capacidades são estado mutável, não constantes.** Cartas especiais elevam tetos — ex.: uma
 carta tipo "mestiço" (⬜ nome autoral) permite **2 raças**. O modelo deve ser
 `máx. raças = 1, alterável por carta`, nunca `1` hardcoded. É a diferença entre regra
@@ -233,6 +239,11 @@ criatividade dos acordos ao que o sistema modela. Acordo em texto livre seria in
 ## 9. Progressão e vitória ✅
 
 - Matar monstro → **loot** (compra de Itens) + **+1 patente**.
+  - ✅ **Implementado** (fatia 8, Plano 3a): vencer o combate saca `monstro.tesouros` cartas
+    (🎚️ 1/1/2/2/3, do Rato Gigante ao Ogro) do baralho de Tesouros **para a mão** do vencedor,
+    nunca direto para o corpo — equipar continua sendo decisão à parte. O evento `loot` publica
+    só a **quantidade**, nunca quais cartas: a mão é zona oculta, e revelar o conteúdo pelo
+    próprio log de vitória vazaria o segredo que ela existe para proteger.
 - Patente dá **só dano** e **posição na corrida**. Sem outros ganhos.
 - ✅ **A patente final só pode ser conquistada matando um monstro** — nunca por carta, venda ou
   efeito. (Ficcionalmente: a guilda só promove com abate verificado.)
@@ -271,9 +282,14 @@ do zero e ainda pegar o 2º lugar é exatamente o tipo de história que §14 que
 
 ## 11. Economia de cartas ✅
 
-- **Mão: 7 cartas** (descarte no fim do turno).
+- **Mão: 7 cartas** (descarte no fim do turno). ✅ **Dial travado** na fatia 8 (Plano 3a):
+  `LIMITE_BASE_DE_MAO = 7` (Humano/Adaptável soma **+1** → 8).
+- **Mão inicial: 4 cartas de Portais + 4 de Tesouros.** ✅ **Dial travado** (Plano 3a):
+  `MAO_INICIAL_PADRAO = 4`, `MAO_INICIAL_TESOUROS = 4`. Os 4 Tesouros existem para o jogador
+  ter o que equipar já no primeiro turno — e a mesa nasce **exatamente no teto** (4+4=8 = limite
+  do Humano); quem devolve a folga é equipar, não a caridade.
 - **Mochila: 🎚️ ~5 itens**, aberta, fora do limite de mão.
-- **Loot ao matar** (Itens).
+- **Loot ao matar** (Itens). ✅ Implementado (Plano 3a) — ver §9.
 - **Sem ouro** — a mochila é a moeda.
 - Tipos de item: equipamento, instantâneo, item de batalha, item que atrapalha batalha.
 - ⬜ Tamanho e composição dos dois baralhos no MVP; regra de reshuffle.

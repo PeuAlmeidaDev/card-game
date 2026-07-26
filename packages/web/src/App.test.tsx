@@ -15,9 +15,11 @@ const catalogo: Catalogo = {
     { id: 'anao', nome: 'Anão', texto: 'Casca de Pedra: o primeiro golpe do combate mal o arranha.' },
     { id: 'orc', nome: 'Orc', texto: 'Sangue de Guerra: ferido, golpeia com mais fúria.' },
   ],
-  monstros: [{ id: 'goblin', nome: 'Goblin', forca: 4, vida: 20, habilidade: 2, agilidade: 4, level: 1 }],
+  monstros: [{ id: 'goblin', nome: 'Goblin', forca: 4, vida: 20, habilidade: 2, agilidade: 4, level: 1, tesouros: 1 }],
   classes: [{ id: 'guerreiro', nome: 'Guerreiro', modificadores: { forca: 1, vida: 5 } }],
-  itens: [{ id: 'espada', nome: 'Espada', modificadores: { forca: 2 } }],
+  // Os itens do catálogo são as cartas de Tesouro (com `slot` e `duasMaos`): o
+  // construtor não os oferece mais, mas a mesa precisa deles para desenhar o corpo.
+  itens: [{ id: 'espada-curta', nome: 'Espada Curta', slot: 'maoDireita', duasMaos: false, modificadores: { forca: 2 } }],
 };
 
 const resultado: ResultadoDuelo = { tipo: 'vitoria', vencedor: 'a', turnos: 3, log: [] };
@@ -62,9 +64,20 @@ describe('App', () => {
     expect(screen.queryByText(/Casca de Pedra/i)).not.toBeInTheDocument();
   });
 
-  it('manda só classe e itens no corpo do duelo', async () => {
-    // O `racaId` saiu do contrato: se o construtor continuasse mandando, seria um
-    // campo que o cliente é obrigado a preencher e o servidor ignora.
+  it('não tem seletor de itens: o item é carta de Tesouro, não escolha de menu', async () => {
+    // Mesma jogada que a raça sofreu na fatia 7. Duas fontes para o mesmo stat
+    // (nascer equipado + sacar do baralho) distorceriam uma corrida ranqueada.
+    mockFetch();
+    render(<App />);
+    await screen.findByText(/Força/);
+    expect(screen.queryByRole('group', { name: /itens/i })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Espada Curta/i)).not.toBeInTheDocument();
+  });
+
+  it('manda só a classe no corpo do duelo', async () => {
+    // O `racaId` saiu do contrato na fatia 7 e o `itemIds` sai agora: se o
+    // construtor continuasse mandando, seria um campo que o cliente é obrigado a
+    // preencher e o servidor ignora — um tipo que mente no fio.
     mockFetch();
     render(<App />);
     await screen.findByText(/Força/);
@@ -75,7 +88,7 @@ describe('App', () => {
     if (typeof enviado !== 'string') {
       throw new Error('o duelo não chegou a mandar um corpo JSON');
     }
-    expect(JSON.parse(enviado) as unknown).toEqual({ classeId: 'guerreiro', itemIds: [] });
+    expect(JSON.parse(enviado) as unknown).toEqual({ classeId: 'guerreiro' });
   });
 
   it('ao clicar em Duelar mostra o desfecho', async () => {

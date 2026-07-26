@@ -3,10 +3,13 @@ import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import { resolverDuelo, type RolarD12, type Combatente } from '@card-dungeon/motor';
 import { contrato } from '@card-dungeon/shared';
 import { CATALOGO, MONSTRO_PADRAO, resolverEscolhas, montarCombatente } from '@card-dungeon/personagem';
-import { MONSTROS_SACAVEIS, RACAS_SACAVEIS, obterRaca, type MonstroCarta } from '@card-dungeon/cartas';
 import {
-  AcaoInvalida, MAO_INICIAL_PADRAO, aplicarAcao, avancarBots, criarPartida, montarComposicao,
-  projetarPara, versaoDe, type CatalogoDaMesa, type Embaralhar, type EntradaJogador, type EstadoPartida,
+  MONSTROS_SACAVEIS, RACAS_SACAVEIS, ITENS_SACAVEIS, obterRaca, obterItem, type MonstroCarta,
+} from '@card-dungeon/cartas';
+import {
+  AcaoInvalida, MAO_INICIAL_PADRAO, MAO_INICIAL_TESOUROS, aplicarAcao, avancarBots, criarPartida, montarComposicao,
+  montarComposicaoTesouros, projetarPara, versaoDe,
+  type CatalogoDaMesa, type Embaralhar, type EntradaJogador, type EstadoPartida,
 } from '@card-dungeon/partida';
 import { initServer } from '@ts-rest/fastify';
 import { criarDadoReal } from './dado';
@@ -84,6 +87,14 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
     RACAS_SACAVEIS.map((r) => r.id),
   );
 
+  /**
+   * Baralho de Tesouros de produção: **uma carta para cada item do catálogo**,
+   * por jogador — a mesma regra que o baralho de Portas usa para monstro e raça
+   * (spec §8). Derivar do catálogo em vez de fixar uma contagem é o que faz a
+   * repetição desaparecer em vez de precisar ser escolhida.
+   */
+  const composicaoTesourosDeProducao = montarComposicaoTesouros(ITENS_SACAVEIS.map((i) => i.id));
+
   // O server RESOLVE (pergunta à carta), nunca DECIDE (`racaId === 'elfo'` seria
   // regra de jogo na borda). As cartas do pacote `cartas` satisfazem
   // `InfoRaca`/`InfoMonstro` estruturalmente, então não há tradução aqui — só o
@@ -91,6 +102,8 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
   const catalogo: CatalogoDaMesa = {
     raca: (racaId) => (racaId === undefined ? undefined : obterRaca(racaId)),
     monstro: acharMonstro,
+    classe: (classeId) => CATALOGO.classes.find((c) => c.id === classeId),
+    item: obterItem,
   };
   const deps = { rolar, embaralhar, catalogo };
 
@@ -101,11 +114,13 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
       if (classe === undefined) {
         throw new Error('montarBots: catálogo vazio');
       }
+      // A CLASSE, não a statline pronta: quem monta o combatente é `combatenteDe`,
+      // no domínio, a cada consulta. A borda parou de tirar o retrato.
       return {
         id: randomUUID(),
         nome: `Bot ${String(i + 1)}`,
         ehBot: true,
-        combatenteBase: montarCombatente(classe, []),
+        classeId: classe.id,
       };
     });
   };
@@ -121,31 +136,42 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
     duelo: async ({ body }) => {
       const resolvido = resolverEscolhas(CATALOGO, body);
       if (!resolvido) {
-        return { status: 400 as const, body: { erro: 'classe ou item inexistente' } };
+        return { status: 400 as const, body: { erro: 'classe inexistente' } };
       }
-      const jogador = montarCombatente(resolvido.classe, resolvido.itens);
+      // Lista de itens VAZIA, e não um parâmetro que sumiu: o `/duelo` é a rota
+      // da fatia 2 e nunca teve mesa, logo nunca tem corpo equipado — item é
+      // carta de Tesouro, que só existe dentro de uma partida. O `montarCombatente`
+      // continua recebendo itens porque é ele que a mesa usa (via `combatenteDe`)
+      // para somar o que está nos slots.
+      const jogador = montarCombatente(resolvido.classe, []);
       return { status: 200 as const, body: resolverDuelo(jogador, monstro, rolar) };
     },
 
     criarPartida: async ({ body }) => {
       const resolvido = resolverEscolhas(CATALOGO, body);
       if (!resolvido) {
-        return { status: 400 as const, body: { erro: 'classe ou item inexistente' } };
+        return { status: 400 as const, body: { erro: 'classe inexistente' } };
       }
       const humano: EntradaJogador = {
         id: randomUUID(),
         nome: 'Você',
         ehBot: false,
-        combatenteBase: montarCombatente(resolvido.classe, resolvido.itens),
+        classeId: resolvido.classe.id,
       };
       const estado = criarPartida(
         randomUUID(),
         [humano, ...montarBots()],
-        { patenteAlvo: PATENTE_ALVO_PADRAO, composicaoPorJogador: composicaoDeProducao, maoInicial: MAO_INICIAL_PADRAO },
+        {
+          patenteAlvo: PATENTE_ALVO_PADRAO,
+          composicaoPorJogador: composicaoDeProducao,
+          composicaoTesouros: composicaoTesourosDeProducao,
+          maoInicial: MAO_INICIAL_PADRAO,
+          maoInicialTesouros: MAO_INICIAL_TESOUROS,
+        },
         { embaralhar },
       );
       repositorio.salvar(estado);
-      return { status: 200 as const, body: projetarPara(humano.id, estado) };
+      return { status: 200 as const, body: projetarPara(humano.id, estado, catalogo) };
     },
 
     agir: async ({ params, body }) => {
@@ -170,14 +196,14 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
           { partidaId: params.id, recebida: body.versao, atual: versaoAtual },
           'ação com versão velha descartada',
         );
-        return { status: 409 as const, body: projetarPara(jogadorId, atual) };
+        return { status: 409 as const, body: projetarPara(jogadorId, atual, catalogo) };
       }
 
       try {
         const depois = aplicarAcao(atual, { ...body.acao, jogadorId }, deps);
         const comBots = avancarBots(depois.estado, deps);
         repositorio.salvar(comBots.estado);
-        return { status: 200 as const, body: projetarPara(jogadorId, comBots.estado) };
+        return { status: 200 as const, body: projetarPara(jogadorId, comBots.estado, catalogo) };
       } catch (erro) {
         // DUAS classes de erro, dois destinos:
         // - AcaoInvalida = as regras recusaram o pedido do cliente => 400 com a
@@ -206,7 +232,7 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
       if (jogadorId === undefined) {
         return { status: 404 as const, body: { erro: 'partida sem jogador humano' } };
       }
-      return { status: 200 as const, body: projetarPara(jogadorId, atual) };
+      return { status: 200 as const, body: projetarPara(jogadorId, atual, catalogo) };
     },
   });
   /* eslint-enable @typescript-eslint/require-await */

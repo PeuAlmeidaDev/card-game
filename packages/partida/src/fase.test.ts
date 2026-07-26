@@ -4,26 +4,30 @@ import { criarPartida } from './montagem';
 import { aplicarAcao } from './mesa';
 import { escolherAcao } from './bot';
 import { projetarPara } from './projecao';
-import { limiteDeMao, MAO_INICIAL_PADRAO } from './mao';
+import { limiteDeMao, LIMITE_BASE_DE_MAO } from './mao';
 import { montarComposicao } from './baralho';
 import { criarDadoCiclico } from './testes/dados';
-import { catalogoDeTeste } from './testes/catalogo';
-import { monstro, raca } from './testes/cartas';
+import { catalogoDeTeste, ID_DA_CLASSE_DE_TESTE } from './testes/catalogo';
+import { COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
+import { monstro, monstros, raca } from './testes/cartas';
+import { SLOTS_VAZIOS } from './corpo';
 import type { JogadorNaMesa, EntradaJogador, EstadoPartida, Fase } from './tipos';
 
-const base = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
+/** A projeção calcula `combatente`, então precisa do catálogo. Um só para o arquivo. */
+const catalogoPadrao = catalogoDeTeste();
 const jogador = (mao: JogadorNaMesa['mao'], comRaca: boolean): JogadorNaMesa => ({
-  id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base,
+  id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE,
   patente: 1, derrotas: 0, mao,
-  emJogo: { raca: comRaca ? raca('r1', 'anao') : null },
+  emJogo: { raca: comRaca ? raca('r1', 'anao') : null, slots: { ...SLOTS_VAZIOS } },
 });
 
 describe('acaoEhLegalNaFase', () => {
-  it('em `vasculhar` valem a compra, a decisão da espiada e jogar raça', () => {
+  it('em `vasculhar` valem a compra, a decisão da espiada, jogar raça e equipar', () => {
     expect(acaoEhLegalNaFase('vasculhar', 'vasculhar')).toBe(true);
     expect(acaoEhLegalNaFase('vasculhar', 'manterCarta')).toBe(true);
     expect(acaoEhLegalNaFase('vasculhar', 'empurrarCarta')).toBe(true);
     expect(acaoEhLegalNaFase('vasculhar', 'jogarCarta')).toBe(true);
+    expect(acaoEhLegalNaFase('vasculhar', 'equiparCarta')).toBe(true);
   });
 
   it('em `vasculhar` NÃO valem as de combate nem a caridade', () => {
@@ -41,14 +45,20 @@ describe('acaoEhLegalNaFase', () => {
     expect(acaoEhLegalNaFase('combate', 'jogarCarta')).toBe(false);
     expect(acaoEhLegalNaFase('combate', 'entregarCarta')).toBe(false);
     expect(acaoEhLegalNaFase('combate', 'manterCarta')).toBe(false);
+    // Remontar o corpo no meio da luta mudaria os stats do combatente que o motor
+    // já congelou na abertura — o snapshot imutável deixaria de ser snapshot.
+    expect(acaoEhLegalNaFase('combate', 'equiparCarta')).toBe(false);
   });
 
-  it('em `descartar` valem as DUAS saídas do excedente, e vasculhar não', () => {
-    // Jogar uma raça tira uma carta da mão; é a outra saída, e o `mesa.test.ts`
-    // já a afirma ("jogar uma raça continua liberado"). Vasculhar precisa ficar
-    // fora: se continuasse legal, "a vez não passa" viraria "jogue para sempre".
+  it('em `descartar` valem as TRÊS saídas do excedente, e vasculhar não', () => {
+    // Jogar uma raça e equipar um tesouro tiram uma carta da mão; são as outras
+    // duas saídas, e o `mesa.test.ts` já as afirma ("jogar uma raça continua
+    // liberado", "equipar é a TERCEIRA saída do excedente"). Vasculhar precisa
+    // ficar fora: se continuasse legal, "a vez não passa" viraria "jogue para
+    // sempre".
     expect(acaoEhLegalNaFase('descartar', 'entregarCarta')).toBe(true);
     expect(acaoEhLegalNaFase('descartar', 'jogarCarta')).toBe(true);
+    expect(acaoEhLegalNaFase('descartar', 'equiparCarta')).toBe(true);
     expect(acaoEhLegalNaFase('descartar', 'vasculhar')).toBe(false);
     expect(acaoEhLegalNaFase('descartar', 'atacar')).toBe(false);
   });
@@ -59,16 +69,20 @@ describe('faseDoTurnoDe', () => {
     expect(faseDoTurnoDe(jogador([monstro('m1')], false))).toBe('vasculhar');
   });
 
+  // 🎚️ Derivada do dial, não cravada em 5: sem raça em jogo o limite é
+  // `LIMITE_BASE_DE_MAO + 1` (o Adaptável do Humano), então esta mão está
+  // EXATAMENTE no teto — e com raça em jogo o limite cai para o base e a mesma
+  // mão passa a estourar. É esse par que os dois testes abaixo comparam; cravado,
+  // ele deixaria de ser um par no primeiro giro do dial.
+  const noTetoDoHumano = monstros(LIMITE_BASE_DE_MAO + 1);
+
   it('exatamente NO limite ainda é `vasculhar` — o teto é `>`, não `>=`', () => {
-    // Sem raça em jogo o limite é 5 (o Adaptável do Humano).
-    const cinco = [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5')];
-    expect(faseDoTurnoDe(jogador(cinco, false))).toBe('vasculhar');
+    expect(faseDoTurnoDe(jogador(noTetoDoHumano, false))).toBe('vasculhar');
   });
 
   it('acima do limite, o turno abre em `descartar`', () => {
-    // Com raça em jogo o limite cai para 4: as mesmas 5 cartas agora estouram.
-    const cinco = [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5')];
-    expect(faseDoTurnoDe(jogador(cinco, true))).toBe('descartar');
+    // Com raça em jogo o limite cai para o base: as MESMAS cartas agora estouram.
+    expect(faseDoTurnoDe(jogador(noTetoDoHumano, true))).toBe('descartar');
   });
 });
 
@@ -127,12 +141,11 @@ describe('a fase nunca mente sobre o estado', () => {
   };
 
   it('vale em todo estado de uma partida inteira, e as três fases aparecem', () => {
-    const base = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
     const quatro: readonly EntradaJogador[] = [
-      { id: 'p1', nome: 'Você', ehBot: false, combatenteBase: base },
-      { id: 'p2', nome: 'Bot 1', ehBot: true, combatenteBase: base },
-      { id: 'p3', nome: 'Bot 2', ehBot: true, combatenteBase: base },
-      { id: 'p4', nome: 'Bot 3', ehBot: true, combatenteBase: base },
+      { id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE },
+      { id: 'p2', nome: 'Bot 1', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
+      { id: 'p3', nome: 'Bot 2', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
+      { id: 'p4', nome: 'Bot 3', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
     ];
     const semEmbaralhar = <T,>(itens: readonly T[]): T[] => [...itens];
     const depsPartida = {
@@ -147,11 +160,23 @@ describe('a fase nunca mente sobre o estado', () => {
     // Baralho COM carta de raça e mão inicial de verdade: é o que faz a mão
     // estourar durante o jogo e a fase `descartar` ser realmente visitada.
     const composicao = montarComposicao(3, Array.from({ length: 5 }, () => 'm-teste'), ['elfo', 'anao']);
-    // Dial girado (brief pedia `MAO_INICIAL_PADRAO`): com 4 cartas a mão nunca
-    // estourava e `descartar` nunca era visitada — a asserção de cobertura falhava.
-    // +1 basta para a partida realmente passar pelas três fases.
+    // 🎚️ Dial LOCAL girado de novo nesta fatia: `LIMITE_BASE_DE_MAO` subiu de 4
+    // para 7, e com 5 cartas a mão parou de estourar — `descartar` deixou de ser
+    // visitada e a asserção de cobertura lá embaixo falhou. A saída é esta (mais
+    // cartas na mão), NUNCA afrouxar a asserção.
+    //
+    // `LIMITE_BASE_DE_MAO + 1` = o teto exato de quem está sem raça em jogo: a
+    // mesa nasce cheia mas não estourada (`vasculhar`), e é a primeira carta que
+    // entra na mão — sala vazia comprada ou tesouro lootado — que empurra o turno
+    // para `descartar`. Nascer já estourado também visitaria a fase, mas provaria
+    // menos: o caminho que interessa é a TRANSIÇÃO durante o jogo.
     let estado = criarPartida('m1', quatro,
-      { patenteAlvo: 4, composicaoPorJogador: composicao, maoInicial: MAO_INICIAL_PADRAO + 1 },
+      {
+        patenteAlvo: 4,
+        composicaoPorJogador: composicao,
+        composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE,
+        maoInicial: LIMITE_BASE_DE_MAO + 1,
+      },
       { embaralhar: semEmbaralhar });
 
     const fasesVistas = new Set<Fase>([estado.fase]);
@@ -176,7 +201,7 @@ describe('a fase nunca mente sobre o estado', () => {
 
     let interrompido = false;
     for (let voltas = 0; voltas < 300 && estado.desfecho === 'emAndamento' && !interrompido; voltas += 1) {
-      const acao = escolherAcao(projetarPara('p1', estado), 'p1');
+      const acao = escolherAcao(projetarPara('p1', estado, catalogoPadrao), 'p1');
       try {
         estado = aplicarAcao(estado, acao, depsPartida).estado;
       } catch (erro) {
@@ -216,7 +241,7 @@ describe('a fase nunca mente sobre o estado', () => {
           interrompido = true;
           break;
         }
-        const acaoDoBot = escolherAcao(projetarPara(daVez.id, estado), daVez.id);
+        const acaoDoBot = escolherAcao(projetarPara(daVez.id, estado, catalogoPadrao), daVez.id);
         try {
           estado = aplicarAcao(estado, acaoDoBot, depsPartida).estado;
         } catch (erro) {

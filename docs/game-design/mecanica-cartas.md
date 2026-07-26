@@ -25,9 +25,13 @@ estrutura; monstros/itens depois.
 - A renomeação **"chutar a porta" → "vasculhar local"** (§2), porque a passiva do Elfo depende
   da compra do baralho.
 
-**Não entra** (fatias seguintes): classes, monstros, maldições, itens/loot, mochila, mão de 7
-completa, interferência (fatias 7), online (fatia 6). Rodamos em **hotseat** (a identidade do
-jogador é `estado.vezDe`; valida a *mecânica*, não valida blefe nem simultaneidade).
+**Não entra** (fatias seguintes): classes, maldições, mochila, interferência (fatia
+7), online (fatia 6). Rodamos em **hotseat** (a identidade do jogador é `estado.vezDe`; valida a
+*mecânica*, não valida blefe nem simultaneidade).
+
+⚠️ **Atualização 2026-07-26:** itens/loot e a mão de 7 completa, listados acima como "fatias
+seguintes" quando este doc nasceu, **entraram** na fatia 8 (Plano 3a "Tesouros e o corpo") — ver
+`CLAUDE.md` § Estado atual e `packages/cartas/src/itens.ts`.
 
 ---
 
@@ -220,7 +224,8 @@ nem componente de UI** (bible/CLAUDE).
 
 - 🎚️ Anão: primeiro acerto → dano pela metade **ou** zero (calibrar).
 - 🎚️ Orc: limiar "vida ≤ metade" e o `+dano` (calibrar).
-- 🎚️ Humano: mão 8 vs 7 (o `+1` pode virar outro número) — **adiada** (ver §10).
+- ✅ Humano: mão 8 vs 7 — **resolvido** na fatia 8 (Plano 3a): `LIMITE_BASE_DE_MAO = 7`, e o
+  Adaptável do Humano soma **+1** (8). Ver `CLAUDE.md` § Estado atual.
 - ⬜ Nome autoral da raça aquática e nomes das passivas.
 - ⬜ Nome do baralho após "vasculhar local".
 - ✅ Forma do gancho da Presciência: **resolvedor injetado** `temPresciencia(racaId)` no `deps` da mesa (nunca `racaId==='elfo'` no domínio) — decidido no plano do Plano 3.

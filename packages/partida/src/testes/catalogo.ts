@@ -8,7 +8,7 @@ import type { CatalogoDaMesa } from '../tipos';
  * números aqui é mudar o resultado de metade da suíte.
  */
 export const MONSTRO_DE_TESTE = {
-  forca: 2, vida: 10, habilidade: 6, agilidade: 1, level: 1,
+  forca: 2, vida: 10, habilidade: 6, agilidade: 1, level: 1, tesouros: 1,
 } as const;
 
 /**
@@ -32,12 +32,40 @@ export const ID_DO_MONSTRO_DE_TESTE = 'm-teste';
  * existia nos testes que cegavam o catálogo de propósito. Um catálogo de teste
  * que aprova tudo não é um dublê do catálogo real; é a ausência de um.
  */
+export const ID_DA_CLASSE_DE_TESTE = 'c-teste';
+/**
+ * ⚠️ **Load-bearing.** Os modificadores não são decorativos: somados ao `BASE` do
+ * `personagem` (`{ forca: 3, vida: 10, habilidade: 6, agilidade: 5 }`) eles
+ * reproduzem EXATAMENTE a statline que as fixtures do pacote carimbavam à mão
+ * quando `combatenteBase` existia (`{ forca: 3, vida: 20, habilidade: 8,
+ * agilidade: 5 }`). É o que faz as dezenas de asserções de combate continuarem
+ * valendo depois que a fonte dos stats mudou. Mexer nestes números é mudar o
+ * resultado de metade da suíte — mesma natureza do `MONSTRO_DE_TESTE`.
+ *
+ *   vida:       10 (BASE) + 10 = 20 ✔
+ *   habilidade:  6 (BASE) +  2 =  8 ✔
+ *   forca/agilidade: já batem com o BASE, sem modificador.
+ */
+export const CLASSE_DE_TESTE = {
+  id: ID_DA_CLASSE_DE_TESTE, nome: 'Classe de Teste', modificadores: { vida: 10, habilidade: 2 },
+};
+
+export const ID_DO_ITEM_DE_TESTE = 'i-teste';
+export const ITEM_DE_TESTE = {
+  id: ID_DO_ITEM_DE_TESTE, nome: 'Item de Teste',
+  slot: 'maoDireita' as const, duasMaos: false, modificadores: { forca: 1 },
+};
+
 export function catalogoDeTeste(
   parcial: Partial<CatalogoDaMesa> = {},
 ): CatalogoDaMesa {
   return {
     raca: () => undefined,
     monstro: (id) => (id === ID_DO_MONSTRO_DE_TESTE ? MONSTRO_DE_TESTE : undefined),
+    // Catálogo de teste conhece UMA classe e UM item, pelo mesmo princípio do
+    // monstro: um dublê que aprova qualquer id não é dublê, é a ausência de um.
+    classe: (id) => (id === ID_DA_CLASSE_DE_TESTE ? CLASSE_DE_TESTE : undefined),
+    item: (id) => (id === ID_DO_ITEM_DE_TESTE ? ITEM_DE_TESTE : undefined),
     ...parcial,
   };
 }

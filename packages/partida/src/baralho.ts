@@ -1,4 +1,4 @@
-import type { Baralho, Embaralhar, ReceitaPorta } from './tipos';
+import type { Baralho, Embaralhar, ReceitaPorta, ReceitaTesouro } from './tipos';
 
 /**
  * Composição de um baralho: uma carta de monstro **para cada id de monstro**
@@ -23,6 +23,19 @@ export function montarComposicao(
     ...Array.from({ length: nSalasVazias }, (): ReceitaPorta => ({ tipo: 'salaVazia' })),
     ...racaIds.map((racaId): ReceitaPorta => ({ tipo: 'raca', racaId })),
   ];
+}
+
+/**
+ * Composição do baralho de Tesouros: uma carta para cada id de item recebido.
+ * Mais simples que a de Portas porque há uma variante só (`equipamento`) —
+ * maldição e classe entram quando tiverem verbo.
+ *
+ * Função própria e não um parâmetro a mais em `montarComposicao`: as duas
+ * assinaturas divergem (Portas tem salas vazias e raças) e juntá-las produziria
+ * uma função com metade dos parâmetros ignorados por chamada.
+ */
+export function montarComposicaoTesouros(itemIds: readonly string[]): ReceitaTesouro[] {
+  return itemIds.map((itemId): ReceitaTesouro => ({ tipo: 'equipamento', itemId }));
 }
 
 /**

@@ -1,8 +1,20 @@
 import { describe, it, expect } from 'vitest';
+import type { Carta, CartaTesouro, InfoItem } from './tipos';
 import { montarComposicao, tirarDoTopo } from './baralho';
 import { monstro, salaVazia } from './testes/cartas';
 
 const idem = <T,>(itens: readonly T[]): T[] => [...itens];
+
+// Guard de compilação, não teste de runtime: afirma que a união da MÃO aceita as
+// duas famílias. Se `Carta` não existir (ou não incluir tesouro), `pnpm typecheck`
+// falha aqui — que é o RED desta task, já que o esbuild do vitest apagaria o
+// `import type` sem nunca resolver o módulo.
+const _tesouroEhCarta: Carta = { id: 't-0', tipo: 'equipamento', itemId: 'espada-curta' } satisfies CartaTesouro;
+void _tesouroEhCarta;
+const _itemTemSlot: InfoItem = {
+  id: 'espada-curta', nome: 'Espada Curta', slot: 'maoDireita', duasMaos: false, modificadores: { forca: 2 },
+};
+void _itemTemSlot;
 
 describe('montarComposicao', () => {
   it('monta a quantidade pedida de cada tipo', () => {

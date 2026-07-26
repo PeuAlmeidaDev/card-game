@@ -10,6 +10,7 @@ export interface ContextoDeNarracao {
   readonly nomeDe: (jogadorId: string) => string;
   readonly nomeDaRaca: (racaId: string) => string;
   readonly nomeDoMonstro: (monstroId: string) => string;
+  readonly nomeDoItem: (itemId: string) => string;
 }
 
 /**
@@ -53,9 +54,25 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
     case 'entrega':
       return `${ctx.nomeDe(evento.jogadorId)} entregou uma carta a ${ctx.nomeDe(evento.paraJogadorId)}.`
         + (evento.rolagem === null ? '' : ` (1d12: ${String(evento.rolagem)})`);
+    // O loot cai na MÃO, que é zona oculta: o evento traz a quantidade e nunca a
+    // carta, então a narração só pode contar. Quem venceu descobre o quê pela
+    // própria mão — mesma regra do `achado`.
+    case 'loot':
+      return `${evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId)} saqueia o cadáver e leva `
+        + `${String(evento.quantidade)} ${evento.quantidade === 1 ? 'tesouro' : 'tesouros'}.`;
+    // O slot é zona ABERTA — o corpo equipado viaja inteiro na projeção —, então
+    // o evento carrega a carta e a narração pode mostrá-la. Assimetria deliberada
+    // em relação ao `loot`, que cai na mão e só conta.
+    //
+    // E NOMEIA o item: "equipa um tesouro" não deixava ninguém avaliar se o
+    // adversário ficou mais perigoso, que é a única razão de a zona ser aberta.
+    case 'equipou':
+      return `${evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId)} equipa `
+        + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem)}.`;
     // O descarte é PÚBLICO: o cemitério já é zona aberta, esconder aqui seria teatro.
     case 'descarte':
-      return `${ctx.nomeDe(evento.jogadorId)} descartou ${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro)}.`;
+      return `${ctx.nomeDe(evento.jogadorId)} descartou `
+        + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem)}.`;
     case 'combate':
       return (
         <>

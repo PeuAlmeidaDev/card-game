@@ -3,21 +3,44 @@ import { api } from './api';
 import { PainelLog } from './PainelLog';
 import { descreverCarta } from './descreverCarta';
 import { acaoEhLegalNaFase } from '@card-dungeon/shared';
-import type { AcaoDaMesa, AcaoNoFio, Catalogo, Escolhas, VistaDaPartida } from '@card-dungeon/shared';
+import type { AcaoDaMesa, AcaoNoFio, Catalogo, Escolhas, Slot, VistaDaPartida } from '@card-dungeon/shared';
 
 /**
  * Usado quando a tela roda sozinha; o `App` passa as escolhas reais do construtor.
  *
  * O tipo é `Escolhas` (inferido do schema Zod), não `EscolhasPersonagem` (o do
- * domínio): o segundo tem `readonly itemIds`, e um `readonly string[]` não é
- * assinável ao `string[]` que o corpo da rota espera. Na borda vale o tipo da borda.
+ * domínio): quem manda no corpo da rota é o tipo da borda.
  */
-const ESCOLHAS_PADRAO: Escolhas = { classeId: 'guerreiro', itemIds: [] };
+const ESCOLHAS_PADRAO: Escolhas = { classeId: 'guerreiro' };
 
-export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = [] }: {
+/**
+ * Os cinco encaixes na ordem em que o corpo se lê, da cabeça aos pés. É ordem de
+ * APRESENTAÇÃO — o domínio guarda um `Record`, que não tem ordem —, por isso a
+ * lista mora aqui e não em `partida`.
+ *
+ * `readonly Slot[]` (e não `string[]`) para que um slot novo na união quebre esta
+ * lista e o rótulo abaixo, em vez de nascer invisível na única tela que mostra o
+ * corpo.
+ */
+const SLOTS_NA_ORDEM: readonly Slot[] = ['capacete', 'armadura', 'maoDireita', 'maoEsquerda', 'pes'];
+
+/**
+ * O rótulo humano de cada encaixe. `Record<Slot, string>` é o que obriga o slot
+ * novo a chegar com nome: um objeto solto o deixaria renderizar `undefined`.
+ */
+const NOME_DO_SLOT: Record<Slot, string> = {
+  capacete: 'Cabeça',
+  armadura: 'Corpo',
+  maoDireita: 'Mão direita',
+  maoEsquerda: 'Mão esquerda',
+  pes: 'Pés',
+};
+
+export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = [], itens = [] }: {
   readonly escolhas?: Escolhas;
   readonly racas?: Catalogo['racas'];
   readonly monstros?: Catalogo['monstros'];
+  readonly itens?: Catalogo['itens'];
 }) {
   const [vista, definirVista] = useState<VistaDaPartida | null>(null);
   const [erro, definirErro] = useState<string | null>(null);
@@ -73,9 +96,15 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
   const nomeDe = (id: string): string => vista.jogadores.find((j) => j.id === id)?.nome ?? id;
   const nomeDaRaca = (id: string): string => racas.find((r) => r.id === id)?.nome ?? id;
   const nomeDoMonstro = (id: string): string => monstros.find((m) => m.id === id)?.nome ?? id;
-  // A vida máxima do jogador é a do combatente base — a patente muda o dano, não a vida.
-  // Do monstro só temos o valor corrente: a vista não carrega o máximo dele.
-  const vidaMaxima = vista.jogadores.find((j) => j.id === vista.voce)?.combatenteBase.vida ?? null;
+  // Mesma degradação para o id das outras duas: skew de versão (bundle antigo,
+  // item novo no server) tem que virar um rótulo feio, nunca uma exceção que
+  // apaga a mesa inteira por causa de um nome.
+  const nomeDoItem = (id: string): string => itens.find((i) => i.id === id)?.nome ?? id;
+  // A vida máxima do jogador vem PRONTA da vista: `combatente` já é o total
+  // calculado pelo domínio (classe + itens equipados), com a patente no `level`.
+  // A patente muda o dano, não a vida. Do monstro só temos o valor corrente: a
+  // vista não carrega o máximo dele.
+  const vidaMaxima = vista.jogadores.find((j) => j.id === vista.voce)?.combatente.vida ?? null;
   const eu = vista.jogadores.find((j) => j.id === vista.voce);
   // O limite vem PRONTO da vista (`limiteDeMao` é publicado por jogador). Recalcular
   // aqui seria reimplementar regra de jogo na UI — e ela divergiria no dia em que
@@ -102,11 +131,32 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
     <section>
       <h2>Mesa — alvo: patente {vista.patenteAlvo}</h2>
 
+      {/* Os stats de TODOS os assentos, não só os do humano: a zona em jogo (raça
+          e slots) já é pública, então o total derivado dela não é segredo —
+          esconder seria teatro, e é dele que sai a decisão de encarar ou não quem
+          está na frente. É o argumento escrito no `JogadorPublico.combatente`.
+
+          Os quatro números vêm PRONTOS da vista. A tela não soma classe + itens:
+          quem monta é `combatenteDe`, no domínio. Uma soma aqui seria regra de
+          jogo na UI, e ela divergiria no dia em que uma maldição virasse o sinal.
+
+          Sem esta linha a fatia inteira era invisível — o jogador equipava, via o
+          slot preencher e não tinha onde conferir se valeu a pena.
+
+          O `level` fica de fora de propósito: ele É a patente (ver `combatenteDe`),
+          que já abre a linha. Repeti-lo com outro nome só ensinaria o jogador a
+          procurar dois números para a mesma coisa.
+
+          Os stats entram logo depois da raça — causa e efeito juntos — e a vida
+          aqui é sempre o TOTAL do corpo, nunca a corrente da luta: o `atual/máximo`
+          já mora no painel de combate, e trocar o significado desta linha no meio
+          do combate deixaria a comparação entre assentos incomparável. */}
       <ul>
         {vista.jogadores.map((j) => (
           <li key={j.id}>
             <strong>{j.nome}</strong> — patente {j.patente} · {j.derrotas} derrota(s)
             {j.emJogo.raca !== null && ` · ${nomeDaRaca(j.emJogo.raca.racaId)}`}
+            {' · '}força {j.combatente.forca} · vida {j.combatente.vida} · habilidade {j.combatente.habilidade} · agilidade {j.combatente.agilidade}
             {' · '}{j.cartasNaMao}/{j.limiteDeMao} cartas
             {j.id === vista.vezDe && ' ← jogando'}
           </li>
@@ -137,7 +187,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
       ) : (
         <>
           {espiada !== null && (
-            <p>Você pressente {descreverCarta(espiada.carta, nomeDaRaca, nomeDoMonstro)} adiante.</p>
+            <p>Você pressente {descreverCarta(espiada.carta, nomeDaRaca, nomeDoMonstro, nomeDoItem)} adiante.</p>
           )}
 
           <div>
@@ -183,17 +233,54 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
         </>
       )}
 
+      {/* O CORPO. Zona ABERTA: os slots de todos são públicos, mas a tela desenha
+          o SEU por inteiro — é dele que sai a decisão de equipar — e o dos outros
+          fica na lista de cima. Os cinco `<li>` saem sempre, inclusive vazios:
+          slot livre é vaga aberta, informação que muda o que vale a pena guardar
+          na mão. Esconder o vazio deixaria o jogador contando de cabeça. */}
+      <section>
+        <h3>Seu corpo</h3>
+        <ul>
+          {SLOTS_NA_ORDEM.map((slot) => {
+            // A arma de duas mãos aparece nas DUAS mãos (é a mesma instância nos
+            // dois slots): a tela mostra os dois encaixes ocupados porque é assim
+            // que o preço dela fica visível. A dedup que impede a força de contar
+            // duas vezes é do domínio (`itensEquipados`), não daqui.
+            const carta = eu?.emJogo.slots[slot] ?? null;
+            return (
+              <li key={slot}>
+                {NOME_DO_SLOT[slot]}: {carta === null ? <em>vazio</em> : nomeDoItem(carta.itemId)}
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+
       <section>
         <h3>Sua mão — {vista.suaMao.length} de {eu?.limiteDeMao ?? 0}</h3>
         {acimaDoLimite && (
+          /* As TRÊS saídas do excedente — o conjunto exato que `fase.ts` declara
+             legal em `descartar` —, e nesta ordem. A faixa é a única instrução da
+             tela, e a mesa NASCE no teto (4 Portas + 4 Tesouros = 8, o limite de
+             quem está sem raça): o turno 1 já cai aqui. Nomeando só a caridade,
+             ela mandava doar o tesouro que o jogador deveria estar vestindo — e
+             doar para quem está atrás, porque o destino da caridade é a patente
+             menor. Equipar vem primeiro por ser a saída que o desenho da mão
+             inicial pressupõe (ver `mao.ts`).
+
+             "a vez só passa quando ela couber", e não "para encerrar o turno":
+             jogar raça sem ter raça em jogo é NET-ZERO (a mão cai 1 e o limite
+             cai junto), então nenhuma das três pode prometer que UMA ação basta.
+             Quem recobra é `encerrarTurno`, a cada ação. */
           <p role="status">
-            Sua mão está acima do limite: entregue uma carta para encerrar o turno.
+            Sua mão está acima do limite: equipe um tesouro, jogue uma raça ou
+            entregue uma carta — a vez só passa quando ela couber.
           </p>
         )}
         <ul>
           {vista.suaMao.map((carta) => (
             <li key={carta.id}>
-              {descreverCarta(carta, nomeDaRaca, nomeDoMonstro)}{' '}
+              {descreverCarta(carta, nomeDaRaca, nomeDoMonstro, nomeDoItem)}{' '}
               {/* Só raça entra em jogo nesta fatia — o domínio recusa o resto, e um
                   botão que só serve para levar 400 ensina o jogador a errar. */}
               {carta.tipo === 'raca' && (
@@ -203,6 +290,25 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
                   onClick={() => void agir({ tipo: 'jogarCarta', cartaId: carta.id })}
                 >
                   Jogar
+                </button>
+              )}
+              {/* Os DOIS pares finos de `equiparCarta` (ver a tabela no
+                  `aplicarAcao`), porque `legal()` é gate grosso e não conhece
+                  nenhum dos dois:
+                  - `carta.tipo === 'equipamento'` → decide se o botão EXISTE;
+                  - `espiada === null` → decide se ele acende, igual a "Vasculhar"
+                    e "Jogar". Com a espiada pendente o reducer recusa, e
+                    `legal('equiparCarta')` sozinho é `true` na fase `vasculhar`.
+                  O SLOT não vai na ação: quem decide onde encaixa é o item, pelo
+                  catálogo do servidor — deixar o cliente escolher seria deixá-lo
+                  pôr o capacete no pé. */}
+              {carta.tipo === 'equipamento' && (
+                <button
+                  type="button"
+                  disabled={!legal('equiparCarta') || espiada !== null}
+                  onClick={() => void agir({ tipo: 'equiparCarta', cartaId: carta.id })}
+                >
+                  Equipar
                 </button>
               )}
               <button
@@ -217,7 +323,14 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
         </ul>
       </section>
 
-      <PainelLog log={vista.log} jogadores={vista.jogadores} voce={vista.voce} racas={racas} monstros={monstros} />
+      <PainelLog
+        log={vista.log}
+        jogadores={vista.jogadores}
+        voce={vista.voce}
+        racas={racas}
+        monstros={monstros}
+        itens={itens}
+      />
 
       {erro !== null && <p role="alert">{erro}</p>}
     </section>

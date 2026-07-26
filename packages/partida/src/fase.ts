@@ -23,12 +23,18 @@ const LEGAL: Record<Fase, ReadonlySet<AcaoDaMesa['tipo']>> = {
   // A espiada da Presciência continua sendo PENDÊNCIA dentro desta fase, não fase
   // própria (spec §6): `vasculhar` e `manterCarta`/`empurrarCarta` são legais na
   // mesma fase e se excluem pelo campo `espiada`, que o reducer ainda consulta.
-  vasculhar: new Set<AcaoDaMesa['tipo']>(['vasculhar', 'manterCarta', 'empurrarCarta', 'jogarCarta']),
+  vasculhar: new Set<AcaoDaMesa['tipo']>([
+    'vasculhar', 'manterCarta', 'empurrarCarta', 'jogarCarta', 'equiparCarta',
+  ]),
+  // `equiparCarta` fica de FORA: o motor recebe um snapshot imutável dos stats na
+  // abertura do combate, então remontar o corpo no meio da luta ou não teria
+  // efeito nenhum (mentindo para quem clicou) ou furaria o snapshot.
   combate: new Set<AcaoDaMesa['tipo']>(['atacar', 'esquivar']),
-  // As DUAS saídas do excedente. `vasculhar` fica de fora: se continuasse legal,
-  // "a vez não passa" viraria "jogue para sempre" — o jogador sacaria carta atrás
-  // de carta sem nunca resolver o excedente.
-  descartar: new Set<AcaoDaMesa['tipo']>(['entregarCarta', 'jogarCarta']),
+  // As TRÊS saídas do excedente. `equiparCarta` entra pelo mesmo motivo que
+  // `jogarCarta`: ela tira uma carta da mão, logo resolve o estouro. `vasculhar`
+  // fica de fora: se continuasse legal, "a vez não passa" viraria "jogue para
+  // sempre" — o jogador sacaria carta atrás de carta sem nunca resolver o excedente.
+  descartar: new Set<AcaoDaMesa['tipo']>(['entregarCarta', 'jogarCarta', 'equiparCarta']),
 };
 
 /** A tabela como pergunta. O `LEGAL` não é exportado: quem lê, lê por aqui. */
@@ -38,9 +44,14 @@ export function acaoEhLegalNaFase(fase: Fase, tipo: AcaoDaMesa['tipo']): boolean
 
 /**
  * A fase em que um jogador COMEÇA o turno. Ponto único: `criarPartida` (o
- * primeiro assento), `encerrarTurno` (quem recebe a vez) e `jogarCarta` (que
- * pode ter resolvido o excedente) fazem a mesma pergunta, e uma cópia esquecida
- * deixaria a vez cair num jogador estourado sem nenhuma ação legal.
+ * primeiro assento), `encerrarTurno` (quem recebe a vez), `jogarCarta` e
+ * `equiparCarta` (que podem ter resolvido o excedente, porque as duas tiram uma
+ * carta da mão) fazem a mesma pergunta, e uma cópia esquecida deixaria a vez cair
+ * num jogador estourado sem nenhuma ação legal.
+ *
+ * São QUATRO chamadores hoje, e cada saída nova do excedente acrescenta um: quem
+ * escrever a quinta e esquecer de recalcular a fase prende o turno em `descartar`
+ * com a mão já cabendo.
  */
 export function faseDoTurnoDe(jogador: JogadorNaMesa): Fase {
   return jogador.mao.length > limiteDeMao(jogador) ? 'descartar' : 'vasculhar';

@@ -1,4 +1,5 @@
 import type { Combatente, EstadoCombate, EventoCombate, DecisaoPendente, PassivaCombate } from '@card-dungeon/motor';
+import type { Classe, Equipamento } from '@card-dungeon/personagem';
 
 /**
  * **Receita** de carta do baralho de PORTAS: o que compor, SEM identidade. É o
@@ -29,12 +30,79 @@ export type CartaPorta = ReceitaPorta & { readonly id: string };
 export type CartaDeRaca = Extract<CartaPorta, { readonly tipo: 'raca' }>;
 
 /**
- * Zona ABERTA do jogador: o que está na mesa, à vista de todos. Um slot nesta
- * fatia; os 5 de equipamento (bible §5) encaixam aqui depois, sem redesenho.
+ * **Receita** de carta do baralho de TESOUROS. Uma variante só nesta fatia;
+ * maldição e classe (spec §4) entram quando tiverem verbo.
+ *
+ * Família SEPARADA de `ReceitaPorta`, e não um `tipo` a mais na mesma união com
+ * um campo `baralho`: com o campo, nada impediria um monstro etiquetado como
+ * tesouro, e "esta carta pode ir para o baralho de Tesouros?" viraria checagem de
+ * runtime. Com dois tipos, quem recusa é o compilador.
+ */
+export type ReceitaTesouro =
+  | { readonly tipo: 'equipamento'; readonly itemId: string };
+
+export type CartaTesouro = ReceitaTesouro & { readonly id: string };
+
+/**
+ * A MÃO é heterogênea: um monstro guardado para o Plano 4 e um tesouro por
+ * equipar convivem nela. Todo consumidor fecha por exaustividade (`never`) —
+ * `resolverCarta`, `jogarCarta`, `descreverCarta` (web), `narrarEvento` (web).
+ */
+export type Carta = CartaPorta | CartaTesouro;
+
+/**
+ * Uma carta de equipamento como instância. O slot da zona aceita SÓ esta: tipar
+ * o slot com `Carta` deixaria um monstro entrar num slot de armadura, e a
+ * checagem viraria runtime em vez de compilação. Mesma jogada de `CartaDeRaca`.
+ */
+export type CartaEquipamento = Extract<CartaTesouro, { readonly tipo: 'equipamento' }>;
+
+/**
+ * Onde uma peça se encaixa no corpo. Cinco slots (bible §5).
+ *
+ * ⚠️ Gêmea da união em `cartas/src/itens.ts` — `partida` é cego ao catálogo e
+ * `cartas` não pode importá-lo (a direção é `cartas ← personagem ← partida`).
+ * Quem impede as duas de divergirem é o guard `_CoberturaSlot` em
+ * `shared/src/index.ts`, que enxerga os dois lados. Slot novo => os dois arquivos.
+ */
+export type Slot = 'capacete' | 'armadura' | 'maoDireita' | 'maoEsquerda' | 'pes';
+
+/**
+ * O que o catálogo sabe de um item: o `Equipamento` que o `montarCombatente` já
+ * consome, mais os dois campos que só a MESA usa (onde encaixa, e se toma as duas
+ * mãos). `ItemCarta` (pacote `cartas`) satisfaz este contrato estruturalmente —
+ * por isso `partida` nunca precisa importar `cartas`.
+ */
+export interface InfoItem extends Equipamento {
+  readonly slot: Slot;
+  readonly duasMaos: boolean;
+}
+
+/**
+ * Zona ABERTA do jogador: o que está na mesa, à vista de todos.
  * `raca: null` = Humano baseline — a ausência de especialização É a linha zero.
+ *
+ * É esta zona que `combatenteDe` (em `./corpo`) lê para montar os stats. Por isso
+ * os 5 slots existem desde o nascimento com `null` em vez de serem opcionais: um
+ * `slots?` deixaria "corpo vazio" e "corpo ausente" indistinguíveis, e cada leitor
+ * teria que decidir de novo o que fazer com o `undefined`.
  */
 export interface ZonaEmJogo {
   readonly raca: CartaDeRaca | null;
+  /**
+   * Os 5 encaixes do corpo (bible §5). `Record<Slot, …>`, e não um array de
+   * cartas com o slot dentro: assim "duas armaduras equipadas" não é um estado
+   * representável, e quem quiser um 6º slot é obrigado pelo compilador a visitar
+   * todo mundo que constrói a zona.
+   *
+   * A arma de duas mãos põe a MESMA instância em `maoDireita` e `maoEsquerda` —
+   * ver a dedup em `itensEquipados`.
+   *
+   * `Readonly<>` e não `Record` cru: sem ele, `zona.slots.capacete = carta`
+   * compilaria e mutaria o estado no lugar, furando a imutabilidade que o resto
+   * do pacote sustenta com spread. Quem equipa monta um `slots` novo.
+   */
+  readonly slots: Readonly<Record<Slot, CartaEquipamento | null>>;
 }
 
 /** Embaralhamento injetado (aleatoriedade na borda). */
@@ -55,12 +123,26 @@ export interface JogadorNaMesa {
   readonly id: string;
   readonly nome: string;
   readonly ehBot: boolean;
-  /** Statline de patente 1 (vida = máximo). A vida reseta a cada combate. */
-  readonly combatenteBase: Combatente;
+  /**
+   * A classe escolhida na criação. Substitui o `combatenteBase` congelado: os
+   * stats agora são CALCULADOS por `combatenteDe` (em `./corpo`) a partir daqui
+   * mais a zona em jogo. Um campo denormalizado ao lado da zona seria um campo
+   * para dessincronizar — equipar e esquecer de recalcular não quebraria teste
+   * nenhum, só deixaria o combatente mentindo.
+   */
+  readonly classeId: string;
   readonly patente: number;
   readonly derrotas: number;
-  /** Zona OCULTA: só o dono vê o conteúdo. A projeção publica só a contagem. */
-  readonly mao: readonly CartaPorta[];
+  /**
+   * Zona OCULTA: só o dono vê o conteúdo. A projeção publica só a contagem.
+   *
+   * `Carta`, e não `CartaPorta`: desde que vencer larga tesouro aqui, a mão é
+   * HETEROGÊNEA — um monstro guardado e um tesouro por equipar convivem nela. É
+   * o alargamento que obriga o descarte a rotear por família
+   * (`descartarNoBaralhoCerto`, em `./mesa`): sem ele um tesouro dispensado
+   * entraria no baralho de Portas e voltaria como Porta na compra seguinte.
+   */
+  readonly mao: readonly Carta[];
   /** Zona ABERTA. É daqui que sai a raça do lutador — não mais da criação da partida. */
   readonly emJogo: ZonaEmJogo;
 }
@@ -75,10 +157,17 @@ export interface JogadorPublico {
   readonly id: string;
   readonly nome: string;
   readonly ehBot: boolean;
-  readonly combatenteBase: Combatente;
+  /**
+   * Os stats DELE AGORA — calculados por `combatenteDe`, não guardados. Público
+   * porque a zona em jogo (raça e itens equipados) já é aberta: esconder o total
+   * seria teatro, e é dele que sai a decisão de encarar ou não quem está na
+   * frente. Publicar `classeId` cru e deixar o cliente somar seria reimplementar
+   * regra de jogo na UI.
+   */
+  readonly combatente: Combatente;
   readonly patente: number;
   readonly derrotas: number;
-  /** Zona ABERTA: a raça em jogo é informação pública. */
+  /** Zona ABERTA: a raça em jogo e o corpo equipado são informação pública. */
   readonly emJogo: ZonaEmJogo;
   /** QUANTAS cartas ele tem — nunca QUAIS. */
   readonly cartasNaMao: number;
@@ -112,6 +201,8 @@ export interface InfoMonstro {
   readonly habilidade: number;
   readonly agilidade: number;
   readonly level: number;
+  /** Quantas cartas de Tesouro o cadáver larga na mão do vencedor. */
+  readonly tesouros: number;
 }
 
 /**
@@ -129,6 +220,10 @@ export interface CatalogoDaMesa {
   readonly raca: (racaId: string | undefined) => InfoRaca | undefined;
   /** `undefined` = id que não existe no catálogo: invariante quebrada, não pedido inválido. */
   readonly monstro: (monstroId: string) => InfoMonstro | undefined;
+  /** `undefined` = id que não existe: invariante quebrada, não pedido inválido. */
+  readonly classe: (classeId: string) => Classe | undefined;
+  /** `undefined` = id que não existe: invariante quebrada, não pedido inválido. */
+  readonly item: (itemId: string) => InfoItem | undefined;
 }
 
 export interface PosicaoFinal {
@@ -172,8 +267,34 @@ export type EventoDaMesa =
    * Descarte PÚBLICO: carrega a carta, porque o cemitério já é zona aberta e
    * esconder aqui seria teatro. Assimetria deliberada em relação à `entrega`
    * (spec §5): quem está em último revela o que dispensa.
+   *
+   * `Carta` e não `CartaPorta`: a mão é heterogênea, então o que se dispensa
+   * pode ser um tesouro. **Qual cemitério** recebe a carta é outra pergunta, e
+   * quem a responde é `descartarNoBaralhoCerto` (em `./mesa`) — o evento só
+   * conta o que foi jogado fora.
    */
-  | { readonly tipo: 'descarte'; readonly jogadorId: string; readonly carta: CartaPorta };
+  | { readonly tipo: 'descarte'; readonly jogadorId: string; readonly carta: Carta }
+  /**
+   * Saque do cadáver. Cai em zona OCULTA (a mão do vencedor), então o evento diz
+   * QUANTAS e **nunca QUAIS** — mesma assimetria de `achado` contra `porta`:
+   * quem decide se o evento carrega a carta é a zona de DESTINO, não a ação.
+   * Quem venceu descobre o quê pela própria mão (`suaMao`).
+   *
+   * `quantidade` é sempre ≥ 1: baralho esgotado não emite evento, porque uma
+   * linha de log dizendo que nada aconteceu é ruído na crônica.
+   */
+  | { readonly tipo: 'loot'; readonly jogadorId: string; readonly quantidade: number }
+  /**
+   * Equipou. CARREGA a carta: o slot é zona ABERTA, e esconder o que a mesa
+   * inteira passa a ver seria teatro. Assimetria deliberada em relação ao `loot`
+   * (zona oculta, só a contagem) — o que decide é a zona de DESTINO.
+   *
+   * `slot` é o que o ITEM declara. Uma arma de duas mãos ocupa as duas e mesmo
+   * assim sai um evento só, com o slot declarado: o log conta o que o jogador
+   * fez, e o corpo resultante já viaja aberto na projeção.
+   */
+  | { readonly tipo: 'equipou'; readonly jogadorId: string;
+      readonly slot: Slot; readonly carta: CartaEquipamento };
 
 export type AcaoDaMesa =
   | { readonly tipo: 'vasculhar'; readonly jogadorId: string }
@@ -182,7 +303,9 @@ export type AcaoDaMesa =
   | { readonly tipo: 'atacar'; readonly jogadorId: string }
   | { readonly tipo: 'esquivar'; readonly jogadorId: string }
   | { readonly tipo: 'jogarCarta'; readonly jogadorId: string; readonly cartaId: string }
-  | { readonly tipo: 'entregarCarta'; readonly jogadorId: string; readonly cartaId: string };
+  | { readonly tipo: 'entregarCarta'; readonly jogadorId: string; readonly cartaId: string }
+  /** Tira um tesouro da mão e o encaixa no corpo. O slot vem do ITEM, nunca do cliente. */
+  | { readonly tipo: 'equiparCarta'; readonly jogadorId: string; readonly cartaId: string };
 
 export interface CombateNaMesa {
   readonly estado: EstadoCombate;
@@ -240,6 +363,8 @@ export interface EstadoPartida {
   readonly vezDe: string;
   readonly patenteAlvo: number;
   readonly portas: Baralho<CartaPorta>;
+  /** O segundo baralho. Mesma estrutura e mesmo `tirarDoTopo` (com reshuffle) do de Portas. */
+  readonly tesouros: Baralho<CartaTesouro>;
   readonly combate: CombateNaMesa | null;
   readonly espiada: EspiadaPendente | null;
   /**
@@ -269,6 +394,12 @@ export interface VistaDaPartida {
   readonly patenteAlvo: number;
   readonly cartasNoMonte: number;
   readonly cartasNoCemiterio: number;
+  /**
+   * Tamanho do monte de Tesouros. Só a CONTAGEM: a ordem do monte é segredo
+   * pelo mesmo motivo que a do de Portas — quem a vê sabe o que o próximo
+   * vencedor vai sacar.
+   */
+  readonly tesourosNoMonte: number;
   readonly combate: CombateNaMesa | null;
   /** A carta espiada, presente SÓ na vista do dono da espiada. `null` para os outros. */
   readonly espiada: EspiadaPendente | null;
@@ -281,24 +412,48 @@ export interface VistaDaPartida {
   readonly desfecho: 'emAndamento' | 'terminada';
   readonly classificacao: readonly PosicaoFinal[] | null;
   readonly log: readonly EventoDaMesa[];
-  /** A SUA mão. A dos outros não existe nesta vista — só a contagem, em `jogadores`. */
-  readonly suaMao: readonly CartaPorta[];
+  /**
+   * A SUA mão. A dos outros não existe nesta vista — só a contagem, em
+   * `jogadores`. Heterogênea (`Carta`) desde que vencer larga tesouro nela.
+   */
+  readonly suaMao: readonly Carta[];
 }
 
 export interface ConfigPartida {
   readonly patenteAlvo: number;
   readonly composicaoPorJogador: readonly ReceitaPorta[];
   /**
+   * Receitas do baralho de Tesouros, por jogador — multiplicadas pelo número de
+   * assentos, como a de Portas. Obrigatória: uma mesa sem baralho de Tesouros é
+   * uma mesa em que vencer não paga nada, e defaultar para `[]` esconderia isso.
+   */
+  readonly composicaoTesouros: readonly ReceitaTesouro[];
+  /**
    * Cartas distribuídas a cada jogador na abertura. Ausente = 0, para que os
    * testes possam montar mesas de baralho mínimo (1 carta por jogador) sem ter
    * que financiar mãos. Produção passa `MAO_INICIAL_PADRAO`.
    */
   readonly maoInicial?: number;
+  /**
+   * Cartas de TESOURO distribuídas a cada jogador na abertura. Ausente = 0, pelo
+   * mesmo motivo de `maoInicial`: a maioria dos testes monta baralho mínimo e não
+   * quer financiar mãos. Produção passa `MAO_INICIAL_TESOUROS`.
+   *
+   * Campo próprio, e não um total somado a `maoInicial`: são dois baralhos com
+   * dois montes, e "8 cartas" não diz de onde cada uma sai. Separado, girar um
+   * dial não mexe no outro.
+   */
+  readonly maoInicialTesouros?: number;
 }
 
 export interface EntradaJogador {
   readonly id: string;
   readonly nome: string;
   readonly ehBot: boolean;
-  readonly combatenteBase: Combatente;
+  /**
+   * A classe, não a statline pronta. A borda para de montar o combatente: quem
+   * monta é `combatenteDe`, a cada consulta, com a zona da hora. Entregar um
+   * `Combatente` aqui era entregar um retrato tirado antes de o corpo existir.
+   */
+  readonly classeId: string;
 }
