@@ -24,8 +24,11 @@ describe('catálogo de monstros', () => {
   });
 
   it('mantém o Goblin idêntico ao MONSTRO_PADRAO da fatia 2 (linha de base do balanceamento)', () => {
+    // `tesouros` é campo novo desta fatia (Tesouros e o Corpo) e não existia no
+    // MONSTRO_PADRAO original — por isso entra aqui em vez de alterar a
+    // comparação histórica dos outros 6 stats.
     expect(obterMonstro('goblin')).toEqual({
-      id: 'goblin', nome: 'Goblin', forca: 4, vida: 20, habilidade: 2, agilidade: 4, level: 1,
+      id: 'goblin', nome: 'Goblin', forca: 4, vida: 20, habilidade: 2, agilidade: 4, level: 1, tesouros: 1,
     });
   });
 
@@ -41,5 +44,16 @@ describe('catálogo de monstros', () => {
       expect(m.agilidade).toBeGreaterThan(0);
       expect(m.level).toBeGreaterThan(0);
     }
+  });
+
+  it('todo monstro declara quantos Tesouros larga, e o perigo paga', () => {
+    for (const m of MONSTROS) {
+      expect(m.tesouros).toBeGreaterThanOrEqual(1);
+    }
+    // O eixo econômico da fatia: monstro mais perigoso larga mais. Sem isto,
+    // "procurar encrenca" (Plano 4) seria escolher risco sem prêmio.
+    const rato = MONSTROS.find((m) => m.id === 'rato-gigante');
+    const ogro = MONSTROS.find((m) => m.id === 'ogro');
+    expect(rato?.tesouros).toBeLessThan(ogro?.tesouros ?? 0);
   });
 });

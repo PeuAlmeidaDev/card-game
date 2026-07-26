@@ -17,6 +17,11 @@ export interface MonstroCarta {
   readonly habilidade: number;
   readonly agilidade: number;
   readonly level: number;
+  /**
+   * Quantos Tesouros o cadáver larga. 🎚️ É o eixo econômico da fatia: escala com
+   * o perigo, para que enfrentar o Ogro seja uma escolha e não masoquismo.
+   */
+  readonly tesouros: number;
 }
 
 /**
@@ -33,11 +38,11 @@ export interface MonstroCarta {
  * que o mantém uma escolha diferente e não um Lobo Sombrio com outros números.
  */
 export const MONSTROS: readonly MonstroCarta[] = [
-  { id: 'rato-gigante', nome: 'Rato Gigante', forca: 3, vida: 14, habilidade: 2, agilidade: 3, level: 1 },
-  { id: 'goblin', nome: 'Goblin', forca: 4, vida: 20, habilidade: 2, agilidade: 4, level: 1 },
-  { id: 'lobo-sombrio', nome: 'Lobo Sombrio', forca: 4, vida: 18, habilidade: 3, agilidade: 7, level: 2 },
-  { id: 'carnical', nome: 'Carniçal', forca: 5, vida: 16, habilidade: 4, agilidade: 4, level: 2 },
-  { id: 'ogro', nome: 'Ogro', forca: 6, vida: 28, habilidade: 3, agilidade: 2, level: 3 },
+  { id: 'rato-gigante', nome: 'Rato Gigante', forca: 3, vida: 14, habilidade: 2, agilidade: 3, level: 1, tesouros: 1 },
+  { id: 'goblin', nome: 'Goblin', forca: 4, vida: 20, habilidade: 2, agilidade: 4, level: 1, tesouros: 1 },
+  { id: 'lobo-sombrio', nome: 'Lobo Sombrio', forca: 4, vida: 18, habilidade: 3, agilidade: 7, level: 2, tesouros: 2 },
+  { id: 'carnical', nome: 'Carniçal', forca: 5, vida: 16, habilidade: 4, agilidade: 4, level: 2, tesouros: 2 },
+  { id: 'ogro', nome: 'Ogro', forca: 6, vida: 28, habilidade: 3, agilidade: 2, level: 3, tesouros: 3 },
 ];
 
 export function obterMonstro(id: string): MonstroCarta | undefined {

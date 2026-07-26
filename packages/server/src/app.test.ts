@@ -153,7 +153,7 @@ describe('mesa', () => {
         throw new Error('SEGREDO-INTERNO-nao-deveria-vazar');
       },
       embaralhar: semEmbaralhar,
-      monstros: [{ id: 'goblin', nome: 'Goblin', forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 }],
+      monstros: [{ id: 'goblin', nome: 'Goblin', forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1, tesouros: 1 }],
     });
     const vista = await criar(app);
 
@@ -369,7 +369,7 @@ describe('mesa', () => {
     // falha (12 > 1). Dano base = level(1)+forca(5) = 6; a passiva reduz o
     // PRIMEIRO dano sofrido no combate à metade -> 3. Vida do guerreiro Anão
     // (base 10 + guerreiro +5 = 15) cai para 12.
-    const monstros = [{ id: 'goblin', nome: 'Goblin', forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 }];
+    const monstros = [{ id: 'goblin', nome: 'Goblin', forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1, tesouros: 1 }];
     const app = buildApp({ rolar: filaDeDados([1, 12]), embaralhar: racasNoTopo, monstros });
 
     const vista = await comRacaEmJogo(app, 'anao');

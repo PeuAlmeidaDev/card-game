@@ -43,7 +43,7 @@ const RACAS_PADRAO: Catalogo['racas'] = [
 // Mesma ideia de RACAS_PADRAO, para o bestiário: os fixtures desta suíte usam
 // `monstroId: 'goblin'`, e sem o catálogo o nome cairia no fallback `?? id`.
 const MONSTROS_PADRAO: Catalogo['monstros'] = [
-  { id: 'goblin', nome: 'Goblin', forca: 4, vida: 20, habilidade: 2, agilidade: 4, level: 1 },
+  { id: 'goblin', nome: 'Goblin', forca: 4, vida: 20, habilidade: 2, agilidade: 4, level: 1, tesouros: 1 },
 ];
 
 const abrirMesa = async (
