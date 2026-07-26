@@ -47,9 +47,9 @@ dinâmico → Habilidades → Contas/ranking/crônica).
 ## Stack (alvo)
 
 Monorepo pnpm workspaces, Node ≥ 22.13 (dev em 24; exigido pelo `pnpm@11.9`), **TypeScript strict** (+ `noUncheckedIndexedAccess`).
-Pacotes de domínio (`motor`, `personagem`, `progressao`) = **TS puro** (dado injetado, zero
-framework). `shared` = contrato ts-rest + Zod. `server` = **Fastify + ts-rest**. `web` =
-**React + Vite**. Testes: **vitest**. Lint: **ESLint flat**.
+Pacotes de domínio (`motor`, `personagem`, `progressao`, `partida`, `cartas`) = **TS puro** (dado
+injetado, zero framework). `shared` = contrato ts-rest + Zod. `server` = **Fastify + ts-rest**.
+`web` = **React + Vite**. Testes: **vitest**. Lint: **ESLint flat**.
 
 ⚠️ `@ts-rest/core` e `@ts-rest/fastify` estão **pinados em `3.53.0-rc.1`** (a linha estável 3.52
 é type-incompatível com TS ≥ 5.6). Trocar pelo 3.53.x estável quando sair.
@@ -57,7 +57,8 @@ framework). `shared` = contrato ts-rest + Zod. `server` = **Fastify + ts-rest**.
 ## Arquitetura
 
 ```
-web (React+Vite) ──ts-rest/REST──▶ server (Fastify) ──chama──▶ motor / personagem / progressao
+web (React+Vite) ──ts-rest/REST──▶ server (Fastify) ──chama──▶ motor / personagem / progressao /
+                                                                partida / cartas
                                                                 (TS puro, dado injetado)
 ```
 
