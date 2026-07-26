@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { aplicarAcao } from './mesa';
 import { avancarBots } from './automacao';
 import { criarPartida } from './montagem';
-import { montarComposicaoTesouros } from './baralho';
+import { montarComposicao, montarComposicaoTesouros } from './baralho';
 import { LIMITE_BASE_DE_MAO, MAO_INICIAL_PADRAO, MAO_INICIAL_TESOUROS, limiteDeMao } from './mao';
 import { escolherAcao } from './bot';
 import { projetarPara } from './projecao';
@@ -1715,24 +1715,43 @@ describe('a composição BASELINE não pode nascer travada', () => {
   });
 
   it('nascer acima do limite deixaria o jogador SEM nenhuma ação legal', () => {
-    // O porquê do teste acima, escrito como comportamento. Com UMA carta a mais
-    // na mão inicial, o humano não pode vasculhar (recusado) e não pode jogar
-    // carta nenhuma (esta composição não tem raça, e sem os itens no catálogo de
-    // teste equipar não é saída aqui) — tela morta no primeiro clique.
+    // O porquê do teste acima, escrito como comportamento: com a mão estourada na
+    // abertura o humano não pode vasculhar (recusado pela fase), e as outras duas
+    // saídas de `descartar` — jogar raça e equipar — dependem de a mão TER a
+    // carta. Esta mão não tem nenhuma das duas, então `entregarCarta` fica sendo o
+    // único clique legal. Tela morta no primeiro turno.
     //
-    // `+ 1` basta agora, onde antes eram `+ 2`: com os dials desta fatia a mesa
-    // já nasce EXATAMENTE no teto (4 Portas + 4 Tesouros = 8 = o limite de quem
-    // está sem raça em jogo), então uma única carta a mais estoura. É também o
-    // que este teste registra sobre a economia nova: a folga da abertura é zero,
-    // e quem a devolve é `equiparCarta`.
-    const p = criarPartida('m1', mesaDeProducao,
-      { ...producao, maoInicialTesouros: MAO_INICIAL_TESOUROS + 1 }, { embaralhar: semEmbaralhar });
+    // O dial mal girado aqui é o de PORTAS, e a mão fica SÓ de Portas de
+    // propósito. Girar o de Tesouros (`maoInicialTesouros`) seria mais barato —
+    // a abertura já nasce no teto, então `+ 1` bastaria —, mas encheria a mão de
+    // `i-teste`, que o `catalogoDeTeste()` conhece: `equiparCarta` é legal em
+    // `descartar`, os slots nascem vazios, e o excedente se resolveria num clique.
+    // As três asserções abaixo continuariam verdes sobre um jogador que TEM saída,
+    // e o alarme deixaria de tocar quando alguém mexesse na tabela de fases.
+    //
+    // Baralho de Portas LOCAL (10 por jogador, sem raça) porque o baseline de 8
+    // não financia esta mão: `LIMITE_BASE_DE_MAO + 2` = 9 cartas × 4 assentos = 36,
+    // e `criarPartida` recusaria a mesa antes de o teste chegar à asserção.
+    const soPortas = montarComposicao(5, Array.from({ length: 5 }, () => 'm-teste'));
+    const p = criarPartida('m1', mesaDeProducao, {
+      ...producao,
+      composicaoPorJogador: soPortas,
+      // `+ 2` sobre o base = uma carta acima do teto de quem está sem raça em jogo
+      // (`LIMITE_BASE_DE_MAO + 1`, o Adaptável do Humano).
+      maoInicial: LIMITE_BASE_DE_MAO + 2,
+      maoInicialTesouros: 0,
+    }, { embaralhar: semEmbaralhar });
     const humano = p.jogadores[0];
 
     expect(humano!.mao.length).toBeGreaterThan(limiteDeMao(humano!));
     expect(() => aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])))
       .toThrow('aplicarAcao: vasculhar não é legal na fase descartar');
+    // As duas asserções que sustentam o título: sem raça e sem equipamento na
+    // mão, as outras duas saídas de `descartar` não existem. Sem elas o teste
+    // aceita um fixture em que o excedente se resolve num clique — foi
+    // exatamente o que aconteceu quando o dial girado foi o de Tesouros.
     expect(humano!.mao.every((c) => c.tipo !== 'raca')).toBe(true);
+    expect(humano!.mao.every((c) => c.tipo !== 'equipamento')).toBe(true);
   });
 });
 
