@@ -11,27 +11,33 @@ import type {
 import type {
   AcaoDaMesa,
   Carta,
+  CartaEquipamento,
   CartaPorta,
+  CartaTesouro,
   EspiadaPendente,
   EventoDaMesa,
   Fase,
   JogadorPublico,
   PosicaoFinal,
+  Slot,
   VistaDaPartida,
 } from '@card-dungeon/partida';
+import type { Slot as SlotDaCarta, ItemCarta } from '@card-dungeon/cartas';
 
 /**
  * Corpo do POST /api/duelo e /api/partida: as escolhas do jogador (ids).
  * Restrito ao tipo de domínio via `satisfies` — o `personagem` continua a fonte
  * única do tipo.
  *
- * **Sem `racaId`:** desde a fatia 7 a raça não é escolha de menu — é carta que se
- * saca do baralho e se joga na mesa. Manter o campo aqui deixaria um dado que o
- * cliente é obrigado a mandar e o servidor ignora: um tipo que mente no fio.
+ * **Sem `racaId` e sem `itemIds`:** desde a fatia 7 a raça não é escolha de menu,
+ * e desde a fatia 8 o item também não — os dois são carta que se saca do baralho
+ * e entra em jogo pela mesa. Manter o campo aqui deixaria um dado que o cliente é
+ * obrigado a mandar e o servidor ignora: um tipo que mente no fio. E duas fontes
+ * para o mesmo stat (nascer equipado + sacar Tesouro) distorceriam uma corrida
+ * ranqueada, que é o motivo de jogo por trás do motivo de tipo.
  */
 export const escolhasSchema = z.object({
   classeId: z.string(),
-  itemIds: z.array(z.string()),
 }) satisfies z.ZodType<EscolhasPersonagem>;
 
 export type Escolhas = z.infer<typeof escolhasSchema>;
@@ -89,6 +95,30 @@ export type AcaoNoFio = z.infer<typeof acaoDaMesaSchema>;
 type _CoberturaAcao = [AcaoDaMesa['tipo']] extends [AcaoNoFio['tipo']] ? true : never;
 const _coberturaAcao: _CoberturaAcao = true;
 void _coberturaAcao;
+
+/**
+ * Trava as duas uniões `Slot` — a de `partida` (a REGRA: o corpo tem 5 encaixes)
+ * e a de `cartas` (o DADO: onde cada item se encaixa). Elas são declaradas
+ * separadas porque `partida` é cego ao catálogo e a direção de dependência
+ * (`cartas ← personagem ← partida`) proíbe o import; a duplicação é o preço do
+ * desacoplamento, o mesmo que `InfoMonstro` já paga replicando os 5 stats.
+ *
+ * `shared` é o único lugar que enxerga os dois lados, e a checagem é MÚTUA de
+ * propósito: com uma direção só, o lado "maior" poderia ganhar um slot que o
+ * outro não tem e o guard continuaria satisfeito — um item declarando `cinto`
+ * nunca teria onde ser equipado, ou um encaixe do corpo nunca receberia item.
+ *
+ * A tupla é obrigatória pelo mesmo motivo do `_CoberturaAcao`: `A | B extends X`
+ * DISTRIBUI sobre a união e a checagem se auto-satisfaz.
+ *
+ * ⚠️ Guard de COMPILAÇÃO. O `vitest` transpila sem checar tipo (o `esbuild` só
+ * apaga as anotações), então quem acusa a divergência é o `pnpm typecheck` —
+ * nunca a suíte.
+ */
+type _CoberturaSlot =
+  [Slot] extends [SlotDaCarta] ? ([SlotDaCarta] extends [Slot] ? true : never) : never;
+const _coberturaSlot: _CoberturaSlot = true;
+void _coberturaSlot;
 
 /**
  * Corpo do POST /api/partida/:id/acao: a ação MAIS a versão do estado que o
@@ -199,6 +229,17 @@ export type {
   // evento `porta` só carregam essa família — quem espia o topo do baralho de
   // Portas nunca vê um tesouro, e estreitar ali é informação, não cerimônia.
   Carta,
+  // A família de Tesouro em separado, pelo mesmo motivo que `CartaPorta`: o
+  // corpo só aceita `CartaEquipamento`, e estreitar ali é o que impede um monstro
+  // de entrar num slot de armadura por erro de tipo em vez de por checagem.
+  CartaTesouro,
+  CartaEquipamento,
   EspiadaPendente,
   Fase,
+  // O vocabulário do corpo. `Slot` sai de `partida` (a regra) e `ItemCarta` de
+  // `cartas` (o dado) — o `_CoberturaSlot` acima é quem garante que as duas
+  // uniões `Slot` continuam sendo a mesma coisa. `web` só depende de `shared`,
+  // então o que não passar por aqui simplesmente não existe para o cliente.
+  Slot,
+  ItemCarta,
 };

@@ -11,6 +11,7 @@ const ctx: ContextoDeNarracao = {
   nomeDe: (id) => (id === 'p1' ? 'Você' : id === 'p2' ? 'Bot 1' : id),
   nomeDaRaca: (id) => (id === 'orc' ? 'Orc' : id === 'elfo' ? 'Elfo' : id),
   nomeDoMonstro: (id) => (id === 'goblin' ? 'Goblin' : id),
+  nomeDoItem: (id) => (id === 'espada-curta' ? 'Espada Curta' : id),
 };
 
 describe('narrarEvento — linhas de texto puro', () => {
@@ -72,26 +73,26 @@ describe('narrarEvento — linhas de texto puro', () => {
     )).toBe('Bot 1 descartou uma carta de Elfo.');
   });
 
-  it('descarte de TESOURO também é narrado — a mão é heterogênea', () => {
+  it('descarte de TESOURO também é narrado, pelo nome do item', () => {
     // O evento `descarte` alargou junto com a mão: o que se dispensa pode ser um
     // tesouro. Sem esta linha, a cadeia de `never` do `descreverCarta` estaria
     // satisfeita e a tela ainda assim renderizaria uma frase que ninguém viu.
     expect(narrarEvento(
       { tipo: 'descarte', jogadorId: 'p2', carta: { id: 't-1', tipo: 'equipamento', itemId: 'espada-curta' } },
       ctx,
-    )).toBe('Bot 1 descartou um tesouro.');
+    )).toBe('Bot 1 descartou Espada Curta.');
   });
 
-  it('equipou MOSTRA a carta — o slot é zona aberta', () => {
+  it('equipou MOSTRA a carta e a NOMEIA — o slot é zona aberta', () => {
     // Assimetria deliberada em relação ao `loot`: o que decide se o evento pode
-    // ser narrado é a zona de DESTINO, e o corpo está à vista da mesa inteira. O
-    // NOME do item ainda não tem de onde vir (o catálogo de itens chega na Task
-    // 7), então a linha é a mesma genérica do `descarte` de tesouro.
+    // ser narrado é a zona de DESTINO, e o corpo está à vista da mesa inteira.
+    // Nomear o item é o que faz a linha valer: "equipa um tesouro" não deixa
+    // ninguém avaliar se o adversário ficou mais perigoso.
     expect(narrarEvento(
       { tipo: 'equipou', jogadorId: 'p2', slot: 'maoDireita',
         carta: { id: 't-1', tipo: 'equipamento', itemId: 'espada-curta' } },
       ctx,
-    )).toBe('Bot 1 equipa um tesouro.');
+    )).toBe('Bot 1 equipa Espada Curta.');
   });
 
   it('loot diz QUANTAS, nunca QUAIS — a mão é zona oculta', () => {

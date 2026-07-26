@@ -136,23 +136,22 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
     duelo: async ({ body }) => {
       const resolvido = resolverEscolhas(CATALOGO, body);
       if (!resolvido) {
-        return { status: 400 as const, body: { erro: 'classe ou item inexistente' } };
+        return { status: 400 as const, body: { erro: 'classe inexistente' } };
       }
-      const jogador = montarCombatente(resolvido.classe, resolvido.itens);
+      // Lista de itens VAZIA, e não um parâmetro que sumiu: o `/duelo` é a rota
+      // da fatia 2 e nunca teve mesa, logo nunca tem corpo equipado — item é
+      // carta de Tesouro, que só existe dentro de uma partida. O `montarCombatente`
+      // continua recebendo itens porque é ele que a mesa usa (via `combatenteDe`)
+      // para somar o que está nos slots.
+      const jogador = montarCombatente(resolvido.classe, []);
       return { status: 200 as const, body: resolverDuelo(jogador, monstro, rolar) };
     },
 
     criarPartida: async ({ body }) => {
       const resolvido = resolverEscolhas(CATALOGO, body);
       if (!resolvido) {
-        return { status: 400 as const, body: { erro: 'classe ou item inexistente' } };
+        return { status: 400 as const, body: { erro: 'classe inexistente' } };
       }
-      // ⚠️ `resolvido.itens` é validado e DESCARTADO aqui. Nascer equipado era o
-      // andaime do construtor, e ele saiu junto com o `combatenteBase`: item
-      // agora é carta que se saca do baralho de Tesouros e se equipa em jogo.
-      // O `itemIds` do corpo some do contrato numa task adiante — deixá-lo
-      // aceito e inerte por uma task é melhor que quebrar a borda no meio da
-      // troca da fonte dos stats.
       const humano: EntradaJogador = {
         id: randomUUID(),
         nome: 'Você',

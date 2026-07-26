@@ -23,7 +23,6 @@ function descrever(r: ResultadoDuelo): string {
 export function App() {
   const [catalogo, setCatalogo] = useState<Catalogo | null>(null);
   const [classeId, setClasseId] = useState('');
-  const [itemIds, setItemIds] = useState<string[]>([]);
   const [texto, setTexto] = useState('');
 
   useEffect(() => {
@@ -39,15 +38,16 @@ export function App() {
   if (!catalogo) return <p>Carregando catálogo…</p>;
 
   const classe = catalogo.classes.find((c) => c.id === classeId);
-  const itens = catalogo.itens.filter((i) => itemIds.includes(i.id));
-  const mods: ModificadoresDeStat[] = [];
-  if (classe) mods.push(classe.modificadores);
-  for (const item of itens) mods.push(item.modificadores);
+  // Só a CLASSE soma no preview. O item saiu do construtor na fatia 8 (virou
+  // carta de Tesouro, sacada em jogo) e a raça saiu na 7 (é passiva, não stat) —
+  // somar aqui algo que o servidor não monta seria a tela prometendo um
+  // personagem que não vai existir.
+  const mods: ModificadoresDeStat[] = classe ? [classe.modificadores] : [];
   const stats = calcularPreview(catalogo.base, mods);
 
   async function duelar(): Promise<void> {
     setTexto('Rolando os dados…');
-    const resposta = await api.duelo({ body: { classeId, itemIds } });
+    const resposta = await api.duelo({ body: { classeId } });
     if (resposta.status === 200) {
       setTexto(descrever(resposta.body));
     } else {
@@ -68,22 +68,6 @@ export function App() {
         </select>
       </label>
 
-      <fieldset>
-        <legend>Itens</legend>
-        {catalogo.itens.map((i) => (
-          <label key={i.id}>
-            <input
-              type="checkbox"
-              checked={itemIds.includes(i.id)}
-              onChange={(e) =>
-                setItemIds((prev) => (e.target.checked ? [...prev, i.id] : prev.filter((x) => x !== i.id)))
-              }
-            />
-            {i.nome}
-          </label>
-        ))}
-      </fieldset>
-
       <p>
         Personagem: Força {stats.forca} · Vida {stats.vida} · Habilidade {stats.habilidade} · Agilidade{' '}
         {stats.agilidade}
@@ -98,8 +82,15 @@ export function App() {
 
           `racas` continua vindo do catálogo: não para ESCOLHER, e sim para a mesa
           nomear as cartas de raça que aparecem na mão e no log. `monstros` faz o
-          mesmo papel para o bestiário. */}
-      <TelaMesa escolhas={{ classeId, itemIds }} racas={catalogo.racas} monstros={catalogo.monstros} />
+          mesmo papel para o bestiário, e `itens` para o baralho de Tesouros — é
+          dele que sai o nome de cada peça e o slot onde ela encaixa, que é o que
+          a mesa precisa para desenhar o corpo. */}
+      <TelaMesa
+        escolhas={{ classeId }}
+        racas={catalogo.racas}
+        monstros={catalogo.monstros}
+        itens={catalogo.itens}
+      />
     </main>
   );
 }

@@ -10,6 +10,7 @@ export interface ContextoDeNarracao {
   readonly nomeDe: (jogadorId: string) => string;
   readonly nomeDaRaca: (racaId: string) => string;
   readonly nomeDoMonstro: (monstroId: string) => string;
+  readonly nomeDoItem: (itemId: string) => string;
 }
 
 /**
@@ -63,16 +64,15 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
     // o evento carrega a carta e a narração pode mostrá-la. Assimetria deliberada
     // em relação ao `loot`, que cai na mão e só conta.
     //
-    // O NOME do item ainda não tem de onde vir: exige um `nomeDoItem` injetado, e
-    // ele só existe quando a tela receber o catálogo de itens (Task 7, junto com
-    // o botão de equipar). Até lá `descreverCarta` dá a linha genérica e honesta —
-    // a mesma do descarte de tesouro.
+    // E NOMEIA o item: "equipa um tesouro" não deixava ninguém avaliar se o
+    // adversário ficou mais perigoso, que é a única razão de a zona ser aberta.
     case 'equipou':
       return `${evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId)} equipa `
-        + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro)}.`;
+        + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem)}.`;
     // O descarte é PÚBLICO: o cemitério já é zona aberta, esconder aqui seria teatro.
     case 'descarte':
-      return `${ctx.nomeDe(evento.jogadorId)} descartou ${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro)}.`;
+      return `${ctx.nomeDe(evento.jogadorId)} descartou `
+        + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem)}.`;
     case 'combate':
       return (
         <>

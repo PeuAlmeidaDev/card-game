@@ -48,13 +48,25 @@ const MONSTROS_PADRAO: Catalogo['monstros'] = [
   { id: 'goblin', nome: 'Goblin', forca: 4, vida: 20, habilidade: 2, agilidade: 4, level: 1, tesouros: 1 },
 ];
 
+// Mesma ideia, para o baralho de Tesouros: sem o catálogo o nome do item cairia
+// no fallback `?? id` e o corpo mostraria `espada-curta` em vez de "Espada Curta".
+const ITENS_PADRAO: Catalogo['itens'] = [
+  { id: 'espada-curta', nome: 'Espada Curta', slot: 'maoDireita', duasMaos: false, modificadores: { forca: 2 } },
+  { id: 'elmo-de-couro', nome: 'Elmo de Couro', slot: 'capacete', duasMaos: false, modificadores: { vida: 2 } },
+];
+
+/** Uma carta de Tesouro na mão (ou já no corpo). */
+const tesouro = (id: string, itemId = 'espada-curta') =>
+  ({ id, tipo: 'equipamento' as const, itemId });
+
 const abrirMesa = async (
   vista: VistaDaPartida,
   racas: Catalogo['racas'] = RACAS_PADRAO,
   monstros: Catalogo['monstros'] = MONSTROS_PADRAO,
+  itens: Catalogo['itens'] = ITENS_PADRAO,
 ) => {
   vi.spyOn(api, 'criarPartida').mockResolvedValue({ status: 200, body: vista } as never);
-  render(<TelaMesa racas={racas} monstros={monstros} />);
+  render(<TelaMesa racas={racas} monstros={monstros} itens={itens} />);
   await userEvent.click(screen.getByRole('button', { name: /nova partida/i }));
 };
 
@@ -479,5 +491,129 @@ describe('TelaMesa — a mão', () => {
 
     expect(await screen.findByRole('button', { name: /entregar/i })).toBeDisabled();
     expect(screen.getByRole('button', { name: /vasculhar local/i })).toBeEnabled();
+  });
+});
+
+describe('TelaMesa — o corpo', () => {
+  /** A vista com o corpo do humano montado a partir de `SLOTS_VAZIOS`. */
+  const comCorpo = (slots: VistaDaPartida['jogadores'][number]['emJogo']['slots']): VistaDaPartida => ({
+    ...vistaBase,
+    jogadores: vistaBase.jogadores.map((j) => (
+      j.id === 'p1' ? { ...j, emJogo: { raca: null, slots } } : j
+    )),
+  });
+
+  it('mostra os cinco slots do corpo, vazios ou com o item', async () => {
+    // O corpo é a fatia inteira ficando visível: sem esta seção o jogador equipa
+    // e não tem onde conferir o que está vestindo. Cinco `<li>`, sempre — slot
+    // vazio é informação (é vaga aberta), não ausência a esconder.
+    await abrirMesa(comCorpo({ ...SLOTS_VAZIOS, maoDireita: tesouro('t-1') }));
+
+    expect(await screen.findByText(/Espada Curta/)).toBeInTheDocument();
+    expect(screen.getAllByText(/vazio/i)).toHaveLength(4);
+  });
+
+  it('a arma de duas mãos aparece nas DUAS mãos — é a mesma instância', async () => {
+    // O corpo desenha o que a zona diz. `itensEquipados` deduplica por id na hora
+    // de somar os stats, mas a UI mostra os dois encaixes ocupados: é assim que o
+    // jogador vê o preço da arma grande (a mão que sobraria para o escudo).
+    const montante = tesouro('t-2', 'montante');
+    await abrirMesa(
+      comCorpo({ ...SLOTS_VAZIOS, maoDireita: montante, maoEsquerda: montante }),
+      undefined, undefined,
+      [{ id: 'montante', nome: 'Montante', slot: 'maoDireita', duasMaos: true, modificadores: { forca: 4 } }],
+    );
+
+    expect(await screen.findAllByText(/Montante/)).toHaveLength(2);
+  });
+
+  it('cai no id quando o item não está no catálogo, sem derrubar a tela', async () => {
+    // Skew de versão, mesma regra do monstro desconhecido: degradar para o id é
+    // feio e legível; lançar apagaria a mesa por causa de um nome.
+    await abrirMesa(comCorpo({ ...SLOTS_VAZIOS, capacete: tesouro('t-1', 'alabarda-nova') }));
+
+    expect(await screen.findByText(/alabarda-nova/)).toBeInTheDocument();
+  });
+});
+
+describe('TelaMesa — equipar', () => {
+  const maoHeterogenea: VistaDaPartida = {
+    ...vistaBase,
+    suaMao: [
+      { id: 'p-1', tipo: 'monstro', monstroId: 'goblin' },
+      { id: 'p-2', tipo: 'raca', racaId: 'orc' },
+      tesouro('t-9'),
+    ],
+  };
+
+  it('o botão Equipar existe só em carta de equipamento', async () => {
+    // A carta de monstro e a de raça na mão não têm "Equipar": o par fino
+    // `carta.tipo === 'equipamento'` é cobrado pelo reducer e a tabela de fases
+    // não o conhece — um botão que só serve para levar 400 ensina o jogador a errar.
+    await abrirMesa(maoHeterogenea);
+
+    expect(screen.getAllByRole('button', { name: 'Equipar' })).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Equipar' })).toBeEnabled();
+  });
+
+  it('nomeia o tesouro na mão em vez de dizer "um tesouro"', async () => {
+    await abrirMesa(maoHeterogenea);
+
+    expect(await screen.findByText(/Espada Curta/)).toBeInTheDocument();
+  });
+
+  it('equipar manda a ação com o id DAQUELA carta', async () => {
+    // O `cartaId` é o único campo livre do fio: com duas cópias do mesmo item na
+    // mão, mandar o id errado é invisível na tela e equipa a carta que não foi
+    // clicada. O SLOT não vai junto — quem decide onde encaixa é o catálogo do
+    // servidor, pelo item.
+    const agir = vi.spyOn(api, 'agir').mockResolvedValue({ status: 200, body: vistaBase } as never);
+    await abrirMesa({ ...maoHeterogenea, versao: 4 });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Equipar' }));
+
+    expect(agir).toHaveBeenCalledWith({
+      params: { id: 'm1' },
+      body: { acao: { tipo: 'equiparCarta', cartaId: 't-9' }, versao: 4 },
+    });
+  });
+
+  it('com espiada pendente, Equipar apaga junto com Vasculhar e Jogar', async () => {
+    // O par fino `espiada === null` do `equiparCarta`: a tabela de fases diz que
+    // equipar cabe na fase `vasculhar`, mas o reducer recusa enquanto o vidente
+    // não resolveu o topo. `legal('equiparCarta')` sozinho acenderia aqui.
+    // Asserção CONJUNTA de propósito — os três consumidores da mesma guarda.
+    await abrirMesa({
+      ...maoHeterogenea,
+      espiada: { jogadorId: 'p1', carta: { id: 'p-0', tipo: 'monstro', monstroId: 'goblin' } },
+    });
+
+    expect(await screen.findByRole('button', { name: 'Vasculhar local' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Jogar' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Equipar' })).toBeDisabled();
+  });
+
+  it('na fase `combate`, Equipar apaga — o snapshot dos stats já foi tirado', async () => {
+    // A tabela de fases já responde este: `equiparCarta` não está no conjunto de
+    // `combate`, porque o motor recebeu um snapshot imutável na abertura da luta.
+    await abrirMesa({ ...maoHeterogenea, fase: 'combate' });
+
+    expect(await screen.findByRole('button', { name: 'Equipar' })).toBeDisabled();
+  });
+
+  it('na fase `descartar`, Equipar continua aceso — é a terceira saída do excedente', async () => {
+    // Equipar tira uma carta da mão, logo resolve o estouro, exatamente como
+    // `jogarCarta` e `entregarCarta`. `limiteDeMao: 0` para p1 é o que torna esta
+    // vista PRODUZÍVEL pelo domínio.
+    await abrirMesa({
+      ...vistaBase,
+      fase: 'descartar',
+      suaMao: [tesouro('t-9')],
+      jogadores: vistaBase.jogadores.map((j) => (
+        j.id === 'p1' ? { ...j, cartasNaMao: 1, limiteDeMao: 0 } : j
+      )),
+    });
+
+    expect(await screen.findByRole('button', { name: 'Equipar' })).toBeEnabled();
   });
 });

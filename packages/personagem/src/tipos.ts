@@ -1,5 +1,5 @@
 import type { Combatente } from '@card-dungeon/motor';
-import type { RacaResumo, MonstroCarta } from '@card-dungeon/cartas';
+import type { RacaResumo, MonstroCarta, ItemCarta } from '@card-dungeon/cartas';
 
 /** Modificadores parciais dos 4 stats de combate. `level` nunca é modificado. */
 export interface ModificadoresDeStat {
@@ -32,15 +32,23 @@ export interface Catalogo {
    */
   readonly monstros: readonly MonstroCarta[];
   readonly classes: readonly Classe[];
-  readonly itens: readonly Equipamento[];
+  /**
+   * O baralho de Tesouros como catálogo. `ItemCarta` e não `Equipamento`: o
+   * cliente precisa do `slot` (para desenhar os cinco encaixes do corpo) e do
+   * `nome` (para nomear a carta na mão e no log) — com só os modificadores, a
+   * tela mostraria o id cru e não saberia onde pintar a peça.
+   *
+   * Dado puro, como os monstros: não há projeção `Resumo` a fazer, a carta
+   * atravessa o JSON inteira.
+   */
+  readonly itens: readonly ItemCarta[];
 }
 
 /**
- * Escolhas do jogador (corpo do POST). Só o que MONTA os stats: a raça saiu na
- * fatia 7 porque virou carta sacável — ela entra na mesa por `jogarCarta`, não
- * pelo construtor.
+ * Escolhas do jogador (corpo do POST). Só o que MONTA os stats — e desde a fatia
+ * 8 isso é a classe, e só ela: a raça saiu na fatia 7 e o item sai agora, os dois
+ * pelo mesmo motivo (viraram carta que se saca do baralho).
  */
 export interface EscolhasPersonagem {
   readonly classeId: string;
-  readonly itemIds: readonly string[];
 }

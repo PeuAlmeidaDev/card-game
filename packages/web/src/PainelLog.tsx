@@ -27,18 +27,23 @@ export function corDoJogador(jogadores: readonly JogadorPublico[], jogadorId: st
  * inline, era uma cadeia de `&&` e um evento novo renderizava `<li>` vazio em
  * silêncio (foi o que aconteceu com `racaEmJogo`, `entrega` e `descarte`).
  */
-export function PainelLog({ log, jogadores, voce, racas, monstros }: {
+export function PainelLog({ log, jogadores, voce, racas, monstros, itens }: {
   readonly log: readonly EventoDaMesa[];
   readonly jogadores: readonly JogadorPublico[];
   readonly voce: string;
   readonly racas: Catalogo['racas'];
   readonly monstros: Catalogo['monstros'];
+  readonly itens: Catalogo['itens'];
 }) {
   const nomeDe = (id: string): string => jogadores.find((j) => j.id === id)?.nome ?? id;
   // Cai no id quando a raça é desconhecida: skew de versão (bundle antigo, raça
   // nova no server) tem que degradar para um texto feio, nunca para tela branca.
   const nomeDaRaca = (id: string): string => racas.find((r) => r.id === id)?.nome ?? id;
   const nomeDoMonstro = (id: string): string => monstros.find((m) => m.id === id)?.nome ?? id;
+  // `itens` é prop OBRIGATÓRIA, e não com default `[]`, pela mesma razão que
+  // `racas` e `monstros`: um default silencioso faria todo item cair no id sem
+  // nada acusar — o log diria "equipa espada-curta" e a suíte ficaria verde.
+  const nomeDoItem = (id: string): string => itens.find((i) => i.id === id)?.nome ?? id;
 
   // `null` = Todos. O filtro é estado LOCAL: é preferência de leitura, não estado
   // de jogo — subir isso para a TelaMesa (ou para o servidor) só acoplaria coisas.
@@ -85,7 +90,7 @@ export function PainelLog({ log, jogadores, voce, racas, monstros }: {
           const cor = 'jogadorId' in evento ? corDoJogador(jogadores, evento.jogadorId) : CINZA;
           return (
             <li key={i} style={{ color: cor }}>
-              {narrarEvento(evento, { voce, nomeDe, nomeDaRaca, nomeDoMonstro })}
+              {narrarEvento(evento, { voce, nomeDe, nomeDaRaca, nomeDoMonstro, nomeDoItem })}
             </li>
           );
         })}

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { escolhasSchema, contrato, acaoDaMesaSchema, acaoRequisicaoSchema } from './index';
 
-const valido = { classeId: 'ladino', itemIds: ['espada'] };
+const valido = { classeId: 'ladino' };
 
 describe('contrato', () => {
   it('expõe o catálogo como GET /api/catalogo', () => {
@@ -17,24 +17,25 @@ describe('contrato', () => {
 });
 
 describe('escolhasSchema', () => {
-  it('valida escolhas com classe e itens', () => {
+  it('valida escolhas só com a classe', () => {
     expect(escolhasSchema.safeParse(valido).success).toBe(true);
   });
 
-  it('aceita lista de itens vazia', () => {
-    expect(escolhasSchema.safeParse({ ...valido, itemIds: [] }).success).toBe(true);
-  });
-
   it('escolhasSchema não pede mais racaId — a raça virou carta sacável', () => {
-    expect(escolhasSchema.safeParse({ classeId: 'guerreiro', itemIds: [] }).success).toBe(true);
+    expect(escolhasSchema.safeParse({ classeId: 'guerreiro' }).success).toBe(true);
   });
 
   it('rejeita quando falta a classe', () => {
-    expect(escolhasSchema.safeParse({ itemIds: [] }).success).toBe(false);
+    expect(escolhasSchema.safeParse({}).success).toBe(false);
   });
 
-  it('rejeita itemIds que não é lista de strings', () => {
-    expect(escolhasSchema.safeParse({ ...valido, itemIds: [1, 2] }).success).toBe(false);
+  it('escolhasSchema não aceita mais itemIds', () => {
+    // O item deixou de ser escolha de menu e virou carta que se saca — a mesma
+    // jogada que a raça sofreu na fatia 7. Manter o campo deixaria um dado que o
+    // cliente é obrigado a mandar e o servidor ignora: um tipo que mente no fio.
+    const r = escolhasSchema.safeParse({ classeId: 'guerreiro', itemIds: ['espada'] });
+    expect(r.success).toBe(true);
+    expect(r.data).toEqual({ classeId: 'guerreiro' });
   });
 });
 
@@ -107,6 +108,17 @@ describe('acaoDaMesaSchema', () => {
 
   it('aceita entregarCarta com o id da carta', () => {
     expect(acaoDaMesaSchema.safeParse({ tipo: 'entregarCarta', cartaId: 'p-3' }).success).toBe(true);
+  });
+
+  it('equiparCarta viaja no fio com o mesmo teto de 64 chars', () => {
+    // O `cartaId` é o único campo livre do fio também aqui, e o SLOT não viaja:
+    // ele sai do item, pelo catálogo do servidor. Deixar o cliente escolher onde
+    // encaixar seria deixá-lo pôr o capacete no pé.
+    expect(acaoDaMesaSchema.safeParse({ tipo: 'equiparCarta', cartaId: 't-1' }).success).toBe(true);
+    expect(acaoDaMesaSchema.safeParse({ tipo: 'equiparCarta', cartaId: '' }).success).toBe(false);
+    expect(acaoDaMesaSchema.safeParse({ tipo: 'equiparCarta', cartaId: 'x'.repeat(65) }).success).toBe(false);
+    expect(acaoDaMesaSchema.parse({ tipo: 'equiparCarta', cartaId: 't-1', slot: 'pes' }))
+      .toEqual({ tipo: 'equiparCarta', cartaId: 't-1' });
   });
 
   it('recusa entregarCarta sem cartaId, com cartaId vazio ou longo demais', () => {
