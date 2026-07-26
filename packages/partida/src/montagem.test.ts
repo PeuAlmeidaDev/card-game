@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { criarPartida } from './montagem';
 import { COMPOSICAO_DE_TESTE } from './testes/composicao';
+import { MAO_INICIAL_PADRAO } from './mao';
 import type { EntradaJogador } from './tipos';
 import type { Combatente } from '@card-dungeon/motor';
 
@@ -104,5 +105,28 @@ describe('criarPartida', () => {
       { ...config, composicaoPorJogador: [{ tipo: 'salaVazia' }], maoInicial: 1 },
       { embaralhar: semEmbaralhar }))
       .toThrow('criarPartida: o baralho não tem cartas para a mão inicial');
+  });
+});
+
+describe('criarPartida — a fase inicial', () => {
+  it('a mesa nasce na fase de vasculhar', () => {
+    const p = criarPartida('m1', entradas,
+      { patenteAlvo: 3, composicaoPorJogador: COMPOSICAO_DE_TESTE, maoInicial: MAO_INICIAL_PADRAO },
+      { embaralhar: semEmbaralhar });
+
+    expect(p.fase).toBe('vasculhar');
+  });
+
+  it('primeiro assento estourado nasce em `descartar`, não em `vasculhar`', () => {
+    // O par do alarme "nascer acima do limite deixaria o jogador SEM nenhuma ação
+    // legal" (mesa.test.ts): se a fase inicial fosse a constante `'vasculhar'`, um
+    // dial mal girado deixaria a mesa nascer numa fase cuja única ação (vasculhar)
+    // o excedente proíbe — tela morta no primeiro clique, agora sem nem o guard
+    // antigo para recusar. A fase inicial tem que ser CALCULADA.
+    const p = criarPartida('m1', entradas,
+      { patenteAlvo: 3, composicaoPorJogador: COMPOSICAO_DE_TESTE, maoInicial: MAO_INICIAL_PADRAO + 2 },
+      { embaralhar: semEmbaralhar });
+
+    expect(p.fase).toBe('descartar');
   });
 });

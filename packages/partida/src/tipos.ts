@@ -242,6 +242,12 @@ export interface EstadoPartida {
   readonly portas: Baralho<CartaPorta>;
   readonly combate: CombateNaMesa | null;
   readonly espiada: EspiadaPendente | null;
+  /**
+   * Onde o turno está. Só é significativa com `desfecho === 'emAndamento'`: a
+   * partida terminada não tem turno, e o guard do topo do `aplicarAcao` recusa
+   * tudo antes de a fase ser consultada.
+   */
+  readonly fase: Fase;
   readonly desfecho: 'emAndamento' | 'terminada';
   readonly classificacao: readonly PosicaoFinal[] | null;
   readonly log: readonly EventoDaMesa[];

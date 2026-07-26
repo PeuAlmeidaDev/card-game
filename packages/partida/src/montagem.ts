@@ -1,6 +1,7 @@
 import type {
   CartaPorta, ConfigPartida, EntradaJogador, Embaralhar, EstadoPartida, EventoDaMesa, JogadorNaMesa,
 } from './tipos';
+import { faseDoTurnoDe } from './fase';
 
 /**
  * Montagem da mesa: como uma partida NASCE. Compõe e embaralha o baralho, carimba
@@ -86,6 +87,11 @@ export function criarPartida(
     portas: { monte, cemiterio: [] },
     combate: null,
     espiada: null,
+    // CALCULADA, nunca a constante `'vasculhar'`: `MAO_INICIAL_PADRAO` e
+    // `LIMITE_BASE_DE_MAO` são dials que o spec §8 diz que vão subir, e um mal
+    // girado faria a mesa nascer estourada. Nesse caso a fase certa é `descartar`
+    // — a mesma que `encerrarTurno` dá a quem recebe a vez acima do limite.
+    fase: faseDoTurnoDe(comMao[0] ?? primeiro),
     desfecho: 'emAndamento',
     classificacao: null,
     log: [abertura],
