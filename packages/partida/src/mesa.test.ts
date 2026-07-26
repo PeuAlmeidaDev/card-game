@@ -1280,3 +1280,117 @@ describe('a composição BASELINE não pode nascer travada', () => {
     expect(humano!.mao.every((c) => c.tipo !== 'raca')).toBe(true);
   });
 });
+
+describe('a fase acompanha o que o turno fez', () => {
+  const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] };
+  const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] };
+
+  it('carta de monstro leva a mesa para `combate`', () => {
+    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+
+    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
+
+    expect(r.estado.fase).toBe('combate');
+  });
+
+  it('um lance que não fecha o combate mantém a fase `combate`', () => {
+    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const comCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
+
+    // 12 = erra o ataque; o combate continua aberto e a vez passa ao monstro.
+    // Dois dados: o segundo cobre o contra-ataque automático do monstro, que o
+    // próprio `avancar` do motor resolve dentro desta mesma chamada (mesmo
+    // padrão de `depsComOgro([12, 12])` logo acima, para o mesmo `entradas`).
+    const r = aplicarAcao(comCombate, { tipo: 'atacar', jogadorId: 'p1' }, deps([12, 12]));
+
+    expect(r.estado.combate).not.toBeNull();
+    expect(r.estado.fase).toBe('combate');
+  });
+
+  it('sala vazia passa a vez e devolve a mesa a `vasculhar`', () => {
+    const p = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+
+    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
+
+    expect(r.estado.vezDe).toBe('p2');
+    expect(r.estado.fase).toBe('vasculhar');
+  });
+
+  it('a espiada pendente NÃO é fase própria — o turno segue em `vasculhar`', () => {
+    // Spec §6: a Presciência é pendência DENTRO da fase, e quem a resolve é o
+    // campo `espiada`, não a fase.
+    const p = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+
+    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([]));
+
+    expect(r.estado.espiada).not.toBeNull();
+    expect(r.estado.fase).toBe('vasculhar');
+  });
+
+  it('a compra que estoura a mão prende o turno em `descartar`', () => {
+    // A mesma situação de "com a mão acima do limite, a vez NÃO passa", agora
+    // dita pela fase: 4 cartas com raça em jogo = NO limite; a raça sacada é a 5ª.
+    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const noLimite: EstadoPartida = {
+      ...p0,
+      jogadores: p0.jogadores.map((j) => (
+        j.id === 'p1'
+          ? { ...j, mao: [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4')],
+              emJogo: { raca: raca('r1', 'anao') } }
+          : j
+      )),
+      portas: { ...p0.portas, monte: [raca('r9', 'elfo')] },
+    };
+
+    const r = aplicarAcao(noLimite, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
+
+    expect(r.estado.vezDe).toBe('p1');
+    expect(r.estado.fase).toBe('descartar');
+  });
+
+  it('quem RECEBE a vez estourado a recebe já em `descartar`', () => {
+    // A caridade pode empurrar o destinatário acima do teto DELE. Sem calcular a
+    // fase na passagem da vez, ele receberia o turno em `vasculhar` — uma fase
+    // cuja única ação o excedente proíbe. Tela morta, agora sem guard que a salve.
+    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const doadorEstourado: EstadoPartida = {
+      ...p0,
+      jogadores: p0.jogadores.map((j) => {
+        if (j.id === 'p1') {
+          return { ...j, patente: 5,
+            mao: [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4'), monstro('m5'), monstro('m6')],
+            emJogo: { raca: raca('r1', 'anao') } };
+        }
+        // p2 já NO teto dele (5 cartas, sem raça em jogo => limite 5): a carta
+        // doada é a que o estoura.
+        return { ...j, mao: [salaVazia('s1'), salaVazia('s2'), salaVazia('s3'), salaVazia('s4'), salaVazia('s5')] };
+      }),
+    };
+
+    const primeira = aplicarAcao(doadorEstourado, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([]));
+    const segunda = aplicarAcao(primeira.estado, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm2' }, deps([]));
+
+    expect(segunda.estado.vezDe).toBe('p2');
+    expect(segunda.estado.jogadores[1]?.mao.length).toBe(7);
+    expect(segunda.estado.fase).toBe('descartar');
+  });
+
+  it('jogar a raça que resolve o excedente devolve o turno a `vasculhar`', () => {
+    // Com raça JÁ em jogo o limite está em 4 e só a mão encolhe: 5 → 4 cabe.
+    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const estourado: EstadoPartida = {
+      ...p0,
+      jogadores: p0.jogadores.map((j) => (
+        j.id === 'p1'
+          ? { ...j, mao: [monstro('m1'), monstro('m2'), monstro('m3'), monstro('m4'), raca('r9', 'orc')],
+              emJogo: { raca: raca('r1', 'anao') } }
+          : j
+      )),
+    };
+
+    const r = aplicarAcao(estourado, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r9' }, deps([]));
+
+    expect(r.estado.jogadores[0]?.mao).toHaveLength(4);
+    expect(r.estado.fase).toBe('vasculhar');
+  });
+});

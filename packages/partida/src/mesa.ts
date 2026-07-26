@@ -7,6 +7,7 @@ import { tirarDoTopo } from './baralho';
 import { destinoDaCaridade } from './caridade';
 import { classificar } from './classificacao';
 import { AcaoInvalida } from './erros';
+import { faseDoTurnoDe } from './fase';
 import { limiteDeMao } from './mao';
 
 /** As ações que só fazem sentido com um combate aberto. */
@@ -76,11 +77,14 @@ function encerrarTurno(base: EstadoPartida, eventos: readonly EventoDaMesa[]): R
   // por esse estado corrompido continua sendo o `proximoJogador`, logo abaixo —
   // um `throw` próprio aqui só duplicaria o guard com outra mensagem.
   if (daVez !== undefined && daVez.mao.length > limiteDeMao(daVez)) {
-    return registrar(base, eventos);
+    return registrar({ ...base, fase: 'descartar' }, eventos);
   }
 
   const seguinte = proximoJogador(base);
-  return registrar({ ...base, vezDe: seguinte.id }, [...eventos, { tipo: 'vez', jogadorId: seguinte.id }]);
+  return registrar(
+    { ...base, vezDe: seguinte.id, fase: faseDoTurnoDe(seguinte) },
+    [...eventos, { tipo: 'vez', jogadorId: seguinte.id }],
+  );
 }
 
 /**
@@ -188,6 +192,7 @@ function resolverCarta(
   return registrar(
     {
       ...revelada,
+      fase: 'combate',
       combate: {
         estado: passo.estado,
         proximaDecisao: passo.proximaDecisao,
@@ -399,6 +404,11 @@ function jogarCarta(
         ...estado.portas,
         cemiterio: anterior === null ? estado.portas.cemiterio : [...estado.portas.cemiterio, anterior],
       },
+      // RECALCULADA: jogar a raça tira uma carta da mão e pode ter resolvido o
+      // excedente (quando já havia raça em jogo — o limite não se move e só a mão
+      // encolhe). Sem isto o turno ficaria preso em `descartar` com a mão já
+      // cabendo, e `vasculhar` seguiria recusado sem motivo.
+      fase: faseDoTurnoDe(atualizado),
     },
     [{ tipo: 'racaEmJogo', jogadorId: acao.jogadorId, carta }],
   );
@@ -472,7 +482,12 @@ function fecharCombate(
       : { tipo: 'derrota', jogadorId, derrotas: atualizado.derrotas },
   ];
 
-  const semCombate: EstadoPartida = { ...estado, jogadores, combate: null };
+  // A fase sai de `combate` junto com o combate. No caminho normal o
+  // `encerrarTurno` logo abaixo a recalcula (`descartar` se o vencedor estourou,
+  // `vasculhar` para quem recebe a vez); no caminho da vitória final ela fica
+  // aqui, neutra — `desfecho: 'terminada'` já recusa toda ação no topo do
+  // `aplicarAcao`, e a partida acabada não tem turno para descrever.
+  const semCombate: EstadoPartida = { ...estado, jogadores, combate: null, fase: 'vasculhar' };
 
   if (atualizado.patente >= estado.patenteAlvo) {
     const classificacao = classificar(jogadores);
