@@ -20,26 +20,31 @@ import { limiteDeMao } from './mao';
  * numa string caia na compilação em vez de virar um conjunto que nunca casa.
  */
 const LEGAL: Record<Fase, ReadonlySet<AcaoDaMesa['tipo']>> = {
+  // FASE 1 (bible §6.1). Recompor o personagem acontece ANTES de a porta abrir:
+  // é o que impede a raça de virar resposta reativa ao monstro que já se viu
+  // (decisão #7 do spec). `passar` é a saída — sem ela esta fase prenderia o
+  // turno de quem tem uma raça na mão e não quer trocar.
+  recompor: new Set<AcaoDaMesa['tipo']>(['jogarCarta', 'equiparCarta', 'passar']),
   // A espiada da Presciência continua sendo PENDÊNCIA dentro desta fase, não fase
   // própria (spec §6): `vasculhar` e `manterCarta`/`empurrarCarta` são legais na
   // mesma fase e se excluem pelo campo `espiada`, que o reducer ainda consulta.
-  vasculhar: new Set<AcaoDaMesa['tipo']>([
-    'vasculhar', 'manterCarta', 'empurrarCarta', 'jogarCarta', 'equiparCarta',
-  ]),
+  vasculhar: new Set<AcaoDaMesa['tipo']>(['vasculhar', 'manterCarta', 'empurrarCarta']),
   // `equiparCarta` fica de FORA: o motor recebe um snapshot imutável dos stats na
   // abertura do combate, então remontar o corpo no meio da luta ou não teria
   // efeito nenhum (mentindo para quem clicou) ou furaria o snapshot.
   combate: new Set<AcaoDaMesa['tipo']>(['atacar', 'esquivar']),
-  // As TRÊS saídas do excedente. `equiparCarta` entra pelo mesmo motivo que
-  // `jogarCarta`: ela tira uma carta da mão, logo resolve o estouro. `vasculhar`
-  // fica de fora: se continuasse legal, "a vez não passa" viraria "jogue para
-  // sempre" — o jogador sacaria carta atrás de carta sem nunca resolver o excedente.
-  descartar: new Set<AcaoDaMesa['tipo']>(['entregarCarta', 'jogarCarta', 'equiparCarta']),
-  // Nascem INERTES: a ação `passar` existe (Task 1) mas nenhuma transição leva a
-  // estas fases ainda, e conjunto vazio é o que garante que uma fase inalcançável
-  // não aceite nada por engano. As Tasks 2 e 3 as preenchem.
-  recompor: new Set<AcaoDaMesa['tipo']>([]),
+  // Continua INERTE: nenhuma transição leva a `jogar` ainda, e conjunto vazio é o
+  // que garante que uma fase inalcançável não aceite nada por engano. A Task 3 a
+  // preenche, e é lá que `equiparCarta` sai de `descartar` para cá.
   jogar: new Set<AcaoDaMesa['tipo']>([]),
+  // DUAS saídas do excedente, não mais três: `jogarCarta` migrou para `recompor`,
+  // que acontece ANTES desta fase — quem chega aqui já teve a janela de trocar de
+  // raça e agora paga o que sobrou (decisão #7). `equiparCarta` fica até a Task 3,
+  // porque só lá nasce a fase `jogar` que a recebe; tirá-la antes disso deixaria o
+  // tesouro da mão estourada sem outra saída que não a caridade. `vasculhar`
+  // continua de fora: se fosse legal, "a vez não passa" viraria "jogue para
+  // sempre" — o jogador sacaria carta atrás de carta sem nunca resolver o estouro.
+  descartar: new Set<AcaoDaMesa['tipo']>(['entregarCarta', 'equiparCarta']),
 };
 
 /** A tabela como pergunta. O `LEGAL` não é exportado: quem lê, lê por aqui. */
@@ -48,16 +53,56 @@ export function acaoEhLegalNaFase(fase: Fase, tipo: AcaoDaMesa['tipo']): boolean
 }
 
 /**
- * A fase em que um jogador COMEÇA o turno. Ponto único: `criarPartida` (o
- * primeiro assento), `encerrarTurno` (quem recebe a vez), `jogarCarta` e
- * `equiparCarta` (que podem ter resolvido o excedente, porque as duas tiram uma
- * carta da mão) fazem a mesma pergunta, e uma cópia esquecida deixaria a vez cair
- * num jogador estourado sem nenhuma ação legal.
+ * A fase se auto-pula? (spec §6.1) — `true` quando a ÚNICA ação legal nela é
+ * `passar`, isto é, quando a fase não tem nada a oferecer a este jogador.
  *
- * São QUATRO chamadores hoje, e cada saída nova do excedente acrescenta um: quem
- * escrever a quinta e esquecer de recalcular a fase prende o turno em `descartar`
- * com a mão já cabendo.
+ * É a mitigação de RITMO da fatia: sem ela, `recompor` e `jogar` custariam dois
+ * cliques por turno a quem não tem nada para jogar nem equipar. `vasculhar`,
+ * `combate` e `descartar` nunca se pulam — pular a primeira seria pular o turno,
+ * e pular a última seria perdoar o excedente.
+ *
+ * A pergunta é a MESMA na entrada da fase e depois de cada ação dentro dela (ver
+ * `entrarOuPular`, em `./mesa`): equipar o último item sai da fase sozinho, sem
+ * cobrar um "Passar" que não decide nada.
+ *
+ * `switch` exaustivo com `never`: fase nova é obrigada a declarar se se pula.
+ */
+export function faseSeAutoPula(fase: Fase, jogador: JogadorNaMesa): boolean {
+  const temRaca = jogador.mao.some((c) => c.tipo === 'raca');
+  const temEquipamento = jogador.mao.some((c) => c.tipo === 'equipamento');
+  switch (fase) {
+    case 'recompor':
+      return !temRaca && !temEquipamento;
+    case 'jogar':
+      // SEM a raça: ela só entra em jogo na fase 1 (decisão #7). Uma raça na mão
+      // não dá o que fazer aqui, então não segura a fase.
+      return !temEquipamento;
+    case 'vasculhar':
+    case 'combate':
+    case 'descartar':
+      return false;
+    default: {
+      const naoTratada: never = fase;
+      throw new Error(`faseSeAutoPula: fase não tratada: ${JSON.stringify(naoTratada)}`);
+    }
+  }
+}
+
+/**
+ * A fase em que um jogador COMEÇA o turno. Ponto único: `criarPartida` (o primeiro
+ * assento) e `encerrarTurno` (quem recebe a vez) fazem a mesma pergunta.
+ *
+ * São DOIS chamadores agora, não quatro: `jogarCarta` deixou de perguntar isto, e
+ * `equiparCarta` só o faz no caminho de `descartar` que a Task 3 remove. Elas
+ * acontecem dentro de uma fase parada e a pergunta delas é outra — "ainda há o que
+ * fazer AQUI?" (`faseSeAutoPula`), não "onde o turno começa?". Enquanto as duas
+ * compartilhavam esta função, equipar dentro de `jogar` teria mandado o jogador de
+ * volta para `recompor`.
+ *
+ * O excedente vem PRIMEIRO: quem abre o turno acima do teto vai para `descartar`
+ * mesmo tendo o que recompor. Invertido, a mão estourada atravessaria o turno.
  */
 export function faseDoTurnoDe(jogador: JogadorNaMesa): Fase {
-  return jogador.mao.length > limiteDeMao(jogador) ? 'descartar' : 'vasculhar';
+  if (jogador.mao.length > limiteDeMao(jogador)) return 'descartar';
+  return faseSeAutoPula('recompor', jogador) ? 'vasculhar' : 'recompor';
 }

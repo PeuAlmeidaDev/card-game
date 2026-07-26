@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { acaoEhLegalNaFase, faseDoTurnoDe } from './fase';
+import { acaoEhLegalNaFase, faseDoTurnoDe, faseSeAutoPula } from './fase';
 import { criarPartida } from './montagem';
 import { aplicarAcao } from './mesa';
 import { escolherAcao } from './bot';
@@ -9,7 +9,7 @@ import { montarComposicao } from './baralho';
 import { criarDadoCiclico } from './testes/dados';
 import { catalogoDeTeste, ID_DA_CLASSE_DE_TESTE } from './testes/catalogo';
 import { COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
-import { monstro, monstros, raca } from './testes/cartas';
+import { equipamento, monstro, monstros, raca } from './testes/cartas';
 import { SLOTS_VAZIOS } from './corpo';
 import type { JogadorNaMesa, EntradaJogador, EstadoPartida, Fase } from './tipos';
 
@@ -22,12 +22,27 @@ const jogador = (mao: JogadorNaMesa['mao'], comRaca: boolean): JogadorNaMesa => 
 });
 
 describe('acaoEhLegalNaFase', () => {
-  it('em `vasculhar` valem a compra, a decisão da espiada, jogar raça e equipar', () => {
+  it('em `recompor` valem jogar raça, equipar e passar', () => {
+    expect(acaoEhLegalNaFase('recompor', 'jogarCarta')).toBe(true);
+    expect(acaoEhLegalNaFase('recompor', 'equiparCarta')).toBe(true);
+    expect(acaoEhLegalNaFase('recompor', 'passar')).toBe(true);
+    // Comprar é da fase 2: recompor acontece ANTES de qualquer carta virar, que é
+    // o que impede a raça de ser resposta reativa ao monstro (spec, decisão #7).
+    expect(acaoEhLegalNaFase('recompor', 'vasculhar')).toBe(false);
+    expect(acaoEhLegalNaFase('recompor', 'entregarCarta')).toBe(false);
+  });
+
+  it('em `vasculhar` sobram SÓ a compra e a decisão da espiada', () => {
     expect(acaoEhLegalNaFase('vasculhar', 'vasculhar')).toBe(true);
     expect(acaoEhLegalNaFase('vasculhar', 'manterCarta')).toBe(true);
     expect(acaoEhLegalNaFase('vasculhar', 'empurrarCarta')).toBe(true);
-    expect(acaoEhLegalNaFase('vasculhar', 'jogarCarta')).toBe(true);
-    expect(acaoEhLegalNaFase('vasculhar', 'equiparCarta')).toBe(true);
+    // Decisão #7 do spec: jogar raça migrou para `recompor`. Trocar de raça depois
+    // de ver o monstro faria a passiva virar resposta reativa em vez de aposta.
+    expect(acaoEhLegalNaFase('vasculhar', 'jogarCarta')).toBe(false);
+    // Equipar migrou junto: as duas são recomposição do corpo, e o corpo se monta
+    // antes de a porta abrir.
+    expect(acaoEhLegalNaFase('vasculhar', 'equiparCarta')).toBe(false);
+    expect(acaoEhLegalNaFase('vasculhar', 'passar')).toBe(false);
   });
 
   it('em `vasculhar` NÃO valem as de combate nem a caridade', () => {
@@ -50,16 +65,17 @@ describe('acaoEhLegalNaFase', () => {
     expect(acaoEhLegalNaFase('combate', 'equiparCarta')).toBe(false);
   });
 
-  it('em `descartar` valem as TRÊS saídas do excedente, e vasculhar não', () => {
-    // Jogar uma raça e equipar um tesouro tiram uma carta da mão; são as outras
-    // duas saídas, e o `mesa.test.ts` já as afirma ("jogar uma raça continua
-    // liberado", "equipar é a TERCEIRA saída do excedente"). Vasculhar precisa
-    // ficar fora: se continuasse legal, "a vez não passa" viraria "jogue para
-    // sempre".
+  it('em `descartar` a caridade deixa de dividir a fase com jogar raça', () => {
+    // 🎚️ Mudança de REGRA (decisão #7), não de estrutura: a raça só entra em jogo
+    // na fase 1. Quem chega a `descartar` já teve a janela de recompor e a de
+    // jogar; aqui só resta pagar o excedente. `equiparCarta` sai na Task 3, junto
+    // com a fase `jogar` que a recebe — até lá ela continua sendo a segunda saída
+    // do excedente, e o `mesa.test.ts` ainda a afirma como tal.
     expect(acaoEhLegalNaFase('descartar', 'entregarCarta')).toBe(true);
-    expect(acaoEhLegalNaFase('descartar', 'jogarCarta')).toBe(true);
     expect(acaoEhLegalNaFase('descartar', 'equiparCarta')).toBe(true);
+    expect(acaoEhLegalNaFase('descartar', 'jogarCarta')).toBe(false);
     expect(acaoEhLegalNaFase('descartar', 'vasculhar')).toBe(false);
+    expect(acaoEhLegalNaFase('descartar', 'passar')).toBe(false);
     expect(acaoEhLegalNaFase('descartar', 'atacar')).toBe(false);
   });
 });
@@ -83,6 +99,49 @@ describe('faseDoTurnoDe', () => {
   it('acima do limite, o turno abre em `descartar`', () => {
     // Com raça em jogo o limite cai para o base: as MESMAS cartas agora estouram.
     expect(faseDoTurnoDe(jogador(noTetoDoHumano, true))).toBe('descartar');
+  });
+});
+
+describe('faseSeAutoPula (spec §6.1)', () => {
+  const comMao = (mao: JogadorNaMesa['mao']): JogadorNaMesa => jogador(mao, false);
+
+  it('`recompor` se pula com a mão sem raça e sem equipamento', () => {
+    expect(faseSeAutoPula('recompor', comMao([monstro('m1')]))).toBe(true);
+  });
+
+  it('`recompor` NÃO se pula com uma raça na mão', () => {
+    expect(faseSeAutoPula('recompor', comMao([raca('r1', 'elfo')]))).toBe(false);
+  });
+
+  it('`recompor` NÃO se pula com um equipamento na mão', () => {
+    expect(faseSeAutoPula('recompor', comMao([equipamento('t-1')]))).toBe(false);
+  });
+
+  it('as fases que compram, lutam ou pagam NUNCA se pulam', () => {
+    // Spec §6.1 é explícito: só `recompor` e `jogar`. Pular `vasculhar` seria pular
+    // o turno; pular `descartar` seria perdoar o excedente.
+    const vazio = comMao([]);
+    expect(faseSeAutoPula('vasculhar', vazio)).toBe(false);
+    expect(faseSeAutoPula('combate', vazio)).toBe(false);
+    expect(faseSeAutoPula('descartar', vazio)).toBe(false);
+  });
+});
+
+describe('faseDoTurnoDe abre o turno em `recompor`', () => {
+  it('com raça na mão, o turno abre em `recompor`', () => {
+    expect(faseDoTurnoDe(jogador([raca('r1', 'elfo')], false))).toBe('recompor');
+  });
+
+  it('sem nada a recompor, o turno já abre em `vasculhar` — o auto-pulo é aqui', () => {
+    expect(faseDoTurnoDe(jogador([monstro('m1')], false))).toBe('vasculhar');
+  });
+
+  it('o excedente vence o auto-pulo: estourado abre em `descartar` mesmo com raça na mão', () => {
+    // A ordem importa: `descartar` primeiro. Invertida, o jogador estourado abriria
+    // em `recompor` e a fase `descartar` só chegaria depois — a mão acima do teto
+    // atravessaria o turno inteiro.
+    const estourado = [raca('r1', 'elfo'), ...monstros(LIMITE_BASE_DE_MAO + 1)];
+    expect(faseDoTurnoDe(jogador(estourado, true))).toBe('descartar');
   });
 });
 
@@ -128,11 +187,22 @@ describe('a fase nunca mente sobre o estado', () => {
         if (estourado) erros.push('fase=combate com a mão de quem tem a vez estourada');
         break;
       case 'recompor':
+        // `faseDoTurnoDe` põe o excedente na frente, então recompor NUNCA convive
+        // com mão estourada. Se conviver, foi uma transição que esqueceu de olhar
+        // o teto.
+        if (estourado) erros.push('fase=recompor com a mão de quem tem a vez estourada');
+        // O auto-pulo é afirmado como INVARIANTE, não só como teste de unidade: se
+        // a mesa parar em `recompor` sem raça nem equipamento na mão, o jogador vê
+        // uma fase cuja única ação é "Passar" — o custo de ritmo que o spec §6.1
+        // existe para evitar. Só é violação com o jogador da vez encontrado.
+        if (daVez !== undefined && faseSeAutoPula('recompor', daVez)) {
+          erros.push('fase=recompor sem nada a recompor — o auto-pulo não aconteceu');
+        }
+        break;
       case 'jogar':
-        // Inalcançáveis nesta task: o conjunto de ações de ambas está vazio em
-        // `fase.ts` (Task 1), então nenhuma transição desta suíte cai aqui. O
-        // `switch` exaustivo cobra o caso mesmo assim — a invariante de excedente
-        // de cada uma é decisão das Tasks 2 e 3, que preenchem as fases.
+        // Inalcançável nesta task: o conjunto de ações de `jogar` continua vazio em
+        // `fase.ts` e nenhuma transição leva até ela. O `switch` exaustivo cobra o
+        // caso mesmo assim — a invariante dela é decisão da Task 3, que a preenche.
         break;
       default: {
         const naoTratada: never = e.fase;
@@ -147,7 +217,7 @@ describe('a fase nunca mente sobre o estado', () => {
     return erros;
   };
 
-  it('vale em todo estado de uma partida inteira, e as três fases aparecem', () => {
+  it('vale em todo estado de uma partida inteira, e as quatro fases aparecem', () => {
     const quatro: readonly EntradaJogador[] = [
       { id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE },
       { id: 'p2', nome: 'Bot 1', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
@@ -266,7 +336,9 @@ describe('a fase nunca mente sobre o estado', () => {
     // Sem esta asserção o teste vira vácuo: uma invariante que só passou por
     // `vasculhar` não provou nada sobre `combate` nem sobre `descartar`.
     // 🎚️ Se falhar por cobertura, o dial é `maoInicial` (mais cartas => mais
-    // excedente) — nunca afrouxar a asserção.
-    expect([...fasesVistas].sort()).toEqual(['combate', 'descartar', 'vasculhar']);
+    // excedente) — nunca afrouxar a asserção. `'jogar'` entra na Task 3, que é
+    // quem lhe dá transição; `'recompor'` já entra aqui, e quem a produz é a mão
+    // com carta de raça que a composição deste fixture distribui.
+    expect([...fasesVistas].sort()).toEqual(['combate', 'descartar', 'recompor', 'vasculhar']);
   });
 });

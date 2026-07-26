@@ -149,6 +149,26 @@ describe('mesa', () => {
   };
 
   /**
+   * Encerra a fase 1 do turno (`recompor`, bible §6.1) e devolve a vista NOVA.
+   *
+   * A mesa de produção distribui 4 Portas + 4 Tesouros, então há o que vestir
+   * antes de a porta abrir e ela NASCE em `recompor` — `vasculhar` é da fase 2 e
+   * leva 400 antes disto. Todo fluxo deste arquivo que abre uma porta no turno 1
+   * passa por aqui, e nenhum deles forja fase: este é o caminho do jogador.
+   *
+   * Devolver a vista nova não é cortesia: o `passou` entra no log, a versão anda,
+   * e mandar a versão velha na ação seguinte cairia no guard de 409.
+   */
+  const passar = async (app: ReturnType<typeof buildApp>, vista: VistaDaPartida) => {
+    const res = await app.inject({
+      method: 'POST', url: `/api/partida/${vista.id}/acao`,
+      payload: { acao: { tipo: 'passar' }, versao: vista.versao },
+    });
+    expect(res.statusCode).toBe(200);
+    return res.json<VistaDaPartida>();
+  };
+
+  /**
    * Põe uma raça na zona do humano pelo caminho REAL: a carta que ele sacou na mão
    * inicial (com `racasNoTopo`) é jogada na mesa. Depende do app ter sido montado
    * com `racasNoTopo` — sem isso a mão inicial não traz raça e o helper falha alto.
@@ -180,11 +200,11 @@ describe('mesa', () => {
       embaralhar: semEmbaralhar,
       monstros: [{ id: 'goblin', nome: 'Goblin', forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1, tesouros: 1 }],
     });
-    const vista = await criar(app);
+    const naFase2 = await passar(app, await criar(app));
 
     const res = await app.inject({
-      method: 'POST', url: `/api/partida/${vista.id}/acao`,
-      payload: { acao: { tipo: 'vasculhar' }, versao: vista.versao },
+      method: 'POST', url: `/api/partida/${naFase2.id}/acao`,
+      payload: { acao: { tipo: 'vasculhar' }, versao: naFase2.versao },
     });
 
     expect(res.statusCode).toBe(500);
@@ -331,16 +351,37 @@ describe('mesa', () => {
     await app.close();
   });
 
-  it('aplica a ação e devolve a vista atualizada', async () => {
+  it('a mesa de produção nasce em `recompor` — vasculhar antes de passar leva 400', async () => {
+    // A abertura entrega 4 Tesouros, então há o que equipar e a fase 1 não se
+    // auto-pula. É a fase que o bible §6.1 pede, e ela chega ao fio: o cliente que
+    // ignorá-la clica em "Vasculhar" e leva 400 com a fase nomeada.
     const app = appDeJogo();
     const vista = await criar(app);
+    expect(vista.fase).toBe('recompor');
 
-    const res = await app.inject({
+    const recusa = await app.inject({
       method: 'POST', url: `/api/partida/${vista.id}/acao`,
       payload: { acao: { tipo: 'vasculhar' }, versao: vista.versao },
     });
+
+    expect(recusa.statusCode).toBe(400);
+    expect(recusa.json<{ erro: string }>().erro).toContain('não é legal na fase recompor');
+    // E `passar` é a saída: depois dela a mesa está na fase que aceita vasculhar.
+    expect((await passar(app, vista)).fase).toBe('vasculhar');
+    await app.close();
+  });
+
+  it('aplica a ação e devolve a vista atualizada', async () => {
+    const app = appDeJogo();
+    const vista = await criar(app);
+    const naFase2 = await passar(app, vista);
+
+    const res = await app.inject({
+      method: 'POST', url: `/api/partida/${naFase2.id}/acao`,
+      payload: { acao: { tipo: 'vasculhar' }, versao: naFase2.versao },
+    });
     expect(res.statusCode).toBe(200);
-    expect(res.json<VistaDaPartida>().log.length).toBeGreaterThan(vista.log.length);
+    expect(res.json<VistaDaPartida>().log.length).toBeGreaterThan(naFase2.log.length);
     await app.close();
   });
 
@@ -349,17 +390,17 @@ describe('mesa', () => {
     // efeito, um cliente jogaria no lugar de outro jogador. Aqui ele é descartado
     // no schema e a ação sai registrada com o id do humano da mesa.
     const app = appDeJogo();
-    const vista = await criar(app);
-    const bot = vista.jogadores.find((j) => j.ehBot);
+    const naFase2 = await passar(app, await criar(app));
+    const bot = naFase2.jogadores.find((j) => j.ehBot);
 
     const res = await app.inject({
-      method: 'POST', url: `/api/partida/${vista.id}/acao`,
-      payload: { acao: { tipo: 'vasculhar', jogadorId: bot?.id }, versao: vista.versao },
+      method: 'POST', url: `/api/partida/${naFase2.id}/acao`,
+      payload: { acao: { tipo: 'vasculhar', jogadorId: bot?.id }, versao: naFase2.versao },
     });
 
     expect(res.statusCode).toBe(200);
     const porta = res.json<VistaDaPartida>().log.find((e) => e.tipo === 'porta');
-    expect(porta).toMatchObject({ jogadorId: vista.voce });
+    expect(porta).toMatchObject({ jogadorId: naFase2.voce });
     await app.close();
   });
 
@@ -367,11 +408,11 @@ describe('mesa', () => {
     // Atacar sem combate aberto: recusa de REGRA, culpa do cliente => 400 com a
     // mensagem no corpo. Bug de servidor viraria 500 sem vazar mensagem.
     const app = appDeJogo();
-    const vista = await criar(app);
+    const naFase2 = await passar(app, await criar(app));
 
     const res = await app.inject({
-      method: 'POST', url: `/api/partida/${vista.id}/acao`,
-      payload: { acao: { tipo: 'atacar' }, versao: vista.versao },
+      method: 'POST', url: `/api/partida/${naFase2.id}/acao`,
+      payload: { acao: { tipo: 'atacar' }, versao: naFase2.versao },
     });
 
     expect(res.statusCode).toBe(400);
@@ -383,9 +424,9 @@ describe('mesa', () => {
     // Simula o duplo-clique: duas requisições com a MESMA versão. A segunda não
     // pode avançar a partida — senão o jogador perde uma rolagem que nunca viu.
     const app = appDeJogo();
-    const vista = await criar(app);
-    const payload = { acao: { tipo: 'vasculhar' }, versao: vista.versao };
-    const url = `/api/partida/${vista.id}/acao`;
+    const naFase2 = await passar(app, await criar(app));
+    const payload = { acao: { tipo: 'vasculhar' }, versao: naFase2.versao };
+    const url = `/api/partida/${naFase2.id}/acao`;
 
     const primeira = await app.inject({ method: 'POST', url, payload });
     expect(primeira.statusCode).toBe(200);
@@ -412,15 +453,18 @@ describe('mesa', () => {
     const monstros = [{ id: 'goblin', nome: 'Goblin', forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1, tesouros: 1 }];
     const app = buildApp({ rolar: filaDeDados([1, 12]), embaralhar: racasNoTopo, monstros });
 
-    const vista = await comRacaEmJogo(app, 'anao');
+    // A carta é jogada na fase 1 (`recompor`) e a porta abre na fase 2: `passar`
+    // no meio é o que separa as duas — jogar raça DEPOIS de ver o monstro é
+    // exatamente o que a decisão #7 do spec fechou.
+    const naFase2 = await passar(app, await comRacaEmJogo(app, 'anao'));
     const abrePorta = await app.inject({
-      method: 'POST', url: `/api/partida/${vista.id}/acao`,
-      payload: { acao: { tipo: 'vasculhar' }, versao: vista.versao },
+      method: 'POST', url: `/api/partida/${naFase2.id}/acao`,
+      payload: { acao: { tipo: 'vasculhar' }, versao: naFase2.versao },
     });
     const aposPorta = abrePorta.json<VistaDaPartida>();
 
     const res = await app.inject({
-      method: 'POST', url: `/api/partida/${vista.id}/acao`,
+      method: 'POST', url: `/api/partida/${naFase2.id}/acao`,
       payload: { acao: { tipo: 'esquivar' }, versao: aposPorta.versao },
     });
 
@@ -431,37 +475,39 @@ describe('mesa', () => {
 
   it('o Elfo espia o topo em vez de resolver a porta', async () => {
     const app = appDeJogoComRacas();
-    const vista = await comRacaEmJogo(app, 'elfo');
+    // A base das comparações é a vista JÁ na fase 2: o `passou` do `passar` também
+    // move o log e a versão, e comparar com a de antes dele mediria a fase errada.
+    const naFase2 = await passar(app, await comRacaEmJogo(app, 'elfo'));
 
     const res = await app.inject({
-      method: 'POST', url: `/api/partida/${vista.id}/acao`,
-      payload: { acao: { tipo: 'vasculhar' }, versao: vista.versao },
+      method: 'POST', url: `/api/partida/${naFase2.id}/acao`,
+      payload: { acao: { tipo: 'vasculhar' }, versao: naFase2.versao },
     });
 
     expect(res.statusCode).toBe(200);
     const depois = res.json<VistaDaPartida>();
     expect(depois.espiada).not.toBeNull();
-    expect(depois.espiada?.jogadorId).toBe(vista.voce);
+    expect(depois.espiada?.jogadorId).toBe(naFase2.voce);
     // O topo é segredo: nenhum evento público foi emitido...
-    expect(depois.log).toEqual(vista.log);
+    expect(depois.log).toEqual(naFase2.log);
     // ...mas a versão andou, senão o retry escaparia do guard de 409.
-    expect(depois.versao).toBe(vista.versao + 1);
+    expect(depois.versao).toBe(naFase2.versao + 1);
     // e a vez continua com o vidente
-    expect(depois.vezDe).toBe(vista.voce);
+    expect(depois.vezDe).toBe(naFase2.voce);
     await app.close();
   });
 
   it('encarar a carta espiada resolve a porta', async () => {
     const app = appDeJogoComRacas();
-    const vista = await comRacaEmJogo(app, 'elfo');
+    const naFase2 = await passar(app, await comRacaEmJogo(app, 'elfo'));
     const espiou = await app.inject({
-      method: 'POST', url: `/api/partida/${vista.id}/acao`,
-      payload: { acao: { tipo: 'vasculhar' }, versao: vista.versao },
+      method: 'POST', url: `/api/partida/${naFase2.id}/acao`,
+      payload: { acao: { tipo: 'vasculhar' }, versao: naFase2.versao },
     });
     const comEspiada = espiou.json<VistaDaPartida>();
 
     const res = await app.inject({
-      method: 'POST', url: `/api/partida/${vista.id}/acao`,
+      method: 'POST', url: `/api/partida/${naFase2.id}/acao`,
       payload: { acao: { tipo: 'manterCarta' }, versao: comEspiada.versao },
     });
 
@@ -477,9 +523,9 @@ describe('mesa', () => {
     // ficava parada, o guard não disparava e o reducer respondia 400 — a única
     // ação da mesa que puniria um duplo-clique com erro vermelho.
     const app = appDeJogoComRacas();
-    const vista = await comRacaEmJogo(app, 'elfo');
-    const url = `/api/partida/${vista.id}/acao`;
-    const payload = { acao: { tipo: 'vasculhar' }, versao: vista.versao };
+    const naFase2 = await passar(app, await comRacaEmJogo(app, 'elfo'));
+    const url = `/api/partida/${naFase2.id}/acao`;
+    const payload = { acao: { tipo: 'vasculhar' }, versao: naFase2.versao };
 
     const primeira = await app.inject({ method: 'POST', url, payload });
     expect(primeira.statusCode).toBe(200);
@@ -493,11 +539,11 @@ describe('mesa', () => {
 
   it('raça não-vidente continua resolvendo a porta de uma vez', async () => {
     const app = appDeJogo();
-    const vista = await criar(app);  // humano, baseline
+    const naFase2 = await passar(app, await criar(app));  // humano, baseline
 
     const res = await app.inject({
-      method: 'POST', url: `/api/partida/${vista.id}/acao`,
-      payload: { acao: { tipo: 'vasculhar' }, versao: vista.versao },
+      method: 'POST', url: `/api/partida/${naFase2.id}/acao`,
+      payload: { acao: { tipo: 'vasculhar' }, versao: naFase2.versao },
     });
 
     expect(res.statusCode).toBe(200);

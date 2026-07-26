@@ -179,10 +179,35 @@ describe('criarPartida', () => {
 });
 
 describe('criarPartida — a fase inicial', () => {
-  it('a mesa nasce na fase de vasculhar', () => {
+  it('mão inicial sem raça e sem tesouro nasce já em `vasculhar` — o auto-pulo da fase 1', () => {
+    // A fase inicial é CALCULADA, e desde o Plano 3b ela tem três respostas
+    // possíveis. Este fixture cai na do meio: `COMPOSICAO_DE_TESTE` não tem carta
+    // de raça e o `config` não distribui Tesouros, então a mão inicial é só
+    // monstro/sala vazia — nada a recompor, e `recompor` se auto-pula (spec §6.1).
+    // O título nomeia o fixture, não uma constante: se a composição de teste um dia
+    // trouxer raça, a resposta certa passa a ser `recompor` e é o título que avisa.
     const p = criarPartida('m1', entradas, { ...config, maoInicial: MAO_INICIAL_PADRAO }, { embaralhar: semEmbaralhar });
 
+    expect(p.jogadores[0]?.mao.every((c) => c.tipo !== 'raca' && c.tipo !== 'equipamento')).toBe(true);
     expect(p.fase).toBe('vasculhar');
+  });
+
+  it('mão inicial COM tesouro nasce em `recompor` — a fase 1 do bible §6.1', () => {
+    // O par do teste acima, e o caso da mesa de PRODUÇÃO: ela distribui 4 Portas +
+    // 4 Tesouros, então há o que vestir antes de abrir a porta e a fase 1 não se
+    // auto-pula. Sem este par, `faseDoTurnoDe` poderia ignorar `recompor` na
+    // abertura e nada aqui acusaria.
+    const p = criarPartida('m1', entradas,
+      {
+        ...config,
+        // 4 por jogador: 1 na mão de cada um dos 2 assentos precisa sobrar monte.
+        composicaoTesouros: montarComposicaoTesouros(Array.from({ length: 4 }, () => 'i-teste')),
+        maoInicial: MAO_INICIAL_PADRAO,
+        maoInicialTesouros: 1,
+      },
+      { embaralhar: semEmbaralhar });
+
+    expect(p.fase).toBe('recompor');
   });
 
   it('primeiro assento estourado nasce em `descartar`, não em `vasculhar`', () => {

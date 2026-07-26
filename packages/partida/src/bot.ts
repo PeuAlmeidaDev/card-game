@@ -48,5 +48,16 @@ export function escolherAcao(vista: VistaDaPartida, jogadorId: string): AcaoDaMe
       return { tipo: 'jogarCarta', jogadorId, cartaId: raca.id };
     }
   }
+  // Fase PARADA sem nada que o bot burro saiba fazer (equipar é o bot guloso do
+  // Plano 4): declina. Sem isto ele cairia no `vasculhar` logo abaixo, que a fase
+  // 1 recusa — e o `AcaoInvalida` subiria por `avancarBots` virando 400 na jogada
+  // do HUMANO, exatamente o modo de falha do bot vidente que ignorava a espiada.
+  //
+  // ⚠️ TRANSITÓRIO: a política inteira vira um `switch` sobre `vista.fase` na
+  // Task 4 do plano, que reescreve este arquivo. Aqui só o mínimo para a mesa não
+  // morrer no instante em que `recompor` passa a existir.
+  if (vista.fase === 'recompor') {
+    return { tipo: 'passar', jogadorId };
+  }
   return { tipo: 'vasculhar', jogadorId };
 }

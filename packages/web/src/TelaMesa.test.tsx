@@ -143,6 +143,10 @@ describe('TelaMesa', () => {
     // virar uma fase nova, esquecer um dos dois consumidores da tabela faz este
     // teste falhar em vez de deixar um botão aceso numa hora em que o domínio
     // recusa.
+    //
+    // As duas continuam apagando juntas, por motivos que se separaram: "Vasculhar"
+    // pela espiada pendente (o único par fino que sobrou), "Jogar" pela tabela —
+    // `jogarCarta` migrou para `recompor` e não é mais legal em `vasculhar`.
     await abrirMesa({
       ...vistaComEspiada,
       suaMao: [{ id: 'p-9', tipo: 'raca', racaId: 'orc' }],
@@ -379,8 +383,11 @@ describe('TelaMesa — a mão', () => {
   });
 
   it('só carta de raça tem botão de jogar', async () => {
+    // `fase: 'recompor'` porque é a única em que jogar raça é legal: uma vista de
+    // `vasculhar` com "Jogar" na tela seria uma vista que nunca aceita o clique.
     await abrirMesa({
       ...vistaBase,
+      fase: 'recompor',
       suaMao: [{ id: 'p-1', tipo: 'monstro', monstroId: 'goblin' }, { id: 'p-2', tipo: 'raca', racaId: 'orc' }],
     });
 
@@ -427,7 +434,9 @@ describe('TelaMesa — a mão', () => {
     // O `cartaId` é o único campo livre do fio; mandar o id errado joga a carta
     // errada, e com duas cópias da mesma raça na mão isso é invisível na tela.
     const agir = vi.spyOn(api, 'agir').mockResolvedValue({ status: 200, body: vistaBase } as never);
-    await abrirMesa({ ...vistaBase, suaMao: [{ id: 'p-9', tipo: 'raca', racaId: 'orc' }] });
+    // `recompor` é a fase em que o botão acende (decisão #7): sem ela o clique cai
+    // num botão desabilitado e o teste passaria a afirmar nada.
+    await abrirMesa({ ...vistaBase, fase: 'recompor', suaMao: [{ id: 'p-9', tipo: 'raca', racaId: 'orc' }] });
 
     await userEvent.click(screen.getByRole('button', { name: 'Jogar' }));
 
@@ -508,8 +517,18 @@ describe('TelaMesa — a mão', () => {
     expect(screen.getAllByRole('button', { name: 'Entregar' })[0]).toBeEnabled();
   });
 
-  it('na fase `descartar`, jogar raça continua aceso — é a outra saída', async () => {
+  it('na fase `descartar`, "Jogar" apaga — a raça só entra na fase 1', async () => {
+    // 🎚️ Inversão autorizada (decisão #7). A tela não decide isto: `legal()` lê a
+    // MESMA tabela do reducer, então o botão apaga sozinho quando a tabela muda.
     await abrirMesa(emDescartar([{ id: 'p-0', tipo: 'raca', racaId: 'orc' }]));
+
+    expect(await screen.findByRole('button', { name: /^jogar$/i })).toBeDisabled();
+  });
+
+  it('na fase `recompor`, "Jogar" acende — é a janela da troca de raça', async () => {
+    // O par positivo da inversão acima. Sem ele, uma tabela que apagasse "Jogar"
+    // em TODA fase passaria verde.
+    await abrirMesa({ ...vistaBase, fase: 'recompor', suaMao: [{ id: 'p-0', tipo: 'raca', racaId: 'orc' }] });
 
     expect(await screen.findByRole('button', { name: /^jogar$/i })).toBeEnabled();
   });
@@ -648,8 +667,14 @@ describe('TelaMesa — os stats na lista', () => {
 });
 
 describe('TelaMesa — equipar', () => {
+  // `fase: 'recompor'` — a fase 1 do turno (bible §6.1), uma das duas em que
+  // `equiparCarta` é legal. Com `vasculhar` (o default do `vistaBase`) esta vista
+  // deixou de ser produzível para quem quer equipar: a tabela migrou as duas ações
+  // de corpo para as fases paradas. E ela é COERENTE — uma mão com tesouro e com
+  // raça é exatamente o que faz a fase 1 não se auto-pular.
   const maoHeterogenea: VistaDaPartida = {
     ...vistaBase,
+    fase: 'recompor',
     suaMao: [
       { id: 'p-1', tipo: 'monstro', monstroId: 'goblin' },
       { id: 'p-2', tipo: 'raca', racaId: 'orc' },
@@ -690,12 +715,18 @@ describe('TelaMesa — equipar', () => {
   });
 
   it('com espiada pendente, Equipar apaga junto com Vasculhar e Jogar', async () => {
-    // O par fino `espiada === null` do `equiparCarta`: a tabela de fases diz que
-    // equipar cabe na fase `vasculhar`, mas o reducer recusa enquanto o vidente
-    // não resolveu o topo. `legal('equiparCarta')` sozinho acenderia aqui.
-    // Asserção CONJUNTA de propósito — os três consumidores da mesma guarda.
+    // 🎚️ Continua verde, por OUTRO motivo. Antes eram três consumidores do mesmo
+    // par fino `espiada === null`. Agora a espiada só apaga "Vasculhar" — o único
+    // par fino que sobrou; "Jogar" e "Equipar" apagam porque a tabela tirou as
+    // duas ações da fase `vasculhar`, que é a única em que a espiada existe. Foi
+    // essa migração que tornou os guards de pendência do reducer inalcançáveis.
+    //
+    // `fase: 'vasculhar'` explícita (o default do `vistaBase`, não o `recompor` do
+    // `maoHeterogenea`): espiada em `recompor` seria vista impossível — a fase 1
+    // acontece antes de qualquer compra.
     await abrirMesa({
       ...maoHeterogenea,
+      fase: 'vasculhar',
       espiada: { jogadorId: 'p1', carta: { id: 'p-0', tipo: 'monstro', monstroId: 'goblin' } },
     });
 
