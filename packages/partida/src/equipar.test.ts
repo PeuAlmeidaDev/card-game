@@ -45,6 +45,24 @@ describe('colocarNoSlot', () => {
     expect(r.deslocados).toEqual([espada, escudo]);
   });
 
+  it('duas mãos sobre duas mãos desloca a anterior UMA vez só', () => {
+    // O caso que a dedup por id existe para cobrir, e o único que a exercita: os
+    // dois slots-alvo apontam para a MESMA carta anterior. Sem a dedup, o montante
+    // velho sai duas vezes na lista e `destinoDoDesequipado` o empurra duas vezes
+    // para `tesouros.cemiterio` — o baralho de Tesouros CRESCE a cada troca de
+    // arma grande, e nenhum outro teste deste arquivo notaria (em (b) os ids são
+    // diferentes; em (d) há um alvo só).
+    const velho = carta('t-0', 'montante');
+    const r = colocarNoSlot(
+      { ...SLOTS_VAZIOS, maoDireita: velho, maoEsquerda: velho },
+      carta('t-1', 'machado-de-guerra'), info('maoDireita', true),
+    );
+
+    expect(r.deslocados).toEqual([velho]);
+    expect(r.slots.maoDireita?.id).toBe('t-1');
+    expect(r.slots.maoEsquerda?.id).toBe('t-1');
+  });
+
   it('equipar de uma mão sobre um montante libera a OUTRA mão também', () => {
     // O montante ocupava as duas. Trocar só a direita não pode deixar a esquerda
     // apontando para uma carta que já foi para o cemitério — seria um fantasma

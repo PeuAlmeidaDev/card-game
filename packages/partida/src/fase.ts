@@ -44,9 +44,14 @@ export function acaoEhLegalNaFase(fase: Fase, tipo: AcaoDaMesa['tipo']): boolean
 
 /**
  * A fase em que um jogador COMEÇA o turno. Ponto único: `criarPartida` (o
- * primeiro assento), `encerrarTurno` (quem recebe a vez) e `jogarCarta` (que
- * pode ter resolvido o excedente) fazem a mesma pergunta, e uma cópia esquecida
- * deixaria a vez cair num jogador estourado sem nenhuma ação legal.
+ * primeiro assento), `encerrarTurno` (quem recebe a vez), `jogarCarta` e
+ * `equiparCarta` (que podem ter resolvido o excedente, porque as duas tiram uma
+ * carta da mão) fazem a mesma pergunta, e uma cópia esquecida deixaria a vez cair
+ * num jogador estourado sem nenhuma ação legal.
+ *
+ * São QUATRO chamadores hoje, e cada saída nova do excedente acrescenta um: quem
+ * escrever a quinta e esquecer de recalcular a fase prende o turno em `descartar`
+ * com a mão já cabendo.
  */
 export function faseDoTurnoDe(jogador: JogadorNaMesa): Fase {
   return jogador.mao.length > limiteDeMao(jogador) ? 'descartar' : 'vasculhar';

@@ -21,7 +21,11 @@ export function colocarNoSlot(
   const alvos: readonly Slot[] = info.duasMaos ? MAOS : [info.slot];
 
   // Dedup por id: o montante ocupando as duas mãos sai UMA vez da lista de
-  // deslocados — senão ele iria duas vezes para o cemitério e o baralho cresceria.
+  // deslocados — senão ele iria duas vezes para o cemitério e o baralho de
+  // Tesouros CRESCERIA a cada troca de arma grande. Quem prende isto é o teste
+  // "duas mãos sobre duas mãos desloca a anterior UMA vez só": é o único caso em
+  // que os dois slots-alvo apontam para a MESMA carta, e portanto o único que
+  // falha se este `Map` virar um array com `push`.
   const deslocados = new Map<string, CartaEquipamento>();
   for (const slot of alvos) {
     const anterior = slots[slot];

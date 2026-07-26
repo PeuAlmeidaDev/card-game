@@ -114,23 +114,30 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // guards certos; agora ela precisa entrar na tabela, e o `Record<Fase, …>` cobra.
   //
   // ⚠️ O QUE A TABELA NÃO RESPONDE. Passar aqui não garante que a ação será
-  // aceita: a elegibilidade FINA continua em cada função, e hoje são quatro
-  // pares — cada um precisa de gêmeo na tela, porque o `legal()` da `TelaMesa`
-  // lê ESTA tabela e não sabe deles:
+  // aceita: a elegibilidade FINA continua em cada função, e hoje são NOVE pares —
+  // cada um precisa de gêmeo na tela, porque o `legal()` da `TelaMesa` lê ESTA
+  // tabela e não sabe deles.
   //
-  //   fase        ação                  segunda condição      quem cobra
-  //   vasculhar   vasculhar/jogarCarta  espiada === null      `vasculhar` / `jogarCarta`
-  //   vasculhar   equiparCarta          espiada === null      `equiparCarta`
-  //   vasculhar   manterCarta/empurrar  espiada !== null      `resolverEspiada`
-  //   vasculhar   jogarCarta            carta.tipo === 'raca' `jogarCarta`
-  //   descartar   jogarCarta            carta.tipo === 'raca' `jogarCarta`
-  //   vasculhar   equiparCarta          carta.tipo ===        `equiparCarta`
-  //   descartar                         'equipamento'
-  //   combate     atacar/esquivar       `proximaDecisao`      o motor, via `AcaoIlegal`
+  // Uma linha por par, sem agrupar ação nem quebrar célula em duas linhas: a
+  // versão agrupada já mentiu uma vez (dizia "quatro pares" com sete linhas, e a
+  // célula quebrada de `equiparCarta` parecia linha órfã), e quem lê isto está
+  // justamente conferindo se não esqueceu nenhum.
+  //
+  //   fase                 ação           segunda condição             quem cobra
+  //   vasculhar            vasculhar      espiada === null             `vasculhar`
+  //   vasculhar            jogarCarta     espiada === null             `jogarCarta`
+  //   vasculhar            equiparCarta   espiada === null             `equiparCarta`
+  //   vasculhar            manterCarta    espiada !== null             `resolverEspiada`
+  //   vasculhar            empurrarCarta  espiada !== null             `resolverEspiada`
+  //   vasculhar/descartar  jogarCarta     carta.tipo === 'raca'        `jogarCarta`
+  //   vasculhar/descartar  equiparCarta   carta.tipo === 'equipamento' `equiparCarta`
+  //   combate              atacar         `proximaDecisao`             o motor (`AcaoIlegal`)
+  //   combate              esquivar       `proximaDecisao`             o motor (`AcaoIlegal`)
   //
   // Um botão novo escrito só com `legal(tipo)` acende nesses estados e leva 400.
-  // Quando `recompor` e `encrenca` chegarem (Planos 3 e 4), as duas primeiras
-  // linhas somem — a espiada vira fase própria e o par deixa de ser necessário.
+  // Quando `recompor` e `encrenca` chegarem (Planos 3 e 4), as CINCO primeiras
+  // linhas somem — a espiada vira fase própria e os pares dela deixam de ser
+  // necessários.
   if (!acaoEhLegalNaFase(estado.fase, acao.tipo)) {
     throw new AcaoInvalida(`aplicarAcao: ${acao.tipo} não é legal na fase ${estado.fase}`);
   }
