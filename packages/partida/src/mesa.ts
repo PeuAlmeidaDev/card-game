@@ -7,7 +7,7 @@ import { tirarDoTopo } from './baralho';
 import { destinoDaCaridade } from './caridade';
 import { classificar } from './classificacao';
 import { AcaoInvalida } from './erros';
-import { faseDoTurnoDe } from './fase';
+import { acaoEhLegalNaFase, faseDoTurnoDe } from './fase';
 import { limiteDeMao } from './mao';
 
 /** As ações que só fazem sentido com um combate aberto. */
@@ -97,6 +97,16 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   }
   if (acao.jogadorId !== estado.vezDe) {
     throw new AcaoInvalida(`aplicarAcao: não é a vez de ${acao.jogadorId}`);
+  }
+
+  // Resposta ÚNICA para "posso?". Antes a pergunta estava espalhada em cinco
+  // funções, cada uma relendo `combate`, `espiada` e o limite de mão por conta
+  // própria — três booleanos ortogonais, oito combinações, e nenhum lugar que
+  // dissesse a verdade inteira. A ação nova do Plano 3 precisava lembrar de
+  // repetir os guards certos; agora ela precisa entrar na tabela, e o
+  // `Record<Fase, …>` cobra.
+  if (!acaoEhLegalNaFase(estado.fase, acao.tipo)) {
+    throw new AcaoInvalida(`aplicarAcao: ${acao.tipo} não é legal na fase ${estado.fase}`);
   }
 
   if (acao.tipo === 'vasculhar') {
@@ -206,22 +216,11 @@ function resolverCarta(
 }
 
 function vasculhar(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): ResultadoAcao {
-  if (estado.combate !== null) {
-    throw new AcaoInvalida('aplicarAcao: há um combate em curso');
-  }
   if (estado.espiada !== null) {
     throw new AcaoInvalida('aplicarAcao: há uma espiada pendente');
   }
 
   const jogador = estado.jogadores.find((j) => j.id === jogadorId);
-
-  // A vez não passa acima do limite (ver `encerrarTurno`). Se vasculhar também
-  // continuasse legal, "não passar a vez" viraria "jogar para sempre": o jogador
-  // sacaria carta atrás de carta sem nunca ter que resolver o excedente. As duas
-  // saídas legais são `entregarCarta` e `jogarCarta`.
-  if (jogador !== undefined && jogador.mao.length > limiteDeMao(jogador)) {
-    throw new AcaoInvalida('aplicarAcao: sua mão está acima do limite — entregue uma carta');
-  }
 
   const temPresciencia = racaDoLutador(deps, jogador)?.espiaTopo ?? false;
 
@@ -287,22 +286,14 @@ function resolverEspiada(estado: EstadoPartida, acao: AcaoDeEspiada, deps: DepsM
 type AcaoDeMao = Extract<AcaoDaMesa, { readonly tipo: 'jogarCarta' | 'entregarCarta' }>;
 
 /**
- * Guards comuns das ações de mão: o turno tem que estar parado (nada de mexer na
- * mão no meio de um combate ou com uma espiada pendente — é a guarda que o spec
- * §4.2 pede, escrita no vocabulário que o reducer já fala, sem inventar máquina
- * de fases) e a carta apontada tem que ser sua.
+ * Guard comum das ações de mão: a carta apontada tem que ser sua. A fase (turno
+ * parado, nada de mexer na mão no meio de um combate) já foi conferida pela
+ * tabela no topo do `aplicarAcao`; o que sobra aqui é achar a carta.
  */
 function cartaDaMao(estado: EstadoPartida, acao: AcaoDeMao): {
   readonly jogador: JogadorNaMesa;
   readonly carta: CartaPorta;
 } {
-  if (estado.combate !== null) {
-    throw new AcaoInvalida('aplicarAcao: há um combate em curso');
-  }
-  if (estado.espiada !== null) {
-    throw new AcaoInvalida('aplicarAcao: há uma espiada pendente');
-  }
-
   const jogador = estado.jogadores.find((j) => j.id === acao.jogadorId);
   if (jogador === undefined) {
     throw new Error(`cartaDaMao: jogador ${acao.jogadorId} não está na mesa`);
@@ -336,10 +327,6 @@ function entregarCarta(
   deps: DepsMesa,
 ): ResultadoAcao {
   const { jogador, carta } = cartaDaMao(estado, acao);
-
-  if (jogador.mao.length <= limiteDeMao(jogador)) {
-    throw new AcaoInvalida('aplicarAcao: sua mão não está acima do limite');
-  }
 
   const destino = destinoDaCaridade(estado.jogadores, jogador, deps.rolar);
   const semACarta = jogador.mao.filter((c) => c.id !== carta.id);
@@ -384,6 +371,14 @@ function jogarCarta(
   estado: EstadoPartida,
   acao: Extract<AcaoDaMesa, { readonly tipo: 'jogarCarta' }>,
 ): ResultadoAcao {
+  // Guarda de PENDÊNCIA, não de fase: `jogarCarta` e a espiada convivem na fase
+  // `vasculhar` enquanto `recompor` não existe como fase própria (só existirá
+  // quando o `passar` do Plano 3 a separar — e aí ela some, porque `recompor`
+  // acontece ANTES de qualquer compra e nenhuma espiada pode estar aberta).
+  if (estado.espiada !== null) {
+    throw new AcaoInvalida('aplicarAcao: há uma espiada pendente');
+  }
+
   const { jogador, carta } = cartaDaMao(estado, acao);
   if (carta.tipo !== 'raca') {
     throw new AcaoInvalida('aplicarAcao: só carta de raça entra em jogo nesta fatia');
@@ -417,7 +412,10 @@ function jogarCarta(
 function agirNoCombate(estado: EstadoPartida, acao: AcaoDeCombate, deps: DepsMesa): ResultadoAcao {
   const combate = estado.combate;
   if (combate === null) {
-    throw new AcaoInvalida('aplicarAcao: não há combate em curso');
+    // Inalcançável pela tabela (só a fase `combate` deixa `atacar`/`esquivar`
+    // passar). Se acontecer, é invariante NOSSA quebrada — fase dizendo `combate`
+    // sem combate aberto — e sobe como Error cru => 500, não como culpa do cliente.
+    throw new Error('agirNoCombate: fase `combate` sem combate aberto');
   }
 
   // As três recusas do motor ("não é a vez de atacar", "não há ataque do monstro

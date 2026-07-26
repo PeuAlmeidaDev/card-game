@@ -131,7 +131,7 @@ describe('aplicarAcao — vasculhar', () => {
     const comCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
 
     expect(() => aplicarAcao(comCombate, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])))
-      .toThrow('aplicarAcao: há um combate em curso');
+      .toThrow('aplicarAcao: vasculhar não é legal na fase combate');
   });
 
   it('recusa a ação como AcaoInvalida, não como Error genérico', () => {
@@ -223,7 +223,7 @@ describe('aplicarAcao — combate', () => {
   it('rejeita atacar quando não há combate', () => {
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     expect(() => aplicarAcao(p, { tipo: 'atacar', jogadorId: 'p1' }, deps([])))
-      .toThrow('aplicarAcao: não há combate em curso');
+      .toThrow('aplicarAcao: atacar não é legal na fase vasculhar');
   });
 
   it('traduz a recusa do motor em AcaoInvalida, preservando a mensagem', () => {
@@ -837,8 +837,9 @@ describe('aplicarAcao — jogarCarta', () => {
   });
 
   it('recusa trocar de raça com um combate em curso', () => {
-    // Bible §5: troca de raça só fora do combate. A guarda fala o vocabulário que
-    // o reducer já tem (`combate`/`espiada`) — não há máquina de fases aqui.
+    // Bible §5: troca de raça só fora do combate. Agora há máquina de fases:
+    // `jogarCarta` não está no conjunto legal da fase `combate`, e é a tabela
+    // (não mais um guard próprio) quem recusa.
     const p0 = criarPartida('m1', entradas,
       { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] },
       { embaralhar: semEmbaralhar });
@@ -847,7 +848,7 @@ describe('aplicarAcao — jogarCarta', () => {
     expect(emCombate.combate).not.toBeNull();
 
     expect(() => aplicarAcao(emCombate, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r1' }, deps([])))
-      .toThrow('aplicarAcao: há um combate em curso');
+      .toThrow('aplicarAcao: jogarCarta não é legal na fase combate');
   });
 
   it('a passiva da raça jogada vale no combate seguinte', () => {
@@ -891,6 +892,8 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
     jogadores: estado.jogadores.map((j) => (
       j.id === 'p1' ? { ...j, mao, emJogo: { raca: raca('r1', 'anao') } } : j
     )),
+    // Forjado direto no estado: a fase tem que vir junto, senão o fixture mente.
+    fase: 'descartar',
   });
 
   const comPatentes = (estado: EstadoPartida, porId: Readonly<Record<string, number>>): EstadoPartida => ({
@@ -1009,7 +1012,7 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
     expect(() => aplicarAcao(dentro, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([])))
       .toThrow(AcaoInvalida);
     expect(() => aplicarAcao(dentro, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([])))
-      .toThrow('aplicarAcao: sua mão não está acima do limite');
+      .toThrow('aplicarAcao: entregarCarta não é legal na fase vasculhar');
   });
 
   it('recusa carta que não está na sua mão', () => {
@@ -1021,17 +1024,17 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
   });
 
   it('recusa entregar com combate em curso', () => {
-    // O guard de combate mora em `cartaDaMao` e roda ANTES de qualquer checagem
-    // de mão — por isso a mão nem precisa estar estourada aqui. (Desde a Task 4,
-    // `vasculhar` também recusa abrir combate com a mão já estourada, então usar
-    // `estourado` para chegar a este `emCombate` nem seria mais possível.)
+    // O guard de fase mora no topo do `aplicarAcao` e roda ANTES de qualquer
+    // checagem de mão — por isso a mão nem precisa estar estourada aqui. (Desde a
+    // Task 4, `vasculhar` também recusa abrir combate com a mão já estourada,
+    // então usar `estourado` para chegar a este `emCombate` nem seria mais possível.)
     const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] };
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const emCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
     expect(emCombate.combate).not.toBeNull();
 
     expect(() => aplicarAcao(emCombate, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([])))
-      .toThrow('aplicarAcao: há um combate em curso');
+      .toThrow('aplicarAcao: entregarCarta não é legal na fase combate');
   });
 
   it('a entrega move a versão — o retry cai no 409, não no 400', () => {
@@ -1154,6 +1157,8 @@ describe('aplicarAcao — vasculhar com a mão estourada', () => {
     jogadores: estado.jogadores.map((j) => (
       j.id === 'p1' ? { ...j, mao: cinco, emJogo: { raca: raca('r1', 'anao') } } : j
     )),
+    // Forjado direto no estado: a fase tem que vir junto, senão o fixture mente.
+    fase: 'descartar',
   });
 
   it('recusa vasculhar enquanto a mão excede o limite', () => {
@@ -1165,7 +1170,7 @@ describe('aplicarAcao — vasculhar com a mão estourada', () => {
     expect(() => aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])))
       .toThrow(AcaoInvalida);
     expect(() => aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])))
-      .toThrow('aplicarAcao: sua mão está acima do limite — entregue uma carta');
+      .toThrow('aplicarAcao: vasculhar não é legal na fase descartar');
   });
 
   it('jogar uma raça continua liberado — é a outra saída do excedente', () => {
@@ -1204,6 +1209,8 @@ describe('aplicarAcao — vasculhar com a mão estourada', () => {
       jogadores: p0.jogadores.map((j) => (
         j.id === 'p1' ? { ...j, mao: [...cinco, raca('r9', 'orc')], emJogo: { raca: null } } : j
       )),
+      // Forjado direto no estado: a fase tem que vir junto, senão o fixture mente.
+      fase: 'descartar',
     };
 
     const r = aplicarAcao(
@@ -1214,7 +1221,7 @@ describe('aplicarAcao — vasculhar com a mão estourada', () => {
     expect(r.estado.jogadores[0]?.emJogo.raca?.id).toBe('r9');
     // Continua estourado: mão(5) > limite(4), agora que a raça está em jogo.
     expect(() => aplicarAcao(r.estado, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])))
-      .toThrow('aplicarAcao: sua mão está acima do limite — entregue uma carta');
+      .toThrow('aplicarAcao: vasculhar não é legal na fase descartar');
 
     // `entregarCarta` continua sendo a saída que sempre funciona.
     const restante = r.estado.jogadores[0]?.mao[0];
@@ -1276,7 +1283,7 @@ describe('a composição BASELINE não pode nascer travada', () => {
 
     expect(humano!.mao.length).toBeGreaterThan(limiteDeMao(humano!));
     expect(() => aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])))
-      .toThrow('aplicarAcao: sua mão está acima do limite — entregue uma carta');
+      .toThrow('aplicarAcao: vasculhar não é legal na fase descartar');
     expect(humano!.mao.every((c) => c.tipo !== 'raca')).toBe(true);
   });
 });
@@ -1365,6 +1372,8 @@ describe('a fase acompanha o que o turno fez', () => {
         // doada é a que o estoura.
         return { ...j, mao: [salaVazia('s1'), salaVazia('s2'), salaVazia('s3'), salaVazia('s4'), salaVazia('s5')] };
       }),
+      // Forjado direto no estado: a fase tem que vir junto, senão o fixture mente.
+      fase: 'descartar',
     };
 
     const primeira = aplicarAcao(doadorEstourado, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([]));
@@ -1394,5 +1403,47 @@ describe('a fase acompanha o que o turno fez', () => {
 
     expect(r.estado.jogadores[0]?.mao).toHaveLength(4);
     expect(r.estado.fase).toBe('vasculhar');
+  });
+});
+
+describe('o guard de fase é ponto único', () => {
+  const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] };
+
+  it('recusa fora de fase como AcaoInvalida, nomeando a ação e a fase', () => {
+    // A mensagem entra verbatim no corpo do 400. Nomear as duas pontas é o que
+    // deixa o jogador (e o log do server) saber POR QUE o clique não valeu.
+    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const emCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
+
+    expect(() => aplicarAcao(emCombate, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])))
+      .toThrow(AcaoInvalida);
+    expect(() => aplicarAcao(emCombate, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])))
+      .toThrow('aplicarAcao: vasculhar não é legal na fase combate');
+  });
+
+  it('a fase é conferida ANTES de a carta ser procurada na mão', () => {
+    // Ordem preservada de propósito: hoje o guard de combate roda antes de
+    // `cartaDaMao`, então um id inexistente numa fase errada devolve "fora de
+    // fase", não "essa carta não é sua". Inverter a ordem vazaria para o cliente
+    // que o id não existe em situações em que ele nem podia agir.
+    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const emCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
+
+    expect(() => aplicarAcao(emCombate, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'nao-existe' }, deps([])))
+      .toThrow('aplicarAcao: entregarCarta não é legal na fase combate');
+  });
+
+  it('a espiada pendente continua sendo guarda DENTRO da fase, não fase', () => {
+    // `vasculhar` e `manterCarta` são legais na MESMA fase; o que as separa é o
+    // campo `espiada`. Estes dois guards são os únicos que sobrevivem à tabela.
+    const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] };
+    const p = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+
+    expect(() => aplicarAcao(p, { tipo: 'manterCarta', jogadorId: 'p1' }, deps([])))
+      .toThrow('aplicarAcao: não há espiada para resolver');
+
+    const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])).estado;
+    expect(() => aplicarAcao(comEspiada, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])))
+      .toThrow('aplicarAcao: há uma espiada pendente');
   });
 });
