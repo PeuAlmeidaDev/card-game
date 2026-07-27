@@ -33,18 +33,18 @@ const LEGAL: Record<Fase, ReadonlySet<AcaoDaMesa['tipo']>> = {
   // abertura do combate, então remontar o corpo no meio da luta ou não teria
   // efeito nenhum (mentindo para quem clicou) ou furaria o snapshot.
   combate: new Set<AcaoDaMesa['tipo']>(['atacar', 'esquivar']),
-  // Continua INERTE: nenhuma transição leva a `jogar` ainda, e conjunto vazio é o
-  // que garante que uma fase inalcançável não aceite nada por engano. A Task 3 a
-  // preenche, e é lá que `equiparCarta` sai de `descartar` para cá.
-  jogar: new Set<AcaoDaMesa['tipo']>([]),
-  // DUAS saídas do excedente, não mais três: `jogarCarta` migrou para `recompor`,
-  // que acontece ANTES desta fase — quem chega aqui já teve a janela de trocar de
-  // raça e agora paga o que sobrou (decisão #7). `equiparCarta` fica até a Task 3,
-  // porque só lá nasce a fase `jogar` que a recebe; tirá-la antes disso deixaria o
-  // tesouro da mão estourada sem outra saída que não a caridade. `vasculhar`
-  // continua de fora: se fosse legal, "a vez não passa" viraria "jogue para
-  // sempre" — o jogador sacaria carta atrás de carta sem nunca resolver o estouro.
-  descartar: new Set<AcaoDaMesa['tipo']>(['entregarCarta', 'equiparCarta']),
+  // FASE 4 (spec §6): a janela DEPOIS do encontro. É onde o loot recém-saqueado
+  // vira corpo — sem ela, o tesouro que o monstro largou só poderia ser vestido no
+  // turno seguinte, e a mão estouraria no caminho. `jogarCarta` fica de fora: a
+  // raça já teve a janela dela e trocá-la aqui seria trocar depois de ver a porta.
+  jogar: new Set<AcaoDaMesa['tipo']>(['equiparCarta', 'passar']),
+  // UMA saída do excedente, não mais três: as duas janelas de gastar carta
+  // acontecem ANTES desta fase — `jogarCarta` migrou para `recompor` (decisão #7)
+  // e `equiparCarta` para `recompor` e `jogar`. Quem chega aqui já teve as duas e
+  // agora paga o que sobrou com a caridade. `vasculhar` continua de fora: se fosse
+  // legal, "a vez não passa" viraria "jogue para sempre" — o jogador sacaria carta
+  // atrás de carta sem nunca resolver o estouro.
+  descartar: new Set<AcaoDaMesa['tipo']>(['entregarCarta']),
 };
 
 /** A tabela como pergunta. O `LEGAL` não é exportado: quem lê, lê por aqui. */
@@ -92,12 +92,11 @@ export function faseSeAutoPula(fase: Fase, jogador: JogadorNaMesa): boolean {
  * A fase em que um jogador COMEÇA o turno. Ponto único: `criarPartida` (o primeiro
  * assento) e `encerrarTurno` (quem recebe a vez) fazem a mesma pergunta.
  *
- * São DOIS chamadores agora, não quatro: `jogarCarta` deixou de perguntar isto, e
- * `equiparCarta` só o faz no caminho de `descartar` que a Task 3 remove. Elas
- * acontecem dentro de uma fase parada e a pergunta delas é outra — "ainda há o que
- * fazer AQUI?" (`faseSeAutoPula`), não "onde o turno começa?". Enquanto as duas
- * compartilhavam esta função, equipar dentro de `jogar` teria mandado o jogador de
- * volta para `recompor`.
+ * São DOIS chamadores, não quatro: `jogarCarta` e `equiparCarta` deixaram de
+ * perguntar isto. Elas acontecem dentro de uma fase parada e a pergunta delas é
+ * outra — "ainda há o que fazer AQUI?" (`faseSeAutoPula`), não "onde o turno
+ * começa?". Enquanto as duas compartilhavam esta função, equipar dentro de `jogar`
+ * teria mandado o jogador de volta para `recompor`.
  *
  * O excedente vem PRIMEIRO: quem abre o turno acima do teto vai para `descartar`
  * mesmo tendo o que recompor. Invertido, a mão estourada atravessaria o turno.

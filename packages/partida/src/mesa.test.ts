@@ -215,15 +215,27 @@ describe('aplicarAcao — combate', () => {
     return aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps(dados)).estado;
   };
 
-  it('vencer o combate sobe a patente e passa a vez', () => {
+  it('vencer o combate sobe a patente e abre a fase `jogar`', () => {
     // Os três golpes e o orçamento de dados de cada lance moram no
     // `venceOCombate` (topo do arquivo), que os testes de loot também usam.
+    //
+    // 🎚️ A vez DEIXOU de passar aqui, e é o desenho: nesta fatia todo tesouro é
+    // equipamento, então vencer sempre põe equipamento na mão e `jogar` nunca se
+    // auto-pula depois de uma vitória. O vencedor veste o que saqueou e só então
+    // `passar` encerra o turno — é o que a segunda metade deste teste afirma,
+    // para que "a vez não passa" não vire "a vez nunca passa".
     const estado = venceOCombate(abrirCombate([]));
 
     expect(estado.combate).toBeNull();
     expect(estado.jogadores.find((j) => j.id === 'p1')?.patente).toBe(2);
-    expect(estado.vezDe).toBe('p2');
+    expect(estado.fase).toBe('jogar');
+    expect(estado.vezDe).toBe('p1');
     expect(estado.log).toContainEqual({ tipo: 'patente', jogadorId: 'p1', patente: 2 });
+
+    const depoisDoPassar = aplicarAcao(estado, { tipo: 'passar', jogadorId: 'p1' }, deps([])).estado;
+
+    expect(depoisDoPassar.vezDe).toBe('p2');
+    expect(depoisDoPassar.fase).toBe('vasculhar');
   });
 
   it('atingir a patente-alvo termina a partida e preenche a classificação', () => {
@@ -266,10 +278,21 @@ describe('aplicarAcao — combate', () => {
       { embaralhar: semEmbaralhar });
     const corrompido = { ...p, vezDe: 'fantasma' };
 
+    // 🎚️ Quem lança MUDOU de guard, não de natureza: desde que a sala vazia
+    // entrega o turno a `jogar`, ela precisa do jogador da vez para perguntar se a
+    // fase se auto-pula — e o `find` que falha estoura antes de o turno chegar ao
+    // `proximoJogador`. Continua Error cru => 500, que é o que este teste protege.
     expect(() => aplicarAcao(corrompido, { tipo: 'vasculhar', jogadorId: 'fantasma' }, deps([])))
-      .toThrow('proximoJogador: a vez aponta para um jogador fora da mesa');
+      .toThrow('resolverCarta: jogador fantasma não está na mesa');
     expect(() => aplicarAcao(corrompido, { tipo: 'vasculhar', jogadorId: 'fantasma' }, deps([])))
       .not.toThrow(AcaoInvalida);
+
+    // E o guard do `proximoJogador` continua coberto pelo caminho que ainda chega
+    // nele: `passar` numa fase parada encerra o turno sem passar por `find` nenhum
+    // antes. Sem esta segunda metade, o alarme do -1 ficaria sem teste.
+    const paradoEFantasma: EstadoPartida = { ...corrompido, fase: 'jogar' };
+    expect(() => aplicarAcao(paradoEFantasma, { tipo: 'passar', jogadorId: 'fantasma' }, deps([])))
+      .toThrow('proximoJogador: a vez aponta para um jogador fora da mesa');
   });
 
   it('rejeita atacar quando não há combate', () => {
@@ -403,11 +426,11 @@ describe('vencer larga tesouro na mão', () => {
     expect(depois.tesouros.monte).toHaveLength(p.tesouros.monte.length);
   });
 
-  it('o loot pode estourar a mão, e aí a fase vira `descartar`', () => {
-    // O caminho que liga esta task à máquina de fases: `fecharCombate` entrega a
-    // `encerrarTurno`, que recobra o limite. Nenhuma linha nova de fase é
-    // preciso — mas o caminho precisa estar afirmado, porque é ele que faz a
-    // fatia inteira encaixar sem mexer no Plano 2.
+  it('o loot abre a fase `jogar` — o excedente só é cobrado depois dela', () => {
+    // 🎚️ Mudança autorizada: antes o loot que estourava a mão levava direto a
+    // `descartar`. Agora `jogar` vem no meio, e é ela que dá ao vencedor a chance
+    // de VESTIR o que acabou de saquear em vez de doá-lo. `descartar` continua
+    // esperando do outro lado, via `encerrarTurno`, para quem passar sem resolver.
     //
     // 🎚️ Derivada do dial: a mão nasce EXATAMENTE no teto de quem está sem raça
     // em jogo (`LIMITE_BASE_DE_MAO + 1`) — cabe para vasculhar (senão o combate
@@ -422,7 +445,43 @@ describe('vencer larga tesouro na mão', () => {
 
     expect(maoDe(depois, 'p1')).toHaveLength(noTeto.length + 3);
     expect(depois.vezDe).toBe('p1');       // a vez ficou presa no vencedor
-    expect(depois.fase).toBe('descartar');
+    expect(depois.fase).toBe('jogar');
+  });
+
+  it('passar em `jogar` com a mão estourada cai em `descartar`', () => {
+    // O par do teste acima: a fase `jogar` adia a cobrança, não a perdoa. Sem esta
+    // asserção, um `sairDaParada` que esquecesse o `encerrarTurno` deixaria o
+    // excedente atravessar o turno em silêncio.
+    const valendo3 = depsValendo(3);
+    const noTeto = monstros(LIMITE_BASE_DE_MAO + 1);
+    const depois = venceOCombate(comCombateAberto(valendo3, noTeto), valendo3);
+    expect(depois.fase).toBe('jogar');
+
+    const final = aplicarAcao(depois, { tipo: 'passar', jogadorId: 'p1' }, valendo3([]));
+
+    expect(final.estado.fase).toBe('descartar');
+    expect(final.estado.vezDe).toBe('p1');
+  });
+
+  it('equipar em `jogar` fica em `jogar` enquanto sobrar equipamento na mão', () => {
+    // O contrário mandaria quem equipou depois de vencer de volta para `recompor`,
+    // reabrindo a troca de raça DEPOIS de o monstro ter sido visto — exatamente o
+    // que a decisão #7 fecha. É por isso que `equiparCarta` usa a fase de origem.
+    //
+    // Mão vazia antes da luta: as três cartas de `jogar` são o PRÓPRIO loot, e é
+    // isso que faz a fase existir (sem equipamento na mão ela se auto-pularia).
+    const valendo3 = depsValendo(3);
+    const depois = venceOCombate(comCombateAberto(valendo3), valendo3);
+    expect(depois.fase).toBe('jogar');
+    const primeiro = maoDe(depois, 'p1')[0];
+
+    const equipou = aplicarAcao(
+      depois, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: primeiro!.id }, valendo3([]),
+    ).estado;
+
+    expect(maoDe(equipou, 'p1')).toHaveLength(2);   // ainda sobra o que vestir
+    expect(equipou.fase).toBe('jogar');
+    expect(equipou.vezDe).toBe('p1');               // equipar não encerra o turno
   });
 
   it('baralho de Tesouros no fim: leva-se o que houver, sem derrubar a partida', () => {
@@ -1280,16 +1339,15 @@ describe('aplicarAcao — equiparCarta', () => {
       .toThrow('aplicarAcao: equiparCarta não é legal na fase combate');
   });
 
-  it('equipar é a TERCEIRA saída do excedente: legal em `descartar`, e recalcula a fase', () => {
-    // Mesmo princípio de `jogarCarta` (fatia 7): a ação tira uma carta da mão,
-    // logo pode resolver o excedente. Sem o recálculo o turno ficaria preso em
-    // `descartar` com a mão já cabendo.
+  it('em `descartar`, equipar já não é saída do excedente', () => {
+    // 🎚️ Mudança de regra autorizada: as janelas de gastar carta (`recompor` e
+    // `jogar`) acontecem ANTES. Quem chega aqui já teve as duas e agora paga com a
+    // caridade — a única ação que `fase.ts` deixa nesta fase.
     //
     // 🎚️ Derivado do dial: `LIMITE_BASE_DE_MAO + 1` cartas com raça em jogo
-    // (limite = o base) => estourado por 1, e equipar deixa a mão exatamente no
-    // teto. Cravado em 5, este fixture parou de estourar quando o teto subiu para
-    // 7 — e como a fase vem forjada, o teste seguiria verde afirmando a "terceira
-    // saída do excedente" sobre uma mão que já cabia.
+    // (limite = o base) => estourado por 1. Cravado em 5, este fixture parou de
+    // estourar quando o teto subiu para 7 — e como a fase vem forjada, o teste
+    // seguiria verde afirmando sobre uma mão que já cabia.
     const maoEstourada = [equipamento('t-1'), ...monstros(LIMITE_BASE_DE_MAO)];
     const p0 = comMao(nascida(), maoEstourada);
     const estourado: EstadoPartida = {
@@ -1298,13 +1356,14 @@ describe('aplicarAcao — equiparCarta', () => {
         j.id === 'p1' ? { ...j, emJogo: { ...j.emJogo, raca: raca('r1', 'anao') } } : j
       )),
       // Forjado direto no estado: a fase tem que vir junto, senão o fixture mente.
+      // Ela é COERENTE com a mão — `faseDoTurnoDe` devolve `descartar` para esta
+      // mão estourada, e é o `comMao` acima (que fixa `recompor`) que precisa ser
+      // sobrescrito.
       fase: 'descartar',
     };
 
-    const { estado: depois } = aplicarAcao(estourado, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
-
-    expect(maoDe(depois, 'p1')).toHaveLength(maoEstourada.length - 1);
-    expect(depois.fase).toBe('vasculhar');
+    expect(() => aplicarAcao(estourado, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([])))
+      .toThrow('aplicarAcao: equiparCarta não é legal na fase descartar');
   });
 
   it('item que o catálogo não conhece é Error cru, nunca AcaoInvalida', () => {
@@ -1891,9 +1950,10 @@ describe('a fase acompanha o que o turno fez', () => {
 
   it('em `descartar`, jogar raça já não é saída do excedente (decisão #7)', () => {
     // 🎚️ MUDANÇA DE REGRA, autorizada na tabela do plano: a raça só entra em jogo
-    // na fase 1. Quem chegou a `descartar` já passou por `recompor` neste turno —
-    // ou nasceu estourado, e aí o excedente vem antes de qualquer janela. A única
-    // saída aqui é a caridade.
+    // na fase 1. Quem chegou a `descartar` já passou pelas DUAS janelas paradas do
+    // turno (`recompor` e `jogar`) — ou nasceu estourado, e aí o excedente vem
+    // antes de qualquer janela. A única saída aqui é a caridade, e desde a Task 3
+    // isso é literal: `fase.ts` não deixa mais nada nesta fase.
     const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
     const estourado: EstadoPartida = {
       ...p0,

@@ -743,10 +743,23 @@ describe('TelaMesa — equipar', () => {
     expect(await screen.findByRole('button', { name: 'Equipar' })).toBeDisabled();
   });
 
-  it('na fase `descartar`, Equipar continua aceso — é a terceira saída do excedente', async () => {
-    // Equipar tira uma carta da mão, logo resolve o estouro, exatamente como
-    // `jogarCarta` e `entregarCarta`.
+  it('na fase `descartar`, "Equipar" apaga — a janela de vestir já passou', async () => {
+    // 🎚️ Inversão autorizada. Equipar tem duas fases próprias (`recompor` e
+    // `jogar`), as duas antes desta; em `descartar` só resta a caridade.
+    //
+    // `emDescartar` em vez de `{ ...maoHeterogenea, fase: 'descartar' }`: a fase
+    // só nasce com a mão EXCEDENDO o limite, e a mão de 3 cartas do
+    // `maoHeterogenea` seria uma vista que o domínio não produz — o modo de falha
+    // que o `MAO_QUE_ESTOURA` no topo deste arquivo existe para fechar.
     await abrirMesa(emDescartar([tesouro('t-9')]));
+
+    expect(await screen.findByRole('button', { name: 'Equipar' })).toBeDisabled();
+  });
+
+  it('na fase `jogar`, "Equipar" acende — é onde o loot vira corpo', async () => {
+    // O par positivo da inversão acima. A vista é coerente sem nenhum ajuste: o
+    // tesouro na mão é exatamente o que impede `jogar` de se auto-pular.
+    await abrirMesa({ ...maoHeterogenea, fase: 'jogar' });
 
     expect(await screen.findByRole('button', { name: 'Equipar' })).toBeEnabled();
   });

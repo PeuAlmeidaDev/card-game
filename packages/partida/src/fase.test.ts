@@ -65,14 +65,23 @@ describe('acaoEhLegalNaFase', () => {
     expect(acaoEhLegalNaFase('combate', 'equiparCarta')).toBe(false);
   });
 
-  it('em `descartar` a caridade deixa de dividir a fase com jogar raça', () => {
+  it('em `jogar` valem equipar e passar', () => {
+    expect(acaoEhLegalNaFase('jogar', 'equiparCarta')).toBe(true);
+    expect(acaoEhLegalNaFase('jogar', 'passar')).toBe(true);
+    // Sem raça: ela só entra na fase 1 (decisão #7). Sem vasculhar: a porta desta
+    // rodada já abriu.
+    expect(acaoEhLegalNaFase('jogar', 'jogarCarta')).toBe(false);
+    expect(acaoEhLegalNaFase('jogar', 'vasculhar')).toBe(false);
+    expect(acaoEhLegalNaFase('jogar', 'entregarCarta')).toBe(false);
+  });
+
+  it('em `descartar` sobra SÓ a caridade', () => {
     // 🎚️ Mudança de REGRA (decisão #7), não de estrutura: a raça só entra em jogo
-    // na fase 1. Quem chega a `descartar` já teve a janela de recompor e a de
-    // jogar; aqui só resta pagar o excedente. `equiparCarta` sai na Task 3, junto
-    // com a fase `jogar` que a recebe — até lá ela continua sendo a segunda saída
-    // do excedente, e o `mesa.test.ts` ainda a afirma como tal.
+    // na fase 1 e o tesouro vira corpo nas duas janelas paradas (`recompor` e
+    // `jogar`), as duas ANTES desta. Quem chega aqui já teve as duas e agora paga
+    // o excedente — a caridade é a única ação que sobra.
     expect(acaoEhLegalNaFase('descartar', 'entregarCarta')).toBe(true);
-    expect(acaoEhLegalNaFase('descartar', 'equiparCarta')).toBe(true);
+    expect(acaoEhLegalNaFase('descartar', 'equiparCarta')).toBe(false);
     expect(acaoEhLegalNaFase('descartar', 'jogarCarta')).toBe(false);
     expect(acaoEhLegalNaFase('descartar', 'vasculhar')).toBe(false);
     expect(acaoEhLegalNaFase('descartar', 'passar')).toBe(false);
@@ -115,6 +124,16 @@ describe('faseSeAutoPula (spec §6.1)', () => {
 
   it('`recompor` NÃO se pula com um equipamento na mão', () => {
     expect(faseSeAutoPula('recompor', comMao([equipamento('t-1')]))).toBe(false);
+  });
+
+  it('`jogar` se pula sem equipamento na mão — inclusive com uma raça nela', () => {
+    // A raça não dá o que fazer aqui (fase 1 já passou), então não pode segurar a
+    // fase. Se segurasse, o jogador veria uma fase cuja única ação é "Passar".
+    expect(faseSeAutoPula('jogar', comMao([raca('r1', 'elfo')]))).toBe(true);
+  });
+
+  it('`jogar` NÃO se pula com equipamento na mão', () => {
+    expect(faseSeAutoPula('jogar', comMao([equipamento('t-1')]))).toBe(false);
   });
 
   it('as fases que compram, lutam ou pagam NUNCA se pulam', () => {
@@ -200,9 +219,12 @@ describe('a fase nunca mente sobre o estado', () => {
         }
         break;
       case 'jogar':
-        // Inalcançável nesta task: o conjunto de ações de `jogar` continua vazio em
-        // `fase.ts` e nenhuma transição leva até ela. O `switch` exaustivo cobra o
-        // caso mesmo assim — a invariante dela é decisão da Task 3, que a preenche.
+        // SEM checagem de excedente, e é deliberado: `jogar` acontece ANTES de o
+        // limite ser cobrado, e o loot que estourou a mão é exatamente o caso que
+        // ela existe para resolver. Quem cobra é `encerrarTurno`, na saída.
+        if (daVez !== undefined && faseSeAutoPula('jogar', daVez)) {
+          erros.push('fase=jogar sem equipamento na mão — o auto-pulo não aconteceu');
+        }
         break;
       default: {
         const naoTratada: never = e.fase;
@@ -217,7 +239,7 @@ describe('a fase nunca mente sobre o estado', () => {
     return erros;
   };
 
-  it('vale em todo estado de uma partida inteira, e as quatro fases aparecem', () => {
+  it('vale em todo estado de uma partida inteira, e as cinco fases aparecem', () => {
     const quatro: readonly EntradaJogador[] = [
       { id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE },
       { id: 'p2', nome: 'Bot 1', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
@@ -336,9 +358,10 @@ describe('a fase nunca mente sobre o estado', () => {
     // Sem esta asserção o teste vira vácuo: uma invariante que só passou por
     // `vasculhar` não provou nada sobre `combate` nem sobre `descartar`.
     // 🎚️ Se falhar por cobertura, o dial é `maoInicial` (mais cartas => mais
-    // excedente) — nunca afrouxar a asserção. `'jogar'` entra na Task 3, que é
-    // quem lhe dá transição; `'recompor'` já entra aqui, e quem a produz é a mão
-    // com carta de raça que a composição deste fixture distribui.
-    expect([...fasesVistas].sort()).toEqual(['combate', 'descartar', 'recompor', 'vasculhar']);
+    // excedente) — nunca afrouxar a asserção. `'recompor'` vem da mão com carta
+    // de raça que a composição deste fixture distribui; `'jogar'` vem do primeiro
+    // combate VENCIDO, porque é o loot que põe equipamento na mão (sem
+    // equipamento a fase se auto-pula e nunca aparece).
+    expect([...fasesVistas].sort()).toEqual(['combate', 'descartar', 'jogar', 'recompor', 'vasculhar']);
   });
 });

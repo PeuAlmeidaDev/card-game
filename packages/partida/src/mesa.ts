@@ -118,17 +118,16 @@ function sairDaParada(
 /**
  * ENTRA numa fase parada — ou a pula, se `passar` for a única ação legal nela
  * (auto-pulo, spec §6.1). Ponto ÚNICO da entrada, para quem CHEGA na fase e para
- * quem acabou de agir DENTRO dela. Hoje os chamadores são só os dois de dentro
- * (`jogarCarta` e `equiparCarta`); os de fora — o fim do combate e a porta que
- * não trouxe monstro — entram na Task 3, que é quem dá transição a `jogar`. A
- * entrada em `recompor` não passa por aqui: ela é o começo do turno, e quem a
- * decide é `faseDoTurnoDe`.
+ * quem acabou de agir DENTRO dela. São cinco chamadores: os dois de dentro
+ * (`jogarCarta` e `equiparCarta`) e os três que CHEGAM em `jogar` — a sala vazia,
+ * a raça que foi para a mão e o fim do combate. A entrada em `recompor` não passa
+ * por aqui: ela é o começo do turno, e quem a decide é `faseDoTurnoDe`.
  *
  * A permanência tem que fazer a mesma pergunta que a entrada: equipar o último
  * item deixaria a fase sem nenhuma ação além de `passar`, e cobrar esse clique
  * seria cobrar uma decisão que não existe. É também o que a invariante de
- * `fase.test.ts` afirma — estar em `recompor` sem raça nem equipamento na mão é
- * violação.
+ * `fase.test.ts` afirma para as DUAS — parar em `recompor` sem raça nem
+ * equipamento na mão, ou em `jogar` sem equipamento, é violação.
  *
  * O `jogador` vem por parâmetro, e não relido de `estado`: quem chama acabou de
  * atualizá-lo, e reler pelo `find` traria a versão de antes da ação.
@@ -185,7 +184,7 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   //   vasculhar            empurrarCarta  espiada !== null             `resolverEspiada`
   //   recompor             jogarCarta     carta.tipo === 'raca'        `jogarCarta`
   //   recompor             equiparCarta   carta.tipo === 'equipamento' `equiparCarta`
-  //   descartar            equiparCarta   carta.tipo === 'equipamento' `equiparCarta`
+  //   jogar                equiparCarta   carta.tipo === 'equipamento' `equiparCarta`
   //   combate              atacar         `proximaDecisao`             o motor (`AcaoIlegal`)
   //   combate              esquivar       `proximaDecisao`             o motor (`AcaoIlegal`)
   //
@@ -198,10 +197,10 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // Mesmo assim a lista SUBIU de sete para oito, e a conta é a lição do parágrafo
   // acima: as linhas antigas `vasculhar/descartar` escondiam DOIS pares cada uma
   // dentro de uma célula agrupada, então nunca foram nove pares — eram nove
-  // LINHAS sobre onze pares. `equiparCarta` continua legal em `descartar` até a
-  // Task 3, e esse par tem gêmeo de verdade na tela (`TelaMesa.test.tsx`, o
-  // "Equipar" aceso em `descartar`). Na Task 3 ele vira `jogar`, e continuam
-  // sendo duas linhas — nunca uma célula com duas fases.
+  // LINHAS sobre onze pares. `equiparCarta` deixou `descartar` na Task 3 e ficou
+  // com as DUAS fases paradas — duas linhas, nunca uma célula com duas fases —, e
+  // cada uma tem gêmeo de verdade na tela (`TelaMesa.test.tsx`: o "Equipar" aceso
+  // em `recompor` e em `jogar`, apagado em `descartar`).
   //
   // A `encrenca` do Plano 4 não muda esta lista: os verbos dela são novos.
   if (!acaoEhLegalNaFase(estado.fase, acao.tipo)) {
@@ -244,8 +243,9 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
 
 /**
  * Resolve uma carta JÁ comprada (o baralho em `base` já reflete a compra) e é
- * dona do seu DESTINO: `salaVazia` passa a vez, `monstro` abre combate, `raca`
- * vai para a mão de quem vasculhou e passa a vez. É o núcleo compartilhado do
+ * dona do seu DESTINO: `monstro` abre combate; `salaVazia` e `raca` (esta indo
+ * para a mão de quem vasculhou) entregam o turno à fase `jogar`, que se auto-pula
+ * e encerra o turno quando não há equipamento na mão. É o núcleo compartilhado do
  * vasculhar atômico e da resolução da espiada.
  *
  * O EVENTO sai por ramo, não antes do `switch`, porque quem decide se a carta
@@ -271,15 +271,33 @@ function resolverCarta(
   };
 
   switch (carta.tipo) {
-    case 'salaVazia':
-      return encerrarTurno(revelada, [{ tipo: 'porta', jogadorId, carta }]);
+    case 'salaVazia': {
+      // A sala vazia não trouxe encontro, mas o turno ainda tem a janela de vestir
+      // o que já estava na mão. No destino do spec §6 quem recebe este caminho é a
+      // fase `encrenca` (Plano 4); enquanto ela não existe, `jogar` é o próximo
+      // ponto do turno — e o auto-pulo faz a mesa nem mostrá-la a quem não tem
+      // equipamento na mão, que é o caso comum.
+      const daVez = base.jogadores.find((j) => j.id === jogadorId);
+      if (daVez === undefined) {
+        throw new Error(`resolverCarta: jogador ${jogadorId} não está na mesa`);
+      }
+      return entrarOuPular(revelada, daVez, 'jogar', [{ tipo: 'porta', jogadorId, carta }]);
+    }
     case 'raca': {
       // A carta sacada NÃO vai ao cemitério: ela fica com quem vasculhou. Por isso
       // o estado usado aqui é `base` (sem a carta), e não `revelada`.
       const jogadores = base.jogadores.map((j) => (
         j.id === jogadorId ? { ...j, mao: [...j.mao, carta] } : j
       ));
-      return encerrarTurno({ ...base, jogadores }, [{ tipo: 'achado', jogadorId }]);
+      const comACarta = jogadores.find((j) => j.id === jogadorId);
+      if (comACarta === undefined) {
+        throw new Error(`resolverCarta: jogador ${jogadorId} não está na mesa`);
+      }
+      // O jogador ATUALIZADO (com a carta já na mão): a raça sacada não dá o que
+      // fazer em `jogar` — ela espera a fase 1 do próximo turno —, mas um
+      // equipamento que já estivesse na mão dá, e é por isso que a pergunta é
+      // feita sobre a mão de agora e não sobre a de antes do saque.
+      return entrarOuPular({ ...base, jogadores }, comACarta, 'jogar', [{ tipo: 'achado', jogadorId }]);
     }
     case 'monstro':
       break;
@@ -524,9 +542,8 @@ function entregarCarta(
  * apodreceu uma vez — o comentário ficou dizendo 4 e 5 depois que o teto subiu
  * para 7, e quem refizesse a conta pelos números chegaria a outra conclusão.
  *
- * Em `descartar` sobram `entregarCarta` e `equiparCarta` (esta última até a Task 3
- * do plano, que lhe dá a fase `jogar`): as duas tiram uma carta da mão sem mexer
- * no limite.
+ * Em `descartar` sobra só `entregarCarta`: `equiparCarta` saiu junto, para as duas
+ * fases paradas que acontecem ANTES da cobrança do excedente.
  */
 function jogarCarta(
   estado: EstadoPartida,
@@ -618,13 +635,10 @@ function equiparCarta(
   ];
 
   if (!ehFaseParada(estado.fase)) {
-    // ⚠️ TRANSITÓRIO — some na Task 3 do plano, junto com `equiparCarta` saindo de
-    // `descartar`. Enquanto a fase `jogar` não existe para receber o tesouro, a
-    // única não-parada que declara `equiparCarta` é `descartar`, e lá equipar
-    // continua sendo saída do excedente: a fase tem que ser RECALCULADA, senão o
-    // turno fica preso em `descartar` com a mão já cabendo. Tirar este ramo antes
-    // da Task 3 é trocar um turno preso por um 500.
-    return registrar({ ...base, fase: faseDoTurnoDe(atualizado) }, eventos);
+    // Inalcançável pela tabela: `equiparCarta` só é legal em `recompor` e `jogar`,
+    // as duas paradas. Se acontecer, é invariante NOSSA quebrada => Error cru, 500
+    // sem vazar — mesmo formato do guard de `passar`, no `aplicarAcao`.
+    throw new Error(`equiparCarta: fase não-parada ${estado.fase}`);
   }
 
   return entrarOuPular(
@@ -731,7 +745,9 @@ function sacarTesouros(
 
 /**
  * Aplica o resultado do combate ao jogador, larga o loot do cadáver na mão do
- * vencedor, decide o fim da partida e passa a vez.
+ * vencedor, decide o fim da partida e entrega o turno à fase `jogar` — a janela
+ * de vestir o que acabou de cair. Quem encerra o turno dali é `sairDaParada`,
+ * pelo `passar` ou pelo auto-pulo.
  *
  * Precisa do `monstroId` e das `deps` por causa do loot: a quantidade vem da
  * CARTA de monstro (`InfoMonstro.tesouros`), não de uma constante — é o que faz
@@ -762,16 +778,16 @@ function fecharCombate(
       : { tipo: 'derrota', jogadorId, derrotas: atualizado.derrotas },
   ];
 
-  // A fase sai de `combate` junto com o combate. No caminho normal o
-  // `encerrarTurno` logo abaixo a recalcula (`descartar` se o vencedor estourou,
-  // `vasculhar` para quem recebe a vez); no caminho da vitória final ela fica
-  // aqui, neutra — `desfecho: 'terminada'` já recusa toda ação no topo do
-  // `aplicarAcao`, e a partida acabada não tem turno para descrever.
-  const semCombate: EstadoPartida = { ...estado, jogadores, combate: null, fase: 'vasculhar' };
+  // A fase sai de `combate` junto com o combate e vai para a janela de vestir o
+  // loot. No caminho da vitória final ela fica aqui, neutra — `desfecho:
+  // 'terminada'` já recusa toda ação no topo do `aplicarAcao`.
+  const semCombate: EstadoPartida = { ...estado, jogadores, combate: null, fase: 'jogar' };
 
-  // O loot vem ANTES do `encerrarTurno` de propósito: é ele quem recobra o
-  // limite de mão, e o tesouro que estoura a mão tem que cair na conta do mesmo
-  // turno. Depois, a fase `descartar` seria dada com a mão de antes do saque.
+  // O loot vem ANTES da saída do turno de propósito: é `encerrarTurno` (do outro
+  // lado de `jogar`) quem recobra o limite de mão, e o tesouro que estoura a mão
+  // tem que cair na conta do mesmo turno. Depois, a fase `descartar` seria dada
+  // com a mão de antes do saque. É também o que decide se `jogar` se auto-pula —
+  // sem o loot somado, o vencedor seria pulado por cima do próprio saque.
   //
   // E vem DEPOIS de `combate: null`: a invariante de fase (`fase.test.ts`) cobra
   // que ninguém fique em `fase: 'combate'` com a mão estourada. Somar o loot com
@@ -803,5 +819,17 @@ function fecharCombate(
     return registrar({ ...comLoot, desfecho: 'terminada', classificacao }, eventos);
   }
 
-  return encerrarTurno(comLoot, eventos);
+  const jogadorAtual = comLoot.jogadores.find((j) => j.id === jogadorId);
+  if (jogadorAtual === undefined) {
+    throw new Error(`fecharCombate: jogador ${jogadorId} não está na mesa`);
+  }
+  // O jogador DEPOIS do loot: `entrarOuPular` pergunta se há equipamento na mão, e
+  // as cartas que acabaram de cair são justamente a resposta. Perguntando sobre o
+  // `anterior`, o vencedor seria pulado por cima do próprio saque.
+  //
+  // Quem PERDEU passa pelo mesmo ponto: a janela é do fim do ENCONTRO, não do
+  // saque. Sem loot na mão ela se auto-pula, então o derrotado só a vê se já
+  // trouxesse um tesouro da mão — e aí vestir antes de encerrar o turno é
+  // exatamente o que a fase existe para permitir.
+  return entrarOuPular(comLoot, jogadorAtual, 'jogar', eventos);
 }
