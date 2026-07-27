@@ -134,4 +134,36 @@ describe('narrarEvento — linhas com marcação', () => {
     render(<>{narrarEvento({ tipo: 'combate', jogadorId: 'p1', eventos: [] }, ctx)}</>);
     expect(screen.getByText(/Seu combate:/)).toBeInTheDocument();
   });
+
+  it('passou de `recompor` é discreto e diz que o jogador segue sem se recompor', () => {
+    // A fase é pública, então nomeá-la não vaza nada — e é o que separa esta
+    // linha da de `jogar`, que fecha o turno.
+    render(<>{narrarEvento({ tipo: 'passou', jogadorId: 'p2', de: 'recompor' }, ctx)}</>);
+    const linha = screen.getByText(/segue sem se recompor/);
+    expect(linha.tagName).toBe('SMALL');
+    expect(linha).toHaveTextContent('Bot 1 segue sem se recompor.');
+  });
+
+  it('evento desconhecido degrada para uma linha NEUTRA, não para linha vazia', () => {
+    // Skew de versão: bundle antigo, evento novo vindo do servidor. O `default`
+    // devolvia `null`, o que renderiza um <li> INVISÍVEL — enquanto o comentário
+    // do arquivo prometia "uma linha neutra". Metade da promessa era verdadeira
+    // (não dá tela branca); a outra metade não existia.
+    //
+    // Uma linha vazia é pior que feia: some da crônica sem deixar rastro, e quem
+    // depura um deploy com duas versões no ar não tem o que procurar.
+    const desconhecido = { tipo: 'interferencia', jogadorId: 'p2' } as unknown as EventoDaMesa;
+    render(<>{narrarEvento(desconhecido, ctx)}</>);
+
+    const linha = screen.getByText(/não sabe descrever/);
+    expect(linha.tagName).toBe('SMALL');
+    expect(linha.textContent).not.toBe('');
+  });
+
+  it('passou de `jogar` diz que o jogador encerra o turno', () => {
+    render(<>{narrarEvento({ tipo: 'passou', jogadorId: 'p1', de: 'jogar' }, ctx)}</>);
+    const linha = screen.getByText(/encerra o turno/);
+    expect(linha.tagName).toBe('SMALL');
+    expect(linha).toHaveTextContent('Você encerra o turno.');
+  });
 });

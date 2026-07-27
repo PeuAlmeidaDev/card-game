@@ -21,6 +21,9 @@ export interface ContextoDeNarracao {
  *
  * O `default` também protege o runtime: um bundle antigo recebendo do servidor um
  * evento que ele não conhece degrada para uma linha neutra, nunca para tela branca.
+ * Linha neutra de verdade, com TEXTO: enquanto ele devolvia `null`, o `<li>` saía
+ * vazio e invisível — a promessa desta frase era metade falsa, e quem depurasse um
+ * deploy com duas versões no ar não teria o que procurar na crônica.
  */
 export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): ReactNode {
   switch (evento.tipo) {
@@ -87,10 +90,24 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
           </ul>
         </>
       );
+    // A fase é pública (viaja na vista), então nomear de qual delas o jogador
+    // saiu não vaza nada — e é o que separa "não vou me recompor" de "encerrei o
+    // turno" numa crônica que, sem isso, teria duas linhas idênticas.
+    case 'passou':
+      return (
+        <small>
+          {evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId)}
+          {evento.de === 'recompor' ? ' segue sem se recompor.' : ' encerra o turno.'}
+        </small>
+      );
     default: {
       const naoTratado: never = evento;
       void naoTratado;
-      return null;
+      // `<small>` pela mesma razão de `vez` e `passou`: é meta-informação sobre a
+      // partida, não narração dela. Não nomeia o `tipo` recebido — o log é lido
+      // pelo jogador, e um id de evento cru na crônica é vazamento de implementação
+      // que não ajuda ninguém a jogar.
+      return <small>Algo aconteceu que esta versão do jogo não sabe descrever.</small>;
     }
   }
 }

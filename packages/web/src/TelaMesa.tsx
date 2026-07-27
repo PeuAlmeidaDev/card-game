@@ -3,7 +3,7 @@ import { api } from './api';
 import { PainelLog } from './PainelLog';
 import { descreverCarta } from './descreverCarta';
 import { acaoEhLegalNaFase } from '@card-dungeon/shared';
-import type { AcaoDaMesa, AcaoNoFio, Catalogo, Escolhas, Slot, VistaDaPartida } from '@card-dungeon/shared';
+import type { AcaoDaMesa, AcaoNoFio, Catalogo, Escolhas, Fase, Slot, VistaDaPartida } from '@card-dungeon/shared';
 
 /**
  * Usado quando a tela roda sozinha; o `App` passa as escolhas reais do construtor.
@@ -34,6 +34,19 @@ const NOME_DO_SLOT: Record<Slot, string> = {
   maoDireita: 'Mão direita',
   maoEsquerda: 'Mão esquerda',
   pes: 'Pés',
+};
+
+/**
+ * O nome humano de cada fase. `Record<Fase, string>` é o que obriga a fase nova a
+ * chegar com nome — um objeto solto a deixaria renderizar `undefined` justamente
+ * na linha que existe para o jogador saber onde está.
+ */
+const NOME_DA_FASE: Record<Fase, string> = {
+  recompor: 'Recompor — vista o corpo antes de abrir a porta',
+  vasculhar: 'Vasculhar — abra a próxima porta',
+  combate: 'Combate',
+  jogar: 'Jogar — vista o que encontrou',
+  descartar: 'Descartar — sua mão está acima do limite',
 };
 
 export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = [], itens = [] }: {
@@ -121,15 +134,23 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
   //
   // ⚠️ `legal()` é um gate GROSSO, não a resposta inteira. O reducer ainda cobra
   // condições que a tabela não conhece, e cada uma precisa de gêmeo aqui — é o
-  // `|| espiada !== null` de "Vasculhar" e "Jogar", o `carta.tipo === 'raca'` que
-  // decide se "Jogar" existe, e o `decisao !== …` de "Atacar"/"Esquivar". A lista
-  // completa dos pares está no comentário do `aplicarAcao` (pacote `partida`):
-  // botão novo escrito só com `legal(tipo)` acende onde o domínio recusa.
+  // `|| espiada !== null` de "Vasculhar" (o único par de espiada que sobrou: as
+  // Tasks 2 e 3 tiraram `jogarCarta` e `equiparCarta` da fase `vasculhar`, a
+  // única em que a espiada existe, e os gêmeos deles morreram junto), o
+  // `carta.tipo === 'raca'` que decide se "Jogar" existe, e o `decisao !== …` de
+  // "Atacar"/"Esquivar". A lista completa dos pares está no comentário do
+  // `aplicarAcao` (pacote `partida`): botão novo escrito só com `legal(tipo)`
+  // acende onde o domínio recusa.
   const legal = (tipo: AcaoDaMesa['tipo']): boolean => podeAgir && acaoEhLegalNaFase(vista.fase, tipo);
 
   return (
     <section>
       <h2>Mesa — alvo: patente {vista.patenteAlvo}</h2>
+
+      {/* A fase vem PRONTA da vista e é regra pública. Renderizá-la é o que separa
+          "o botão apagou" de "não é a hora dele" — a lição do gate ocular do Plano
+          3a: o domínio publicar não basta, o jogador precisa ver. */}
+      <p>{NOME_DA_FASE[vista.fase]}</p>
 
       {/* Os stats de TODOS os assentos, não só os do humano: a zona em jogo (raça
           e slots) já é pública, então o total derivado dela não é segredo —
@@ -198,6 +219,16 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
             >
               Vasculhar local
             </button>
+            {/* Uma etiqueta só para as duas fases paradas: o que "Passar" significa
+                em cada uma já está dito na linha de fase acima, e dois rótulos
+                dariam ao jogador dois botões para aprender em vez de um. */}
+            <button
+              type="button"
+              disabled={!legal('passar')}
+              onClick={() => void agir({ tipo: 'passar' })}
+            >
+              Passar
+            </button>
             {/* "Encarar"/"Empurrar" falam a língua do jogo; as AÇÕES continuam
                 `manterCarta`/`empurrarCarta` (a língua do domínio). A tradução
                 mora aqui, na borda de apresentação. */}
@@ -259,22 +290,30 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
       <section>
         <h3>Sua mão — {vista.suaMao.length} de {eu?.limiteDeMao ?? 0}</h3>
         {acimaDoLimite && (
-          /* As TRÊS saídas do excedente — o conjunto exato que `fase.ts` declara
-             legal em `descartar` —, e nesta ordem. A faixa é a única instrução da
-             tela, e a mesa NASCE no teto (4 Portas + 4 Tesouros = 8, o limite de
-             quem está sem raça): o turno 1 já cai aqui. Nomeando só a caridade,
-             ela mandava doar o tesouro que o jogador deveria estar vestindo — e
-             doar para quem está atrás, porque o destino da caridade é a patente
-             menor. Equipar vem primeiro por ser a saída que o desenho da mão
-             inicial pressupõe (ver `mao.ts`).
+          /* UMA saída, não mais três: `fase.ts` só legaliza `entregarCarta` em
+             `descartar` desde as Tasks 2 e 3 — `jogarCarta` migrou para
+             `recompor` (decisão #7) e `equiparCarta` para `recompor` E `jogar`
+             (o comentário de `LEGAL.jogar` explica por que a raça NÃO está
+             nesta segunda: trocá-la depois de ver a porta seria reagir ao
+             monstro). Prometer as outras duas aqui era mentir: as duas levam
+             400 nesta fase.
+
+             A frase lembra ONDE cada ação ainda cabe — SEPARADA por ação, não
+             numa lista só, porque as duas não têm o mesmo conjunto de fases:
+             juntar "equipar e jogar raça acontecem... em recompor e jogar"
+             implicava que jogar raça também vale em `jogar`, e não vale. Essa
+             é a mesma classe de mentira que o texto antigo tinha (prometer uma
+             ação numa fase em que ela leva 400) — só que deslocada de "aqui"
+             para "lá".
 
              "a vez só passa quando ela couber", e não "para encerrar o turno":
-             jogar raça sem ter raça em jogo é NET-ZERO (a mão cai 1 e o limite
-             cai junto), então nenhuma das três pode prometer que UMA ação basta.
-             Quem recobra é `encerrarTurno`, a cada ação. */
+             entregar sozinha pode não bastar (a mão pode seguir acima do limite
+             depois de uma carta), então a frase não promete que UM clique
+             resolve. Quem recobra é `encerrarTurno`, a cada ação. */
           <p role="status">
-            Sua mão está acima do limite: equipe um tesouro, jogue uma raça ou
-            entregue uma carta — a vez só passa quando ela couber.
+            Sua mão está acima do limite: entregue uma carta — a vez só passa
+            quando ela couber. Equipar acontece antes, nas fases de recompor e
+            de jogar; jogar raça, só na de recompor.
           </p>
         )}
         <ul>
@@ -286,26 +325,27 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
               {carta.tipo === 'raca' && (
                 <button
                   type="button"
-                  disabled={!legal('jogarCarta') || espiada !== null}
+                  disabled={!legal('jogarCarta')}
                   onClick={() => void agir({ tipo: 'jogarCarta', cartaId: carta.id })}
                 >
                   Jogar
                 </button>
               )}
-              {/* Os DOIS pares finos de `equiparCarta` (ver a tabela no
+              {/* O par fino que sobra de `equiparCarta` (ver a tabela no
                   `aplicarAcao`), porque `legal()` é gate grosso e não conhece
-                  nenhum dos dois:
-                  - `carta.tipo === 'equipamento'` → decide se o botão EXISTE;
-                  - `espiada === null` → decide se ele acende, igual a "Vasculhar"
-                    e "Jogar". Com a espiada pendente o reducer recusa, e
-                    `legal('equiparCarta')` sozinho é `true` na fase `vasculhar`.
+                  este:
+                  - `carta.tipo === 'equipamento'` → decide se o botão EXISTE.
+                  O gêmeo de espiada morreu junto com o guard do reducer: a
+                  espiada só existe na fase `vasculhar`, e nem `jogarCarta` nem
+                  `equiparCarta` são legais nela desde as Tasks 2 e 3 — a tabela
+                  já apaga os dois botões antes de qualquer pendência importar.
                   O SLOT não vai na ação: quem decide onde encaixa é o item, pelo
                   catálogo do servidor — deixar o cliente escolher seria deixá-lo
                   pôr o capacete no pé. */}
               {carta.tipo === 'equipamento' && (
                 <button
                   type="button"
-                  disabled={!legal('equiparCarta') || espiada !== null}
+                  disabled={!legal('equiparCarta')}
                   onClick={() => void agir({ tipo: 'equiparCarta', cartaId: carta.id })}
                 >
                   Equipar

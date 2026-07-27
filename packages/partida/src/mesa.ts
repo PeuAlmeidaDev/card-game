@@ -2,7 +2,7 @@ import type { Combatente, Passo, RolarD12, PassivaCombate } from '@card-dungeon/
 import { AcaoIlegal, criarCombate, proximoPasso } from '@card-dungeon/motor';
 import type {
   AcaoDaMesa, Carta, CartaPorta, CartaTesouro, CatalogoDaMesa, Embaralhar, EstadoPartida, EventoDaMesa,
-  InfoRaca, JogadorNaMesa,
+  Fase, FaseParada, InfoRaca, JogadorNaMesa,
 } from './tipos';
 import { tirarDoTopo } from './baralho';
 import { destinoDaCaridade } from './caridade';
@@ -10,7 +10,7 @@ import { combatenteDe } from './corpo';
 import { colocarNoSlot, destinoDoDesequipado } from './equipar';
 import { classificar } from './classificacao';
 import { AcaoInvalida } from './erros';
-import { acaoEhLegalNaFase, faseDoTurnoDe } from './fase';
+import { acaoEhLegalNaFase, faseDoTurnoDe, faseSeAutoPula } from './fase';
 
 /** As ações que só fazem sentido com um combate aberto. */
 type AcaoDeCombate = Extract<AcaoDaMesa, { readonly tipo: 'atacar' | 'esquivar' }>;
@@ -95,6 +95,85 @@ function encerrarTurno(base: EstadoPartida, eventos: readonly EventoDaMesa[]): R
 }
 
 /**
+ * Sai de uma fase PARADA. `recompor` entrega o turno à fase 2 (`vasculhar`) sem
+ * passar a vez; `jogar` encerra o turno, e é `encerrarTurno` quem cobra o limite
+ * de mão dali.
+ *
+ * As duas saídas são diferentes de propósito: `recompor` é ANTES da porta abrir e
+ * `jogar` é DEPOIS de o encontro resolver. Uma função só para as duas é o que
+ * garante que `passar` e o auto-pulo terminem no MESMO lugar — se divergissem,
+ * passar à mão e ser pulado dariam turnos diferentes.
+ */
+function sairDaParada(
+  estado: EstadoPartida,
+  fase: FaseParada,
+  eventos: readonly EventoDaMesa[],
+): ResultadoAcao {
+  if (fase === 'recompor') {
+    return registrar({ ...estado, fase: 'vasculhar' }, eventos);
+  }
+  return encerrarTurno(estado, eventos);
+}
+
+/**
+ * ENTRA numa fase parada — ou a pula, se `passar` for a única ação legal nela
+ * (auto-pulo, spec §6.1). Ponto ÚNICO da entrada, para quem CHEGA na fase e para
+ * quem acabou de agir DENTRO dela. São cinco chamadores: os dois de dentro
+ * (`jogarCarta` e `equiparCarta`) e os três que CHEGAM em `jogar` — a sala vazia,
+ * a raça que foi para a mão e o fim do combate. A entrada em `recompor` não passa
+ * por aqui: ela é o começo do turno, e quem a decide é `faseDoTurnoDe`.
+ *
+ * A permanência tem que fazer a mesma pergunta que a entrada: equipar o último
+ * item deixaria a fase sem nenhuma ação além de `passar`, e cobrar esse clique
+ * seria cobrar uma decisão que não existe. É também o que a invariante de
+ * `fase.test.ts` afirma para as DUAS — parar em `recompor` sem raça nem
+ * equipamento na mão, ou em `jogar` sem equipamento, é violação.
+ *
+ * O `jogador` vem por parâmetro, e não relido de `estado`: quem chama acabou de
+ * atualizá-lo, e reler pelo `find` traria a versão de antes da ação.
+ */
+function entrarOuPular(
+  estado: EstadoPartida,
+  jogador: JogadorNaMesa,
+  fase: FaseParada,
+  eventos: readonly EventoDaMesa[],
+): ResultadoAcao {
+  if (faseSeAutoPula(fase, jogador)) {
+    return sairDaParada(estado, fase, eventos);
+  }
+  return registrar({ ...estado, fase }, eventos);
+}
+
+/**
+ * As fases paradas, como TABELA e não como cadeia de `===`. Mesmo mecanismo do
+ * `LEGAL` em `fase.ts`: `Record<FaseParada, true>` **cobra membro novo na
+ * compilação**, e é isso que a comparação por igualdade não fazia.
+ *
+ * O motivo é concreto, não estético. `ehFaseParada` é um **type predicate**, e o
+ * TypeScript não verifica o corpo de um: com `FaseParada` ganhando um membro, o
+ * tipo dizia uma coisa e a função dizia outra, sem nada acusar. Medido:
+ * acrescentar um terceiro membro a `FaseParada` deixava `pnpm typecheck` passar
+ * LIMPO, e `passar` na fase esquecida saía como `Error` cru — **500 numa partida
+ * legítima**, não o 400 de `AcaoInvalida`.
+ *
+ * ⚠️ A `encrenca` do Plano 4 **não** é candidata: o spec §6 dá a ela
+ * `procurarEncrenca` e `saquear`, e nenhum `passar` — `saquear` está sempre
+ * disponível, então a fase nunca é beco sem saída. O risco aqui não é uma fase
+ * específica do roteiro; é `FaseParada` ser uma união mantida à mão, que qualquer
+ * um alarga sem passar por esta função.
+ *
+ * Os dois `throw` que dependem deste predicado (no `aplicarAcao` e no
+ * `equiparCarta`) se descrevem como "inalcançável pela tabela". Continuam sendo —
+ * mas agora quem alargar `FaseParada` é obrigado a passar por aqui antes.
+ */
+const FASES_PARADAS: Record<FaseParada, true> = { recompor: true, jogar: true };
+
+/** É fase parada? Narrowing para `FaseParada` — só elas aceitam `passar`. */
+function ehFaseParada(fase: Fase): fase is FaseParada {
+  return fase in FASES_PARADAS;
+}
+
+/**
  * Reducer autoritativo da mesa. Recusa do cliente sai como `AcaoInvalida` (a borda
  * traduz em 400); invariante nossa quebrada sai como `Error` cru (500, sem vazar).
  */
@@ -114,7 +193,7 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // guards certos; agora ela precisa entrar na tabela, e o `Record<Fase, …>` cobra.
   //
   // ⚠️ O QUE A TABELA NÃO RESPONDE. Passar aqui não garante que a ação será
-  // aceita: a elegibilidade FINA continua em cada função, e hoje são NOVE pares —
+  // aceita: a elegibilidade FINA continua em cada função, e hoje são OITO pares —
   // cada um precisa de gêmeo na tela, porque o `legal()` da `TelaMesa` lê ESTA
   // tabela e não sabe deles.
   //
@@ -125,19 +204,29 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   //
   //   fase                 ação           segunda condição             quem cobra
   //   vasculhar            vasculhar      espiada === null             `vasculhar`
-  //   vasculhar            jogarCarta     espiada === null             `jogarCarta`
-  //   vasculhar            equiparCarta   espiada === null             `equiparCarta`
   //   vasculhar            manterCarta    espiada !== null             `resolverEspiada`
   //   vasculhar            empurrarCarta  espiada !== null             `resolverEspiada`
-  //   vasculhar/descartar  jogarCarta     carta.tipo === 'raca'        `jogarCarta`
-  //   vasculhar/descartar  equiparCarta   carta.tipo === 'equipamento' `equiparCarta`
+  //   recompor             jogarCarta     carta.tipo === 'raca'        `jogarCarta`
+  //   recompor             equiparCarta   carta.tipo === 'equipamento' `equiparCarta`
+  //   jogar                equiparCarta   carta.tipo === 'equipamento' `equiparCarta`
   //   combate              atacar         `proximaDecisao`             o motor (`AcaoIlegal`)
   //   combate              esquivar       `proximaDecisao`             o motor (`AcaoIlegal`)
   //
   // Um botão novo escrito só com `legal(tipo)` acende nesses estados e leva 400.
-  // Quando `recompor` e `encrenca` chegarem (Planos 3 e 4), as CINCO primeiras
-  // linhas somem — a espiada vira fase própria e os pares dela deixam de ser
-  // necessários.
+  // Os dois pares `espiada !== null` de `jogarCarta` e `equiparCarta` MORRERAM:
+  // as duas saíram da fase em que a espiada existe, os guards ficaram
+  // inalcançáveis e foram removidos (os gêmeos na tela saem na Task 5, onde o
+  // botão "Passar" chega).
+  //
+  // Mesmo assim a lista SUBIU de sete para oito, e a conta é a lição do parágrafo
+  // acima: as linhas antigas `vasculhar/descartar` escondiam DOIS pares cada uma
+  // dentro de uma célula agrupada, então nunca foram nove pares — eram nove
+  // LINHAS sobre onze pares. `equiparCarta` deixou `descartar` na Task 3 e ficou
+  // com as DUAS fases paradas — duas linhas, nunca uma célula com duas fases —, e
+  // cada uma tem gêmeo de verdade na tela (`TelaMesa.test.tsx`: o "Equipar" aceso
+  // em `recompor` e em `jogar`, apagado em `descartar`).
+  //
+  // A `encrenca` do Plano 4 não muda esta lista: os verbos dela são novos.
   if (!acaoEhLegalNaFase(estado.fase, acao.tipo)) {
     throw new AcaoInvalida(`aplicarAcao: ${acao.tipo} não é legal na fase ${estado.fase}`);
   }
@@ -162,13 +251,25 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
     return equiparCarta(estado, acao, deps);
   }
 
+  if (acao.tipo === 'passar') {
+    if (!ehFaseParada(estado.fase)) {
+      // Inalcançável pela tabela (só `recompor` e `jogar` declaram `passar`). Se
+      // acontecer, é invariante NOSSA quebrada => Error cru, 500 sem vazar.
+      throw new Error(`aplicarAcao: passar aceito na fase não-parada ${estado.fase}`);
+    }
+    return sairDaParada(estado, estado.fase, [
+      { tipo: 'passou', jogadorId: acao.jogadorId, de: estado.fase },
+    ]);
+  }
+
   return agirNoCombate(estado, acao, deps);
 }
 
 /**
  * Resolve uma carta JÁ comprada (o baralho em `base` já reflete a compra) e é
- * dona do seu DESTINO: `salaVazia` passa a vez, `monstro` abre combate, `raca`
- * vai para a mão de quem vasculhou e passa a vez. É o núcleo compartilhado do
+ * dona do seu DESTINO: `monstro` abre combate; `salaVazia` e `raca` (esta indo
+ * para a mão de quem vasculhou) entregam o turno à fase `jogar`, que se auto-pula
+ * e encerra o turno quando não há equipamento na mão. É o núcleo compartilhado do
  * vasculhar atômico e da resolução da espiada.
  *
  * O EVENTO sai por ramo, não antes do `switch`, porque quem decide se a carta
@@ -194,15 +295,33 @@ function resolverCarta(
   };
 
   switch (carta.tipo) {
-    case 'salaVazia':
-      return encerrarTurno(revelada, [{ tipo: 'porta', jogadorId, carta }]);
+    case 'salaVazia': {
+      // A sala vazia não trouxe encontro, mas o turno ainda tem a janela de vestir
+      // o que já estava na mão. No destino do spec §6 quem recebe este caminho é a
+      // fase `encrenca` (Plano 4); enquanto ela não existe, `jogar` é o próximo
+      // ponto do turno — e o auto-pulo faz a mesa nem mostrá-la a quem não tem
+      // equipamento na mão, que é o caso comum.
+      const daVez = base.jogadores.find((j) => j.id === jogadorId);
+      if (daVez === undefined) {
+        throw new Error(`resolverCarta: jogador ${jogadorId} não está na mesa`);
+      }
+      return entrarOuPular(revelada, daVez, 'jogar', [{ tipo: 'porta', jogadorId, carta }]);
+    }
     case 'raca': {
       // A carta sacada NÃO vai ao cemitério: ela fica com quem vasculhou. Por isso
       // o estado usado aqui é `base` (sem a carta), e não `revelada`.
       const jogadores = base.jogadores.map((j) => (
         j.id === jogadorId ? { ...j, mao: [...j.mao, carta] } : j
       ));
-      return encerrarTurno({ ...base, jogadores }, [{ tipo: 'achado', jogadorId }]);
+      const comACarta = jogadores.find((j) => j.id === jogadorId);
+      if (comACarta === undefined) {
+        throw new Error(`resolverCarta: jogador ${jogadorId} não está na mesa`);
+      }
+      // O jogador ATUALIZADO (com a carta já na mão): a raça sacada não dá o que
+      // fazer em `jogar` — ela espera a fase 1 do próximo turno —, mas um
+      // equipamento que já estivesse na mão dá, e é por isso que a pergunta é
+      // feita sobre a mão de agora e não sobre a de antes do saque.
+      return entrarOuPular({ ...base, jogadores }, comACarta, 'jogar', [{ tipo: 'achado', jogadorId }]);
     }
     case 'monstro':
       break;
@@ -430,34 +549,34 @@ function entregarCarta(
  * Põe uma carta de raça da mão na zona em jogo. A anterior vai para o cemitério:
  * a zona é ABERTA, então trocar de raça é jogada pública.
  *
- * A vez NÃO passa — jogar raça é decisão do próprio turno. Estando acima do
- * limite, jogar raça só é saída quando o jogador JÁ tem raça em jogo: a mão
- * encolhe 1 e o limite (`LIMITE_BASE_DE_MAO`, hoje 7) não se move. Sem raça em
- * jogo é NET-ZERO — o limite era `LIMITE_BASE_DE_MAO + 1` (hoje 8) e cai para o
- * base junto com a mão, o excedente não muda — porque a especialização derruba o
- * próprio bônus que ela substitui (o Adaptável do Humano, em `./mao`).
+ * A vez NÃO passa — jogar raça é decisão do próprio turno, e o turno segue para a
+ * fase 2 (ou fica em `recompor`, se ainda houver o que vestir).
+ *
+ * DEIXOU de ser saída do excedente (decisão #7 do spec): só é legal em
+ * `recompor`, e `faseDoTurnoDe` manda quem abre o turno estourado direto para
+ * `descartar`. Não é perda — nunca foi saída de verdade quando o jogador estava
+ * sem raça em jogo: ali a jogada é NET-ZERO, porque o limite era
+ * `LIMITE_BASE_DE_MAO + 1` (hoje 8) e cai para o base junto com a mão, já que a
+ * especialização derruba o próprio bônus que ela substitui (o Adaptável do
+ * Humano, em `./mao`). Pelo mesmo cálculo, quem está DENTRO do limite (o único
+ * jeito de chegar a `recompor`) nunca estoura ao jogar uma raça.
  *
  * A conta está escrita em cima das CONSTANTES, não dos números: os "hoje 7/8" são
  * cortesia para quem lê, e a razão sobrevive ao próximo giro do dial. Ela já
  * apodreceu uma vez — o comentário ficou dizendo 4 e 5 depois que o teto subiu
  * para 7, e quem refizesse a conta pelos números chegaria a outra conclusão.
  *
- * `entregarCarta` e `equiparCarta` são as saídas que sempre funcionam, nos dois
- * casos: as duas tiram uma carta da mão sem mexer no limite. As três juntas são
- * o conjunto que a tabela de `./fase` declara legal em `descartar`.
+ * Em `descartar` sobra só `entregarCarta`: `equiparCarta` saiu junto, para as duas
+ * fases paradas que acontecem ANTES da cobrança do excedente.
  */
 function jogarCarta(
   estado: EstadoPartida,
   acao: Extract<AcaoDaMesa, { readonly tipo: 'jogarCarta' }>,
 ): ResultadoAcao {
-  // Guarda de PENDÊNCIA, não de fase: `jogarCarta` e a espiada convivem na fase
-  // `vasculhar` enquanto `recompor` não existe como fase própria (só existirá
-  // quando o `passar` do Plano 3 a separar — e aí ela some, porque `recompor`
-  // acontece ANTES de qualquer compra e nenhuma espiada pode estar aberta).
-  if (estado.espiada !== null) {
-    throw new AcaoInvalida('aplicarAcao: há uma espiada pendente');
-  }
-
+  // O guard de espiada MORREU aqui: `jogarCarta` só é legal em `recompor`, que
+  // acontece antes de qualquer compra, e a espiada só existe em `vasculhar`. A
+  // pendência deixou de ser alcançável nesta função — era exatamente o que o
+  // comentário antigo previa para quando `recompor` nascesse.
   const { jogador, carta } = cartaDaMao(estado, acao);
   if (carta.tipo !== 'raca') {
     throw new AcaoInvalida('aplicarAcao: só carta de raça entra em jogo nesta fatia');
@@ -475,7 +594,7 @@ function jogarCarta(
     emJogo: { ...jogador.emJogo, raca: carta },
   };
 
-  return registrar(
+  return entrarOuPular(
     {
       ...estado,
       jogadores: estado.jogadores.map((j) => (j.id === atualizado.id ? atualizado : j)),
@@ -483,12 +602,12 @@ function jogarCarta(
         ...estado.portas,
         cemiterio: anterior === null ? estado.portas.cemiterio : [...estado.portas.cemiterio, anterior],
       },
-      // RECALCULADA: jogar a raça tira uma carta da mão e pode ter resolvido o
-      // excedente (quando já havia raça em jogo — o limite não se move e só a mão
-      // encolhe). Sem isto o turno ficaria preso em `descartar` com a mão já
-      // cabendo, e `vasculhar` seguiria recusado sem motivo.
-      fase: faseDoTurnoDe(atualizado),
     },
+    atualizado,
+    // `recompor` fixo, e não `estado.fase`: a tabela só declara `jogarCarta` legal
+    // aqui. Um dia em que ela declarar noutra fase, este literal é a linha que
+    // vai estar mentindo — e é por isso que ele fica visível em vez de derivado.
+    'recompor',
     [{ tipo: 'racaEmJogo', jogadorId: acao.jogadorId, carta }],
   );
 }
@@ -508,13 +627,9 @@ function equiparCarta(
   acao: Extract<AcaoDaMesa, { readonly tipo: 'equiparCarta' }>,
   deps: DepsMesa,
 ): ResultadoAcao {
-  // Guarda de PENDÊNCIA, não de fase — gêmeo do que `jogarCarta` já carrega:
-  // `equiparCarta` e a espiada convivem na fase `vasculhar` enquanto `recompor`
-  // não existe como fase própria (Plano 3b).
-  if (estado.espiada !== null) {
-    throw new AcaoInvalida('aplicarAcao: há uma espiada pendente');
-  }
-
+  // O guard de espiada MORREU aqui, gêmeo do de `jogarCarta`: `equiparCarta`
+  // deixou de ser legal em `vasculhar`, a única fase em que a espiada existe, e a
+  // pendência ficou inalcançável nesta função.
   const { jogador, carta } = cartaDaMao(estado, acao);
   if (carta.tipo !== 'equipamento') {
     throw new AcaoInvalida('aplicarAcao: só carta de equipamento vai para o corpo');
@@ -537,15 +652,27 @@ function equiparCarta(
   const comJogador: EstadoPartida = {
     ...estado,
     jogadores: estado.jogadores.map((j) => (j.id === atualizado.id ? atualizado : j)),
-    // RECALCULADA pelo mesmo motivo que em `jogarCarta`: equipar tira uma carta
-    // da mão e pode ter resolvido o excedente. Sem isto o turno ficaria preso em
-    // `descartar` com a mão já cabendo.
-    fase: faseDoTurnoDe(atualizado),
   };
+  const base = destinoDoDesequipado(comJogador, deslocados);
+  const eventos: readonly EventoDaMesa[] = [
+    { tipo: 'equipou', jogadorId: acao.jogadorId, slot: info.slot, carta },
+  ];
 
-  return registrar(
-    destinoDoDesequipado(comJogador, deslocados),
-    [{ tipo: 'equipou', jogadorId: acao.jogadorId, slot: info.slot, carta }],
+  if (!ehFaseParada(estado.fase)) {
+    // Inalcançável pela tabela: `equiparCarta` só é legal em `recompor` e `jogar`,
+    // as duas paradas. Se acontecer, é invariante NOSSA quebrada => Error cru, 500
+    // sem vazar — mesmo formato do guard de `passar`, no `aplicarAcao`.
+    throw new Error(`equiparCarta: fase não-parada ${estado.fase}`);
+  }
+
+  return entrarOuPular(
+    base,
+    atualizado,
+    // A fase de ORIGEM, não um literal: equipar é legal em `recompor` e em
+    // `jogar`, e o jogador tem que continuar onde estava. Fixar `recompor` aqui
+    // mandaria quem equipou depois de vencer um combate de volta para a fase 1.
+    estado.fase,
+    eventos,
   );
 }
 
@@ -642,7 +769,9 @@ function sacarTesouros(
 
 /**
  * Aplica o resultado do combate ao jogador, larga o loot do cadáver na mão do
- * vencedor, decide o fim da partida e passa a vez.
+ * vencedor, decide o fim da partida e entrega o turno à fase `jogar` — a janela
+ * de vestir o que acabou de cair. Quem encerra o turno dali é `sairDaParada`,
+ * pelo `passar` ou pelo auto-pulo.
  *
  * Precisa do `monstroId` e das `deps` por causa do loot: a quantidade vem da
  * CARTA de monstro (`InfoMonstro.tesouros`), não de uma constante — é o que faz
@@ -673,16 +802,16 @@ function fecharCombate(
       : { tipo: 'derrota', jogadorId, derrotas: atualizado.derrotas },
   ];
 
-  // A fase sai de `combate` junto com o combate. No caminho normal o
-  // `encerrarTurno` logo abaixo a recalcula (`descartar` se o vencedor estourou,
-  // `vasculhar` para quem recebe a vez); no caminho da vitória final ela fica
-  // aqui, neutra — `desfecho: 'terminada'` já recusa toda ação no topo do
-  // `aplicarAcao`, e a partida acabada não tem turno para descrever.
-  const semCombate: EstadoPartida = { ...estado, jogadores, combate: null, fase: 'vasculhar' };
+  // A fase sai de `combate` junto com o combate e vai para a janela de vestir o
+  // loot. No caminho da vitória final ela fica aqui, neutra — `desfecho:
+  // 'terminada'` já recusa toda ação no topo do `aplicarAcao`.
+  const semCombate: EstadoPartida = { ...estado, jogadores, combate: null, fase: 'jogar' };
 
-  // O loot vem ANTES do `encerrarTurno` de propósito: é ele quem recobra o
-  // limite de mão, e o tesouro que estoura a mão tem que cair na conta do mesmo
-  // turno. Depois, a fase `descartar` seria dada com a mão de antes do saque.
+  // O loot vem ANTES da saída do turno de propósito: é `encerrarTurno` (do outro
+  // lado de `jogar`) quem recobra o limite de mão, e o tesouro que estoura a mão
+  // tem que cair na conta do mesmo turno. Depois, a fase `descartar` seria dada
+  // com a mão de antes do saque. É também o que decide se `jogar` se auto-pula —
+  // sem o loot somado, o vencedor seria pulado por cima do próprio saque.
   //
   // E vem DEPOIS de `combate: null`: a invariante de fase (`fase.test.ts`) cobra
   // que ninguém fique em `fase: 'combate'` com a mão estourada. Somar o loot com
@@ -714,5 +843,17 @@ function fecharCombate(
     return registrar({ ...comLoot, desfecho: 'terminada', classificacao }, eventos);
   }
 
-  return encerrarTurno(comLoot, eventos);
+  const jogadorAtual = comLoot.jogadores.find((j) => j.id === jogadorId);
+  if (jogadorAtual === undefined) {
+    throw new Error(`fecharCombate: jogador ${jogadorId} não está na mesa`);
+  }
+  // O jogador DEPOIS do loot: `entrarOuPular` pergunta se há equipamento na mão, e
+  // as cartas que acabaram de cair são justamente a resposta. Perguntando sobre o
+  // `anterior`, o vencedor seria pulado por cima do próprio saque.
+  //
+  // Quem PERDEU passa pelo mesmo ponto: a janela é do fim do ENCONTRO, não do
+  // saque. Sem loot na mão ela se auto-pula, então o derrotado só a vê se já
+  // trouxesse um tesouro da mão — e aí vestir antes de encerrar o turno é
+  // exatamente o que a fase existe para permitir.
+  return entrarOuPular(comLoot, jogadorAtual, 'jogar', eventos);
 }
