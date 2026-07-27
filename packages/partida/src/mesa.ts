@@ -150,11 +150,17 @@ function entrarOuPular(
  * compilação**, e é isso que a comparação por igualdade não fazia.
  *
  * O motivo é concreto, não estético. `ehFaseParada` é um **type predicate**, e o
- * TypeScript não verifica o corpo de um: com `FaseParada` ganhando um membro (a
- * `encrenca` do Plano 4 aceita `passar`), o tipo dizia uma coisa e a função dizia
- * outra, sem nada acusar. Medido: acrescentar um terceiro membro a `FaseParada`
- * deixava `pnpm typecheck` passar LIMPO, e `passar` na fase esquecida saía como
- * `Error` cru — **500 numa partida legítima**, não o 400 de `AcaoInvalida`.
+ * TypeScript não verifica o corpo de um: com `FaseParada` ganhando um membro, o
+ * tipo dizia uma coisa e a função dizia outra, sem nada acusar. Medido:
+ * acrescentar um terceiro membro a `FaseParada` deixava `pnpm typecheck` passar
+ * LIMPO, e `passar` na fase esquecida saía como `Error` cru — **500 numa partida
+ * legítima**, não o 400 de `AcaoInvalida`.
+ *
+ * ⚠️ A `encrenca` do Plano 4 **não** é candidata: o spec §6 dá a ela
+ * `procurarEncrenca` e `saquear`, e nenhum `passar` — `saquear` está sempre
+ * disponível, então a fase nunca é beco sem saída. O risco aqui não é uma fase
+ * específica do roteiro; é `FaseParada` ser uma união mantida à mão, que qualquer
+ * um alarga sem passar por esta função.
  *
  * Os dois `throw` que dependem deste predicado (no `aplicarAcao` e no
  * `equiparCarta`) se descrevem como "inalcançável pela tabela". Continuam sendo —
