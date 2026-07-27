@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { criarPartida } from './montagem';
 import { montarComposicaoTesouros } from './baralho';
 import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
-import { MAO_INICIAL_PADRAO, MAO_INICIAL_TESOUROS } from './mao';
+import { MAO_INICIAL_PADRAO, MAO_INICIAL_TESOUROS, LIMITE_MOCHILA } from './mao';
 import { SLOTS_VAZIOS } from './corpo';
 import { ID_DA_CLASSE_DE_TESTE } from './testes/catalogo';
 import type { EntradaJogador } from './tipos';
@@ -175,6 +175,22 @@ describe('criarPartida', () => {
     for (const t of estado.tesouros.monte) {
       expect(idsDePorta.has(t.id)).toBe(false);
     }
+  });
+
+  it('todo jogador nasce com a mochila VAZIA', () => {
+    // A mochila é zona aberta e começa vazia: nada no construtor a alimenta
+    // (decisão #1 — item só vem de carta). Se um dia a composição a financiar,
+    // este teste é o alarme.
+    const p = criarPartida('m1', entradas, config, { embaralhar: (x) => [...x] });
+
+    expect(p.jogadores.map((j) => j.mochila)).toEqual([[], []]);
+  });
+
+  it('LIMITE_MOCHILA é 5 — o dial do spec §7.1', () => {
+    // Cravado de propósito, não derivado: é um DIAL de balanceamento, e derivá-lo
+    // de outra constante tornaria a asserção tautológica e mataria o alarme no dia
+    // em que alguém girasse o valor sem querer.
+    expect(LIMITE_MOCHILA).toBe(5);
   });
 });
 

@@ -143,6 +143,17 @@ export interface JogadorNaMesa {
    * entraria no baralho de Portas e voltaria como Porta na compra seguinte.
    */
   readonly mao: readonly Carta[];
+  /**
+   * Zona ABERTA, teto `LIMITE_MOCHILA`, **fora** do limite de mão. Viaja inteira
+   * na projeção — ao contrário da mão, que publica só a contagem.
+   *
+   * `CartaTesouro` e não `Carta`: só tesouro se guarda. Uma Porta na mochila não
+   * teria como sair (mochila → mão não existe nesta fatia) nem como ser jogada,
+   * então estreitar aqui torna o caso impossível por TIPO em vez de por guard.
+   *
+   * O teto é cobrado em `guardarCarta`, não aqui: um array não sabe se está cheio.
+   */
+  readonly mochila: readonly CartaTesouro[];
   /** Zona ABERTA. É daqui que sai a raça do lutador — não mais da criação da partida. */
   readonly emJogo: ZonaEmJogo;
 }

@@ -36,6 +36,7 @@ export function criarPartida(
     patente: 1,
     derrotas: 0,
     mao: [],
+    mochila: [],
     // Todo mundo começa Humano: a raça agora é carta que se saca e se joga
     // (`jogarCarta`). Nascer com uma raça em jogo era o andaime do construtor —
     // e ele custava caro: a carta semeada nunca tinha saído do baralho, então

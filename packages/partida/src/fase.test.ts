@@ -17,7 +17,7 @@ import type { JogadorNaMesa, EntradaJogador, EstadoPartida, Fase } from './tipos
 const catalogoPadrao = catalogoDeTeste();
 const jogador = (mao: JogadorNaMesa['mao'], comRaca: boolean): JogadorNaMesa => ({
   id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE,
-  patente: 1, derrotas: 0, mao,
+  patente: 1, derrotas: 0, mao, mochila: [],
   emJogo: { raca: comRaca ? raca('r1', 'anao') : null, slots: { ...SLOTS_VAZIOS } },
 });
 

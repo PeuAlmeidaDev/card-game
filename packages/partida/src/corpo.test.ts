@@ -6,7 +6,7 @@ import type { JogadorNaMesa } from './tipos';
 
 const jogador = (over: Partial<JogadorNaMesa> = {}): JogadorNaMesa => ({
   id: 'p1', nome: 'Você', ehBot: false, classeId: CLASSE_DE_TESTE.id,
-  patente: 1, derrotas: 0, mao: [],
+  patente: 1, derrotas: 0, mao: [], mochila: [],
   emJogo: { raca: null, slots: { ...SLOTS_VAZIOS } },
   ...over,
 });
