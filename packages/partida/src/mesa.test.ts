@@ -2070,10 +2070,18 @@ describe('o guard de fase é ponto único', () => {
       .toThrow('aplicarAcao: há uma espiada pendente');
   });
 
-  it('`passar` ainda não tem fase que o aceite — o gate recusa nas três', () => {
-    // A ação existe no vocabulário antes de existir a fase que a consome: é o que
-    // permite `recompor` e `jogar` nascerem já com saída, em vez de nascerem como
-    // fase da qual não se sai (o erro que o Plano 2 evitou adiando as duas).
+  it('`passar` é recusado nas TRÊS fases que não o declaram', () => {
+    // `passar` é a saída das duas fases PARADAS (`recompor` e `jogar`). As outras
+    // três têm que recusá-lo, e cada uma por uma razão própria: de `vasculhar` não
+    // se passa (a porta é o que faz o turno andar), no `combate` a luta não se
+    // abandona (não há mecânica de fuga — spec, decisão #5b), e em `descartar`
+    // passar seria escapar do teto de mão levando o excedente junto.
+    //
+    // O título já mentiu: nasceu na Task 1 dizendo "`passar` ainda não tem fase
+    // que o aceite" — verdade naquele commit, falsa desde que `recompor` e `jogar`
+    // existem — e afirmava "as três" exercitando UMA. Um teste cujo título
+    // descreve um mundo que acabou é pior que um teste faltando: ele ensina errado
+    // a quem lê para entender a regra.
     const soSalaVazia = {
       patenteAlvo: 10,
       composicaoPorJogador: [{ tipo: 'salaVazia' as const }],
@@ -2081,9 +2089,32 @@ describe('o guard de fase é ponto único', () => {
     };
     const p = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
 
+    expect(p.fase).toBe('vasculhar');
     expect(() => aplicarAcao(p, { tipo: 'passar', jogadorId: 'p1' }, deps([])))
       .toThrow(AcaoInvalida);
     expect(() => aplicarAcao(p, { tipo: 'passar', jogadorId: 'p1' }, deps([])))
       .toThrow('aplicarAcao: passar não é legal na fase vasculhar');
+
+    const emCombate = aplicarAcao(
+      criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar }),
+      { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]),
+    ).estado;
+    expect(emCombate.fase).toBe('combate');
+    expect(() => aplicarAcao(emCombate, { tipo: 'passar', jogadorId: 'p1' }, deps([])))
+      .toThrow('aplicarAcao: passar não é legal na fase combate');
+
+    // A fase é DERIVADA de `faseDoTurnoDe`, nunca cravada: uma mão de
+    // `LIMITE_BASE_DE_MAO + 2` estoura o teto de quem está sem raça (que é o base
+    // + 1), e é o próprio domínio que diz que isso é `descartar`. Cravar aqui
+    // repetiria a forja que este arquivo acabou de tirar dos helpers `comMao`.
+    const jogadores = p.jogadores.map((j) => (
+      j.id === 'p1' ? { ...j, mao: monstros(LIMITE_BASE_DE_MAO + 2) } : j
+    ));
+    const estourado: EstadoPartida = {
+      ...p, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...p, jogadores }, 'p1')),
+    };
+    expect(estourado.fase).toBe('descartar');
+    expect(() => aplicarAcao(estourado, { tipo: 'passar', jogadorId: 'p1' }, deps([])))
+      .toThrow('aplicarAcao: passar não é legal na fase descartar');
   });
 });
