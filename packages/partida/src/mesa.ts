@@ -144,9 +144,27 @@ function entrarOuPular(
   return registrar({ ...estado, fase }, eventos);
 }
 
+/**
+ * As fases paradas, como TABELA e não como cadeia de `===`. Mesmo mecanismo do
+ * `LEGAL` em `fase.ts`: `Record<FaseParada, true>` **cobra membro novo na
+ * compilação**, e é isso que a comparação por igualdade não fazia.
+ *
+ * O motivo é concreto, não estético. `ehFaseParada` é um **type predicate**, e o
+ * TypeScript não verifica o corpo de um: com `FaseParada` ganhando um membro (a
+ * `encrenca` do Plano 4 aceita `passar`), o tipo dizia uma coisa e a função dizia
+ * outra, sem nada acusar. Medido: acrescentar um terceiro membro a `FaseParada`
+ * deixava `pnpm typecheck` passar LIMPO, e `passar` na fase esquecida saía como
+ * `Error` cru — **500 numa partida legítima**, não o 400 de `AcaoInvalida`.
+ *
+ * Os dois `throw` que dependem deste predicado (no `aplicarAcao` e no
+ * `equiparCarta`) se descrevem como "inalcançável pela tabela". Continuam sendo —
+ * mas agora quem alargar `FaseParada` é obrigado a passar por aqui antes.
+ */
+const FASES_PARADAS: Record<FaseParada, true> = { recompor: true, jogar: true };
+
 /** É fase parada? Narrowing para `FaseParada` — só elas aceitam `passar`. */
 function ehFaseParada(fase: Fase): fase is FaseParada {
-  return fase === 'recompor' || fase === 'jogar';
+  return fase in FASES_PARADAS;
 }
 
 /**
