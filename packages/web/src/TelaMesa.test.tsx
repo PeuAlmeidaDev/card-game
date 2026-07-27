@@ -415,19 +415,39 @@ describe('TelaMesa — a mão', () => {
     expect(screen.getByRole('status')).toHaveTextContent(/acima do limite/i);
   });
 
-  it('a faixa do excedente nomeia as TRÊS saídas, não só a caridade', async () => {
-    // A mesa nasce EXATAMENTE no teto (4 Portas + 4 Tesouros = 8 para quem está
-    // sem raça em jogo), então o turno 1 de produção já começa em `descartar` e
-    // esta faixa é a única instrução na tela. Dizendo só "entregue uma carta",
-    // ela mandava o jogador DOAR o tesouro que a fatia inteira existe para ele
-    // vestir — e doar para quem está atrás, porque a caridade segue a patente
-    // menor. As três saídas são as que `fase.ts` declara legais em `descartar`.
+  it('a faixa do excedente aponta só a entrega — equipar e jogar já tiveram a janela deles', async () => {
+    // 🎚️ Mudança de texto autorizada (a única desta task). Até a Task 3, a fase
+    // `descartar` legalizava as três saídas e a faixa as nomeava certo — mas as
+    // Tasks 2 e 3 migraram `jogarCarta` para `recompor` e `equiparCarta` para
+    // `recompor`/`jogar`: as duas primeiras agora levam 400 se tentadas aqui,
+    // e a faixa antiga continuava prometendo as duas. A mesa nasce EXATAMENTE no
+    // teto (4 Portas + 4 Tesouros = 8 para quem está sem raça em jogo), então o
+    // turno 1 de produção já começa em `descartar` e esta faixa é a única
+    // instrução na tela — ela não pode mentir sobre o que ainda cabe.
     await abrirMesa(emDescartar([tesouro('t-9'), { id: 'p-8', tipo: 'raca', racaId: 'orc' }]));
 
     const faixa = screen.getByRole('status');
-    expect(faixa).toHaveTextContent(/equipe/i);
-    expect(faixa).toHaveTextContent(/jogue/i);
-    expect(faixa).toHaveTextContent(/entregue/i);
+    expect(faixa).toHaveTextContent(/entregue uma carta/i);
+    // As duas saídas que `descartar` não legaliza mais não podem ser prometidas
+    // aqui — foi a mentira que a Task 3 piorou.
+    expect(faixa).not.toHaveTextContent(/equipe um tesouro/i);
+    expect(faixa).not.toHaveTextContent(/jogue uma raça/i);
+  });
+
+  it('a faixa separa as janelas por AÇÃO — jogar raça não é prometida em `jogar`', async () => {
+    // Achado do review desta task: a primeira redação juntava as duas ações numa
+    // lista só ("equipar e jogar raça acontecem... nas fases de recompor e de
+    // jogar"), o que implicava jogar raça também valer em `jogar` — mas
+    // `LEGAL.jogar` (fase.ts) só tem `equiparCarta` e `passar`; jogar raça é SÓ
+    // `recompor` (decisão #7, o comentário de `LEGAL.jogar` explica: trocar a
+    // raça depois de ver a porta seria reagir ao monstro). Era a MESMA classe de
+    // mentira do texto original — só deslocada de "aqui" para "lá". Este teste
+    // pina o texto corrigido, que atribui cada ação à(s) fase(s) certa(s).
+    await abrirMesa(emDescartar([tesouro('t-9'), { id: 'p-8', tipo: 'raca', racaId: 'orc' }]));
+
+    const faixa = screen.getByRole('status');
+    expect(faixa).toHaveTextContent(/equipar acontece antes, nas fases de recompor e de jogar/i);
+    expect(faixa).toHaveTextContent(/jogar raça, só na de recompor/i);
   });
 
   it('jogar uma carta manda a ação com o id DELA', async () => {
@@ -762,5 +782,98 @@ describe('TelaMesa — equipar', () => {
     await abrirMesa({ ...maoHeterogenea, fase: 'jogar' });
 
     expect(await screen.findByRole('button', { name: 'Equipar' })).toBeEnabled();
+  });
+});
+
+describe('TelaMesa — a fase e o botão Passar', () => {
+  it('mostra em que fase o turno está', async () => {
+    // Sem isto o jogador vê botões acendendo e apagando sem saber por quê — foi o
+    // modo de falha do gate ocular do Plano 3a: o domínio publicava a informação e
+    // a tela não a renderizava, então a tese da fatia era invisível para quem joga.
+    //
+    // `suaMao` com uma raça: `recompor` se auto-pula sem raça NEM equipamento na
+    // mão (`faseSeAutoPula`), e uma vista de `recompor` com a mão vazia é uma que
+    // o domínio nunca produziria — o mesmo cuidado que já vale para as outras
+    // vistas de `recompor` deste arquivo (ver `maoHeterogenea` acima).
+    await abrirMesa({ ...vistaBase, fase: 'recompor', suaMao: [{ id: 'p-9', tipo: 'raca', racaId: 'orc' }] });
+
+    expect(await screen.findByText(/Recompor/i)).toBeInTheDocument();
+  });
+
+  it('em `recompor`, "Passar" acende e "Vasculhar local" apaga', async () => {
+    await abrirMesa({ ...vistaBase, fase: 'recompor', suaMao: [{ id: 'p-9', tipo: 'raca', racaId: 'orc' }] });
+
+    expect(await screen.findByRole('button', { name: 'Passar' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Vasculhar local' })).toBeDisabled();
+  });
+
+  it('em `vasculhar`, "Passar" apaga — desta fase não se passa', async () => {
+    await abrirMesa({ ...vistaBase, fase: 'vasculhar' });
+
+    expect(await screen.findByRole('button', { name: 'Passar' })).toBeDisabled();
+  });
+
+  it('clicar em "Passar" manda a ação `passar` com a versão da vista', async () => {
+    // `suaMao` com um equipamento: `jogar` se auto-pula sem equipamento na mão
+    // (`faseSeAutoPula`), então uma vista de `jogar` com a mão vazia não é uma
+    // que o domínio produziria — mesma razão do `maoHeterogenea` usado no
+    // describe de "equipar" acima.
+    const agir = vi.spyOn(api, 'agir').mockResolvedValue({ status: 200, body: vistaBase } as never);
+    await abrirMesa({ ...vistaBase, fase: 'jogar', suaMao: [tesouro('t-9')] });
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Passar' }));
+
+    expect(agir).toHaveBeenCalledWith({
+      params: { id: 'm1' },
+      body: { acao: { tipo: 'passar' }, versao: 1 },
+    });
+  });
+
+  it('nomeia corretamente as outras quatro fases', async () => {
+    // Achado do review: o `Record<Fase, string>` garante em tempo de compilação
+    // que TODA fase tenha nome, mas não garante que o TEXTO esteja certo — um
+    // conteúdo errado passaria a suíte inteira em silêncio (foi exatamente esse
+    // buraco que deixou a faixa do excedente errada sem vermelho nenhum). `recompor`
+    // já tem teste próprio acima; aqui fecham as quatro que faltavam, cada vista
+    // coerente com `faseSeAutoPula`/`limiteDeMao`/o combate exigir estado aberto.
+    await abrirMesa({ ...vistaBase, fase: 'vasculhar' });
+    expect(await screen.findByText('Vasculhar — abra a próxima porta')).toBeInTheDocument();
+    cleanup();
+
+    // `equiparCarta` só é legal em `jogar` com equipamento na mão — sem ele a
+    // fase se auto-pula (`faseSeAutoPula`) e esta vista nunca aconteceria.
+    await abrirMesa({ ...vistaBase, fase: 'jogar', suaMao: [tesouro('t-9')] });
+    expect(await screen.findByText('Jogar — vista o que encontrou')).toBeInTheDocument();
+    cleanup();
+
+    // `descartar` só existe com a mão acima do limite — `emDescartar` garante isso.
+    await abrirMesa(emDescartar());
+    expect(await screen.findByText('Descartar — sua mão está acima do limite')).toBeInTheDocument();
+    cleanup();
+
+    // `combate` exige um combate aberto na vista: `fase: 'combate'` com
+    // `combate: null` seria incoerente (a fase não existe sem uma luta em curso).
+    await abrirMesa({
+      ...vistaBase,
+      fase: 'combate',
+      combate: {
+        monstroId: 'goblin',
+        proximaDecisao: 'ataque',
+        estado: {
+          jogador: { ...combatente, vida: 6 },
+          monstro: { forca: 4, vida: 23, habilidade: 2, agilidade: 4, level: 5 },
+          vez: 'jogador',
+          turno: 3,
+          ataqueDoMonstro: null,
+          desfecho: 'emAndamento',
+          vidaInicialJogador: combatente.vida,
+          passiva: null,
+        },
+      },
+    });
+    // `{ selector: 'p' }` desambigua: o painel de combate também tem um
+    // `<strong>Combate</strong>` com o mesmo texto, e sem escopo o
+    // `findByText` reprova por achar os dois.
+    expect(await screen.findByText('Combate', { selector: 'p' })).toBeInTheDocument();
   });
 });
