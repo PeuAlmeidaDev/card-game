@@ -201,6 +201,37 @@ describe('PainelLog — filtro e cauda', () => {
     expect(screen.getByText(/A partida terminou/)).toBeInTheDocument();
   });
 
+  it('filtrar por você MOSTRA a carta que você recebeu, não só as que você deu', async () => {
+    // O filtro indexava o evento só por `jogadorId`, que numa entrega é o DOADOR.
+    // A carta que chegava na sua mão ficava arquivada sob o bot, então o botão
+    // "Você" — que promete "o que aconteceu comigo" — escondia justamente ela.
+    // Pego no gate ocular do Plano 3b: a mão subia de 8 para 13 e o filtro do
+    // próprio jogador não tinha uma linha sequer explicando de onde vinham.
+    const comEntrega: readonly EventoDaMesa[] = [
+      { tipo: 'entrega', jogadorId: 'p2', paraJogadorId: 'p1', rolagem: null },
+    ];
+    render(<PainelLog log={comEntrega} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Você' }));
+
+    expect(screen.getByText(/entregou uma carta a Você/)).toBeInTheDocument();
+  });
+
+  it('a entrega também continua no filtro de quem deu — o evento é das duas pontas', async () => {
+    // O par do teste acima: alargar o filtro para o destinatário não pode custar
+    // o doador. A entrega aparece nos DOIS filtros porque envolve os dois, e é a
+    // primeira vez que um evento faz isso — o precedente vale para a fatia de
+    // Interferência, que é toda de eventos de duas pontas.
+    const comEntrega: readonly EventoDaMesa[] = [
+      { tipo: 'entrega', jogadorId: 'p2', paraJogadorId: 'p1', rolagem: null },
+    ];
+    render(<PainelLog log={comEntrega} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Bot 1' }));
+
+    expect(screen.getByText(/entregou uma carta a Você/)).toBeInTheDocument();
+  });
+
   it('volta a mostrar tudo ao clicar em Todos', async () => {
     render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} />);
 

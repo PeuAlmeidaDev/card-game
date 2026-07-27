@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { narrarEvento } from './narrarEvento';
+import { participantesDe } from './participantesDe';
 import type { Catalogo, EventoDaMesa, JogadorPublico } from '@card-dungeon/shared';
 
 /**
@@ -50,10 +51,19 @@ export function PainelLog({ log, jogadores, voce, racas, monstros, itens }: {
   const [filtro, definirFiltro] = useState<string | null>(null);
   const cauda = useRef<HTMLLIElement>(null);
 
-  const visiveis = log.filter(
-    // Evento sem `jogadorId` é global (`fim`): aparece em qualquer filtro.
-    (e) => filtro === null || !('jogadorId' in e) || e.jogadorId === filtro,
-  );
+  const visiveis = log.filter((e) => {
+    if (filtro === null) return true;
+    const participantes = participantesDe(e);
+    // Sem participante = evento global (`fim`): aparece em qualquer filtro.
+    //
+    // Quem envolve, e não quem CAUSOU: a `entrega` tem duas pontas, e filtrar por
+    // `jogadorId` (o doador) escondia do destinatário a carta que ele recebeu —
+    // o botão promete "o que aconteceu comigo" e omitia exatamente isso. Por
+    // envolver os dois, a entrega aparece nos DOIS filtros. É a primeira vez que
+    // um evento faz isso, e é o comportamento certo: o log é a crônica de quem
+    // lê, não o extrato de quem agiu.
+    return participantes.length === 0 || participantes.includes(filtro);
+  });
 
   useEffect(() => {
     cauda.current?.scrollIntoView({ block: 'nearest' });
