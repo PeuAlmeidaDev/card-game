@@ -43,9 +43,20 @@ export function participantesDe(evento: EventoDaMesa): readonly string[] {
     default: {
       const naoTratado: never = evento;
       void naoTratado;
-      // Degrada para global (visível em todo filtro), nunca para escondido: um
-      // bundle antigo recebendo evento novo tem que mostrar demais, não de menos.
-      return [];
+      // O `never` acima é a cobrança de MANUTENÇÃO (não compila até alguém
+      // declarar os participantes). Este `return` é o que acontece em PRODUÇÃO
+      // quando a cobrança chega tarde: bundle antigo, evento novo no fio.
+      //
+      // Arquiva sob quem causou, e não `[]`. Devolver `[]` marcaria o evento como
+      // global e o repetiria em TODO filtro por assento — medido no review do
+      // commit `ba16801`: 1 linha por filtro contra 1 no total antes. Como o
+      // desconhecido também não tem narração própria, multiplicar é multiplicar
+      // ruído. Sem causador identificável não dá para inventar dono: aí sim `[]`.
+      //
+      // `never` é atribuível a qualquer tipo, então a anotação abaixo compila sem
+      // `as` — e o `typeof` é checagem de verdade, não fé no formato do fio.
+      const bruto: { readonly jogadorId?: unknown } = evento;
+      return typeof bruto.jogadorId === 'string' ? [bruto.jogadorId] : [];
     }
   }
 }

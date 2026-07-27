@@ -232,6 +232,21 @@ describe('PainelLog — filtro e cauda', () => {
     expect(screen.getByText(/entregou uma carta a Você/)).toBeInTheDocument();
   });
 
+  it('evento desconhecido não se multiplica pelos filtros', async () => {
+    // Skew de versão. Medido no review sondado do commit `ba16801`: tratar o
+    // desconhecido como global punha uma linha dele em CADA assento (Todos 1 ·
+    // Você 1 · Bot 1 1), contra Todos 1 · Você 0 · Bot 1 1 antes. Degradar
+    // multiplicando ruído por assento é degradar para pior.
+    const desconhecido = { tipo: 'interferencia', jogadorId: 'p2' } as unknown as EventoDaMesa;
+    render(<PainelLog log={[desconhecido]} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Você' }));
+    expect(screen.queryByText(/não sabe descrever/)).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Bot 1' }));
+    expect(screen.getByText(/não sabe descrever/)).toBeInTheDocument();
+  });
+
   it('volta a mostrar tudo ao clicar em Todos', async () => {
     render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} />);
 

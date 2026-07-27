@@ -23,6 +23,20 @@ describe('participantesDe', () => {
     expect(participantesDe({ tipo: 'fim', classificacao: [] })).toEqual([]);
   });
 
+  it('evento DESCONHECIDO é arquivado sob quem o causou, não tratado como global', () => {
+    // Skew de versão. Devolver `[]` aqui faria o filtro tratá-lo como global e
+    // repeti-lo em TODOS os assentos — medido: 1 linha por filtro, contra 1 no
+    // total antes de esta função existir. A degradação certa é a de antes:
+    // arquiva sob quem causou, se houver quem.
+    const desconhecido = { tipo: 'interferencia', jogadorId: 'p2', alvoId: 'p1' } as unknown as EventoDaMesa;
+    expect(participantesDe(desconhecido)).toEqual(['p2']);
+  });
+
+  it('evento desconhecido SEM causador continua global — não dá para inventar dono', () => {
+    const semDono = { tipo: 'cataclismo' } as unknown as EventoDaMesa;
+    expect(participantesDe(semDono)).toEqual([]);
+  });
+
   it('todo evento da união responde, e nenhum responde vazio por engano', () => {
     // A cobrança de exaustividade real é do compilador (`never` no `default`), que
     // o vitest NÃO exercita — o esbuild apaga tipo sem resolver. Ver
