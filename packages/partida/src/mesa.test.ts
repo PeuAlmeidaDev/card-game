@@ -5,6 +5,9 @@ import { criarPartida } from './montagem';
 import { montarComposicao, montarComposicaoTesouros } from './baralho';
 import { LIMITE_BASE_DE_MAO, MAO_INICIAL_PADRAO, MAO_INICIAL_TESOUROS, limiteDeMao } from './mao';
 import { escolherAcao } from './bot';
+// Importado pelos helpers `comMao`: eles DERIVAM a fase da mão que montam em vez
+// de cravá-la, para não produzirem estado que o domínio nunca geraria.
+import { faseDoTurnoDe } from './fase';
 import { projetarPara } from './projecao';
 import { AcaoInvalida } from './erros';
 import { filaDeDados, criarDadoCiclico } from './testes/dados';
@@ -1076,10 +1079,20 @@ describe('aplicarAcao — jogarCarta', () => {
    * Quem quiser a mesa em `vasculhar` com estas cartas usa o caminho do jogador:
    * uma ação `passar` sobre este estado, que é a saída da fase parada.
    */
-  const comMao = (estado: EstadoPartida, cartas: readonly CartaPorta[]): EstadoPartida => ({
-    ...estado,
-    jogadores: estado.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao: cartas } : j)),
-    fase: 'recompor',
+  const comMao = (estado: EstadoPartida, cartas: readonly CartaPorta[]): EstadoPartida => {
+    const jogadores = estado.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao: cartas } : j));
+    return { ...estado, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...estado, jogadores }, 'p1')) };
+  };
+
+  it('o helper DERIVA a fase da mão em vez de forjá-la', () => {
+    // Mão só de monstros: nada a recompor, então `faseDoTurnoDe` manda o turno
+    // direto para `vasculhar`. Um helper que crava `recompor` produz um estado que
+    // o domínio nunca geraria — e o teste que o usar passa a exercitar um caminho
+    // inalcançável, em silêncio. É a forma EXATA dos 7 testes que ficaram verdes e
+    // vazios no Plano 3a quando o teto de mão subiu de 4 para 7.
+    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+
+    expect(comMao(p0, monstros(1)).fase).toBe('vasculhar');
   });
 
   it('move a carta da mão para a zona em jogo e NÃO passa a vez', () => {
@@ -1244,10 +1257,15 @@ describe('aplicarAcao — equiparCarta', () => {
    * que é uma das fases em que `equiparCarta` é legal. Os testes que precisam de
    * `vasculhar` chegam lá pelo caminho do jogador, com uma ação `passar`.
    */
-  const comMao = (estado: EstadoPartida, mao: readonly Carta[]): EstadoPartida => ({
-    ...estado,
-    jogadores: estado.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao } : j)),
-    fase: 'recompor',
+  const comMao = (estado: EstadoPartida, mao: readonly Carta[]): EstadoPartida => {
+    const jogadores = estado.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao } : j));
+    return { ...estado, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...estado, jogadores }, 'p1')) };
+  };
+
+  it('o helper DERIVA a fase da mão em vez de forjá-la', () => {
+    // O gêmeo do teste do `describe` de `jogarCarta`: são dois helpers `comMao`
+    // diferentes (mão de Portas × mão heterogênea) e os dois forjavam a fase.
+    expect(comMao(nascida(), monstros(1)).fase).toBe('vasculhar');
   });
 
   /** Mesa com o corpo de p1 forjado. Espalha `SLOTS_VAZIOS` para não escrever os 5 slots à mão. */
@@ -1355,10 +1373,12 @@ describe('aplicarAcao — equiparCarta', () => {
       jogadores: p0.jogadores.map((j) => (
         j.id === 'p1' ? { ...j, emJogo: { ...j.emJogo, raca: raca('r1', 'anao') } } : j
       )),
-      // Forjado direto no estado: a fase tem que vir junto, senão o fixture mente.
-      // Ela é COERENTE com a mão — `faseDoTurnoDe` devolve `descartar` para esta
-      // mão estourada, e é o `comMao` acima (que fixa `recompor`) que precisa ser
-      // sobrescrito.
+      // Sobrescrito, e o motivo é a ORDEM: `comMao` deriva a fase do estado que
+      // ele monta, e ali p1 ainda está SEM raça em jogo — limite 8, mão de 8, não
+      // estoura, logo `recompor`. A raça entra na linha acima, e ter raça em jogo
+      // BAIXA o limite para 7 (`limiteDeMao`), o que só então estoura a mesma mão.
+      // A fase escrita aqui é a que `faseDoTurnoDe` devolveria para o estado FINAL:
+      // é correção de ordem, não forja.
       fase: 'descartar',
     };
 
