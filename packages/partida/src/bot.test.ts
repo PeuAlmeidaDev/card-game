@@ -5,11 +5,11 @@ import { avancarBots } from './automacao';
 import { criarPartida } from './montagem';
 import { projetarPara } from './projecao';
 import { filaDeDados } from './testes/dados';
-import { monstro as cartaMonstro, monstros, raca } from './testes/cartas';
+import { equipamento, monstro as cartaMonstro, monstros, raca } from './testes/cartas';
 import { LIMITE_BASE_DE_MAO } from './mao';
 import { catalogoDeTeste, ID_DA_CLASSE_DE_TESTE } from './testes/catalogo';
 import { COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
-import type { EntradaJogador, EstadoPartida } from './tipos';
+import type { Carta, CartaDeRaca, EntradaJogador, EstadoPartida, Fase, VistaDaPartida } from './tipos';
 
 /** A projeção calcula `combatente`, então precisa do catálogo. Um só para o arquivo. */
 const catalogoPadrao = catalogoDeTeste();
@@ -31,6 +31,50 @@ const soMonstro = {
  * continuaria entregando e o teste seguiria verde sobre uma mão que cabia.
  */
 const ACIMA_DO_TETO = monstros(LIMITE_BASE_DE_MAO + 1);
+
+/**
+ * Vista mínima para uma FASE dada, montada por cima de `criarPartida` — o mesmo
+ * caminho que as forjas de fase já espalhadas neste arquivo usam (ver
+ * `estourado` mais abaixo): forja-se o `EstadoPartida` (mão e `emJogo.raca` de
+ * 'p1', mais a `fase`) e projeta-se de verdade, para que `combatente` também
+ * saia de `combatenteDe` em vez de ficar preso ao jogador recém-criado.
+ *
+ * Só sobrescreve 'p1' — o único jogador que os testes do `switch` chamam.
+ * `limiteDeMao` é o único campo que a VISTA carrega e o domínio não deriva de
+ * `mao`/`emJogo`, então ele é sobrescrito DEPOIS da projeção, direto na vista.
+ */
+function vistaEm(
+  fase: Fase,
+  overrides: {
+    readonly suaMao?: readonly Carta[];
+    readonly racaEmJogo?: CartaDeRaca | null;
+    readonly limiteDeMao?: number;
+  } = {},
+): VistaDaPartida {
+  const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+  const forjado: EstadoPartida = {
+    ...p,
+    fase,
+    jogadores: p.jogadores.map((j) => (
+      j.id === 'p1'
+        ? {
+            ...j,
+            mao: overrides.suaMao ?? j.mao,
+            emJogo: {
+              ...j.emJogo,
+              raca: overrides.racaEmJogo !== undefined ? overrides.racaEmJogo : j.emJogo.raca,
+            },
+          }
+        : j
+    )),
+  };
+  const vista = projetarPara('p1', forjado, catalogoPadrao);
+  if (overrides.limiteDeMao === undefined) return vista;
+  return {
+    ...vista,
+    jogadores: vista.jogadores.map((j) => (j.id === 'p1' ? { ...j, limiteDeMao: overrides.limiteDeMao! } : j)),
+  };
+}
 
 describe('escolherAcao', () => {
   it('sem combate em curso, chuta a porta', () => {
@@ -288,5 +332,39 @@ describe('escolherAcao', () => {
       { rolar: filaDeDados([]), embaralhar: semEmbaralhar, catalogo: catalogoDeTeste() });
 
     expect(r.estado.vezDe).toBe('p1');   // a vez voltou ao humano
+  });
+
+  it('em `recompor` com raça na mão e sem raça em jogo, o bot se especializa', () => {
+    const vista = vistaEm('recompor', { suaMao: [raca('r1', 'elfo')], racaEmJogo: null });
+
+    expect(escolherAcao(vista, 'p1')).toEqual({ tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r1' });
+  });
+
+  it('em `recompor` com raça JÁ em jogo, o bot passa — trocar por trocar é decisão', () => {
+    // Burro por definição: trocar de raça é jogada, e a anterior iria para o
+    // cemitério sem ganho nenhum. Mesma política da fatia 7, agora dentro da fase.
+    const vista = vistaEm('recompor', { suaMao: [raca('r1', 'elfo')], racaEmJogo: raca('r0', 'anao') });
+
+    expect(escolherAcao(vista, 'p1')).toEqual({ tipo: 'passar', jogadorId: 'p1' });
+  });
+
+  it('em `jogar` o bot passa — equipar é do Plano 4', () => {
+    // 🚨 DÍVIDA MEDIDA, deliberada: o bot que nunca equipa termina a partida com
+    // força 3,67 contra 5,95 do bot guloso, e o humano vence 80% das mesas em vez
+    // de 42,5%. Fica assim NESTE plano de propósito — misturar política de bot com
+    // máquina de fases faria a medição da Task 7 não saber o que mediu.
+    const vista = vistaEm('jogar', { suaMao: [equipamento('t-1')] });
+
+    expect(escolherAcao(vista, 'p1')).toEqual({ tipo: 'passar', jogadorId: 'p1' });
+  });
+
+  it('o bot não recalcula o excedente — quem manda é a fase', () => {
+    // A mão CABE (nenhum excedente), mas a fase diz `descartar`. O bot obedece à
+    // fase: era esta divergência que, no dia em que o teto deixasse de ser `>`,
+    // faria o bot pedir `entregarCarta` fora de `descartar` e o `AcaoInvalida`
+    // subir por `avancarBots` como 400 na jogada do HUMANO.
+    const vista = vistaEm('descartar', { suaMao: [cartaMonstro('m1')], limiteDeMao: 7 });
+
+    expect(escolherAcao(vista, 'p1')).toEqual({ tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' });
   });
 });
