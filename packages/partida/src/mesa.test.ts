@@ -1290,11 +1290,15 @@ describe('aplicarAcao — equiparCarta', () => {
     expect(combatenteDe(jogadorDe(depois, 'p1'), catalogoPadrao).forca).toBe(antes + 1);
   });
 
-  it('o item deslocado vai para o cemitério de Tesouros', () => {
-    // Sem mochila nesta fatia (Plano 4). O ponto único que muda lá é
-    // `destinoDoDesequipado`, não este teste — que continua valendo para o ramo
-    // "mochila cheia".
-    const p = comSlots(comMao(nascida(), [equipamento('t-1')]), { maoDireita: equipamento('t-0') });
+  it('o item deslocado vai para o cemitério de Tesouros quando a mochila está CHEIA', () => {
+    // A mochila entrou como destino preferencial (Task 5 do Plano 4a):
+    // `destinoDoDesequipado` só cai aqui quando ela não tem vaga. Sem forjar a
+    // mochila cheia, o deslocado iria PARA ELA, e este teste pararia de exercitar
+    // o cemitério — o ramo "há vaga" tem teste próprio em `equipar.test.ts`.
+    const cheia = Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
+    const base = comSlots(comMao(nascida(), [equipamento('t-1')]), { maoDireita: equipamento('t-0') });
+    const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
+    const p: EstadoPartida = { ...base, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...base, jogadores }, 'p1')) };
 
     const { estado: depois } = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
 
@@ -1425,6 +1429,31 @@ describe('aplicarAcao — equiparCarta', () => {
 
     expect(jogadorDe(r.estado, 'p1').mochila).toEqual([]);
     expect(itensEquipados(jogadorDe(r.estado, 'p1').emJogo.slots).map((c) => c.id)).toContain('t-1');
+  });
+
+  it('vindo de uma mochila CHEIA, o deslocado ainda cabe — a origem sai ANTES do roteamento', () => {
+    // ⚠️ Pin de ordem (achado de review adiado para a Task 5 do Plano 4a).
+    // `equiparCarta` tira a carta equipada da zona de ORIGEM antes de chamar
+    // `destinoDoDesequipado`. Equipar um item que veio de uma mochila CHEIA libera
+    // EXATAMENTE uma vaga, e é nela que o item deslocado do slot precisa caber.
+    //
+    // Um refactor que hoiste-asse a chamada de `destinoDoDesequipado` para ANTES
+    // da remoção compilaria e passaria o resto da suíte inteira: a mochila ainda
+    // estaria cheia no instante da pergunta, o deslocado cairia no cemitério, e
+    // este teste é o único que nota — os outros ou não usam mochila cheia como
+    // origem, ou não deslocam nada do slot.
+    const cheia = [equipamento('t-1'), ...Array.from({ length: LIMITE_MOCHILA - 1 }, (_, i) => equipamento(`t-cheia-${String(i)}`))];
+    const base = comSlots(comMao(nascida(), []), { maoDireita: equipamento('t-0') });
+    const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
+    const p: EstadoPartida = { ...base, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...base, jogadores }, 'p1')) };
+
+    const r = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+
+    // A mochila continua no teto: perdeu 't-1' (foi para o slot) e ganhou 't-0'
+    // (o deslocado) — nunca ficou em 4.
+    expect(jogadorDe(r.estado, 'p1').mochila).toHaveLength(LIMITE_MOCHILA);
+    expect(jogadorDe(r.estado, 'p1').mochila.map((c) => c.id)).toContain('t-0');
+    expect(r.estado.tesouros.cemiterio.map((c) => c.id)).not.toContain('t-0');
   });
 
   it('a mão tem PRECEDÊNCIA quando o mesmo id está nas duas zonas', () => {

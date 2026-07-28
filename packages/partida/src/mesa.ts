@@ -694,6 +694,11 @@ function equiparCarta(
     // Remove da zona de ORIGEM, nunca das duas: filtrar a mão quando a carta veio
     // da mochila seria no-op silencioso, e a carta ficaria duplicada (equipada E
     // na mochila) — o tipo de bug que o censo de conservação de cartas pega tarde.
+    //
+    // ⚠️ ANTES de `destinoDoDesequipado`, não depois: vindo de uma mochila CHEIA,
+    // é esta remoção que libera a vaga onde o item deslocado do slot precisa
+    // caber. Invertida, a mochila ainda pareceria cheia na hora do roteamento —
+    // ver o pin de ordem em `mesa.test.ts` ("vindo de uma mochila CHEIA...").
     mao: origem === 'mao' ? jogador.mao.filter((c) => c.id !== carta.id) : jogador.mao,
     mochila: origem === 'mochila' ? jogador.mochila.filter((c) => c.id !== carta.id) : jogador.mochila,
     // ESPALHA a zona; não a remonta — mesmo motivo de `jogarCarta`: a raça que
@@ -704,7 +709,7 @@ function equiparCarta(
     ...estado,
     jogadores: estado.jogadores.map((j) => (j.id === atualizado.id ? atualizado : j)),
   };
-  const base = destinoDoDesequipado(comJogador, deslocados);
+  const base = destinoDoDesequipado(comJogador, deslocados, acao.jogadorId);
   const eventos: readonly EventoDaMesa[] = [
     { tipo: 'equipou', jogadorId: acao.jogadorId, slot: info.slot, carta },
   ];
