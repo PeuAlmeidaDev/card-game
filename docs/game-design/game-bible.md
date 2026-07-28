@@ -314,6 +314,24 @@ do zero e ainda pegar o 2º lugar é exatamente o tipo de história que §14 que
 Mitigações fixadas: **janela B é condicional** (na maioria dos turnos nem abre) e **janela A
 fecha assim que todos passarem**. Timers são teto anti-AFK, não ritmo esperado.
 
+**📊 Ritmo MEDIDO (não estimado), em ações do humano por partida, mediana:**
+
+| Fatia | Política do bot | Equipando |
+|---|---|---|
+| 5 (A Mesa) | 74 | — |
+| 8, Plano 3a | 107 | 95 |
+| 8, Plano 3b | **136** | **114** |
+
+31 partidas por medição, dado e embaralho reais, dials de produção. **Aceito em 2026-07-27**
+(decisão #22): o Plano 4 muda a economia de novo, então regular agora é mirar em alvo móvel.
+
+⚠️ **O auto-pulo das fases paradas NÃO está funcionando como mitigação** (decisão #23).
+`recompor` evita **0 cliques na mediana** — ela exige mão sem raça E sem equipamento, e todo
+Tesouro desta fatia é equipamento. E a saída óbvia é ruim: estreitá-la para "só aparece com slot
+vazio compatível" tiraria a troca de equipamento antes da porta, que é a razão de a fase existir.
+**A mitigação de ritmo terá que vir de outro lugar** — a interferência (que dá o que fazer no
+turno alheio) continua sendo a aposta estrutural, não o auto-pulo.
+
 ⬜ Política de **abandono/AFK** em ranked (substituição por bot? penalidade de rating?).
 
 ---
@@ -497,3 +515,11 @@ turno, fase de ajuda/atrapalhar antes da batalha, mão de 7, sem ouro, morte sem
 | 18 | **Histórico de partidas** no perfil vira requisito; toda partida produz o log completo desde a fatia 5 |
 | 19 | **Ordem revista:** jogo com bots primeiro (fatia 5), online depois (fatia 6), interferência depois do online (fatia 7) — mas **autoridade no servidor desde o dia 1** |
 | 20 | Transporte do tempo real = **socket.io** (salas, reconexão, adapter Redis); mensagens validadas com Zod no `shared` |
+
+**Sessão 4 — 2026-07-27** (execução da fatia 8, Planos 3b e 4a):
+
+| # | Decisão | Porquê |
+|---|---|---|
+| 21 | **Maldição NUNCA entra na mochila; classe é carta de PORTA** (vai para a mão, como raça). A família Tesouros é **equipamento-only por desenho** | Confirmação, não mudança: §4 e §6.2 já diziam. Registrado porque um docstring no código afirmava o oposto e custou um ciclo inteiro de revisão — ver a regra do game bible vivo no `CLAUDE.md` |
+| 22 | **Ritmo aceito em 136 ações do humano** por partida (contra 107 do Plano 3a, +27%). Remedir depois do Plano 4 | O Plano 4 muda a economia de novo (mochila, bot guloso): regular agora é mirar em alvo móvel. 🎚️ Continua sendo dial, não regra |
+| 23 | **O auto-pulo das fases paradas está quase inerte** e NÃO é a mitigação de ritmo que o §6.1 do spec prometia | Medido: `recompor` evitou **0 cliques na mediana**, porque todo Tesouro desta fatia é equipamento e a mão quase sempre carrega algum. ⚠️ Estreitá-lo para "slot vazio compatível" **tiraria a troca de equipamento antes da porta**, que é a razão de a fase existir — a mitigação de ritmo terá que vir de outro lugar |

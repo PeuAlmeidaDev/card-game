@@ -23,6 +23,33 @@ autoral a definir**. Inspirado nas *mecânicas* do Munchkin; tema, nomes e arte 
 Os specs anteriores a 2026-07-22 foram escritos quando o jogo era uma **run solo**. Onde eles
 divergirem do game bible, **o game bible vence**.
 
+### ⚠️ O game bible é DOCUMENTO VIVO — atualizar faz parte da task, não é limpeza
+
+**Gatilho:** toda vez que uma decisão de **jogo** for tomada ou confirmada — o que uma carta
+faz, onde ela mora, qual zona a recebe, um dial de balanceamento, uma regra de turno, uma
+mudança de roteiro. Vale inclusive para decisão tomada de passagem numa conversa de execução.
+
+**O que fazer, na mesma leva de commits em que a decisão aparece:**
+
+1. Registrar em **§19 (Registro de decisões)**, na sessão do dia, com **o porquê** — a tabela é
+   numerada e cronológica; continue a numeração, não reinicie.
+2. Atualizar a **seção temática** que a decisão contradiz ou completa (§5 corpo, §6 turno,
+   §11 economia, §17 roteiro…). §19 é o histórico; a seção temática é o que alguém lê para
+   saber a regra de hoje.
+3. Se a decisão fechar uma **⬜ pergunta em aberto** do §18, tirá-la de lá.
+
+**Por que isto virou regra (2026-07-27):** um docstring em `partida/src/tipos.ts` afirmava que
+*"maldição e classe entram na família Tesouros quando tiverem verbo"*. O game bible **já dizia o
+contrário** desde sempre — §4 põe maldições e classes no baralho de **Portais**, e maldição
+resolve com **efeito imediato** (nunca vai para a mão, logo nunca para a mochila). O comentário
+derivou da fonte de verdade sem ninguém notar, e um implementador **e** um revisor gastaram um
+ciclo inteiro raciocinando sobre um cenário que o jogo não tem.
+
+⚠️ **A direção do erro importa:** não foi o game bible que ficou desatualizado — foi o CÓDIGO
+que se afastou dele. Por isso a regra não é só "escreva no bible depois"; é **ler o bible antes
+de escrever comentário que afirme regra de jogo**. Comentário afirma o presente; intenção futura
+vai para o spec ou para um teste que falha quando a hora chegar.
+
 ## Estado atual (2026-07-27)
 
 Visão do jogo **fechada** em 2 sessões de `grilling` (9 + 13 decisões) — ver §19 do game bible.
