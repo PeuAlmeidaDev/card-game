@@ -14,7 +14,7 @@ import { filaDeDados, criarDadoCiclico } from './testes/dados';
 import { monstro, monstros, salaVazia, salasVazias, raca, equipamento } from './testes/cartas';
 import { catalogoDeTeste, ID_DA_CLASSE_DE_TESTE, MONSTRO_DE_TESTE } from './testes/catalogo';
 import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
-import { combatenteDe, SLOTS_VAZIOS } from './corpo';
+import { combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
 import type { DepsMesa } from './mesa';
 import type {
   Carta, ConfigPartida, EntradaJogador, CartaPorta, EstadoPartida, InfoMonstro, JogadorNaMesa,
@@ -1396,6 +1396,58 @@ describe('aplicarAcao — equiparCarta', () => {
       .toThrow(/item-fantasma/);
     expect(() => aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([])))
       .not.toThrow(AcaoInvalida);
+  });
+
+  it('equipa uma carta vinda da MOCHILA, e ela sai de lá', () => {
+    // Uma ação, duas origens (spec §6). Duas ações separadas fariam o cliente
+    // decidir de onde a carta vem — informação que o servidor já tem e que o
+    // cliente pode ter desatualizada.
+    //
+    // A fase é DERIVADA DE NOVO depois de a mochila entrar no jogador, e não
+    // herdada de `p0`: `comMao` só olha a mão, e com ela vazia devolve `vasculhar`
+    // — a mochila ainda estava vazia no instante em que `comMao` perguntou. Se a
+    // fase ficasse presa a esse instante, o fixture pararia numa fase em que
+    // `equiparCarta` nem é legal, e o teste falharia pelo motivo errado (o gate de
+    // fase, não a busca pela carta). `faseSeAutoPula` conta a mochila como origem
+    // de equipamento desde a Task 3, então perguntar de novo com a mochila já
+    // preenchida é o que devolve `recompor`.
+    const p0 = comMao(nascida(), []);
+    const jogadores: readonly JogadorNaMesa[] = p0.jogadores.map((j) => (
+      j.id === 'p1' ? { ...j, mochila: [equipamento('t-1')] } : j
+    ));
+    const p: EstadoPartida = {
+      ...p0,
+      jogadores,
+      fase: faseDoTurnoDe(jogadorDe({ ...p0, jogadores }, 'p1')),
+    };
+
+    const r = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+
+    expect(jogadorDe(r.estado, 'p1').mochila).toEqual([]);
+    expect(itensEquipados(jogadorDe(r.estado, 'p1').emJogo.slots).map((c) => c.id)).toContain('t-1');
+  });
+
+  it('a mão tem PRECEDÊNCIA quando o mesmo id está nas duas zonas', () => {
+    // Não deveria acontecer (ids são únicos por carta), mas a ordem da busca é
+    // observável e precisa ser afirmada: sem isto, trocar a ordem do `??` mudaria
+    // de qual zona a carta some, e nenhum teste acusaria.
+    const p0 = comMao(nascida(), [equipamento('t-1')]);
+    const p: EstadoPartida = {
+      ...p0,
+      jogadores: p0.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: [equipamento('t-1')] } : j)),
+    };
+
+    const r = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+
+    expect(maoDe(r.estado, 'p1')).toEqual([]);
+    expect(jogadorDe(r.estado, 'p1').mochila).toHaveLength(1);
+  });
+
+  it('id que não está em NENHUMA das duas zonas é AcaoInvalida', () => {
+    const p = comMao(nascida(), [equipamento('t-1')]);
+
+    expect(() => aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 'nao-existe' }, deps([])))
+      .toThrow('aplicarAcao: a carta nao-existe não está na sua mão nem na mochila');
   });
 });
 

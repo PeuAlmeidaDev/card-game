@@ -477,6 +477,44 @@ function cartaDaMao(estado: EstadoPartida, acao: AcaoDeMao): {
 }
 
 /**
+ * A carta a equipar, venha ela da mão ou da mochila — e de ONDE veio, porque quem
+ * chama tem que removê-la da zona certa.
+ *
+ * Função própria, e não um parâmetro a mais em `cartaDaMao`: as duas respondem a
+ * perguntas diferentes. `cartaDaMao` serve as ações que só a mão alimenta
+ * (`jogarCarta`, `entregarCarta`, `guardarCarta`) e devolve `Carta` heterogênea;
+ * esta serve só `equiparCarta` e é a única que enxerga a mochila. Juntar as duas
+ * daria uma função com metade dos retornos ignorados por chamada.
+ *
+ * A MÃO tem precedência na busca, e isso é afirmado por teste: ids são únicos por
+ * carta, então o empate não deveria existir — mas a ordem é observável, e sem a
+ * asserção trocá-la mudaria de qual zona a carta some sem nada acusar.
+ */
+function cartaEquipavelDe(
+  estado: EstadoPartida,
+  acao: Extract<AcaoDaMesa, { readonly tipo: 'equiparCarta' }>,
+): {
+  readonly jogador: JogadorNaMesa;
+  readonly carta: Carta;
+  readonly origem: 'mao' | 'mochila';
+} {
+  const jogador = estado.jogadores.find((j) => j.id === acao.jogadorId);
+  if (jogador === undefined) {
+    throw new Error(`cartaEquipavelDe: jogador ${acao.jogadorId} não está na mesa`);
+  }
+
+  const naMao = jogador.mao.find((c) => c.id === acao.cartaId);
+  if (naMao !== undefined) return { jogador, carta: naMao, origem: 'mao' };
+
+  const naMochila = jogador.mochila.find((c) => c.id === acao.cartaId);
+  if (naMochila !== undefined) return { jogador, carta: naMochila, origem: 'mochila' };
+
+  // Pedido do cliente, não bug nosso: id velho (a carta já saiu) ou de outro
+  // jogador. 400, nunca 500 — mesma cadeia de `cartaDaMao`.
+  throw new AcaoInvalida(`aplicarAcao: a carta ${acao.cartaId} não está na sua mão nem na mochila`);
+}
+
+/**
  * Manda a carta para o cemitério do baralho A QUE ELA PERTENCE. Ponto único, e
  * exaustivo por construção: o `switch` sobre a união fecha em `never`, então a
  * terceira família de carta (maldição, classe — spec §4) não consegue nascer sem
@@ -639,7 +677,7 @@ function equiparCarta(
   // O guard de espiada MORREU aqui, gêmeo do de `jogarCarta`: `equiparCarta`
   // deixou de ser legal em `vasculhar`, a única fase em que a espiada existe, e a
   // pendência ficou inalcançável nesta função.
-  const { jogador, carta } = cartaDaMao(estado, acao);
+  const { jogador, carta, origem } = cartaEquipavelDe(estado, acao);
   if (carta.tipo !== 'equipamento') {
     throw new AcaoInvalida('aplicarAcao: só carta de equipamento vai para o corpo');
   }
@@ -653,7 +691,11 @@ function equiparCarta(
   const { slots, deslocados } = colocarNoSlot(jogador.emJogo.slots, carta, info);
   const atualizado: JogadorNaMesa = {
     ...jogador,
-    mao: jogador.mao.filter((c) => c.id !== carta.id),
+    // Remove da zona de ORIGEM, nunca das duas: filtrar a mão quando a carta veio
+    // da mochila seria no-op silencioso, e a carta ficaria duplicada (equipada E
+    // na mochila) — o tipo de bug que o censo de conservação de cartas pega tarde.
+    mao: origem === 'mao' ? jogador.mao.filter((c) => c.id !== carta.id) : jogador.mao,
+    mochila: origem === 'mochila' ? jogador.mochila.filter((c) => c.id !== carta.id) : jogador.mochila,
     // ESPALHA a zona; não a remonta — mesmo motivo de `jogarCarta`: a raça que
     // esta função não conhece precisa sobreviver a ela.
     emJogo: { ...jogador.emJogo, slots },
