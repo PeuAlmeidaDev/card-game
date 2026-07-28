@@ -1456,6 +1456,32 @@ describe('aplicarAcao — equiparCarta', () => {
     expect(r.estado.tesouros.cemiterio.map((c) => c.id)).not.toContain('t-0');
   });
 
+  it('o deslocado que cai na mochila SEGURA a fase — o auto-pulo lê o estado final', () => {
+    // ⚠️ Gêmeo do pin de ordem acima, e o único fixture que alcança o bug: aqui a
+    // mochila tem EXATAMENTE a carta que vai para o slot, e a mão está vazia.
+    //
+    // `equiparCarta` monta `atualizado` (a mão e a mochila já sem a carta equipada)
+    // ANTES de `destinoDoDesequipado` rotear o item que saiu do slot. Passar
+    // `atualizado` para `entrarOuPular` faria `faseSeAutoPula` ler uma mochila
+    // vazia — quando o estado real já tem 't-0' dentro dela. A fase se auto-pularia
+    // com o jogador ainda tendo o que vestir, e em `jogar` isso passa o turno.
+    //
+    // O pin de ordem não alcança isto: lá a mochila cheia deixa 4 cartas para trás,
+    // então a versão stale ainda responde "tenho equipamento" e o auto-pulo não
+    // dispara. É preciso que a mochila stale fique VAZIA.
+    const base = comSlots(comMao(nascida(), []), { maoDireita: equipamento('t-0') });
+    const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: [equipamento('t-1')] } : j));
+    const p: EstadoPartida = { ...base, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...base, jogadores }, 'p1')) };
+    expect(p.fase).toBe('recompor');
+
+    const r = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+
+    // O deslocado achou vaga (a carta equipada acabou de liberar uma)...
+    expect(jogadorDe(r.estado, 'p1').mochila.map((c) => c.id)).toEqual(['t-0']);
+    // ...logo ainda há o que equipar, e a fase parada NÃO pode ter se pulado.
+    expect(r.estado.fase).toBe('recompor');
+  });
+
   it('a mão tem PRECEDÊNCIA quando o mesmo id está nas duas zonas', () => {
     // Não deveria acontecer (ids são únicos por carta), mas a ordem da busca é
     // observável e precisa ser afirmada: sem isto, trocar a ordem do `??` mudaria

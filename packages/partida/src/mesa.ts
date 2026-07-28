@@ -130,8 +130,14 @@ function sairDaParada(
  * `fase.test.ts` afirma para as DUAS — parar em `recompor` sem raça nem
  * equipamento na mão, ou em `jogar` sem equipamento, é violação.
  *
- * O `jogador` vem por parâmetro, e não relido de `estado`: quem chama acabou de
- * atualizá-lo, e reler pelo `find` traria a versão de antes da ação.
+ * O `jogador` vem por parâmetro porque quem chama é quem sabe QUAL versão dele já
+ * é a final. Na maioria das ações é a que o chamador acabou de montar; em
+ * `equiparCarta` NÃO é — lá o estado sofre uma segunda mutação
+ * (`destinoDoDesequipado` devolvendo o item deslocado à mochila) depois que o
+ * jogador atualizado foi fechado, e é a versão de `estado` que vale. Por isso o
+ * parâmetro existe em vez de um `find` aqui dentro: nenhuma regra fixa serve para
+ * os dois casos, e errar o lado faz a fase parada se pular com o jogador ainda
+ * tendo o que vestir.
  */
 function entrarOuPular(
   estado: EstadoPartida,
@@ -733,7 +739,14 @@ function equiparCarta(
 
   return entrarOuPular(
     base,
-    atualizado,
+    // ⚠️ RELÊ de `base`; não passa `atualizado`. Esta é a única ação do reducer em
+    // que o jogador sofre uma SEGUNDA mutação depois de `atualizado` ser fechado:
+    // `destinoDoDesequipado` (acima) pode ter posto o item que saiu do slot na
+    // mochila DESTE mesmo jogador. E `faseSeAutoPula` decide por
+    // `mochila.length > 0` — com a versão de antes, equipar a última carta da
+    // mochila pularia a fase parada tendo o deslocado dentro dela para vestir.
+    // Em `jogar`, isso passa o turno inteiro.
+    base.jogadores.find((j) => j.id === acao.jogadorId) ?? atualizado,
     // A fase de ORIGEM, não um literal: equipar é legal em `recompor` e em
     // `jogar`, e o jogador tem que continuar onde estava. Fixar `recompor` aqui
     // mandaria quem equipou depois de vencer um combate de volta para a fase 1.
