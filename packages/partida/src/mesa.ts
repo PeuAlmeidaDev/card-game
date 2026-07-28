@@ -194,7 +194,7 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // guards certos; agora ela precisa entrar na tabela, e o `Record<Fase, …>` cobra.
   //
   // ⚠️ O QUE A TABELA NÃO RESPONDE. Passar aqui não garante que a ação será
-  // aceita: a elegibilidade FINA continua em cada função, e hoje são OITO pares —
+  // aceita: a elegibilidade FINA continua em cada função, e hoje são DOZE pares —
   // cada um precisa de gêmeo na tela, porque o `legal()` da `TelaMesa` lê ESTA
   // tabela e não sabe deles.
   //
@@ -222,6 +222,16 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // as duas saíram da fase em que a espiada existe, os guards ficaram
   // inalcançáveis e foram removidos (os gêmeos na tela saem na Task 5, onde o
   // botão "Passar" chega).
+  //
+  // Os QUATRO pares de `guardarCarta` (Task 2) ganham gêmeo na tela na Task 7
+  // (`TelaMesa.test.tsx`, describe "a mochila"): `carta.tipo === 'equipamento'`
+  // vira gate de EXISTÊNCIA do botão "Guardar" (mesmo tratamento que
+  // `equiparCarta` já dá ao seu par de tipo), e "mochila cheia" vira `disabled`
+  // comum. O gate de FASE deste botão específico também é EXISTÊNCIA — não só
+  // `disabled` como o resto da lista —, porque guardar numa fase errada não é
+  // "espere a hora certa" (a mão pode entregar a qualquer momento): é fugir do
+  // teto de mão para uma zona que ele não alcança, e prometer essa fuga com um
+  // botão desabilitado já seria a mentira.
   //
   // Mesmo assim a lista SUBIU de sete para oito, e a conta é a lição do parágrafo
   // acima: as linhas antigas `vasculhar/descartar` escondiam DOIS pares cada uma

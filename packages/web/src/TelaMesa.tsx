@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api } from './api';
 import { PainelLog } from './PainelLog';
 import { descreverCarta } from './descreverCarta';
-import { acaoEhLegalNaFase } from '@card-dungeon/shared';
+import { acaoEhLegalNaFase, LIMITE_MOCHILA } from '@card-dungeon/shared';
 import type { AcaoDaMesa, AcaoNoFio, Catalogo, Escolhas, Fase, Slot, VistaDaPartida } from '@card-dungeon/shared';
 
 /**
@@ -119,6 +119,9 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
   // vista não carrega o máximo dele.
   const vidaMaxima = vista.jogadores.find((j) => j.id === vista.voce)?.combatente.vida ?? null;
   const eu = vista.jogadores.find((j) => j.id === vista.voce);
+  // A SUA mochila, para o teto do "Guardar" e para o botão "Equipar" (que só faz
+  // sentido no que é seu — a mochila alheia é visível, mas não sua para vestir).
+  const minhaMochila = eu?.mochila ?? [];
   // O limite vem PRONTO da vista (`limiteDeMao` é publicado por jogador). Recalcular
   // aqui seria reimplementar regra de jogo na UI — e ela divergiria no dia em que
   // um item mexesse no teto.
@@ -179,6 +182,13 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
             {j.emJogo.raca !== null && ` · ${nomeDaRaca(j.emJogo.raca.racaId)}`}
             {' · '}força {j.combatente.forca} · vida {j.combatente.vida} · habilidade {j.combatente.habilidade} · agilidade {j.combatente.agilidade}
             {' · '}{j.cartasNaMao}/{j.limiteDeMao} cartas
+            {/* A mochila é zona ABERTA (spec §11): esconder a de quem não é você
+                seria teatro, e é dela que sai a leitura de quem está estocando o
+                quê para vestir depois. Sem botão aqui — só o dono equipa a sua,
+                pelo "Sua mochila" abaixo. */}
+            {j.mochila.length > 0 && (
+              <> · mochila: {j.mochila.map((c) => nomeDoItem(c.itemId)).join(', ')}</>
+            )}
             {j.id === vista.vezDe && ' ← jogando'}
           </li>
         ))}
@@ -287,6 +297,28 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
         </ul>
       </section>
 
+      {/* A MOCHILA. Zona ABERTA (spec §11) e FORA do teto de mão: guardar aqui não
+          é descartar, é adiar o "vestir" — daí o botão "Equipar" nascer nesta
+          lista e não na da mão. Só a SUA aparece aqui com ação; a dos outros já
+          está visível na linha do assento, acima. */}
+      <section>
+        <h3>Sua mochila — {minhaMochila.length} de {LIMITE_MOCHILA}</h3>
+        <ul>
+          {minhaMochila.map((carta) => (
+            <li key={carta.id}>
+              {nomeDoItem(carta.itemId)}{' '}
+              <button
+                type="button"
+                disabled={!legal('equiparCarta')}
+                onClick={() => void agir({ tipo: 'equiparCarta', cartaId: carta.id })}
+              >
+                Equipar
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+
       <section>
         <h3>Sua mão — {vista.suaMao.length} de {eu?.limiteDeMao ?? 0}</h3>
         {acimaDoLimite && (
@@ -349,6 +381,27 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
                   onClick={() => void agir({ tipo: 'equiparCarta', cartaId: carta.id })}
                 >
                   Equipar
+                </button>
+              )}
+              {/* O par fino de `guardarCarta` (ver a tabela no `aplicarAcao`), e os
+                  DOIS gates de EXISTÊNCIA (não só `disabled`) de propósito:
+                  - `carta.tipo === 'equipamento'` → só tesouro se guarda, mesmo
+                    gate de existência que `equiparCarta` já usa acima.
+                  - `legal('guardarCarta')` → aqui na EXISTÊNCIA, e não só no
+                    `disabled` como o resto dos botões desta lista. Guardar em
+                    `descartar` seria abrir uma saída que o teto de mão não
+                    alcança — sinalizar isso com um botão desabilitado ainda
+                    prometeria a saída; o botão certo é AUSENTE.
+                  O teto da mochila (`minhaMochila.length >= LIMITE_MOCHILA`) já é
+                  DISABLED normal, como os outros pares finos — cheia é reversível
+                  (esvazia equipando), diferente da fase errada. */}
+              {carta.tipo === 'equipamento' && legal('guardarCarta') && (
+                <button
+                  type="button"
+                  disabled={minhaMochila.length >= LIMITE_MOCHILA}
+                  onClick={() => void agir({ tipo: 'guardarCarta', cartaId: carta.id })}
+                >
+                  Guardar
                 </button>
               )}
               <button

@@ -36,6 +36,7 @@ export function participantesDe(evento: EventoDaMesa): readonly string[] {
     case 'descarte':
     case 'loot':
     case 'equipou':
+    case 'guardou':
     case 'passou':
       return [evento.jogadorId];
     case 'fim':

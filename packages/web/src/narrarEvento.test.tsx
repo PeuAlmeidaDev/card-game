@@ -95,6 +95,13 @@ describe('narrarEvento — linhas de texto puro', () => {
     )).toBe('Bot 1 equipa Espada Curta.');
   });
 
+  it('guardou MOSTRA a carta — a mochila é zona aberta', () => {
+    expect(narrarEvento(
+      { tipo: 'guardou', jogadorId: 'p2', carta: { id: 't1', tipo: 'equipamento', itemId: 'espada-curta' } },
+      ctx,
+    )).toBe('Bot 1 guarda Espada Curta na mochila.');
+  });
+
   it('loot diz QUANTAS, nunca QUAIS — a mão é zona oculta', () => {
     // Mesmo princípio do `achado`: a carta caiu numa zona que só o dono vê, e o
     // evento nem carrega a carta para a narração poder nomeá-la. Vale também
