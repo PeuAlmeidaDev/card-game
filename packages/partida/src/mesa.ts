@@ -5,6 +5,7 @@ import type {
   Fase, FaseParada, InfoRaca, JogadorNaMesa,
 } from './tipos';
 import { tirarDoTopo } from './baralho';
+import { LIMITE_MOCHILA } from './mao';
 import { destinoDaCaridade } from './caridade';
 import { combatenteDe } from './corpo';
 import { colocarNoSlot, destinoDoDesequipado } from './equipar';
@@ -209,6 +210,10 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   //   recompor             jogarCarta     carta.tipo === 'raca'        `jogarCarta`
   //   recompor             equiparCarta   carta.tipo === 'equipamento' `equiparCarta`
   //   jogar                equiparCarta   carta.tipo === 'equipamento' `equiparCarta`
+  //   recompor             guardarCarta   carta.tipo === 'equipamento' `guardarCarta`
+  //   recompor             guardarCarta   mochila cheia                `guardarCarta`
+  //   jogar                guardarCarta   carta.tipo === 'equipamento' `guardarCarta`
+  //   jogar                guardarCarta   mochila cheia                `guardarCarta`
   //   combate              atacar         `proximaDecisao`             o motor (`AcaoIlegal`)
   //   combate              esquivar       `proximaDecisao`             o motor (`AcaoIlegal`)
   //
@@ -249,6 +254,10 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
 
   if (acao.tipo === 'equiparCarta') {
     return equiparCarta(estado, acao, deps);
+  }
+
+  if (acao.tipo === 'guardarCarta') {
+    return guardarCarta(estado, acao);
   }
 
   if (acao.tipo === 'passar') {
@@ -441,7 +450,7 @@ function resolverEspiada(estado: EstadoPartida, acao: AcaoDeEspiada, deps: DepsM
 }
 
 /** As ações que apontam para uma carta da própria mão. */
-type AcaoDeMao = Extract<AcaoDaMesa, { readonly tipo: 'jogarCarta' | 'entregarCarta' | 'equiparCarta' }>;
+type AcaoDeMao = Extract<AcaoDaMesa, { readonly tipo: 'jogarCarta' | 'entregarCarta' | 'equiparCarta' | 'guardarCarta' }>;
 
 /**
  * Guard comum das ações de mão: a carta apontada tem que ser sua. A fase (turno
@@ -674,6 +683,48 @@ function equiparCarta(
     estado.fase,
     eventos,
   );
+}
+
+/**
+ * Mão → mochila. Direção única (spec §6): o que entra na mochila só sai equipado.
+ *
+ * O teto é cobrado AQUI e não no tipo porque um array não sabe se está cheio —
+ * mesma razão de `limiteDeMao` ser função e não propriedade do array de mão.
+ */
+function guardarCarta(
+  estado: EstadoPartida,
+  acao: Extract<AcaoDaMesa, { readonly tipo: 'guardarCarta' }>,
+): ResultadoAcao {
+  const { jogador, carta } = cartaDaMao(estado, acao);
+  if (carta.tipo !== 'equipamento') {
+    throw new AcaoInvalida('aplicarAcao: só carta de tesouro vai para a mochila');
+  }
+  if (jogador.mochila.length >= LIMITE_MOCHILA) {
+    // Pedido do cliente que a regra recusa => 400. A vista dele pode ser de um
+    // instante em que ainda havia vaga.
+    throw new AcaoInvalida('aplicarAcao: a mochila está cheia');
+  }
+
+  const atualizado: JogadorNaMesa = {
+    ...jogador,
+    mao: jogador.mao.filter((c) => c.id !== carta.id),
+    mochila: [...jogador.mochila, carta],
+  };
+  const base: EstadoPartida = {
+    ...estado,
+    jogadores: estado.jogadores.map((j) => (j.id === atualizado.id ? atualizado : j)),
+  };
+
+  if (!ehFaseParada(estado.fase)) {
+    // Inalcançável pela tabela: `guardarCarta` só é legal nas duas paradas. Se
+    // acontecer, é invariante NOSSA quebrada => Error cru, mesmo formato do guard
+    // gêmeo em `equiparCarta`.
+    throw new Error(`guardarCarta: fase não-parada ${estado.fase}`);
+  }
+
+  return entrarOuPular(base, atualizado, estado.fase, [
+    { tipo: 'guardou', jogadorId: acao.jogadorId, carta },
+  ]);
 }
 
 function agirNoCombate(estado: EstadoPartida, acao: AcaoDeCombate, deps: DepsMesa): ResultadoAcao {

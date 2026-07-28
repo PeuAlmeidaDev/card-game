@@ -3,7 +3,7 @@ import { aplicarAcao } from './mesa';
 import { avancarBots } from './automacao';
 import { criarPartida } from './montagem';
 import { montarComposicao, montarComposicaoTesouros } from './baralho';
-import { LIMITE_BASE_DE_MAO, MAO_INICIAL_PADRAO, MAO_INICIAL_TESOUROS, limiteDeMao } from './mao';
+import { LIMITE_BASE_DE_MAO, LIMITE_MOCHILA, MAO_INICIAL_PADRAO, MAO_INICIAL_TESOUROS, limiteDeMao } from './mao';
 import { escolherAcao } from './bot';
 // Importado pelos helpers `comMao`: eles DERIVAM a fase da mão que montam em vez
 // de cravá-la, para não produzirem estado que o domínio nunca geraria.
@@ -1396,6 +1396,72 @@ describe('aplicarAcao — equiparCarta', () => {
       .toThrow(/item-fantasma/);
     expect(() => aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([])))
       .not.toThrow(AcaoInvalida);
+  });
+});
+
+describe('aplicarAcao — guardarCarta', () => {
+  const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
+
+  /** Mesma fábrica de mesa nascida das outras `describe`s deste arquivo — local ao bloco. */
+  const nascida = (cfg: ConfigPartida = soSalaVazia): EstadoPartida =>
+    criarPartida('m1', entradas, cfg, { embaralhar: semEmbaralhar });
+
+  const comMao = (estado: EstadoPartida, mao: readonly Carta[]): EstadoPartida => {
+    const jogadores = estado.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao } : j));
+    return { ...estado, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...estado, jogadores }, 'p1')) };
+  };
+
+  it('tira da mão e põe na mochila, e o evento CARREGA a carta', () => {
+    // A mochila é zona ABERTA — a mesa inteira vê o que você guardou —, então
+    // esconder a carta no evento seria teatro. Mesma assimetria do `equipou`
+    // contra o `loot`: quem decide é a zona de DESTINO, não a ação.
+    const p = comMao(nascida(), [equipamento('t-1')]);
+
+    const r = aplicarAcao(p, { tipo: 'guardarCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+
+    expect(maoDe(r.estado, 'p1')).toEqual([]);
+    expect(jogadorDe(r.estado, 'p1').mochila).toEqual([equipamento('t-1')]);
+    expect(r.eventos).toContainEqual({ tipo: 'guardou', jogadorId: 'p1', carta: equipamento('t-1') });
+  });
+
+  it('a mochila CHEIA recusa como AcaoInvalida, não como 500', () => {
+    // Pedido do cliente que a regra não permite => 400. O cliente pode ter uma
+    // vista de um instante atrás em que ainda havia vaga.
+    const cheia = Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
+    const p0 = comMao(nascida(), [equipamento('t-1')]);
+    const p: EstadoPartida = {
+      ...p0,
+      jogadores: p0.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j)),
+    };
+
+    expect(() => aplicarAcao(p, { tipo: 'guardarCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([])))
+      .toThrow(AcaoInvalida);
+    expect(() => aplicarAcao(p, { tipo: 'guardarCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([])))
+      .toThrow('aplicarAcao: a mochila está cheia');
+  });
+
+  it('carta de PORTA não vai para a mochila', () => {
+    // A mochila é `readonly CartaTesouro[]`: guardar um monstro ali criaria uma
+    // carta sem saída (mochila → mão não existe) e sem cemitério de destino.
+    //
+    // O tesouro na mão é o que sustenta a fase 1 (sem ele `recompor` se auto-pula
+    // e o fixture vira vista impossível) — mesmo motivo do gêmeo em `equiparCarta`.
+    // A carta APONTADA é a de monstro: é ela que o guard de tipo recusa.
+    const p = comMao(nascida(), [monstro('p-1'), equipamento('t-1')]);
+
+    expect(() => aplicarAcao(p, { tipo: 'guardarCarta', jogadorId: 'p1', cartaId: 'p-1' }, deps([])))
+      .toThrow('aplicarAcao: só carta de tesouro vai para a mochila');
+  });
+
+  it('guardar NÃO passa a vez — segue na mesma janela parada', () => {
+    // Guardar é decisão do próprio turno, igual a equipar: quem guardou pode ainda
+    // querer equipar outra coisa antes de abrir a porta.
+    const p = comMao(nascida(), [equipamento('t-1'), equipamento('t-2')]);
+
+    const r = aplicarAcao(p, { tipo: 'guardarCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+
+    expect(r.estado.vezDe).toBe('p1');
+    expect(r.estado.fase).toBe('recompor');
   });
 });
 

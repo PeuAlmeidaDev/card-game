@@ -24,7 +24,7 @@ const LEGAL: Record<Fase, ReadonlySet<AcaoDaMesa['tipo']>> = {
   // é o que impede a raça de virar resposta reativa ao monstro que já se viu
   // (decisão #7 do spec). `passar` é a saída — sem ela esta fase prenderia o
   // turno de quem tem uma raça na mão e não quer trocar.
-  recompor: new Set<AcaoDaMesa['tipo']>(['jogarCarta', 'equiparCarta', 'passar']),
+  recompor: new Set<AcaoDaMesa['tipo']>(['jogarCarta', 'equiparCarta', 'guardarCarta', 'passar']),
   // A espiada da Presciência continua sendo PENDÊNCIA dentro desta fase, não fase
   // própria (spec §6): `vasculhar` e `manterCarta`/`empurrarCarta` são legais na
   // mesma fase e se excluem pelo campo `espiada`, que o reducer ainda consulta.
@@ -37,7 +37,7 @@ const LEGAL: Record<Fase, ReadonlySet<AcaoDaMesa['tipo']>> = {
   // vira corpo — sem ela, o tesouro que o monstro largou só poderia ser vestido no
   // turno seguinte, e a mão estouraria no caminho. `jogarCarta` fica de fora: a
   // raça já teve a janela dela e trocá-la aqui seria trocar depois de ver a porta.
-  jogar: new Set<AcaoDaMesa['tipo']>(['equiparCarta', 'passar']),
+  jogar: new Set<AcaoDaMesa['tipo']>(['equiparCarta', 'guardarCarta', 'passar']),
   // UMA saída do excedente, não mais três: as duas janelas de gastar carta
   // acontecem ANTES desta fase — `jogarCarta` migrou para `recompor` (decisão #7)
   // e `equiparCarta` para `recompor` e `jogar`. Quem chega aqui já teve as duas e

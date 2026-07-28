@@ -307,6 +307,13 @@ export type EventoDaMesa =
   | { readonly tipo: 'equipou'; readonly jogadorId: string;
       readonly slot: Slot; readonly carta: CartaEquipamento }
   /**
+   * Guardou na mochila. CARREGA a carta, pelo mesmo motivo do `equipou`: a mochila
+   * é zona ABERTA e a mesa inteira passa a ver o conteúdo, então esconder no
+   * evento seria teatro. A assimetria com o `loot` (que só conta) é a regra firmada
+   * na fatia 7: quem decide é a zona de DESTINO, não a ação.
+   */
+  | { readonly tipo: 'guardou'; readonly jogadorId: string; readonly carta: CartaTesouro }
+  /**
    * O jogador declinou de agir numa fase parada. Emite evento — e não silêncio —
    * porque `versaoDe` é `log.length`: sem mover a versão, um duplo-clique em
    * "Passar" escaparia do guard de 409 do server e morreria como 400 na cara do
@@ -328,6 +335,12 @@ export type AcaoDaMesa =
   | { readonly tipo: 'entregarCarta'; readonly jogadorId: string; readonly cartaId: string }
   /** Tira um tesouro da mão e o encaixa no corpo. O slot vem do ITEM, nunca do cliente. */
   | { readonly tipo: 'equiparCarta'; readonly jogadorId: string; readonly cartaId: string }
+  /**
+   * Tira um tesouro da mão e o põe na MOCHILA. Sempre nessa direção: mochila → mão
+   * não existe nesta fatia (spec §6/§11), e é essa mão única que faz a mochila ser
+   * uma aposta — o que entra ali só sai equipado.
+   */
+  | { readonly tipo: 'guardarCarta'; readonly jogadorId: string; readonly cartaId: string }
   /**
    * Encerra uma fase PARADA (`recompor`/`jogar`) sem fazer mais nada nela. É o
    * verbo que dá SAÍDA às duas — sem ele, `recompor` seria uma fase da qual não

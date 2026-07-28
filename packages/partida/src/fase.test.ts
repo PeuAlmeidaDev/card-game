@@ -75,6 +75,19 @@ describe('acaoEhLegalNaFase', () => {
     expect(acaoEhLegalNaFase('jogar', 'entregarCarta')).toBe(false);
   });
 
+  it('guardar acontece nas duas janelas paradas, e só nelas', () => {
+    // Mesmas fases de `equiparCarta`: guardar é a outra coisa que se faz com um
+    // tesouro na mão, e as duas janelas de mexer no corpo são `recompor` (antes da
+    // porta) e `jogar` (depois do encontro).
+    expect(acaoEhLegalNaFase('recompor', 'guardarCarta')).toBe(true);
+    expect(acaoEhLegalNaFase('jogar', 'guardarCarta')).toBe(true);
+    expect(acaoEhLegalNaFase('vasculhar', 'guardarCarta')).toBe(false);
+    expect(acaoEhLegalNaFase('combate', 'guardarCarta')).toBe(false);
+    // Em `descartar` NÃO: guardar seria escapar do teto de mão movendo a carta
+    // para uma zona que o teto não alcança. A saída do excedente é a caridade.
+    expect(acaoEhLegalNaFase('descartar', 'guardarCarta')).toBe(false);
+  });
+
   it('em `descartar` sobra SÓ a caridade', () => {
     // 🎚️ Mudança de REGRA (decisão #7), não de estrutura: a raça só entra em jogo
     // na fase 1 e o tesouro vira corpo nas duas janelas paradas (`recompor` e
