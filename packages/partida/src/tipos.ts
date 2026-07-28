@@ -342,7 +342,11 @@ export type AcaoDaMesa =
   | { readonly tipo: 'esquivar'; readonly jogadorId: string }
   | { readonly tipo: 'jogarCarta'; readonly jogadorId: string; readonly cartaId: string }
   | { readonly tipo: 'entregarCarta'; readonly jogadorId: string; readonly cartaId: string }
-  /** Tira um tesouro da mão e o encaixa no corpo. O slot vem do ITEM, nunca do cliente. */
+  /**
+   * Tira um tesouro da mão OU da mochila e o encaixa no corpo. As duas origens
+   * desde o Plano 4a (ver `cartaEquipavelDe`, em `./mesa`); a mão tem precedência
+   * se o id estiver nas duas. O slot vem do ITEM, nunca do cliente.
+   */
   | { readonly tipo: 'equiparCarta'; readonly jogadorId: string; readonly cartaId: string }
   /**
    * Tira um tesouro da mão e o põe na MOCHILA. Sempre nessa direção: mochila → mão

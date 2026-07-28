@@ -243,13 +243,14 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // UM vocabulário para "você não pode agora", e verbo que some é verbo que o
   // jogador nunca aprende que existe.
   //
-  // Mesmo assim a lista SUBIU de sete para oito, e a conta é a lição do parágrafo
-  // acima: as linhas antigas `vasculhar/descartar` escondiam DOIS pares cada uma
-  // dentro de uma célula agrupada, então nunca foram nove pares — eram nove
-  // LINHAS sobre onze pares. `equiparCarta` deixou `descartar` na Task 3 e ficou
-  // com as DUAS fases paradas — duas linhas, nunca uma célula com duas fases —, e
-  // cada uma tem gêmeo de verdade na tela (`TelaMesa.test.tsx`: o "Equipar" aceso
-  // em `recompor` e em `jogar`, apagado em `descartar`).
+  // HISTÓRICO da contagem, que é a lição do parágrafo acima — os números abaixo
+  // são de planos passados, NÃO a contagem de hoje (que é a lista de doze):
+  // no Plano 3b a lista subiu de sete para oito, e ao conferir descobriu-se que a
+  // contagem anterior também mentia — as linhas `vasculhar/descartar` escondiam
+  // DOIS pares cada uma dentro de uma célula agrupada, então nunca foram nove
+  // pares: eram nove LINHAS sobre onze pares. `equiparCarta` deixou `descartar`
+  // e ficou com as DUAS fases paradas — duas linhas, nunca uma célula com duas
+  // fases. O Plano 4a levou de oito para doze, com os quatro de `guardarCarta`.
   //
   // A `encrenca` do Plano 4 não muda esta lista: os verbos dela são novos.
   if (!acaoEhLegalNaFase(estado.fase, acao.tipo)) {
@@ -469,8 +470,14 @@ function resolverEspiada(estado: EstadoPartida, acao: AcaoDeEspiada, deps: DepsM
   return resolverCarta(base, espiada.jogadorId, compra.carta, deps);
 }
 
-/** As ações que apontam para uma carta da própria mão. */
-type AcaoDeMao = Extract<AcaoDaMesa, { readonly tipo: 'jogarCarta' | 'entregarCarta' | 'equiparCarta' | 'guardarCarta' }>;
+/**
+ * As ações que apontam para uma carta da própria mão — e SÓ da mão.
+ *
+ * `equiparCarta` saiu desta união no Plano 4a: ela ganhou a mochila como segunda
+ * origem e passou a resolver por `cartaEquipavelDe`, logo abaixo. Mantê-la aqui
+ * declarava como entrada legal de `cartaDaMao` uma ação que nunca mais a chama.
+ */
+type AcaoDeMao = Extract<AcaoDaMesa, { readonly tipo: 'jogarCarta' | 'entregarCarta' | 'guardarCarta' }>;
 
 /**
  * Guard comum das ações de mão: a carta apontada tem que ser sua. A fase (turno
