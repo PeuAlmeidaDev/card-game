@@ -69,7 +69,13 @@ export function acaoEhLegalNaFase(fase: Fase, tipo: AcaoDaMesa['tipo']): boolean
  */
 export function faseSeAutoPula(fase: Fase, jogador: JogadorNaMesa): boolean {
   const temRaca = jogador.mao.some((c) => c.tipo === 'raca');
-  const temEquipamento = jogador.mao.some((c) => c.tipo === 'equipamento');
+  // As DUAS origens de `equiparCarta` (spec §6): mão e mochila. Enquanto a
+  // mochila não existia, olhar só a mão era a mesma pergunta; desde que ela é
+  // origem, um jogador de mão vazia e mochila cheia ainda tem o que vestir —
+  // pulá-lo esconderia a única ação disponível. `mochila.length > 0`, não
+  // `.some(...)`: a mochila é `readonly CartaTesouro[]`, então toda carta nela
+  // já é equipável por tipo — um `.some` leria como se pudesse não ser.
+  const temEquipamento = jogador.mao.some((c) => c.tipo === 'equipamento') || jogador.mochila.length > 0;
   switch (fase) {
     case 'recompor':
       return !temRaca && !temEquipamento;

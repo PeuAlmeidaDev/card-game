@@ -149,6 +149,22 @@ describe('faseSeAutoPula (spec §6.1)', () => {
     expect(faseSeAutoPula('jogar', comMao([equipamento('t-1')]))).toBe(false);
   });
 
+  it('`recompor` NÃO se pula com a mão vazia e um item na mochila', () => {
+    // A mochila é origem de `equiparCarta` desde o Plano 4a: quem tem item ali
+    // ainda tem o que vestir antes de abrir a porta. Pular seria esconder a única
+    // ação que ele podia tomar.
+    expect(faseSeAutoPula('recompor', { ...comMao([]), mochila: [equipamento('t-1')] })).toBe(false);
+  });
+
+  it('`jogar` NÃO se pula com a mão vazia e um item na mochila', () => {
+    expect(faseSeAutoPula('jogar', { ...comMao([]), mochila: [equipamento('t-1')] })).toBe(false);
+  });
+
+  it('as duas se pulam com mão E mochila vazias', () => {
+    expect(faseSeAutoPula('recompor', { ...comMao([]), mochila: [] })).toBe(true);
+    expect(faseSeAutoPula('jogar', { ...comMao([]), mochila: [] })).toBe(true);
+  });
+
   it('as fases que compram, lutam ou pagam NUNCA se pulam', () => {
     // Spec §6.1 é explícito: só `recompor` e `jogar`. Pular `vasculhar` seria pular
     // o turno; pular `descartar` seria perdoar o excedente.
