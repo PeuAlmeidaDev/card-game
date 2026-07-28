@@ -5,9 +5,9 @@ import { criarPartida } from './montagem';
 import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import { AcaoInvalida } from './erros';
 import { filaDeDados } from './testes/dados';
-import { raca } from './testes/cartas';
+import { raca, equipamento } from './testes/cartas';
 import { catalogoDeTeste, ID_DA_CLASSE_DE_TESTE } from './testes/catalogo';
-import type { EntradaJogador } from './tipos';
+import type { EntradaJogador, CartaTesouro } from './tipos';
 
 /**
  * A projeção agora precisa do catálogo: `JogadorPublico.combatente` é calculado
@@ -93,6 +93,11 @@ describe('projetarPara', () => {
     jogadores: partida.jogadores.map((j) => ({ ...j, mao: [raca(`h-${j.id}`, 'elfo')] })),
   };
 
+  const comMochilaDe = (jogadorId: string, cartas: readonly CartaTesouro[]) => ({
+    ...partida,
+    jogadores: partida.jogadores.map((j) => (j.id === jogadorId ? { ...j, mochila: cartas } : j)),
+  });
+
   it('não entrega a mão de ninguém — só a contagem', () => {
     // Mesmo formato do teste que trava o segredo da espiada: a asserção é
     // ESTRUTURAL (a chave não existe) mais uma varredura do JSON pelo id da carta
@@ -140,6 +145,17 @@ describe('projetarPara', () => {
     // patente (1 na abertura) — o mesmo número que `combatenteDe` devolve.
     expect(vista.jogadores[0]?.combatente)
       .toEqual({ forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 });
+  });
+
+  it('a mochila viaja INTEIRA, de todos — é zona aberta', () => {
+    // Ao contrário da mão (que publica só a contagem): a mochila é pública por
+    // desenho, e é dela que sai a leitura de quem está guardando o quê para
+    // vestir depois. Publicar só o tamanho tiraria a única informação útil.
+    const estado = comMochilaDe('p2', [equipamento('t-9')]);
+
+    const vista = projetarPara('p1', estado, catalogoDeTeste());
+
+    expect(vista.jogadores.find((j) => j.id === 'p2')?.mochila).toEqual([equipamento('t-9')]);
   });
 
   it('a fase é pública — é dela que o cliente tira quais botões acendem', () => {

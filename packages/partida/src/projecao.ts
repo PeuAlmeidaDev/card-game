@@ -51,6 +51,7 @@ export function projetarPara(
       patente: j.patente,
       derrotas: j.derrotas,
       emJogo: j.emJogo,
+      mochila: j.mochila,
       cartasNaMao: j.mao.length,
       limiteDeMao: limiteDeMao(j),
     })),

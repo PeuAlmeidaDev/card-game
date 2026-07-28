@@ -182,6 +182,13 @@ export interface JogadorPublico {
   readonly derrotas: number;
   /** Zona ABERTA: a raça em jogo e o corpo equipado são informação pública. */
   readonly emJogo: ZonaEmJogo;
+  /**
+   * Zona ABERTA, inteira. Assimetria deliberada com `cartasNaMao` (que publica só
+   * a contagem): a mão é oculta e a mochila não é. Publicar só o tamanho da
+   * mochila esconderia exatamente o que a torna informação — QUE item o
+   * adversário está segurando para vestir depois.
+   */
+  readonly mochila: readonly CartaTesouro[];
   /** QUANTAS cartas ele tem — nunca QUAIS. */
   readonly cartasNaMao: number;
   /** A capacidade dele agora (o limite é regra pública, não segredo). */

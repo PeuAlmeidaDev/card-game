@@ -78,6 +78,10 @@ export const acaoDaMesaSchema = z.discriminatedUnion('tipo', [
   // capacete no pé, e a checagem viraria mais um guard no reducer em vez de ser
   // impossível por construção. Mesmo teto de 64 e pelo mesmo motivo.
   z.object({ tipo: z.literal('equiparCarta'), cartaId: z.string().min(1).max(64) }),
+  // Mesmo teto de 64 e pelo mesmo motivo do `equiparCarta`: o `cartaId` é
+  // refletido verbatim no 400 e no log. O DESTINO não viaja — guardar tem um
+  // destino só (a mochila), então não há o que o cliente escolher.
+  z.object({ tipo: z.literal('guardarCarta'), cartaId: z.string().min(1).max(64) }),
   // Sem campo nenhum além do tipo: `passar` é a intenção de não fazer nada nesta
   // fase, e QUAL fase é ela vem do estado autoritativo, nunca do cliente.
   z.object({ tipo: z.literal('passar') }),
@@ -144,6 +148,10 @@ export { acaoEhLegalNaFase } from '@card-dungeon/partida';
 // Valor, pelo mesmo motivo: o corpo vazio é um `Record` com os cinco slots, e a
 // cópia escrita à mão no cliente é a que fica para trás quando o sexto nascer.
 export { SLOTS_VAZIOS } from '@card-dungeon/partida';
+
+// Valor, pelo mesmo motivo: o teto da mochila é regra, e um `5` typed by hand no
+// cliente é a cópia que fica para trás quando o dial girar.
+export { LIMITE_MOCHILA } from '@card-dungeon/partida';
 
 const c = initContract();
 
