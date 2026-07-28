@@ -501,6 +501,32 @@ por isso **não valida diversão** — valida **ritmo**, que é o risco aberto d
 | 7 | Política de abandono/AFK em ranked | §12 |
 | 8 | Partida com bot conta pro rating? | §13 |
 | 9 | Todo o meta-jogo off-game (ranking, skins, perfil, clãs, conquistas, amigos) | §15 |
+| 10 | ⬜ **A raça acumula na mão sem ter onde ficar — a fatia 8 criou uma assimetria.** Equipamento ganhou DUAS casas (mão + 5 vagas de mochila, fora do limite); raça continua com UMA. Levantada pelo Pedro no gate ocular do Plano 4a (2026-07-28), jogando: *"não vale a pena ficar com várias raças na mão"*. **Marcada para uma sessão de `grill-me` dedicada** — é economia de fatia, e a decisão tem que ser dele e fundamentada, não resolvida de passagem. | §11, §6 |
+
+### Nota sobre a pergunta 10 — o que já se sabe, para a sessão de grill não recomeçar do zero
+
+**Contra pôr raça na mochila** (a leitura que a IA defendeu, e que o Pedro aceitou registrar em vez
+de aplicar):
+
+- Raça na mão **não é carta morta**: tem verbo (`jogarCarta`, em `recompor`) e jogá-la TROCA de
+  verdade — a anterior vai para o cemitério de Portas. Diferente de `monstro`/`salaVazia`, que
+  hoje não têm verbo nenhum e são a carta morta de fato. Esse buraco é do Plano 4b (`encrenca`).
+- Raça sobrando é **palha por desenho**: guardar a segunda só vale se você quiser trocar depois, e
+  a decisão #7 proíbe trocar depois de ver o monstro — logo é aposta às cegas. Dar armazém a isso
+  **recompensa segurar palha**, o oposto da pressão que o limite de mão existe para criar.
+- **Custo medido:** a caridade (anti-*kingmaking* da fatia 7) já está inerte nesta configuração
+  (994 tesouros doados → ~0). Mais armazenamento = menos mão estourando = mais inerte ainda.
+- **Custo de tipo:** `mochila` é `readonly CartaTesouro[]`. Torná-la heterogênea é a mesma manobra
+  que custou um **500 em partida legítima** no Plano 3a (alargar união abre caminho de descarte
+  que o plano não enxerga).
+- **Tom:** o jogo é sério, não satírico. Espada na mochila narra; raça na mochila não.
+
+**A pista melhor, que a sessão deveria perseguir:** a pergunta talvez não seja *"raça merece
+mochila?"* mas ***"por que sobra tanta raça na mão?"***. O roster do baralho é **uma carta para
+cada raça do catálogo** (decisão #11) — então cada raça nova que entrar no catálogo põe mais palha
+no baralho, **sem ninguém decidir isso**. O dial está escondido dentro de uma decisão que era
+sobre outra coisa. Ver também a pergunta 4 (quantas raças no MVP), que é a mesma tensão por
+outro ângulo.
 
 ---
 
