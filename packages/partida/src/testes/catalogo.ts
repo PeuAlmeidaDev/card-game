@@ -56,16 +56,38 @@ export const ITEM_DE_TESTE = {
   slot: 'maoDireita' as const, duasMaos: false, modificadores: { forca: 1 },
 };
 
+/**
+ * Par de itens de força DIFERENTE, para o bot guloso (`bot.ts`) ter o que
+ * comparar — um item só não prova que a política escolhe o MAIOR ganho, só que
+ * ela reconhece "melhora" contra "nada". `ID_DO_ITEM_DE_TESTE` continua sendo o
+ * item load-bearing; estes dois são aditivos, não substituição.
+ */
+export const ID_DO_ITEM_FORTE = 'i-forte';
+export const ITEM_FORTE = {
+  id: ID_DO_ITEM_FORTE, nome: 'Item Forte',
+  slot: 'maoDireita' as const, duasMaos: false, modificadores: { forca: 3 },
+};
+export const ID_DO_ITEM_FRACO = 'i-fraco';
+export const ITEM_FRACO = {
+  id: ID_DO_ITEM_FRACO, nome: 'Item Fraco',
+  slot: 'maoDireita' as const, duasMaos: false, modificadores: { forca: 1 },
+};
+
 export function catalogoDeTeste(
   parcial: Partial<CatalogoDaMesa> = {},
 ): CatalogoDaMesa {
   return {
     raca: () => undefined,
     monstro: (id) => (id === ID_DO_MONSTRO_DE_TESTE ? MONSTRO_DE_TESTE : undefined),
-    // Catálogo de teste conhece UMA classe e UM item, pelo mesmo princípio do
+    // Catálogo de teste conhece UMA classe e TRÊS itens, pelo mesmo princípio do
     // monstro: um dublê que aprova qualquer id não é dublê, é a ausência de um.
     classe: (id) => (id === ID_DA_CLASSE_DE_TESTE ? CLASSE_DE_TESTE : undefined),
-    item: (id) => (id === ID_DO_ITEM_DE_TESTE ? ITEM_DE_TESTE : undefined),
+    item: (id) => {
+      if (id === ID_DO_ITEM_DE_TESTE) return ITEM_DE_TESTE;
+      if (id === ID_DO_ITEM_FORTE) return ITEM_FORTE;
+      if (id === ID_DO_ITEM_FRACO) return ITEM_FRACO;
+      return undefined;
+    },
     ...parcial,
   };
 }

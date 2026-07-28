@@ -6,10 +6,12 @@ import { criarPartida } from './montagem';
 import { projetarPara } from './projecao';
 import { filaDeDados } from './testes/dados';
 import { equipamento, monstro as cartaMonstro, monstros, raca } from './testes/cartas';
-import { LIMITE_BASE_DE_MAO } from './mao';
+import { LIMITE_BASE_DE_MAO, LIMITE_MOCHILA } from './mao';
 import { catalogoDeTeste, ID_DA_CLASSE_DE_TESTE } from './testes/catalogo';
 import { COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
-import type { Carta, CartaDeRaca, EntradaJogador, EstadoPartida, Fase, VistaDaPartida } from './tipos';
+import type {
+  Carta, CartaDeRaca, CartaEquipamento, CartaTesouro, EntradaJogador, EstadoPartida, Fase, Slot, VistaDaPartida,
+} from './tipos';
 
 /** A projeção calcula `combatente`, então precisa do catálogo. Um só para o arquivo. */
 const catalogoPadrao = catalogoDeTeste();
@@ -42,6 +44,11 @@ const ACIMA_DO_TETO = monstros(LIMITE_BASE_DE_MAO + 1);
  * Só sobrescreve 'p1' — o único jogador que os testes do `switch` chamam.
  * `limiteDeMao` é o único campo que a VISTA carrega e o domínio não deriva de
  * `mao`/`emJogo`, então ele é sobrescrito DEPOIS da projeção, direto na vista.
+ *
+ * `mochila` e `slots` entraram para o bot guloso (Task 8): a mochila é a
+ * segunda origem de `equiparCarta` e os slots são o que ele desloca ao comparar
+ * ganho. `slots` é PARCIAL e faz merge sobre o corpo vazio de `criarPartida` —
+ * um objeto completo em cada teste espalharia os 5 slots por toda parte.
  */
 function vistaEm(
   fase: Fase,
@@ -49,6 +56,8 @@ function vistaEm(
     readonly suaMao?: readonly Carta[];
     readonly racaEmJogo?: CartaDeRaca | null;
     readonly limiteDeMao?: number;
+    readonly mochila?: readonly CartaTesouro[];
+    readonly slots?: Partial<Record<Slot, CartaEquipamento | null>>;
   } = {},
 ): VistaDaPartida {
   const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
@@ -60,9 +69,11 @@ function vistaEm(
         ? {
             ...j,
             mao: overrides.suaMao ?? j.mao,
+            mochila: overrides.mochila ?? j.mochila,
             emJogo: {
               ...j.emJogo,
               raca: overrides.racaEmJogo !== undefined ? overrides.racaEmJogo : j.emJogo.raca,
+              slots: overrides.slots !== undefined ? { ...j.emJogo.slots, ...overrides.slots } : j.emJogo.slots,
             },
           }
         : j
@@ -79,7 +90,8 @@ function vistaEm(
 describe('escolherAcao', () => {
   it('sem combate em curso, chuta a porta', () => {
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
-    expect(escolherAcao(projetarPara('p1', p, catalogoPadrao), 'p1')).toEqual({ tipo: 'vasculhar', jogadorId: 'p1' });
+    expect(escolherAcao(projetarPara('p1', p, catalogoPadrao), 'p1', catalogoPadrao))
+      .toEqual({ tipo: 'vasculhar', jogadorId: 'p1' });
   });
 
   it('com decisão de ataque pendente, ataca', () => {
@@ -87,7 +99,8 @@ describe('escolherAcao', () => {
     const comCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' },
       { rolar: filaDeDados([]), embaralhar: semEmbaralhar, catalogo: catalogoDeTeste() }).estado;
 
-    expect(escolherAcao(projetarPara('p1', comCombate, catalogoPadrao), 'p1')).toEqual({ tipo: 'atacar', jogadorId: 'p1' });
+    expect(escolherAcao(projetarPara('p1', comCombate, catalogoPadrao), 'p1', catalogoPadrao))
+      .toEqual({ tipo: 'atacar', jogadorId: 'p1' });
   });
 
   it('com esquiva pendente, esquiva', () => {
@@ -99,7 +112,7 @@ describe('escolherAcao', () => {
         catalogo: catalogoDeTeste({ monstro: () => rapido }) }).estado;
     expect(pedindoEsquiva.combate?.proximaDecisao).toBe('esquiva');
 
-    expect(escolherAcao(projetarPara('p1', pedindoEsquiva, catalogoPadrao), 'p1'))
+    expect(escolherAcao(projetarPara('p1', pedindoEsquiva, catalogoPadrao), 'p1', catalogoPadrao))
       .toEqual({ tipo: 'esquivar', jogadorId: 'p1' });
   });
 
@@ -115,7 +128,7 @@ describe('escolherAcao', () => {
     }).estado;
     expect(comEspiada.espiada).not.toBeNull();
 
-    expect(escolherAcao(projetarPara('p1', comEspiada, catalogoPadrao), 'p1'))
+    expect(escolherAcao(projetarPara('p1', comEspiada, catalogoPadrao), 'p1', catalogoPadrao))
       .toEqual({ tipo: 'manterCarta', jogadorId: 'p1' });
   });
 
@@ -149,7 +162,7 @@ describe('escolherAcao', () => {
       fase: 'descartar',
     };
 
-    expect(escolherAcao(projetarPara('p2', estourado, catalogoPadrao), 'p2'))
+    expect(escolherAcao(projetarPara('p2', estourado, catalogoPadrao), 'p2', catalogoPadrao))
       .toEqual({ tipo: 'entregarCarta', jogadorId: 'p2', cartaId: 'm1' });
   });
 
@@ -160,7 +173,8 @@ describe('escolherAcao', () => {
       jogadores: p.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao: [cartaMonstro('c1')] } : j)),
     };
 
-    expect(escolherAcao(projetarPara('p1', comMao, catalogoPadrao), 'p1')).toEqual({ tipo: 'vasculhar', jogadorId: 'p1' });
+    expect(escolherAcao(projetarPara('p1', comMao, catalogoPadrao), 'p1', catalogoPadrao))
+      .toEqual({ tipo: 'vasculhar', jogadorId: 'p1' });
   });
 
   it('em `recompor`, sem raça em jogo e com raça na mão, joga a raça', () => {
@@ -182,7 +196,7 @@ describe('escolherAcao', () => {
       fase: 'recompor',
     };
 
-    expect(escolherAcao(projetarPara('p1', comRacaNaMao, catalogoPadrao), 'p1'))
+    expect(escolherAcao(projetarPara('p1', comRacaNaMao, catalogoPadrao), 'p1', catalogoPadrao))
       .toEqual({ tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r7' });
   });
 
@@ -197,7 +211,7 @@ describe('escolherAcao', () => {
       )),
     };
 
-    expect(escolherAcao(projetarPara('p1', jaEspecializado, catalogoPadrao), 'p1'))
+    expect(escolherAcao(projetarPara('p1', jaEspecializado, catalogoPadrao), 'p1', catalogoPadrao))
       .toEqual({ tipo: 'vasculhar', jogadorId: 'p1' });
   });
 
@@ -222,7 +236,8 @@ describe('escolherAcao', () => {
       fase: 'descartar',
     };
 
-    expect(escolherAcao(projetarPara('p1', estourado, catalogoPadrao), 'p1').tipo).toBe('entregarCarta');
+    expect(escolherAcao(projetarPara('p1', estourado, catalogoPadrao), 'p1', catalogoPadrao).tipo)
+      .toBe('entregarCarta');
   });
 
   /**
@@ -233,43 +248,30 @@ describe('escolherAcao', () => {
     rolar: filaDeDados(dados), embaralhar: semEmbaralhar, catalogo: catalogoDeTeste(),
   });
 
-  it('em `jogar`, NÃO joga a raça: ela só é legal na fase 1', () => {
-    // ⚠️ O cenário é da MESA DE PRODUÇÃO, e este teste chega nele JOGANDO — sem
-    // forjar fase nenhuma. O bot nasce sem raça em jogo, segurando um tesouro da
-    // mão inicial (ele nunca equipa nesta fatia), e a porta que ele chuta é uma
-    // raça: a carta vai para a mão e `resolverCarta` entrega o turno a `jogar`,
-    // que NÃO se auto-pula porque há equipamento na mão.
+  it('em `jogar`, NÃO joga a raça: jogarCarta não é opção ali', () => {
+    // ⚠️ `jogarCarta` só é legal em `recompor` (decisão #7): a raça que pousa na
+    // mão durante `vasculhar`/`jogar` espera o PRÓXIMO turno. Escolher
+    // `jogarCarta` aqui mata a mesa, não só a jogada: `aplicarAcao` lança
+    // `AcaoInvalida`, `avancarBots` não captura, e o handler devolve 400 SEM
+    // salvar. Como a decisão do bot é determinística sobre o estado persistido,
+    // a retentativa repete o mesmo erro — para sempre, e o 400 cai na jogada do
+    // HUMANO. É o modo de falha do bot vidente que ignorava a espiada, agora
+    // pela porta que a fase `jogar` abriu.
     //
-    // Escolher `jogarCarta` aqui mata a mesa, não só a jogada: `aplicarAcao`
-    // lança `AcaoInvalida`, `avancarBots` não captura, e o handler devolve 400
-    // SEM salvar. Como a decisão do bot é determinística sobre o estado
-    // persistido, a retentativa repete o mesmo erro — para sempre, e o 400 cai
-    // na jogada do HUMANO. É o modo de falha do bot vidente que ignorava a
-    // espiada, agora pela porta que a fase `jogar` abriu.
-    const comRacaNoTopo = {
-      patenteAlvo: 5,
-      composicaoPorJogador: [{ tipo: 'raca' as const, racaId: 'orc' }, { tipo: 'salaVazia' as const }],
-      composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE,
-      // O tesouro vem pela MÃO INICIAL de verdade, não forjado: é ele que faz a
-      // fase 1 não se auto-pular no começo e `jogar` não se auto-pular no fim.
-      maoInicialTesouros: 1,
-    };
-    const p = criarPartida('m1', entradas, comRacaNoTopo, { embaralhar: semEmbaralhar });
-    expect(p.fase).toBe('recompor');
+    // A versão anterior deste teste chegava aqui JOGANDO a mesa inteira, ação
+    // por ação, apoiada num tesouro da mão inicial que sobrevivia intocado até
+    // `jogar` porque o bot nunca equipava (Plano 3b). Esta Task paga essa
+    // dívida: o bot guloso equiparia o tesouro já em `recompor`, e a mesa nunca
+    // mais para em `jogar` segurando algo para provar o ponto por esse caminho
+    // — `entrarOuPular` a puxaria direto para o turno seguinte. `vistaEm` isola
+    // a MESMA pergunta (o que o bot faz com uma raça na mão em `jogar`?) sem
+    // depender de o bot deixar sobra para trás.
+    const vista = vistaEm('jogar', { suaMao: [raca('r7', 'orc')] });
 
-    // O caminho do jogador, ação por ação: sai da fase 1, chuta a porta, e a raça
-    // sacada o deixa parado em `jogar`.
-    const naFase2 = aplicarAcao(p, escolherAcao(projetarPara('p1', p, catalogoPadrao), 'p1'), deps()).estado;
-    const emJogar = aplicarAcao(naFase2, { tipo: 'vasculhar', jogadorId: 'p1' }, deps()).estado;
-    expect(emJogar.fase).toBe('jogar');
-    expect(emJogar.jogadores[0]?.mao.some((c) => c.tipo === 'raca')).toBe(true);
-    expect(emJogar.jogadores[0]?.emJogo.raca).toBeNull();
-
-    expect(escolherAcao(projetarPara('p1', emJogar, catalogoPadrao), 'p1'))
-      .toEqual({ tipo: 'passar', jogadorId: 'p1' });
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste())).toEqual({ tipo: 'passar', jogadorId: 'p1' });
   });
 
-  it('em `jogar` com a mão estourada, PASSA — a caridade é da fase seguinte', () => {
+  it('em `jogar` com a mão estourada, NÃO entrega — a caridade é da fase seguinte', () => {
     // O gêmeo do de cima para a outra política do bot. Desde que `jogar` acontece
     // ANTES da cobrança do excedente, a mão estourada aparece numa fase que recusa
     // `entregarCarta` — e é o próprio loot que a estoura. Sem esta asserção, o
@@ -278,6 +280,13 @@ describe('escolherAcao', () => {
     // Também chega jogando: mão inicial EXATAMENTE no teto de quem está sem raça
     // em jogo (`LIMITE_BASE_DE_MAO` Portas + 1 Tesouro = `LIMITE_BASE_DE_MAO + 1`),
     // e é o loot do monstro vencido que passa dele.
+    //
+    // A ação de `recompor` é `{ tipo: 'passar' }` FORJADA (não `escolherAcao`) de
+    // propósito: é o que preserva o tesouro da mão inicial intocado até aqui —
+    // se o bot escolhesse por conta própria, o guloso o teria equipado em
+    // `recompor`, e o corpo já não estaria vazio quando `jogar` chegasse. Isto
+    // isola a pergunta deste teste (o gate de FASE recusa `entregarCarta`?) da
+    // pergunta do teste anterior (o que o bot faz quando não sobra nada?).
     const soMonstros = {
       patenteAlvo: 5,
       // 9 por jogador: o baralho precisa sobreviver à mão inicial de 7 e ainda ter
@@ -304,8 +313,14 @@ describe('escolherAcao', () => {
     expect(eu!.mao.length).toBeGreaterThan(LIMITE_BASE_DE_MAO + 1);   // o loot estourou a mão
     expect(eu!.mao.some((c) => c.tipo === 'raca')).toBe(false);       // isola do teste acima
 
-    expect(escolherAcao(projetarPara('p1', venceu, catalogoPadrao), 'p1'))
-      .toEqual({ tipo: 'passar', jogadorId: 'p1' });
+    // O corpo continua vazio (o tesouro da mão inicial nunca foi equipado — ver
+    // o comentário no topo do teste), então o guloso encontra ganho > 0 no
+    // primeiro candidato e equipa. O que importa aqui NÃO é qual carta ele
+    // escolhe, é que a escolha nunca é `entregarCarta`: essa é a asserção que o
+    // Critical do Plano 3b (o `AcaoInvalida` que virava 400 na jogada do humano)
+    // pede.
+    expect(escolherAcao(projetarPara('p1', venceu, catalogoPadrao), 'p1', catalogoPadrao).tipo)
+      .not.toBe('entregarCarta');
   });
 
   it('uma mesa de bots com a mão estourada não trava `avancarBots`', () => {
@@ -337,7 +352,7 @@ describe('escolherAcao', () => {
   it('em `recompor` com raça na mão e sem raça em jogo, o bot se especializa', () => {
     const vista = vistaEm('recompor', { suaMao: [raca('r1', 'elfo')], racaEmJogo: null });
 
-    expect(escolherAcao(vista, 'p1')).toEqual({ tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r1' });
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste())).toEqual({ tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r1' });
   });
 
   it('em `recompor` com raça JÁ em jogo, o bot passa — trocar por trocar é decisão', () => {
@@ -345,17 +360,66 @@ describe('escolherAcao', () => {
     // cemitério sem ganho nenhum. Mesma política da fatia 7, agora dentro da fase.
     const vista = vistaEm('recompor', { suaMao: [raca('r1', 'elfo')], racaEmJogo: raca('r0', 'anao') });
 
-    expect(escolherAcao(vista, 'p1')).toEqual({ tipo: 'passar', jogadorId: 'p1' });
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste())).toEqual({ tipo: 'passar', jogadorId: 'p1' });
   });
 
-  it('em `jogar` o bot passa — equipar é do Plano 4', () => {
-    // 🚨 DÍVIDA MEDIDA, deliberada: o bot que nunca equipa termina a partida com
-    // força 3,67 contra 5,95 do bot guloso, e o humano vence 80% das mesas em vez
-    // de 42,5%. Fica assim NESTE plano de propósito — misturar política de bot com
-    // máquina de fases faria a medição da Task 7 não saber o que mediu.
+  it('em `recompor`, equipa o item que MELHORA em vez de passar', () => {
+    // Guloso, não inteligente (decisão #9): compara a soma dos modificadores do
+    // item novo com a do que ele desloca. Não avalia risco, não planeja combate.
+    const vista = vistaEm('recompor', { suaMao: [equipamento('t-1')] });
+
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
+      .toEqual({ tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' });
+  });
+
+  it('NÃO equipa o item que piora — o slot ocupado tem mais modificador', () => {
+    const vista = vistaEm('recompor', {
+      suaMao: [equipamento('t-fraco')],
+      slots: { maoDireita: equipamento('t-forte') },
+    });
+
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
+      .not.toEqual({ tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-fraco' });
+  });
+
+  it('guarda o que não melhora, se a mochila tem vaga', () => {
+    // Ordem do spec §8: equipar se melhora → guardar se há vaga. Guardar o que não
+    // serve agora tira a carta do teto de mão sem jogá-la fora.
+    const vista = vistaEm('recompor', {
+      suaMao: [equipamento('t-fraco')],
+      slots: { maoDireita: equipamento('t-forte') },
+      mochila: [],
+    });
+
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
+      .toEqual({ tipo: 'guardarCarta', jogadorId: 'p1', cartaId: 't-fraco' });
+  });
+
+  it('com a mochila CHEIA e nada a equipar, passa', () => {
+    // Sem este ramo o bot pediria `guardarCarta` numa mochila cheia, o
+    // `AcaoInvalida` subiria por `avancarBots` e viraria 400 na jogada do HUMANO —
+    // exatamente o Critical que matou 28 de 30 mesas no Plano 3b.
+    const vista = vistaEm('recompor', {
+      suaMao: [equipamento('t-fraco')],
+      slots: { maoDireita: equipamento('t-forte') },
+      mochila: Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-c${String(i)}`)),
+    });
+
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste())).toEqual({ tipo: 'passar', jogadorId: 'p1' });
+  });
+
+  it('em `jogar`, veste o loot que acabou de cair', () => {
     const vista = vistaEm('jogar', { suaMao: [equipamento('t-1')] });
 
-    expect(escolherAcao(vista, 'p1')).toEqual({ tipo: 'passar', jogadorId: 'p1' });
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
+      .toEqual({ tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' });
+  });
+
+  it('equipa da MOCHILA quando a mão não tem nada melhor', () => {
+    const vista = vistaEm('jogar', { suaMao: [], mochila: [equipamento('t-1')] });
+
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
+      .toEqual({ tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' });
   });
 
   it('o bot não recalcula o excedente — quem manda é a fase', () => {
@@ -365,6 +429,6 @@ describe('escolherAcao', () => {
     // subir por `avancarBots` como 400 na jogada do HUMANO.
     const vista = vistaEm('descartar', { suaMao: [cartaMonstro('m1')], limiteDeMao: 7 });
 
-    expect(escolherAcao(vista, 'p1')).toEqual({ tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' });
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste())).toEqual({ tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' });
   });
 });

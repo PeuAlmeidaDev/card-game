@@ -631,7 +631,7 @@ describe('partida completa', () => {
     const MAX_VOLTAS = 500;
     let voltas = 0;
     while (estado.desfecho === 'emAndamento' && voltas < MAX_VOLTAS) {
-      const acao = escolherAcao(projetarPara('p1', estado, catalogoPadrao), 'p1');
+      const acao = escolherAcao(projetarPara('p1', estado, catalogoPadrao), 'p1', catalogoPadrao);
       estado = aplicarAcao(estado, acao, dadosDeps).estado;
       estado = avancarBots(estado, dadosDeps).estado;
       voltas += 1;

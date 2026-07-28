@@ -41,7 +41,7 @@ export function avancarBots(estado: EstadoPartida, deps: DepsMesa): ResultadoAca
     const daVez = atual.jogadores.find((j) => j.id === atual.vezDe);
     if (daVez === undefined || !daVez.ehBot) break;
 
-    const acao = escolherAcao(projetarPara(daVez.id, atual, deps.catalogo), daVez.id);
+    const acao = escolherAcao(projetarPara(daVez.id, atual, deps.catalogo), daVez.id, deps.catalogo);
     const passo = aplicarAcao(atual, acao, deps);
     eventos.push(...passo.eventos);
     atual = passo.estado;

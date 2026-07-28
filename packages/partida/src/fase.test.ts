@@ -329,7 +329,7 @@ describe('a fase nunca mente sobre o estado', () => {
 
     let interrompido = false;
     for (let voltas = 0; voltas < 300 && estado.desfecho === 'emAndamento' && !interrompido; voltas += 1) {
-      const acao = escolherAcao(projetarPara('p1', estado, catalogoPadrao), 'p1');
+      const acao = escolherAcao(projetarPara('p1', estado, catalogoPadrao), 'p1', catalogoPadrao);
       try {
         estado = aplicarAcao(estado, acao, depsPartida).estado;
       } catch (erro) {
@@ -369,7 +369,7 @@ describe('a fase nunca mente sobre o estado', () => {
           interrompido = true;
           break;
         }
-        const acaoDoBot = escolherAcao(projetarPara(daVez.id, estado, catalogoPadrao), daVez.id);
+        const acaoDoBot = escolherAcao(projetarPara(daVez.id, estado, catalogoPadrao), daVez.id, catalogoPadrao);
         try {
           estado = aplicarAcao(estado, acaoDoBot, depsPartida).estado;
         } catch (erro) {
