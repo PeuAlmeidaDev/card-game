@@ -7,7 +7,7 @@ import { projetarPara } from './projecao';
 import { filaDeDados } from './testes/dados';
 import { equipamento, monstro as cartaMonstro, monstros, raca } from './testes/cartas';
 import { LIMITE_BASE_DE_MAO, LIMITE_MOCHILA } from './mao';
-import { catalogoDeTeste, ID_DA_CLASSE_DE_TESTE } from './testes/catalogo';
+import { catalogoDeTeste, ID_DA_CLASSE_DE_TESTE, ID_DO_ITEM_FORTE, ID_DO_ITEM_FRACO } from './testes/catalogo';
 import { COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import type {
   Carta, CartaDeRaca, CartaEquipamento, CartaTesouro, EntradaJogador, EstadoPartida, Fase, Slot, VistaDaPartida,
@@ -266,12 +266,28 @@ describe('escolherAcao', () => {
     // — `entrarOuPular` a puxaria direto para o turno seguinte. `vistaEm` isola
     // a MESMA pergunta (o que o bot faz com uma raça na mão em `jogar`?) sem
     // depender de o bot deixar sobra para trás.
-    const vista = vistaEm('jogar', { suaMao: [raca('r7', 'orc')] });
+    //
+    // ⚠️ Mas a vista tem que ser uma que o DOMÍNIO produz — é a lição do
+    // comentário logo abaixo, no describe da mochila: uma vista que
+    // `faseSeAutoPula` nunca entregaria passa verde sem provar nada. Com a mão
+    // só a raça e corpo/mochila vazios, `temEquipamento` seria `false` e
+    // `jogar` se auto-pularia — a mesa NUNCA para aqui com esse corpo. Por
+    // isso a mão também carrega um equipamento (pior que o do slot ocupado) e
+    // a mochila está cheia: `temEquipamento` fica `true` (a fase legitimamente
+    // para), e ainda assim não há nem o que equipar (perde para o slot
+    // ocupado) nem onde guardar (mochila em `LIMITE_MOCHILA`) — só `passar`
+    // sobra, e é o `jogarCarta` da raça que este teste prova que o bot não
+    // escolhe no lugar.
+    const vista = vistaEm('jogar', {
+      suaMao: [raca('r7', 'orc'), equipamento('t-fraco', ID_DO_ITEM_FRACO)],
+      slots: { maoDireita: equipamento('t-forte', ID_DO_ITEM_FORTE) },
+      mochila: Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-c${String(i)}`)),
+    });
 
     expect(escolherAcao(vista, 'p1', catalogoDeTeste())).toEqual({ tipo: 'passar', jogadorId: 'p1' });
   });
 
-  it('em `jogar` com a mão estourada, NÃO entrega — a caridade é da fase seguinte', () => {
+  it('em `jogar` com a mão estourada e o corpo/mochila cheios, PASSA', () => {
     // O gêmeo do de cima para a outra política do bot. Desde que `jogar` acontece
     // ANTES da cobrança do excedente, a mão estourada aparece numa fase que recusa
     // `entregarCarta` — e é o próprio loot que a estoura. Sem esta asserção, o
@@ -279,22 +295,26 @@ describe('escolherAcao', () => {
     //
     // Também chega jogando: mão inicial EXATAMENTE no teto de quem está sem raça
     // em jogo (`LIMITE_BASE_DE_MAO` Portas + 1 Tesouro = `LIMITE_BASE_DE_MAO + 1`),
-    // e é o loot do monstro vencido que passa dele.
+    // agora composta como 3 Portas + 5 Tesouros em vez de 7 + 1 — é o Tesouro que
+    // precisa ser abundante aqui (ver por quê logo abaixo), e o monte de Portas
+    // sobra de sobra com só 3 saindo da mão inicial de um baralho de 9/jogador.
     //
     // A ação de `recompor` é `{ tipo: 'passar' }` FORJADA (não `escolherAcao`) de
-    // propósito: é o que preserva o tesouro da mão inicial intocado até aqui —
-    // se o bot escolhesse por conta própria, o guloso o teria equipado em
-    // `recompor`, e o corpo já não estaria vazio quando `jogar` chegasse. Isto
-    // isola a pergunta deste teste (o gate de FASE recusa `entregarCarta`?) da
-    // pergunta do teste anterior (o que o bot faz quando não sobra nada?).
+    // propósito: é o que preserva os 5 tesouros da mão inicial intocados até
+    // aqui — se o bot escolhesse por conta própria, o guloso já teria equipado
+    // um deles em `recompor`.
     const soMonstros = {
       patenteAlvo: 5,
-      // 9 por jogador: o baralho precisa sobreviver à mão inicial de 7 e ainda ter
+      // 9 por jogador: o baralho precisa sobreviver à mão inicial de 3 e ainda ter
       // monstro no topo do monte para o combate abrir.
       composicaoPorJogador: Array.from({ length: 9 }, () => ({ tipo: 'monstro' as const, monstroId: 'm-teste' })),
-      composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE,
-      maoInicial: LIMITE_BASE_DE_MAO,
-      maoInicialTesouros: 1,
+      // 6 por jogador, e não os 2 de `COMPOSICAO_TESOURO_DE_TESTE`: a mão
+      // inicial sozinha precisa segurar os 5 que sobrevivem até `jogar` (1 para
+      // ocupar `maoDireita`, `LIMITE_MOCHILA` para encher a mochila), e ainda
+      // sobrar 1 no monte para o loot do combate ter o que sacar.
+      composicaoTesouros: Array.from({ length: 6 }, () => ({ tipo: 'equipamento' as const, itemId: 'i-teste' })),
+      maoInicial: 3,
+      maoInicialTesouros: 5,
     };
     const p = criarPartida('m1', entradas, soMonstros, { embaralhar: semEmbaralhar });
     const naFase2 = aplicarAcao(p, { tipo: 'passar', jogadorId: 'p1' }, deps()).estado;
@@ -312,15 +332,33 @@ describe('escolherAcao', () => {
     expect(venceu.fase).toBe('jogar');
     expect(eu!.mao.length).toBeGreaterThan(LIMITE_BASE_DE_MAO + 1);   // o loot estourou a mão
     expect(eu!.mao.some((c) => c.tipo === 'raca')).toBe(false);       // isola do teste acima
+    expect(eu!.mao.filter((c) => c.tipo === 'equipamento')).toHaveLength(6); // 5 da mão inicial + 1 do loot
 
-    // O corpo continua vazio (o tesouro da mão inicial nunca foi equipado — ver
-    // o comentário no topo do teste), então o guloso encontra ganho > 0 no
-    // primeiro candidato e equipa. O que importa aqui NÃO é qual carta ele
-    // escolhe, é que a escolha nunca é `entregarCarta`: essa é a asserção que o
-    // Critical do Plano 3b (o `AcaoInvalida` que virava 400 na jogada do humano)
-    // pede.
-    expect(escolherAcao(projetarPara('p1', venceu, catalogoPadrao), 'p1', catalogoPadrao).tipo)
-      .not.toBe('entregarCarta');
+    // Consome os 6 tesouros por AÇÃO real (nunca forjando `fase`): equipa o
+    // primeiro (ocupa `maoDireita`) e guarda os 5 seguintes (enche a mochila até
+    // `LIMITE_MOCHILA`) — exatamente o "corpo cheio + mochila cheia" que torna
+    // `passar` a ÚNICA resposta legal que sobra, em vez de uma entre várias que
+    // só não é `entregarCarta`. `entrarOuPular` mantém a fase em `jogar` a cada
+    // passo porque sempre sobra equipamento (na mão ou na mochila) até o laço
+    // acabar — a mesma regra que `faseSeAutoPula` teria testado.
+    const primeiroEquipamento = venceu.jogadores[0]!.mao.find((c) => c.tipo === 'equipamento')!;
+    let corpoPronto = aplicarAcao(
+      venceu, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: primeiroEquipamento.id }, deps(),
+    ).estado;
+    for (let i = 0; i < LIMITE_MOCHILA; i += 1) {
+      const alvo = corpoPronto.jogadores[0]!.mao.find((c) => c.tipo === 'equipamento')!;
+      corpoPronto = aplicarAcao(corpoPronto, { tipo: 'guardarCarta', jogadorId: 'p1', cartaId: alvo.id }, deps()).estado;
+    }
+    expect(corpoPronto.fase).toBe('jogar');                                    // nunca saiu da fase
+    expect(corpoPronto.jogadores[0]!.mochila).toHaveLength(LIMITE_MOCHILA);    // mochila CHEIA
+    expect(corpoPronto.jogadores[0]!.mao.some((c) => c.tipo === 'equipamento')).toBe(false); // mão sem mais tesouro
+
+    // Com o corpo ocupado, a mochila cheia e nenhum tesouro sobrando na mão, o
+    // guloso não tem candidato a equipar nem vaga para guardar — `passar` é a
+    // ÚNICA ação que `vestirOuGuardar` consegue devolver, e nunca `entregarCarta`
+    // (o Critical do Plano 3b que este teste protege).
+    expect(escolherAcao(projetarPara('p1', corpoPronto, catalogoPadrao), 'p1', catalogoPadrao))
+      .toEqual({ tipo: 'passar', jogadorId: 'p1' });
   });
 
   it('uma mesa de bots com a mão estourada não trava `avancarBots`', () => {
@@ -373,21 +411,40 @@ describe('escolherAcao', () => {
   });
 
   it('NÃO equipa o item que piora — o slot ocupado tem mais modificador', () => {
+    // ⚠️ O `itemId` é o SEGUNDO argumento de `equipamento` (o primeiro é só o id
+    // da carta) — passar 't-fraco'/'t-forte' ali só nomeia a carta, e as duas
+    // cairiam no `itemId` DEFAULT ('i-teste') se eu não passasse
+    // `ID_DO_ITEM_FRACO`/`ID_DO_ITEM_FORTE` aqui: o teste exerceria um EMPATE
+    // (ganho 0, também rejeitado por `ganho > 0`), nunca uma perda de verdade.
     const vista = vistaEm('recompor', {
-      suaMao: [equipamento('t-fraco')],
-      slots: { maoDireita: equipamento('t-forte') },
+      suaMao: [equipamento('t-fraco', ID_DO_ITEM_FRACO)],
+      slots: { maoDireita: equipamento('t-forte', ID_DO_ITEM_FORTE) },
     });
 
     expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
       .not.toEqual({ tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-fraco' });
   });
 
+  it('entre vários candidatos, equipa o de MAIOR ganho', () => {
+    // Cobertura que faltava para a dupla `i-forte`/`i-fraco`: um candidato só
+    // prova que o guloso reconhece "melhora" contra "nada" — não que ele
+    // escolhe o MAIOR ganho quando há mais de um. Corpo vazio: os dois
+    // candidatos disputam contra um slot livre (custo 0), então o ganho de
+    // cada um é o próprio valor do item — e só o mais forte pode vencer.
+    const vista = vistaEm('recompor', {
+      suaMao: [equipamento('t-fraco', ID_DO_ITEM_FRACO), equipamento('t-forte', ID_DO_ITEM_FORTE)],
+    });
+
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
+      .toEqual({ tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-forte' });
+  });
+
   it('guarda o que não melhora, se a mochila tem vaga', () => {
     // Ordem do spec §8: equipar se melhora → guardar se há vaga. Guardar o que não
     // serve agora tira a carta do teto de mão sem jogá-la fora.
     const vista = vistaEm('recompor', {
-      suaMao: [equipamento('t-fraco')],
-      slots: { maoDireita: equipamento('t-forte') },
+      suaMao: [equipamento('t-fraco', ID_DO_ITEM_FRACO)],
+      slots: { maoDireita: equipamento('t-forte', ID_DO_ITEM_FORTE) },
       mochila: [],
     });
 
@@ -400,8 +457,8 @@ describe('escolherAcao', () => {
     // `AcaoInvalida` subiria por `avancarBots` e viraria 400 na jogada do HUMANO —
     // exatamente o Critical que matou 28 de 30 mesas no Plano 3b.
     const vista = vistaEm('recompor', {
-      suaMao: [equipamento('t-fraco')],
-      slots: { maoDireita: equipamento('t-forte') },
+      suaMao: [equipamento('t-fraco', ID_DO_ITEM_FRACO)],
+      slots: { maoDireita: equipamento('t-forte', ID_DO_ITEM_FORTE) },
       mochila: Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-c${String(i)}`)),
     });
 
