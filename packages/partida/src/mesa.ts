@@ -200,9 +200,16 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // guards certos; agora ela precisa entrar na tabela, e o `Record<Fase, …>` cobra.
   //
   // ⚠️ O QUE A TABELA NÃO RESPONDE. Passar aqui não garante que a ação será
-  // aceita: a elegibilidade FINA continua em cada função, e hoje são DOZE pares —
+  // aceita: a elegibilidade FINA continua em cada função, e hoje são TREZE pares —
   // cada um precisa de gêmeo na tela, porque o `legal()` da `TelaMesa` lê ESTA
   // tabela e não sabe deles.
+  //
+  // ⚠️ O 13º entrou em 2026-07-28, e não era par novo: existia desde o Plano 3b e
+  // NUNCA esteve na tabela (o par "monte+cemitério vazios" de `empurrarCarta`).
+  // Foi achado recontando os pares um a um contra o reducer, e o gêmeo na tela
+  // também não existia — fim de baralho + clique era 400 na cara do jogador.
+  // A lição: conferir a tabela contra si mesma não acha o par que ninguém
+  // escreveu. A recontagem tem que sair do CÓDIGO para a tabela, nunca ao contrário.
   //
   // Uma linha por par, sem agrupar ação nem quebrar célula em duas linhas: a
   // versão agrupada já mentiu uma vez (dizia "quatro pares" com sete linhas, e a
@@ -213,6 +220,7 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   //   vasculhar            vasculhar      espiada === null             `vasculhar`
   //   vasculhar            manterCarta    espiada !== null             `resolverEspiada`
   //   vasculhar            empurrarCarta  espiada !== null             `resolverEspiada`
+  //   vasculhar            empurrarCarta  monte+cemitério não vazios   `resolverEspiada`
   //   recompor             jogarCarta     carta.tipo === 'raca'        `jogarCarta`
   //   recompor             equiparCarta   carta.tipo === 'equipamento' `equiparCarta`
   //   jogar                equiparCarta   carta.tipo === 'equipamento' `equiparCarta`

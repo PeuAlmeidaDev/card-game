@@ -182,6 +182,31 @@ describe('TelaMesa', () => {
     });
   });
 
+  it('"Empurrar" APAGA sem outra carta para comprar, e "Encarar" continua aceso', async () => {
+    // O gêmeo que faltava do par fino de `empurrarCarta` (`mesa.ts`: monte E
+    // cemitério de Portas vazios => AcaoInvalida). Sem ele, fim de baralho + um
+    // clique = 400 na cara do jogador. Foi achado contando os pares da tabela do
+    // `aplicarAcao` um a um contra o reducer: eram TREZE, e a tabela dizia doze.
+    //
+    // "Encarar" tem que continuar aceso na MESMA vista: é a saída legal que
+    // sobra, e apagar os dois deixaria o vidente sem ação nenhuma com uma
+    // espiada pendente — trocaria um 400 por uma tela travada.
+    await abrirMesa({ ...vistaComEspiada, cartasNoMonte: 0, cartasNoCemiterio: 0 });
+
+    expect(await screen.findByRole('button', { name: /empurrar/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /encarar/i })).toBeEnabled();
+  });
+
+  it('"Empurrar" continua aceso com o monte vazio mas o cemitério cheio', async () => {
+    // O par é uma conjunção, e é por isso que o gêmeo não pode ser
+    // `cartasNoMonte === 0` sozinho: com o cemitério cheio o baralho REEMBARALHA
+    // e há sim outra carta para comprar. Aproximar pelo monte apagaria um botão
+    // que o domínio aceita — o erro oposto, e igualmente errado.
+    await abrirMesa({ ...vistaComEspiada, cartasNoMonte: 0, cartasNoCemiterio: 7 });
+
+    expect(await screen.findByRole('button', { name: /empurrar/i })).toBeEnabled();
+  });
+
   it('descreve corretamente a carta pressentida de cada tipo', async () => {
     // Ternário sobre união ABERTA mente: antes desta correção, uma carta de raça
     // era anunciada como "uma sala vazia" na única tela que existe para informar.

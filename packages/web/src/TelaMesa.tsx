@@ -249,9 +249,20 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
             >
               Encarar
             </button>
+            {/* O 13º par fino (ver a tabela no `aplicarAcao`): empurrar exige que
+                exista OUTRA carta de Porta para comprar, e o reducer recusa com
+                `AcaoInvalida` quando monte E cemitério estão vazios. É uma
+                CONJUNÇÃO, e escrevê-la só com `cartasNoMonte === 0` apagaria o
+                botão com o cemitério cheio — situação em que o baralho
+                reembaralha e empurrar é legal.
+                "Encarar" fica de fora de propósito: é a saída que sobra ao
+                vidente, e apagar as duas trocaria um 400 por uma tela travada. */}
             <button
               type="button"
-              disabled={!minhaVez || espiada === null}
+              disabled={
+                !minhaVez || espiada === null
+                || (vista.cartasNoMonte === 0 && vista.cartasNoCemiterio === 0)
+              }
               onClick={() => void agir({ tipo: 'empurrarCarta' })}
             >
               Empurrar
