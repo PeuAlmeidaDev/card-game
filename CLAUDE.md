@@ -193,6 +193,39 @@ geral do branch e uma adversarial dirigida aos vícios que este projeto já pago
 - 🕳️ **O 13º par** (ver abaixo) e o §6 do game bible, que não conhecia `guardarCarta` — a regra
   do bible vivo nasceu neste branch e falhou na primeira oportunidade de ser aplicada.
 
+🔴 **E DEPOIS DE TUDO ISSO, O GATE OCULAR PEGOU O QUE NINGUÉM PEGOU.** Pedro, jogando:
+*"ganho uma batalha, não ganho tesouros, e minha mão fica estagnada em 7"*. Duas revisões amplas,
+nove tasks revisadas e 497 testes verdes passaram por cima.
+
+**Causa raiz, medida:** o baralho de Tesouros é **fluxo de mão única**. São 32 cartas numa mesa de
+4 (uma por item do catálogo, por jogador) contra **68 vagas de absorção** nas zonas dos jogadores
+(mãos 28 + slots 20 + mochilas 20), e o cemitério — única fonte de reabastecimento via reshuffle —
+quase nunca recebe carta de volta. Sonda com dials de produção: **20 de 20 partidas** zeram o
+estoque perto da metade, e daí em diante **6 a 22 combates vencidos por partida pagam zero**.
+
+⚠️ **Não é regressão do 4a** — o contrafactual com o comportamento pré-mochila esgota igual, ~10%
+mais tarde. A mochila acelera, não causa. Nasceu com o baralho de Tesouros, no Plano 3a.
+
+⚠️ **O código estava CERTO — o COMENTÁRIO estava errado.** `sacarTesouros` trata baralho vazio de
+propósito (lançar derrubaria partida legítima). O defeito era o **silêncio**, e ele estava
+justificado por escrito: *"`quantidade: 0` seria uma linha de log dizendo que nada aconteceu"*.
+A premissa não se sustenta — não é nada acontecendo, é a **economia da mesa tendo secado**.
+➡️ **É a 7ª vez nesta fatia que um comentário afirmando o presente errado custa caro, e a PRIMEIRA
+em que ele justificava uma AUSÊNCIA de código.** Essa variante é muito mais difícil de auditar
+que as seis anteriores: não há linha para conferir contra a afirmação, só a falta dela. Nenhuma
+revisão de diff a pega, porque não há diff.
+
+Corrigido: evento **`tesouroEsgotado`** (com `naoPagas`, convivendo com o `loot` no pagamento
+parcial) e a tela mostrando o estoque dos **dois** baralhos — `tesourosNoMonte` viajava na vista
+desde o 3a e **nunca fora renderizado**, a 3ª ocorrência de "publicado mas não renderizado" nesta
+fatia. ⚠️ Isto conserta a **visibilidade**; a **economia continua aberta** (pergunta 11 do §18) e
+é dial do Pedro.
+
+💡 **Hipótese não medida, plausível:** isto pode explicar os DOIS números que a Task 9 registrou
+sem causa fechada — a caridade zerada (não há tesouro para doar na segunda metade) e a taxa de
+vitória do humano abaixo da projeção (com o baralho seco, quem acumulou cedo trava a vantagem).
+Medir no 4b antes de tratar como fato.
+
 ⚠️ **Vale mais que os achados: os dois vícios que este projeto mais teme deram LIMPO**, e não por
 leitura otimista — o revisor adversarial quebrou o código de produção em **7 pontos** e conferiu
 que os testes que deviam reprovar reprovaram (um deles com exatamente 1 teste falhando, como o
