@@ -736,9 +736,13 @@ function equiparCarta(
     ...estado,
     jogadores: estado.jogadores.map((j) => (j.id === atualizado.id ? atualizado : j)),
   };
-  const base = destinoDoDesequipado(comJogador, deslocados, acao.jogadorId);
+  const { estado: base, eventos: doDeslocado } = destinoDoDesequipado(comJogador, deslocados, acao.jogadorId);
+  // `equipou` primeiro: o log conta a ação que o jogador pediu, e só então o que
+  // ela custou. Invertido, a linha "Espada Curta foi para o cemitério" apareceria
+  // antes de existir motivo para ela.
   const eventos: readonly EventoDaMesa[] = [
     { tipo: 'equipou', jogadorId: acao.jogadorId, slot: info.slot, carta },
+    ...doDeslocado,
   ];
 
   if (!ehFaseParada(estado.fase)) {

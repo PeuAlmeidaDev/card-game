@@ -39,6 +39,14 @@ export function participantesDe(evento: EventoDaMesa): readonly string[] {
     case 'guardou':
     case 'passou':
       return [evento.jogadorId];
+    // Ramo próprio só para caber o comentário: agrupá-lo acima faz o
+    // `no-fallthrough` reclamar (um comentário entre `case`s conta como conteúdo).
+    //
+    // Uma ponta só, apesar de a carta poder ir para o cemitério: o cemitério é
+    // zona da MESA, não de um jogador, e ninguém filtra o log por ele. Quem
+    // aparece é o dono do corpo de onde o item saiu.
+    case 'desequipou':
+      return [evento.jogadorId];
     case 'fim':
       return [];
     default: {

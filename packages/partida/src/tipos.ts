@@ -323,6 +323,26 @@ export type EventoDaMesa =
    */
   | { readonly tipo: 'guardou'; readonly jogadorId: string; readonly carta: CartaTesouro }
   /**
+   * O item que SAIU do corpo para dar lugar ao que foi equipado, e para onde ele
+   * foi. CARREGA a carta pelo mesmo motivo dos dois acima: as duas pontas
+   * possíveis — mochila e cemitério de Tesouros — são zonas ABERTAS, então não há
+   * o que esconder.
+   *
+   * `destino` existe porque a regra é CONDICIONAL desde o Plano 4a (mochila se há
+   * vaga, cemitério se não) e o jogador não escolhe (decisão #8). Sem o campo, as
+   * duas ramificações ficam indistinguíveis no log, e a mais cara delas — a carta
+   * ser DESTRUÍDA — acontece calada. É o único ponto do jogo em que uma carta some
+   * sem ninguém pedir, e é justamente o que ensina "esvazie a mochila antes de
+   * trocar de equipamento".
+   *
+   * UM evento por item deslocado, na ordem em que `destinoDoDesequipado` os
+   * resolve: um montante por cima de duas armas de uma mão desloca DOIS itens e a
+   * mochila pode caber só um, então um evento para o lote não conseguiria nomear
+   * os dois destinos.
+   */
+  | { readonly tipo: 'desequipou'; readonly jogadorId: string;
+      readonly carta: CartaEquipamento; readonly destino: 'mochila' | 'cemiterio' }
+  /**
    * O jogador declinou de agir numa fase parada. Emite evento — e não silêncio —
    * porque `versaoDe` é `log.length`: sem mover a versão, um duplo-clique em
    * "Passar" escaparia do guard de 409 do server e morreria como 400 na cara do

@@ -1320,6 +1320,40 @@ describe('aplicarAcao — equiparCarta', () => {
     });
   });
 
+  it('o evento `desequipou` CHEGA ao log pela ação real, com o destino certo', () => {
+    // Gêmeo de integração do teste de `equipar.test.ts`: lá a unidade devolve os
+    // eventos, aqui se prova que `equiparCarta` os REPASSA. Sem este, a função
+    // poderia montar os eventos e o reducer descartá-los, com a suíte verde.
+    //
+    // Mochila CHEIA de propósito: é o ramo em que a carta é DESTRUÍDA, o único
+    // momento do jogo em que isso acontece sem o jogador pedir, e o que estava
+    // invisível antes deste evento existir.
+    const cheia = Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
+    const b = comSlots(comMao(nascida(), [equipamento('t-1')]), { maoDireita: equipamento('t-0') });
+    const jogadores = b.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
+    const p: EstadoPartida = { ...b, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...b, jogadores }, 'p1')) };
+
+    const { eventos } = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+
+    expect(eventos).toContainEqual({
+      tipo: 'desequipou', jogadorId: 'p1', destino: 'cemiterio',
+      carta: { id: 't-0', tipo: 'equipamento', itemId: 'i-teste' },
+    });
+    // E na ordem: a ação pedida antes do que ela custou.
+    expect(eventos.findIndex((e) => e.tipo === 'equipou'))
+      .toBeLessThan(eventos.findIndex((e) => e.tipo === 'desequipou'));
+  });
+
+  it('slot vazio NÃO emite `desequipou` — nada saiu do corpo', () => {
+    // O caso comum. Uma linha de log dizendo que nada aconteceu é ruído na
+    // crônica, mesma regra que faz o `loot` calar com o baralho esgotado.
+    const p = comMao(nascida(), [equipamento('t-1')]);
+
+    const { eventos } = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+
+    expect(eventos.some((e) => e.tipo === 'desequipou')).toBe(false);
+  });
+
   it('carta de PORTA não pode ser equipada', () => {
     // O tesouro na mão é o que sustenta a fase 1 (sem ele `recompor` se auto-pula
     // e o fixture vira vista impossível). A carta APONTADA é a de monstro — é ela

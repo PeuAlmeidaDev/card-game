@@ -110,6 +110,18 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
           {evento.de === 'recompor' ? ' segue sem se recompor.' : ' encerra o turno.'}
         </small>
       );
+    // O preço de equipar, que antes acontecia calado. NOMEIA o destino porque a
+    // regra é condicional (decisão #8: a mochila se há vaga, o cemitério se não, e
+    // o jogador não escolhe) — sem dizer qual dos dois foi, o jogador não descobre
+    // que trocar de equipamento com a mochila cheia DESTRÓI uma carta, que é
+    // justamente o que ensina a esvaziá-la antes.
+    case 'desequipou': {
+      const quem = evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId);
+      const item = descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem);
+      return evento.destino === 'mochila'
+        ? `${quem} tira ${item} do corpo — vai para a mochila.`
+        : `${quem} tira ${item} do corpo — a mochila está cheia, e a carta é descartada.`;
+    }
     default: {
       const naoTratado: never = evento;
       void naoTratado;
