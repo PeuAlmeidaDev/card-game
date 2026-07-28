@@ -73,8 +73,11 @@ export function faseSeAutoPula(fase: Fase, jogador: JogadorNaMesa): boolean {
   // mochila não existia, olhar só a mão era a mesma pergunta; desde que ela é
   // origem, um jogador de mão vazia e mochila cheia ainda tem o que vestir —
   // pulá-lo esconderia a única ação disponível. `mochila.length > 0`, não
-  // `.some(...)`: a mochila é `readonly CartaTesouro[]`, então toda carta nela
-  // já é equipável por tipo — um `.some` leria como se pudesse não ser.
+  // `.some((c) => c.tipo === 'equipamento')`: a mochila é tipada
+  // `readonly CartaTesouro[]`, e essa família é equipamento-only POR DESENHO
+  // (ver o docstring de `ReceitaTesouro` em `./tipos`) — classe é carta de
+  // Portas e maldição nunca entra na mochila. `.length > 0` e o `.some` são a
+  // MESMA pergunta; o `.some` sugeriria uma distinção que o modelo não tem.
   const temEquipamento = jogador.mao.some((c) => c.tipo === 'equipamento') || jogador.mochila.length > 0;
   switch (fase) {
     case 'recompor':

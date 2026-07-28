@@ -30,8 +30,10 @@ export type CartaPorta = ReceitaPorta & { readonly id: string };
 export type CartaDeRaca = Extract<CartaPorta, { readonly tipo: 'raca' }>;
 
 /**
- * **Receita** de carta do baralho de TESOUROS. Uma variante só nesta fatia;
- * maldição e classe (spec §4) entram quando tiverem verbo.
+ * **Receita** de carta do baralho de TESOUROS. Equipamento-only POR DESENHO, não
+ * por acidente desta fatia: classe é carta de PORTAS (vai para a mão, como
+ * raça) e maldição nunca entra na mochila — nenhuma das duas pertence a esta
+ * família.
  *
  * Família SEPARADA de `ReceitaPorta`, e não um `tipo` a mais na mesma união com
  * um campo `baralho`: com o campo, nada impediria um monstro etiquetado como
