@@ -56,7 +56,7 @@ Visão do jogo **fechada** em 2 sessões de `grilling` (9 + 13 decisões) — ve
 
 **Construído e mergeado:** `motor`, `personagem`, `progressao`, `cartas`, `partida`, `shared`,
 `server`, `web`. Fatias 1–7 completas. **Fatia 8 "TESOUROS": Planos 1, 2, 3a ("Tesouros e o
-corpo") e 3b ("As fases do corpo") mergeados.**
+corpo"), 3b ("As fases do corpo") e 4a ("Mochila e o bot que veste") mergeados.**
 
 O Plano 2 trocou os guards espalhados do reducer por uma **máquina de fases**:
 `EstadoPartida.fase` (então `vasculhar | combate | descartar`; o 3b levou a cinco) mais a tabela
@@ -76,7 +76,7 @@ põe a mesma instância nos dois slots e `itensEquipados` deduplica por id. Venc
 `monstro.tesouros` cartas **para a mão** (evento `loot` só diz a quantidade — a mão é zona
 oculta); `equiparCarta` tira o item da mão e o põe no slot que o item declara (evento `equipou`,
 que carrega a carta — o slot é zona aberta), e o item deslocado vai para o cemitério de
-Tesouros (`destinoDoDesequipado`, ponto único que o Plano 4 troca quando a mochila existir). A
+Tesouros (`destinoDoDesequipado`, ponto único que o Plano 4a troca — ver abaixo). A
 mão virou heterogênea (`readonly Carta[]`) e o descarte roteia por família
 (`descartarNoBaralhoCerto`, fechado por `never`). O construtor perdeu `itemIds`:
 `escolhasSchema` é só `{ classeId }`. Um guard `_CoberturaSlot` em `shared` trava as duas
@@ -95,35 +95,80 @@ de encontro (sala vazia, raça→mão, fim de combate) entrega o turno a `jogar`
 `vista.fase`: a dívida do **"quinto leitor da regra de excedente" está PAGA**. A `TelaMesa` ganhou
 indicador de fase (`Record<Fase, string>`) e o botão **"Passar"**.
 
+**O Plano 4a entregou a mochila e o bot que veste.** `JogadorNaMesa.mochila: readonly
+CartaTesouro[]` — zona ABERTA, teto `LIMITE_MOCHILA` (5), fora do limite de mão — e o verbo
+**`guardarCarta`** (mão → mochila, direção única: mochila → mão não existe nesta fatia). O
+`equiparCarta` ganhou uma SEGUNDA origem: `cartaEquipavelDe` procura a carta primeiro na mão,
+depois na mochila (a mão tem precedência quando o id colide, afirmado por teste — não deveria
+colidir, mas a ordem é observável). `destinoDoDesequipado` (`packages/partida/src/equipar.ts`)
+ganhou o ramo prometido no Plano 3a: o item deslocado do slot vai para a mochila se houver vaga,
+e só para o cemitério de Tesouros quando ela está cheia — o jogador não escolhe (decisão #8 do
+spec). `escolherAcao` ganhou um **terceiro parâmetro**, `catalogo: CatalogoDaMesa` (a chamada em
+`automacao.ts` foi junto), porque o bot guloso precisa do `InfoItem` para saber se um item
+melhora. **O bot deixou de ser hoarding**: nas fases `recompor`/`jogar` ele equipa o candidato
+(mão + mochila) de MAIOR ganho estritamente positivo sobre o que desloca (`vestirOuGuardar`,
+soma dos 4 modificadores, dedup de duas mãos pelo mesmo motivo de `colocarNoSlot`); se nada
+melhora, guarda o primeiro equipamento da mão na mochila se houver vaga; senão passa — nunca
+lança em item que o catálogo não conhece (vale 0). A mochila é pública na projeção e no
+`shared` (`JogadorPublico.mochila`); a `TelaMesa` ganhou os botões **"Guardar"** e **"Equipar"**
+lendo a origem certa.
+
+**Censo de conservação e sonda de sigilo, remedidos com a mochila em jogo:** 80 partidas,
+34.991 ações, censo id-a-id **depois de CADA ação** em todas as zonas (os dois baralhos, toda
+mão, toda mochila, todo slot equipado — deduplicado por id via `itensEquipados`, a arma de duas
+mãos não pode contar dobrado). **Zero cartas sumiram ou duplicaram.** A mochila é a primeira
+zona alimentada por DUAS origens (`guardarCarta` da mão, `destinoDoDesequipado` do slot) —
+exercitada 948 vezes em `guardarCarta`, 169 equipagens de item de duas mãos e 50 desequipados
+roteados ao cemitério por mochila cheia, sem uma única divergência. A sonda de sigilo (mesmas 80
+partidas) confirma que nenhum evento carrega carta que termina numa mão — com `guardou` afirmado
+como exceção deliberada (a carta tem que estar na mochila certa, não só "não é uma mão").
+
 **Dials girados:** `LIMITE_BASE_DE_MAO` 4 → **7**, mais **+1 para quem não tem raça em jogo** —
 que É o Humano (`limiteDeMao`, `mao.ts`): a raça é carta, e enquanto nenhuma está em jogo você é
-humano, com teto 8. Mão inicial **4 Portas + 4 Tesouros**.
+humano, com teto 8. Mão inicial **4 Portas + 4 Tesouros**. `LIMITE_MOCHILA` = **5** (Plano 4a,
+`mao.ts`) — vive ao lado do limite de mão porque as duas respondem "quanta carta um jogador
+carrega", mas são tetos SEPARADOS de propósito: a mochila fica fora do limite de mão.
 
-**Ritmo medido no 3b** (31 partidas, dado e embaralho reais, dials de produção, mediana de ações
-**do humano**): **136** com a política do bot (que nunca equipa) e **114** equipando — contra
-**107/95** do Plano 3a (+27% e +20%). ⚖️ **Pedro decidiu ACEITAR** (2026-07-27), com o porquê: o
-Plano 4 muda a economia de novo (mochila, bot guloso), então regular agora é mirar em alvo móvel.
-**Remedir depois do Plano 4.**
+**Ritmo REMEDIDO no Plano 4a** (31 partidas, dado e embaralho reais, dials de produção, mediana
+de ações **do humano**): **109** com a política do bot e **115** equipando — contra **136/114**
+do Plano 3b. ⚠️ **A leitura direta ("caiu 20%") é enganosa.** A política "bot" mudou de
+IDENTIDADE entre as duas medições — no 3b ela era o bot que nunca equipava (hoarding); hoje é a
+MESMA função `escolherAcao`, só que ela virou o bot guloso (ver abaixo). Toda comparação contra
+o 3b muda duas coisas ao mesmo tempo: a política do humano (o eixo controlado) e a política dos
+outros 3 assentos (efeito colateral deste plano ter trocado o bot). Não dá para isolar "o
+efeito da mochila no ritmo" sem reintroduzir bots hoarding nos outros 3 assentos — o que não é a
+mesa que vai para produção. Detalhe completo, com a checagem de robustez em N=90 e a nota de
+variância de amostra: `.superpowers/sdd/2026-07-27-fatia-8-plano-4a-mochila-e-o-bot-que-veste/task-9-report.md`.
 
-⚠️ **O auto-pulo — que ERA a mitigação de ritmo — está quase inerte, e a causa não é a que o
-plano previa.** `recompor` evitou **0 cliques na mediana**, porque `faseSeAutoPula('recompor')`
-exige mão sem raça E sem equipamento, e **todo Tesouro desta fatia é `equipamento`**. `jogar` só
-se auto-pula sob a política que ativamente esvazia a mão (0 sob bot, 9 equipando). Quem for
-mexer nisso: **estreitar o auto-pulo de `recompor` para "slot vazio compatível" tira a troca de
-equipamento antes da porta**, que é a razão de a fase existir — some uma decisão junto com o
-clique.
+⚠️ **O auto-pulo continua com mediana 0 em `recompor`** nas duas políticas (igual ao 3b — já
+estava no piso, não deu para medir "piorar ainda mais"). `jogar` também caiu para mediana 0 nas
+duas (era 0/**9** no 3b) — de novo efeito dominante dos 3 bots terem mudado, não do humano.
 
-⚠️ **Dívidas medidas que o Plano 4 herda:** o **bot nunca equipa** — os 3 bots seguram os 4
-tesouros da abertura e resolvem todo excedente por caridade, distorcendo a economia da mesa de
-produção — e a **mesa nasce exatamente no teto** (4+4 = 8 = limite de quem está sem raça).
-Nasce em **`recompor`** (há equipamento na mão, então não se auto-pula), e `vasculhar` como
-primeira ação leva 400; qualquer carta que entre joga o jogador em `descartar` no turno 1.
+**Dívida "o bot nunca equipa" — PAGA.** Força final dos bots medida: **6,05–6,16** (média, duas
+rodadas) contra os **3,67** do bot hoarding e os **5,95** projetados no Plano 3a para um bot
+guloso — bate com a projeção (+2% a +3,5%). **Taxa de vitória do humano medida: 22,6%–37,8%**
+(varia por rodada e política) contra os **80%** do bot antigo e os **42,5%** projetados — PIOR
+que a projeção nas três rodadas que rodei, sem explicação fechada (ver o relatório da Task 9 para
+as duas hipóteses candidatas). **Tesouros doados por bots via caridade: ~0** (era **994**, com
+**145** para o humano) — o bot guloso resolve equipamento ANTES de chegar em `descartar`, e o
+que sobra para doar são cartas de Porta (`monstro`/`salaVazia`) que a mão inicial recebeu CRUAS
+(nunca resolvidas — `criarPartida` distribui direto do topo do baralho) e que **nenhum verbo do
+jogo hoje sabe jogar** — é exatamente o buraco que a fase `encrenca` do Plano 4b fecha.
+
+**Dívida "a mesa nasce exatamente no teto" (4+4 = 8 = limite de quem está sem raça) — segue
+verdadeira estruturalmente**, sem mudança: nasce em `recompor`, e qualquer carta que entre no
+turno 1 sem o jogador aliviar a mão antes (equipando ou guardando) joga ele em `descartar`. O
+Plano 4a não fecha essa dívida — só dá ao jogador uma ferramenta a mais (`guardarCarta`) para
+aliviar a mão ANTES de vasculhar, dentro do próprio `recompor`. Este plano não instrumentou
+"quantos turnos 1 evitam `descartar` usando essa ferramenta" — fica registrado como pergunta em
+aberto, não como número medido.
 
 ⚠️ **A tabela é um gate de fase, não a resposta inteira de "posso?".** A elegibilidade fina
 (espiada pendente, tipo da carta, `proximaDecisao` do combate) continua em cada função do
-reducer, e **cada uma dessas condições precisa de gêmeo na tela**. Hoje são **8 pares, em 8
-linhas**, tabelados no comentário do `aplicarAcao` — botão novo escrito só com `legal(tipo)`
-acende onde o domínio recusa e leva 400. ⚠️ Essa tabela já mentiu **três vezes**, sempre pelo
+reducer, e **cada uma dessas condições precisa de gêmeo na tela**. Hoje são **12 pares, em 12
+linhas** (o Plano 4a acrescentou os 4 de `guardarCarta`: tipo da carta e mochila cheia, em
+`recompor` e em `jogar`), tabelados no comentário do `aplicarAcao` — botão novo escrito só com
+`legal(tipo)` acende onde o domínio recusa e leva 400. ⚠️ Essa tabela já mentiu **três vezes**, sempre pelo
 mesmo mecanismo: **agrupar duas fases numa célula**. A regra "uma linha por par" está escrita
 no próprio comentário e foi violada mesmo assim.
 
@@ -134,9 +179,12 @@ quebra a compilação de **exatamente 2 arquivos**, `narrarEvento.tsx` e `partic
 dois em `web`; nada em `partida`/`shared`/`server`, porque as respostas do contrato são
 `c.type<T>()` e o Zod está na entrada.
 
-**Próximo passo: Plano 4 — "Mochila e o segundo verbo".** Mochila (teto 5) · fase `encrenca`
-(`procurarEncrenca` / `saquear`) · bot guloso. `destinoDoDesequipado` ganha o ramo da mochila e
-**nada mais no código muda** — foi desenhado para isso.
+**Próximo passo: Plano 4b — a fase `encrenca`.** Os verbos `procurarEncrenca`/`saquear` (spec §6,
+fase 3 do turno) — a Task 9 do Plano 4a mediu por que ela importa: cartas de Porta
+(`monstro`/`salaVazia`) dadas na mão inicial ficam mortas até existir um verbo que as jogue de
+dentro da mão, e é isso que hoje esvazia a caridade de tesouro (ver "Dívida... PAGA" acima).
+Fora de escopo, já declarado: mochila → mão (adiada para a fatia da interferência) e escolher o
+que queimar com a mochila cheia.
 
 Roteiro completo e justificativa em §17 do game bible (Mesa → Interferência → Personagem
 dinâmico → Habilidades → Contas/ranking/crônica).

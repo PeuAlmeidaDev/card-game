@@ -288,7 +288,11 @@ do zero e ainda pegar o 2º lugar é exatamente o tipo de história que §14 que
   `MAO_INICIAL_PADRAO = 4`, `MAO_INICIAL_TESOUROS = 4`. Os 4 Tesouros existem para o jogador
   ter o que equipar já no primeiro turno — e a mesa nasce **exatamente no teto** (4+4=8 = limite
   do Humano); quem devolve a folga é equipar, não a caridade.
-- **Mochila: 🎚️ ~5 itens**, aberta, fora do limite de mão.
+- **Mochila: 5 itens**, aberta, fora do limite de mão. ✅ **Dial travado** (Plano 4a):
+  `LIMITE_MOCHILA = 5`. Item deslocado do corpo vai para a mochila se houver vaga, senão para o
+  cemitério de Tesouros — o jogador não escolhe. Medido em produção (80 partidas, censo id-a-id
+  após cada ação): zero divergência de carta, inclusive nos 948 `guardarCarta` e 50 roteamentos
+  ao cemitério por mochila cheia que a amostra exercitou.
 - **Loot ao matar** (Itens). ✅ Implementado (Plano 3a) — ver §9.
 - **Sem ouro** — a mochila é a moeda.
 - Tipos de item: equipamento, instantâneo, item de batalha, item que atrapalha batalha.
@@ -320,10 +324,15 @@ fecha assim que todos passarem**. Timers são teto anti-AFK, não ritmo esperado
 |---|---|---|
 | 5 (A Mesa) | 74 | — |
 | 8, Plano 3a | 107 | 95 |
-| 8, Plano 3b | **136** | **114** |
+| 8, Plano 3b | 136 | 114 |
+| 8, Plano 4a | **109** | **115** |
 
-31 partidas por medição, dado e embaralho reais, dials de produção. **Aceito em 2026-07-27**
-(decisão #22): o Plano 4 muda a economia de novo, então regular agora é mirar em alvo móvel.
+31 partidas por medição, dado e embaralho reais, dials de produção. ⚠️ **A comparação Plano 3b →
+4a NÃO isola o efeito da mochila** (decisão #24): a política "bot" mudou de identidade junto —
+no 3b era o bot que nunca equipava; no 4a é a mesma função, mas ela virou o bot guloso. A queda
+de 136 para 109 é o efeito de TROCAR o bot, não de o auto-pulo ou a mochila terem melhorado o
+ritmo isoladamente. **Remedido, aceito de novo em 2026-07-27** — próxima remedição só faz
+sentido depois da fase `encrenca` (Plano 4b), que muda a economia mais uma vez.
 
 ⚠️ **O auto-pulo das fases paradas NÃO está funcionando como mitigação** (decisão #23).
 `recompor` evita **0 cliques na mediana** — ela exige mão sem raça E sem equipamento, e todo
@@ -523,3 +532,4 @@ turno, fase de ajuda/atrapalhar antes da batalha, mão de 7, sem ouro, morte sem
 | 21 | **Maldição NUNCA entra na mochila; classe é carta de PORTA** (vai para a mão, como raça). A família Tesouros é **equipamento-only por desenho** | Confirmação, não mudança: §4 e §6.2 já diziam. Registrado porque um docstring no código afirmava o oposto e custou um ciclo inteiro de revisão — ver a regra do game bible vivo no `CLAUDE.md` |
 | 22 | **Ritmo aceito em 136 ações do humano** por partida (contra 107 do Plano 3a, +27%). Remedir depois do Plano 4 | O Plano 4 muda a economia de novo (mochila, bot guloso): regular agora é mirar em alvo móvel. 🎚️ Continua sendo dial, não regra |
 | 23 | **O auto-pulo das fases paradas está quase inerte** e NÃO é a mitigação de ritmo que o §6.1 do spec prometia | Medido: `recompor` evitou **0 cliques na mediana**, porque todo Tesouro desta fatia é equipamento e a mão quase sempre carrega algum. ⚠️ Estreitá-lo para "slot vazio compatível" **tiraria a troca de equipamento antes da porta**, que é a razão de a fase existir — a mitigação de ritmo terá que vir de outro lugar |
+| 24 | **A dívida "bot nunca equipa" está PAGA** (Plano 4a): força final medida 6,05–6,16, batendo com os 5,95 projetados no Plano 3a (contra 3,67 do bot hoarding). **Tesouros doados por caridade caíram de 994 para ~0** — o bot guloso resolve equipamento antes de chegar em `descartar`; o que sobra para doar são cartas de Porta (`monstro`/`salaVazia`) dadas CRUAS na mão inicial, que nenhum verbo do jogo hoje sabe jogar. **Taxa de vitória do humano medida (22,6%–37,8%) ficou ABAIXO dos 42,5% projetados**, sem explicação fechada | A dívida do bot está paga e o número bate com a projeção — mas a queda de doações revela que a mão inicial cria cartas mortas até a fase `encrenca` existir, e a taxa de vitória mais baixa que a projeção fica registrada sem causa fechada (relatório completo: `.superpowers/sdd/2026-07-27-fatia-8-plano-4a-mochila-e-o-bot-que-veste/task-9-report.md`) |
