@@ -74,9 +74,14 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
         + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem)}.`;
     // A mochila é zona ABERTA, então o evento carrega a carta e a narração pode
     // nomeá-la — mesma regra do `equipou`, e a mesma assimetria com o `loot`.
+    // Passa por `descreverCarta` e não por `nomeDoItem` direto: hoje o resultado é
+    // byte-idêntico (`descreverCarta` devolve exatamente `nomeDoItem` para
+    // `equipamento`), mas o atalho abria mão da pressão do `never` — se a família
+    // Tesouros ganhar variante, o `equipou` acima quebra a compilação e este case
+    // continuaria compilando, calado.
     case 'guardou':
       return `${evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId)} guarda `
-        + `${ctx.nomeDoItem(evento.carta.itemId)} na mochila.`;
+        + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem)} na mochila.`;
     // O descarte é PÚBLICO: o cemitério já é zona aberta, esconder aqui seria teatro.
     case 'descarte':
       return `${ctx.nomeDe(evento.jogadorId)} descartou `

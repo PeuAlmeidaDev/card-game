@@ -344,8 +344,8 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
              resolve. Quem recobra é `encerrarTurno`, a cada ação. */
           <p role="status">
             Sua mão está acima do limite: entregue uma carta — a vez só passa
-            quando ela couber. Equipar acontece antes, nas fases de recompor e
-            de jogar; jogar raça, só na de recompor.
+            quando ela couber. Equipar e guardar acontecem antes, nas fases de
+            recompor e de jogar; jogar raça, só na de recompor.
           </p>
         )}
         <ul>

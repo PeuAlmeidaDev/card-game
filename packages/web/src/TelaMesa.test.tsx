@@ -443,10 +443,15 @@ describe('TelaMesa — a mão', () => {
     // raça depois de ver a porta seria reagir ao monstro). Era a MESMA classe de
     // mentira do texto original — só deslocada de "aqui" para "lá". Este teste
     // pina o texto corrigido, que atribui cada ação à(s) fase(s) certa(s).
+    //
+    // "guardar" entrou na frase junto de "equipar" porque as duas têm as MESMAS
+    // duas fases em `LEGAL` (`recompor` e `jogar`) — agrupá-las não repete o erro
+    // acima, que foi juntar ações de fases DIFERENTES. A faixa existe para
+    // enumerar as válvulas de escape do excedente, e guardar é a terceira delas.
     await abrirMesa(emDescartar([tesouro('t-9'), { id: 'p-8', tipo: 'raca', racaId: 'orc' }]));
 
     const faixa = screen.getByRole('status');
-    expect(faixa).toHaveTextContent(/equipar acontece antes, nas fases de recompor e de jogar/i);
+    expect(faixa).toHaveTextContent(/equipar e guardar acontecem antes, nas fases de recompor e de jogar/i);
     expect(faixa).toHaveTextContent(/jogar raça, só na de recompor/i);
   });
 
