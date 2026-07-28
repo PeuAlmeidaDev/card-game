@@ -1486,11 +1486,14 @@ describe('aplicarAcao — equiparCarta', () => {
     // Não deveria acontecer (ids são únicos por carta), mas a ordem da busca é
     // observável e precisa ser afirmada: sem isto, trocar a ordem do `??` mudaria
     // de qual zona a carta some, e nenhum teste acusaria.
+    // ⚠️ A fase é RE-DERIVADA depois da mochila, como os vizinhos: `comMao` a
+    // calcula sobre o estado que ele monta, e `faseDoTurnoDe` LÊ a mochila
+    // (via `faseSeAutoPula`). Injetá-la depois deixaria a fase velha. Aqui o
+    // valor não muda (a mão tem equipamento nos dois casos), mas derivar por
+    // último é a regra que este arquivo já violou três vezes.
     const p0 = comMao(nascida(), [equipamento('t-1')]);
-    const p: EstadoPartida = {
-      ...p0,
-      jogadores: p0.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: [equipamento('t-1')] } : j)),
-    };
+    const jogadores = p0.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: [equipamento('t-1')] } : j));
+    const p: EstadoPartida = { ...p0, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...p0, jogadores }, 'p1')) };
 
     const r = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
 
@@ -1534,12 +1537,14 @@ describe('aplicarAcao — guardarCarta', () => {
   it('a mochila CHEIA recusa como AcaoInvalida, não como 500', () => {
     // Pedido do cliente que a regra não permite => 400. O cliente pode ter uma
     // vista de um instante atrás em que ainda havia vaga.
+    // ⚠️ Fase re-derivada DEPOIS da mochila (ver o gêmeo no describe de
+    // `equiparCarta`): `faseDoTurnoDe` lê a mochila, então injetá-la depois
+    // deixaria a fase velha e o teste poderia passar pelo gate de fase em vez
+    // do guard de teto que ele existe para cobrir.
     const cheia = Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
     const p0 = comMao(nascida(), [equipamento('t-1')]);
-    const p: EstadoPartida = {
-      ...p0,
-      jogadores: p0.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j)),
-    };
+    const jogadores = p0.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
+    const p: EstadoPartida = { ...p0, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...p0, jogadores }, 'p1')) };
 
     expect(() => aplicarAcao(p, { tipo: 'guardarCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([])))
       .toThrow(AcaoInvalida);
