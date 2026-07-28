@@ -182,6 +182,18 @@ describe('TelaMesa', () => {
     });
   });
 
+  it('a tela mostra o estoque dos DOIS baralhos, não só o de Portas', async () => {
+    // `tesourosNoMonte` viajava na vista desde o Plano 3a e NUNCA era renderizado
+    // — a mesma falha do `combatente` publicado e invisível que o gate ocular
+    // pegou naquele plano. Custou caro: o baralho de Tesouros esgota em 20 de 20
+    // partidas de produção, e o jogador não tinha um único número na tela que
+    // explicasse por que suas vitórias pararam de pagar.
+    await abrirMesa({ ...vistaBase, cartasNoMonte: 16, tesourosNoMonte: 0 });
+
+    expect(await screen.findByText(/Cartas no monte: 16/)).toBeInTheDocument();
+    expect(screen.getByText(/Tesouros no monte: 0/)).toBeInTheDocument();
+  });
+
   it('"Empurrar" APAGA sem outra carta para comprar, e "Encarar" continua aceso', async () => {
     // O gêmeo que faltava do par fino de `empurrarCarta` (`mesa.ts`: monte E
     // cemitério de Portas vazios => AcaoInvalida). Sem ele, fim de baralho + um

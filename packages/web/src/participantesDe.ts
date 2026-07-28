@@ -38,6 +38,7 @@ export function participantesDe(evento: EventoDaMesa): readonly string[] {
     case 'equipou':
     case 'guardou':
     case 'passou':
+    case 'tesouroEsgotado':
       return [evento.jogadorId];
     // Ramo próprio só para caber o comentário: agrupá-lo acima faz o
     // `no-fallthrough` reclamar (um comentário entre `case`s conta como conteúdo).

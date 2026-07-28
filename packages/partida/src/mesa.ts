@@ -971,10 +971,23 @@ function fecharCombate(
     }
     const saque = sacarTesouros(semCombate, jogadorId, info.tesouros, deps);
     comLoot = saque.estado;
-    // Só emite se algo saiu do baralho: `quantidade: 0` seria uma linha de log
-    // dizendo que nada aconteceu.
+    // `loot` só sai se algo REALMENTE saiu do baralho: `quantidade: 0` seria uma
+    // linha dizendo que o jogador recebeu nada.
     if (saque.quantidade > 0) {
       eventos.push({ tipo: 'loot', jogadorId, quantidade: saque.quantidade });
+    }
+    // ...e o que o baralho não conseguiu pagar sai como evento PRÓPRIO. Os dois
+    // convivem no pagamento parcial, cada um com o seu número.
+    //
+    // ⚠️ Até 2026-07-28 este ramo não existia, e a ausência era um bug de jogo: o
+    // vencedor não recebia nada e NADA na tela dizia por quê. Não é "nada
+    // aconteceu" — é a economia da mesa tendo secado, e medir mostrou que ela seca
+    // em 20 de 20 partidas de produção, perto da metade. O jogador não tem outra
+    // pista: `tesourosNoMonte` viaja na vista mas quase não é olhado, e a mão dele
+    // simplesmente para de crescer.
+    const naoPagas = info.tesouros - saque.quantidade;
+    if (naoPagas > 0) {
+      eventos.push({ tipo: 'tesouroEsgotado', jogadorId, naoPagas });
     }
   }
 

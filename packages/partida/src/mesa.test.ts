@@ -501,8 +501,16 @@ describe('vencer larga tesouro na mão', () => {
     expect(depois.log).toContainEqual({ tipo: 'loot', jogadorId: 'p1', quantidade: 1 });
   });
 
-  it('baralho de Tesouros VAZIO não emite evento nenhum de loot', () => {
-    // `quantidade: 0` seria uma linha de log dizendo que nada aconteceu.
+  it('baralho de Tesouros VAZIO troca o `loot` por `tesouroEsgotado`, e não por silêncio', () => {
+    // ⚠️ Esta asserção foi REESCRITA em 2026-07-28. Ela dizia "não emite evento
+    // nenhum", com a justificativa de que `quantidade: 0` seria "uma linha de log
+    // dizendo que nada aconteceu". A premissa estava errada, e o Pedro bateu nela
+    // jogando: não é "nada aconteceu" — é "você venceu e o baralho não tinha como
+    // pagar", que é informação de jogo e a única pista de que a economia secou.
+    //
+    // Medido: o baralho de Tesouros esgota em 20 de 20 partidas de produção, por
+    // volta da metade da partida. O jogador via combates vencidos sem prêmio e sem
+    // nenhuma explicação em lugar nenhum da tela.
     const valendo2 = depsValendo(2);
     const aberto = comCombateAberto(valendo2);
     const vazio: EstadoPartida = { ...aberto, tesouros: { monte: [], cemiterio: [] } };
@@ -510,8 +518,33 @@ describe('vencer larga tesouro na mão', () => {
     const depois = venceOCombate(vazio, valendo2);
 
     expect(depois.log.some((e) => e.tipo === 'loot')).toBe(false);
+    expect(depois.log).toContainEqual({ tipo: 'tesouroEsgotado', jogadorId: 'p1', naoPagas: 2 });
     expect(maoDe(depois, 'p1')).toEqual([]);
     expect(depois.desfecho).toBe('emAndamento');
+  });
+
+  it('pagamento PARCIAL emite os DOIS eventos, cada um com o seu número', () => {
+    // O monstro vale 3 e o baralho tem 1: o jogador recebe 1 e fica devendo 2.
+    // Um evento só não conseguiria contar as duas metades, e é o caso que separa
+    // "o baralho está no fim" de "o baralho acabou" — informação diferente para
+    // quem está decidindo se vale a pena procurar briga.
+    const valendo3 = depsValendo(3);
+    const aberto = comCombateAberto(valendo3);
+    const quaseVazio: EstadoPartida = { ...aberto, tesouros: { monte: [equipamento('t-9')], cemiterio: [] } };
+
+    const depois = venceOCombate(quaseVazio, valendo3);
+
+    expect(depois.log).toContainEqual({ tipo: 'loot', jogadorId: 'p1', quantidade: 1 });
+    expect(depois.log).toContainEqual({ tipo: 'tesouroEsgotado', jogadorId: 'p1', naoPagas: 2 });
+  });
+
+  it('baralho que PAGA tudo não emite `tesouroEsgotado`', () => {
+    // A rede contra o evento virar ruído em toda vitória.
+    const valendo2 = depsValendo(2);
+
+    const depois = venceOCombate(comCombateAberto(valendo2), valendo2);
+
+    expect(depois.log.some((e) => e.tipo === 'tesouroEsgotado')).toBe(false);
   });
 
   it('monstro fora do catálogo na hora do loot é Error cru, nunca AcaoInvalida', () => {

@@ -194,7 +194,12 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
         ))}
       </ul>
 
-      <p>Cartas no monte: {vista.cartasNoMonte}</p>
+      {/* Os DOIS baralhos, lado a lado. O de Tesouros ficou dois planos sem
+          aparecer — viajava na vista desde o 3a e ninguém o renderizava —, e é o
+          que seca: medido, ele esgota em 20 de 20 partidas de produção perto da
+          metade. Sem este número, "minhas vitórias pararam de pagar" não tem
+          nenhuma explicação na tela. */}
+      <p>Cartas no monte: {vista.cartasNoMonte} · Tesouros no monte: {vista.tesourosNoMonte}</p>
 
       {vista.combate !== null && (
         <p>

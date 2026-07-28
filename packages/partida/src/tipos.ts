@@ -305,6 +305,23 @@ export type EventoDaMesa =
    */
   | { readonly tipo: 'loot'; readonly jogadorId: string; readonly quantidade: number }
   /**
+   * Venceu, mas o baralho de Tesouros não tinha como pagar tudo — `naoPagas` é
+   * quanto ficou faltando. Convive com o `loot` no pagamento PARCIAL (monstro vale
+   * 3, baralho tem 1: sai `loot` de 1 e este com 2).
+   *
+   * ⚠️ Este evento existe porque a ausência dele era um BUG DE JOGO, não porque
+   * completa uma simetria. Até 2026-07-28 o saque vazio não emitia nada, com a
+   * justificativa de que "uma linha dizendo que nada aconteceu é ruído" — mas não é
+   * nada que acontece: é a economia da mesa tendo secado, e é a única pista que o
+   * jogador tem disso. Medido: o baralho de Tesouros esgota em **20 de 20**
+   * partidas de produção, perto da metade, e a partir daí toda vitória pagava zero
+   * em silêncio.
+   *
+   * Diz o NÚMERO, nunca quais cartas faltaram — não existem cartas a nomear, e
+   * mesmo o `loot` só conta (a mão é zona oculta).
+   */
+  | { readonly tipo: 'tesouroEsgotado'; readonly jogadorId: string; readonly naoPagas: number }
+  /**
    * Equipou. CARREGA a carta: o slot é zona ABERTA, e esconder o que a mesa
    * inteira passa a ver seria teatro. Assimetria deliberada em relação ao `loot`
    * (zona oculta, só a contagem) — o que decide é a zona de DESTINO.

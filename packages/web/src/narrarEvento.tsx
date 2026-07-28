@@ -122,6 +122,13 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
         ? `${quem} tira ${item} do corpo — vai para a mochila.`
         : `${quem} tira ${item} do corpo — a mochila está cheia, e a carta é descartada.`;
     }
+    // A única pista que o jogador tem de que a economia da mesa secou. NOMEIA o
+    // baralho em vez de dizer só "não ganhou nada": sem isso ele lê a própria
+    // vitória como bug — foi exatamente o que aconteceu no gate ocular do 4a.
+    case 'tesouroEsgotado':
+      return `${evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId)} venceu, mas o `
+        + `baralho de Tesouros acabou: ${String(evento.naoPagas)} `
+        + `${evento.naoPagas === 1 ? 'tesouro fica' : 'tesouros ficam'} sem pagar.`;
     default: {
       const naoTratado: never = evento;
       void naoTratado;
