@@ -156,7 +156,8 @@ duas mãos e eu perco o escudo") e é a âncora natural das skins.
 **Turno de um jogador:**
 
 1. **(Re)composição do personagem** — pode trocar raça/classe/equipamento (carta da mão → zona
-   em jogo; a antiga sai). Termina com um personagem definido.
+   em jogo; a antiga sai) **ou guardar um equipamento na mochila** (mão → mochila). Termina com
+   um personagem definido.
 2. **Vasculhar local (aberta)** — compra 1 carta de **Portais**, virada. *(Antes "chutar a
    porta"; renomeado 2026-07-24 — os caçadores já estão dentro do portal, então revelam o
    próximo perigo vasculhando o local. Mecânica idêntica.)*
@@ -168,9 +169,17 @@ duas mãos e eu perco o escudo") e é a âncora natural das skins.
    - **Saquear a sala / porta fechada** — compra 1 Portal virado pra mão (sem combate).
 4. **Se há combate** → **fase de interferência** (§7) → **snapshot** → **motor** resolve o
    combate round a round → loot ou Bad Stuff.
-5. **Jogar cartas (fim de turno)** — equipar itens, usar maldições, jogar outros itens.
+5. **Jogar cartas (fim de turno)** — equipar itens (da mão **ou da mochila**), guardar
+   equipamento na mochila, usar maldições, jogar outros itens.
    **Não pode trocar raça/classe aqui.**
-6. **Descarte** até o limite de mão = **7**.
+6. **Descarte** até o limite de mão = **7**. ⚠️ **Guardar na mochila NÃO é saída daqui** — a
+   mochila fica fora do limite de mão, e deixar guardar no descarte seria fugir do teto. As
+   saídas do excedente são entregar (caridade) e o que já foi feito nos passos 1 e 5.
+
+⚠️ **A mochila é de mão única: mochila → mão não existe.** O que entra nela só sai **equipado**.
+É essa direção única que dá **preço** à mochila — guardar é uma aposta ("vou querer isto vestido
+depois"), não um estacionamento reversível. Desequipar para a mão está adiado para a fatia da
+**interferência**; até lá, nenhum verbo devolve carta da mochila para a mão.
 
 ---
 
@@ -290,8 +299,8 @@ do zero e ainda pegar o 2º lugar é exatamente o tipo de história que §14 que
   do Humano); quem devolve a folga é equipar, não a caridade.
 - **Mochila: 5 itens**, aberta, fora do limite de mão. ✅ **Dial travado** (Plano 4a):
   `LIMITE_MOCHILA = 5`. Item deslocado do corpo vai para a mochila se houver vaga, senão para o
-  cemitério de Tesouros — o jogador não escolhe. Medido em produção (80 partidas, censo id-a-id
-  após cada ação): zero divergência de carta, inclusive nos 948 `guardarCarta` e 50 roteamentos
+  cemitério de Tesouros — o jogador não escolhe. Medido por simulação sobre o domínio, com dado e
+  embaralho reais (80 partidas, censo id-a-id após cada ação — não há tráfego de produção): zero divergência de carta, inclusive nos 948 `guardarCarta` e 50 roteamentos
   ao cemitério por mochila cheia que a amostra exercitou.
 - **Loot ao matar** (Itens). ✅ Implementado (Plano 3a) — ver §9.
 - **Sem ouro** — a mochila é a moeda.
