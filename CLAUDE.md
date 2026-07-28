@@ -174,14 +174,46 @@ aliviar a mão ANTES de vasculhar, dentro do próprio `recompor`. Este plano nã
 "quantos turnos 1 evitam `descartar` usando essa ferramenta" — fica registrado como pergunta em
 aberto, não como número medido.
 
+**O fechamento do 4a (2026-07-28): duas revisões amplas e uma leva de 9 commits.** Uma revisão
+geral do branch e uma adversarial dirigida aos vícios que este projeto já pagou. O que saiu dali:
+
+- 🐛 **Um bug real, o único de comportamento:** `equiparCarta` passava a `entrarOuPular` o
+  jogador montado ANTES de `destinoDoDesequipado`, então `faseSeAutoPula` lia a mochila sem o
+  item que acabara de cair nela. Equipar a última carta da mochila **auto-pulava a fase parada
+  com o jogador ainda tendo o que vestir** — em `jogar`, passava o turno. É a única ação do
+  reducer com uma segunda mutação depois do jogador atualizado ser fechado. O pin de ordem que já
+  existia não alcançava (mochila cheia deixa 4 cartas, e a versão velha ainda responde "tenho
+  equipamento"); o teste novo é o gêmeo dele com a mochila contendo **exatamente** a carta que vai
+  para o slot.
+- 🎯 **Evento `desequipou` (decisão #27)**, achado **convergente das duas revisões**, sem uma
+  saber da outra: o item deslocado sumia sem uma linha de log, e desde o 4a o destino é
+  **condicional**, então "guardado" e "DESTRUÍDO" eram indistinguíveis na tela. Um evento por
+  item, com o `destino`.
+- 🎨 **Decisão #26:** o "Guardar" deixou de sumir e passou a ficar apagado, como os vizinhos.
+- 🕳️ **O 13º par** (ver abaixo) e o §6 do game bible, que não conhecia `guardarCarta` — a regra
+  do bible vivo nasceu neste branch e falhou na primeira oportunidade de ser aplicada.
+
+⚠️ **Vale mais que os achados: os dois vícios que este projeto mais teme deram LIMPO**, e não por
+leitura otimista — o revisor adversarial quebrou o código de produção em **7 pontos** e conferiu
+que os testes que deviam reprovar reprovaram (um deles com exatamente 1 teste falhando, como o
+comentário prometia). "Teste verde e vazio" e "teste de ausência virado vácuo": nenhum dos dois
+apareceu nesta fatia.
+
 ⚠️ **A tabela é um gate de fase, não a resposta inteira de "posso?".** A elegibilidade fina
 (espiada pendente, tipo da carta, `proximaDecisao` do combate) continua em cada função do
-reducer, e **cada uma dessas condições precisa de gêmeo na tela**. Hoje são **12 pares, em 12
+reducer, e **cada uma dessas condições precisa de gêmeo na tela**. Hoje são **13 pares, em 13
 linhas** (o Plano 4a acrescentou os 4 de `guardarCarta`: tipo da carta e mochila cheia, em
 `recompor` e em `jogar`), tabelados no comentário do `aplicarAcao` — botão novo escrito só com
-`legal(tipo)` acende onde o domínio recusa e leva 400. ⚠️ Essa tabela já mentiu **três vezes**, sempre pelo
-mesmo mecanismo: **agrupar duas fases numa célula**. A regra "uma linha por par" está escrita
-no próprio comentário e foi violada mesmo assim.
+`legal(tipo)` acende onde o domínio recusa e leva 400.
+
+⚠️ Essa tabela já mentiu **quatro vezes**. As três primeiras pelo mesmo mecanismo — **agrupar
+duas fases numa célula** —, com a regra "uma linha por par" escrita no próprio comentário e
+violada mesmo assim. **A quarta (2026-07-28) é de mecanismo DIFERENTE e mais perigoso: OMISSÃO.**
+O par "monte e cemitério de Portas não ambos vazios" de `empurrarCarta` existia desde o Plano 3b,
+**nunca esteve na tabela**, e o gêmeo na tela também não existia — fim de baralho mais um clique
+era 400 na cara do jogador. Foi achado recontando os pares um a um **a partir do reducer**, não
+conferindo a tabela contra si mesma: agrupamento se acha relendo a tabela, omissão não.
+**A recontagem tem que sair do CÓDIGO para a tabela, nunca ao contrário.**
 
 **O log é indexado por quem o evento ENVOLVE, não por quem o causou.**
 `packages/web/src/participantesDe.ts` (`switch` fechado por `never`) responde isso, e o filtro do
