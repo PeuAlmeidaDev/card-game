@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api } from './api';
 import { PainelLog } from './PainelLog';
 import { descreverCarta } from './descreverCarta';
-import { acaoEhLegalNaFase } from '@card-dungeon/shared';
+import { acaoEhLegalNaFase, LIMITE_MOCHILA } from '@card-dungeon/shared';
 import type { AcaoDaMesa, AcaoNoFio, Catalogo, Escolhas, Fase, Slot, VistaDaPartida } from '@card-dungeon/shared';
 
 /**
@@ -119,6 +119,9 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
   // vista não carrega o máximo dele.
   const vidaMaxima = vista.jogadores.find((j) => j.id === vista.voce)?.combatente.vida ?? null;
   const eu = vista.jogadores.find((j) => j.id === vista.voce);
+  // A SUA mochila, para o teto do "Guardar" e para o botão "Equipar" (que só faz
+  // sentido no que é seu — a mochila alheia é visível, mas não sua para vestir).
+  const minhaMochila = eu?.mochila ?? [];
   // O limite vem PRONTO da vista (`limiteDeMao` é publicado por jogador). Recalcular
   // aqui seria reimplementar regra de jogo na UI — e ela divergiria no dia em que
   // um item mexesse no teto.
@@ -179,12 +182,24 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
             {j.emJogo.raca !== null && ` · ${nomeDaRaca(j.emJogo.raca.racaId)}`}
             {' · '}força {j.combatente.forca} · vida {j.combatente.vida} · habilidade {j.combatente.habilidade} · agilidade {j.combatente.agilidade}
             {' · '}{j.cartasNaMao}/{j.limiteDeMao} cartas
+            {/* A mochila é zona ABERTA (spec §11): esconder a de quem não é você
+                seria teatro, e é dela que sai a leitura de quem está estocando o
+                quê para vestir depois. Sem botão aqui — só o dono equipa a sua,
+                pelo "Sua mochila" abaixo. */}
+            {j.mochila.length > 0 && (
+              <> · mochila: {j.mochila.map((c) => nomeDoItem(c.itemId)).join(', ')}</>
+            )}
             {j.id === vista.vezDe && ' ← jogando'}
           </li>
         ))}
       </ul>
 
-      <p>Cartas no monte: {vista.cartasNoMonte}</p>
+      {/* Os DOIS baralhos, lado a lado. O de Tesouros ficou dois planos sem
+          aparecer — viajava na vista desde o 3a e ninguém o renderizava —, e é o
+          que seca: medido, ele esgota em 20 de 20 partidas de produção perto da
+          metade. Sem este número, "minhas vitórias pararam de pagar" não tem
+          nenhuma explicação na tela. */}
+      <p>Cartas no monte: {vista.cartasNoMonte} · Tesouros no monte: {vista.tesourosNoMonte}</p>
 
       {vista.combate !== null && (
         <p>
@@ -239,9 +254,20 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
             >
               Encarar
             </button>
+            {/* O 13º par fino (ver a tabela no `aplicarAcao`): empurrar exige que
+                exista OUTRA carta de Porta para comprar, e o reducer recusa com
+                `AcaoInvalida` quando monte E cemitério estão vazios. É uma
+                CONJUNÇÃO, e escrevê-la só com `cartasNoMonte === 0` apagaria o
+                botão com o cemitério cheio — situação em que o baralho
+                reembaralha e empurrar é legal.
+                "Encarar" fica de fora de propósito: é a saída que sobra ao
+                vidente, e apagar as duas trocaria um 400 por uma tela travada. */}
             <button
               type="button"
-              disabled={!minhaVez || espiada === null}
+              disabled={
+                !minhaVez || espiada === null
+                || (vista.cartasNoMonte === 0 && vista.cartasNoCemiterio === 0)
+              }
               onClick={() => void agir({ tipo: 'empurrarCarta' })}
             >
               Empurrar
@@ -287,6 +313,28 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
         </ul>
       </section>
 
+      {/* A MOCHILA. Zona ABERTA (spec §11) e FORA do teto de mão: guardar aqui não
+          é descartar, é adiar o "vestir" — daí o botão "Equipar" nascer nesta
+          lista e não na da mão. Só a SUA aparece aqui com ação; a dos outros já
+          está visível na linha do assento, acima. */}
+      <section>
+        <h3>Sua mochila — {minhaMochila.length} de {LIMITE_MOCHILA}</h3>
+        <ul>
+          {minhaMochila.map((carta) => (
+            <li key={carta.id}>
+              {nomeDoItem(carta.itemId)}{' '}
+              <button
+                type="button"
+                disabled={!legal('equiparCarta')}
+                onClick={() => void agir({ tipo: 'equiparCarta', cartaId: carta.id })}
+              >
+                Equipar
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+
       <section>
         <h3>Sua mão — {vista.suaMao.length} de {eu?.limiteDeMao ?? 0}</h3>
         {acimaDoLimite && (
@@ -312,8 +360,8 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
              resolve. Quem recobra é `encerrarTurno`, a cada ação. */
           <p role="status">
             Sua mão está acima do limite: entregue uma carta — a vez só passa
-            quando ela couber. Equipar acontece antes, nas fases de recompor e
-            de jogar; jogar raça, só na de recompor.
+            quando ela couber. Equipar e guardar acontecem antes, nas fases de
+            recompor e de jogar; jogar raça, só na de recompor.
           </p>
         )}
         <ul>
@@ -349,6 +397,31 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
                   onClick={() => void agir({ tipo: 'equiparCarta', cartaId: carta.id })}
                 >
                   Equipar
+                </button>
+              )}
+              {/* Os pares finos de `guardarCarta` (ver a tabela no `aplicarAcao`).
+                  UM gate de existência e o resto em `disabled`:
+                  - `carta.tipo === 'equipamento'` → EXISTÊNCIA, mesmo tratamento
+                    que `equiparCarta` dá ao seu par de tipo logo acima. Uma carta
+                    de Porta nunca vai poder ser guardada, em fase nenhuma: o botão
+                    não descreve um estado, descreve a carta errada.
+                  - `legal('guardarCarta')` → DISABLED, como o resto desta lista.
+                    Já foi gate de existência, com o argumento de que um botão
+                    apagado "prometeria" uma fuga do teto de mão que `descartar`
+                    não permite. O argumento provava demais: "Equipar" também
+                    reduz a mão, também é ilegal em `descartar`, e sempre esteve
+                    apagado-e-visível ali. Sumir com o verbo era o único jeito
+                    garantido de o jogador nunca aprender que ele existe — decisão
+                    #26 do game bible.
+                  - teto da mochila → DISABLED, e por outro motivo: cheia é
+                    reversível esvaziando pela equipagem, fase errada não é. */}
+              {carta.tipo === 'equipamento' && (
+                <button
+                  type="button"
+                  disabled={!legal('guardarCarta') || minhaMochila.length >= LIMITE_MOCHILA}
+                  onClick={() => void agir({ tipo: 'guardarCarta', cartaId: carta.id })}
+                >
+                  Guardar
                 </button>
               )}
               <button

@@ -55,6 +55,7 @@ describe('participantesDe', () => {
       { tipo: 'descarte', jogadorId: 'p1', carta: { id: 'c2', tipo: 'salaVazia' } },
       { tipo: 'loot', jogadorId: 'p1', quantidade: 1 },
       { tipo: 'equipou', jogadorId: 'p1', carta: { id: 't1', tipo: 'equipamento', itemId: 'espada-curta' }, slot: 'maoDireita' },
+      { tipo: 'guardou', jogadorId: 'p1', carta: { id: 't1', tipo: 'equipamento', itemId: 'espada-curta' } },
       { tipo: 'passou', jogadorId: 'p1', de: 'recompor' },
     ];
 

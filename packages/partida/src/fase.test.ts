@@ -17,7 +17,7 @@ import type { JogadorNaMesa, EntradaJogador, EstadoPartida, Fase } from './tipos
 const catalogoPadrao = catalogoDeTeste();
 const jogador = (mao: JogadorNaMesa['mao'], comRaca: boolean): JogadorNaMesa => ({
   id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE,
-  patente: 1, derrotas: 0, mao,
+  patente: 1, derrotas: 0, mao, mochila: [],
   emJogo: { raca: comRaca ? raca('r1', 'anao') : null, slots: { ...SLOTS_VAZIOS } },
 });
 
@@ -73,6 +73,19 @@ describe('acaoEhLegalNaFase', () => {
     expect(acaoEhLegalNaFase('jogar', 'jogarCarta')).toBe(false);
     expect(acaoEhLegalNaFase('jogar', 'vasculhar')).toBe(false);
     expect(acaoEhLegalNaFase('jogar', 'entregarCarta')).toBe(false);
+  });
+
+  it('guardar acontece nas duas janelas paradas, e só nelas', () => {
+    // Mesmas fases de `equiparCarta`: guardar é a outra coisa que se faz com um
+    // tesouro na mão, e as duas janelas de mexer no corpo são `recompor` (antes da
+    // porta) e `jogar` (depois do encontro).
+    expect(acaoEhLegalNaFase('recompor', 'guardarCarta')).toBe(true);
+    expect(acaoEhLegalNaFase('jogar', 'guardarCarta')).toBe(true);
+    expect(acaoEhLegalNaFase('vasculhar', 'guardarCarta')).toBe(false);
+    expect(acaoEhLegalNaFase('combate', 'guardarCarta')).toBe(false);
+    // Em `descartar` NÃO: guardar seria escapar do teto de mão movendo a carta
+    // para uma zona que o teto não alcança. A saída do excedente é a caridade.
+    expect(acaoEhLegalNaFase('descartar', 'guardarCarta')).toBe(false);
   });
 
   it('em `descartar` sobra SÓ a caridade', () => {
@@ -134,6 +147,22 @@ describe('faseSeAutoPula (spec §6.1)', () => {
 
   it('`jogar` NÃO se pula com equipamento na mão', () => {
     expect(faseSeAutoPula('jogar', comMao([equipamento('t-1')]))).toBe(false);
+  });
+
+  it('`recompor` NÃO se pula com a mão vazia e um item na mochila', () => {
+    // A mochila é origem de `equiparCarta` desde o Plano 4a: quem tem item ali
+    // ainda tem o que vestir antes de abrir a porta. Pular seria esconder a única
+    // ação que ele podia tomar.
+    expect(faseSeAutoPula('recompor', { ...comMao([]), mochila: [equipamento('t-1')] })).toBe(false);
+  });
+
+  it('`jogar` NÃO se pula com a mão vazia e um item na mochila', () => {
+    expect(faseSeAutoPula('jogar', { ...comMao([]), mochila: [equipamento('t-1')] })).toBe(false);
+  });
+
+  it('as duas se pulam com mão E mochila vazias', () => {
+    expect(faseSeAutoPula('recompor', { ...comMao([]), mochila: [] })).toBe(true);
+    expect(faseSeAutoPula('jogar', { ...comMao([]), mochila: [] })).toBe(true);
   });
 
   it('as fases que compram, lutam ou pagam NUNCA se pulam', () => {
@@ -300,7 +329,7 @@ describe('a fase nunca mente sobre o estado', () => {
 
     let interrompido = false;
     for (let voltas = 0; voltas < 300 && estado.desfecho === 'emAndamento' && !interrompido; voltas += 1) {
-      const acao = escolherAcao(projetarPara('p1', estado, catalogoPadrao), 'p1');
+      const acao = escolherAcao(projetarPara('p1', estado, catalogoPadrao), 'p1', catalogoPadrao);
       try {
         estado = aplicarAcao(estado, acao, depsPartida).estado;
       } catch (erro) {
@@ -340,7 +369,7 @@ describe('a fase nunca mente sobre o estado', () => {
           interrompido = true;
           break;
         }
-        const acaoDoBot = escolherAcao(projetarPara(daVez.id, estado, catalogoPadrao), daVez.id);
+        const acaoDoBot = escolherAcao(projetarPara(daVez.id, estado, catalogoPadrao), daVez.id, catalogoPadrao);
         try {
           estado = aplicarAcao(estado, acaoDoBot, depsPartida).estado;
         } catch (erro) {

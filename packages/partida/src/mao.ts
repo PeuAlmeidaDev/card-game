@@ -29,6 +29,17 @@ export const MAO_INICIAL_PADRAO = 4;
 export const MAO_INICIAL_TESOUROS = 4;
 
 /**
+ * Teto da MOCHILA (spec §7.1, bible §4/§11). 🎚️ **5**.
+ *
+ * Vive ao lado de `LIMITE_BASE_DE_MAO` porque as duas respondem à mesma pergunta
+ * — quanta carta um jogador carrega — e girar uma sem olhar a outra é como o
+ * balanceamento desanda. Mas são tetos SEPARADOS de propósito: a mochila fica
+ * FORA do limite de mão, e é essa isenção que dá preço a ela (decisão #3 do spec:
+ * dos três destinos do loot, a mochila é a que compra folga).
+ */
+export const LIMITE_MOCHILA = 5;
+
+/**
  * Capacidade da mão: CALCULADA a cada consulta, nunca guardada. O bible §5 exige
  * que todo teto seja alterável por carta, e este já nasce assim — o bônus de
  * quem não tem raça em jogo é o Adaptável do Humano.

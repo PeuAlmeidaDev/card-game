@@ -156,7 +156,8 @@ duas mãos e eu perco o escudo") e é a âncora natural das skins.
 **Turno de um jogador:**
 
 1. **(Re)composição do personagem** — pode trocar raça/classe/equipamento (carta da mão → zona
-   em jogo; a antiga sai). Termina com um personagem definido.
+   em jogo; a antiga sai) **ou guardar um equipamento na mochila** (mão → mochila). Termina com
+   um personagem definido.
 2. **Vasculhar local (aberta)** — compra 1 carta de **Portais**, virada. *(Antes "chutar a
    porta"; renomeado 2026-07-24 — os caçadores já estão dentro do portal, então revelam o
    próximo perigo vasculhando o local. Mecânica idêntica.)*
@@ -168,9 +169,17 @@ duas mãos e eu perco o escudo") e é a âncora natural das skins.
    - **Saquear a sala / porta fechada** — compra 1 Portal virado pra mão (sem combate).
 4. **Se há combate** → **fase de interferência** (§7) → **snapshot** → **motor** resolve o
    combate round a round → loot ou Bad Stuff.
-5. **Jogar cartas (fim de turno)** — equipar itens, usar maldições, jogar outros itens.
+5. **Jogar cartas (fim de turno)** — equipar itens (da mão **ou da mochila**), guardar
+   equipamento na mochila, usar maldições, jogar outros itens.
    **Não pode trocar raça/classe aqui.**
-6. **Descarte** até o limite de mão = **7**.
+6. **Descarte** até o limite de mão = **7**. ⚠️ **Guardar na mochila NÃO é saída daqui** — a
+   mochila fica fora do limite de mão, e deixar guardar no descarte seria fugir do teto. As
+   saídas do excedente são entregar (caridade) e o que já foi feito nos passos 1 e 5.
+
+⚠️ **A mochila é de mão única: mochila → mão não existe.** O que entra nela só sai **equipado**.
+É essa direção única que dá **preço** à mochila — guardar é uma aposta ("vou querer isto vestido
+depois"), não um estacionamento reversível. Desequipar para a mão está adiado para a fatia da
+**interferência**; até lá, nenhum verbo devolve carta da mochila para a mão.
 
 ---
 
@@ -288,7 +297,13 @@ do zero e ainda pegar o 2º lugar é exatamente o tipo de história que §14 que
   `MAO_INICIAL_PADRAO = 4`, `MAO_INICIAL_TESOUROS = 4`. Os 4 Tesouros existem para o jogador
   ter o que equipar já no primeiro turno — e a mesa nasce **exatamente no teto** (4+4=8 = limite
   do Humano); quem devolve a folga é equipar, não a caridade.
-- **Mochila: 🎚️ ~5 itens**, aberta, fora do limite de mão.
+- **Mochila: 5 itens**, aberta, fora do limite de mão. ✅ **Dial travado** (Plano 4a):
+  `LIMITE_MOCHILA = 5`. Item deslocado do corpo vai para a mochila se houver vaga, senão para o
+  cemitério de Tesouros — o jogador não escolhe. **O log NOMEIA o destino** (evento `desequipou`,
+  decisão #27): sem isso, a ramificação cara — a carta ser destruída — acontecia calada.
+  Medido por simulação sobre o domínio, com dado e
+  embaralho reais (80 partidas, censo id-a-id após cada ação — não há tráfego de produção): zero divergência de carta, inclusive nos 948 `guardarCarta` e 50 roteamentos
+  ao cemitério por mochila cheia que a amostra exercitou.
 - **Loot ao matar** (Itens). ✅ Implementado (Plano 3a) — ver §9.
 - **Sem ouro** — a mochila é a moeda.
 - Tipos de item: equipamento, instantâneo, item de batalha, item que atrapalha batalha.
@@ -313,6 +328,32 @@ do zero e ainda pegar o 2º lugar é exatamente o tipo de história que §14 que
 
 Mitigações fixadas: **janela B é condicional** (na maioria dos turnos nem abre) e **janela A
 fecha assim que todos passarem**. Timers são teto anti-AFK, não ritmo esperado.
+
+**📊 Ritmo MEDIDO (não estimado), em ações do humano por partida, mediana:**
+
+| Fatia | Política do bot | Equipando |
+|---|---|---|
+| 5 (A Mesa) | 74 | — |
+| 8, Plano 3a | 107 | 95 |
+| 8, Plano 3b | 136 | 114 |
+| 8, Plano 4a | **109** | **115** |
+
+31 partidas por medição, dado e embaralho reais, dials de produção. ⚠️ **A comparação Plano 3b →
+4a NÃO isola o efeito da mochila** (decisão #24): a política "bot" mudou de identidade junto —
+no 3b era o bot que nunca equipava; no 4a é a mesma função, mas ela virou o bot guloso. A queda
+de 136 para 109 é o efeito de TROCAR o bot, não de o auto-pulo ou a mochila terem melhorado o
+ritmo isoladamente. **Remedido em 2026-07-27 e ACEITO pelo Pedro em 2026-07-28** (decisão #25):
+os dois números caem dentro da faixa que a decisão #22 já tinha aceitado, então nada piorou —
+mas a aceitação é do PATAMAR, não uma validação de que a mochila melhorou o ritmo, que esta
+medição não consegue afirmar. Próxima remedição só faz sentido depois da fase `encrenca`
+(Plano 4b), que muda a economia mais uma vez.
+
+⚠️ **O auto-pulo das fases paradas NÃO está funcionando como mitigação** (decisão #23).
+`recompor` evita **0 cliques na mediana** — ela exige mão sem raça E sem equipamento, e todo
+Tesouro desta fatia é equipamento. E a saída óbvia é ruim: estreitá-la para "só aparece com slot
+vazio compatível" tiraria a troca de equipamento antes da porta, que é a razão de a fase existir.
+**A mitigação de ritmo terá que vir de outro lugar** — a interferência (que dá o que fazer no
+turno alheio) continua sendo a aposta estrutural, não o auto-pulo.
 
 ⬜ Política de **abandono/AFK** em ranked (substituição por bot? penalidade de rating?).
 
@@ -460,6 +501,33 @@ por isso **não valida diversão** — valida **ritmo**, que é o risco aberto d
 | 7 | Política de abandono/AFK em ranked | §12 |
 | 8 | Partida com bot conta pro rating? | §13 |
 | 9 | Todo o meta-jogo off-game (ranking, skins, perfil, clãs, conquistas, amigos) | §15 |
+| 11 | 🚨 **O baralho de Tesouros SECA em 100% das partidas, e a economia não tem como se reabastecer.** Medido em 2026-07-28: 20/20 partidas de produção zeram o estoque (monte + cemitério) perto da metade, e a partir daí **6 a 22 combates vencidos por partida não pagam nada**. Achado pelo Pedro **jogando** o gate ocular do 4a. ⚠️ **NÃO é regressão do 4a** — o contrafactual com o comportamento pré-mochila esgota igual. Nasceu com o baralho de Tesouros, no Plano 3a. **O feedback já foi corrigido (decisão #28); a ECONOMIA continua aberta e é dial do Pedro.** | §11 |
+| 10 | ⬜ **A raça acumula na mão sem ter onde ficar — a fatia 8 criou uma assimetria.** Equipamento ganhou DUAS casas (mão + 5 vagas de mochila, fora do limite); raça continua com UMA. Levantada pelo Pedro no gate ocular do Plano 4a (2026-07-28), jogando: *"não vale a pena ficar com várias raças na mão"*. **Marcada para uma sessão de `grill-me` dedicada** — é economia de fatia, e a decisão tem que ser dele e fundamentada, não resolvida de passagem. | §11, §6 |
+
+### Nota sobre a pergunta 10 — o que já se sabe, para a sessão de grill não recomeçar do zero
+
+**Contra pôr raça na mochila** (a leitura que a IA defendeu, e que o Pedro aceitou registrar em vez
+de aplicar):
+
+- Raça na mão **não é carta morta**: tem verbo (`jogarCarta`, em `recompor`) e jogá-la TROCA de
+  verdade — a anterior vai para o cemitério de Portas. Diferente de `monstro`/`salaVazia`, que
+  hoje não têm verbo nenhum e são a carta morta de fato. Esse buraco é do Plano 4b (`encrenca`).
+- Raça sobrando é **palha por desenho**: guardar a segunda só vale se você quiser trocar depois, e
+  a decisão #7 proíbe trocar depois de ver o monstro — logo é aposta às cegas. Dar armazém a isso
+  **recompensa segurar palha**, o oposto da pressão que o limite de mão existe para criar.
+- **Custo medido:** a caridade (anti-*kingmaking* da fatia 7) já está inerte nesta configuração
+  (994 tesouros doados → ~0). Mais armazenamento = menos mão estourando = mais inerte ainda.
+- **Custo de tipo:** `mochila` é `readonly CartaTesouro[]`. Torná-la heterogênea é a mesma manobra
+  que custou um **500 em partida legítima** no Plano 3a (alargar união abre caminho de descarte
+  que o plano não enxerga).
+- **Tom:** o jogo é sério, não satírico. Espada na mochila narra; raça na mochila não.
+
+**A pista melhor, que a sessão deveria perseguir:** a pergunta talvez não seja *"raça merece
+mochila?"* mas ***"por que sobra tanta raça na mão?"***. O roster do baralho é **uma carta para
+cada raça do catálogo** (decisão #11) — então cada raça nova que entrar no catálogo põe mais palha
+no baralho, **sem ninguém decidir isso**. O dial está escondido dentro de uma decisão que era
+sobre outra coisa. Ver também a pergunta 4 (quantas raças no MVP), que é a mesma tensão por
+outro ângulo.
 
 ---
 
@@ -497,3 +565,21 @@ turno, fase de ajuda/atrapalhar antes da batalha, mão de 7, sem ouro, morte sem
 | 18 | **Histórico de partidas** no perfil vira requisito; toda partida produz o log completo desde a fatia 5 |
 | 19 | **Ordem revista:** jogo com bots primeiro (fatia 5), online depois (fatia 6), interferência depois do online (fatia 7) — mas **autoridade no servidor desde o dia 1** |
 | 20 | Transporte do tempo real = **socket.io** (salas, reconexão, adapter Redis); mensagens validadas com Zod no `shared` |
+
+**Sessão 4 — 2026-07-27** (execução da fatia 8, Planos 3b e 4a):
+
+| # | Decisão | Porquê |
+|---|---|---|
+| 21 | **Maldição NUNCA entra na mochila; classe é carta de PORTA** (vai para a mão, como raça). A família Tesouros é **equipamento-only por desenho** | Confirmação, não mudança: §4 e §6.2 já diziam. Registrado porque um docstring no código afirmava o oposto e custou um ciclo inteiro de revisão — ver a regra do game bible vivo no `CLAUDE.md` |
+| 22 | **Ritmo aceito em 136 ações do humano** por partida (contra 107 do Plano 3a, +27%). Remedir depois do Plano 4 | O Plano 4 muda a economia de novo (mochila, bot guloso): regular agora é mirar em alvo móvel. 🎚️ Continua sendo dial, não regra |
+| 23 | **O auto-pulo das fases paradas está quase inerte** e NÃO é a mitigação de ritmo que o §6.1 do spec prometia | Medido: `recompor` evitou **0 cliques na mediana**, porque todo Tesouro desta fatia é equipamento e a mão quase sempre carrega algum. ⚠️ Estreitá-lo para "slot vazio compatível" **tiraria a troca de equipamento antes da porta**, que é a razão de a fase existir — a mitigação de ritmo terá que vir de outro lugar |
+| 24 | **A dívida "bot nunca equipa" está PAGA** (Plano 4a): força final medida 5,71–6,16 nas quatro amostras (contra 3,67 do bot hoarding) — mas SÓ três das quatro batem os 5,95 projetados no Plano 3a; a política equipando em N=31 deu 5,71, 4,0% abaixo da projeção. A dívida está paga mesmo assim: até o valor mais baixo medido supera o bot hoarding em +56%. **Tesouros doados por caridade caíram de 994 para ~0** — o bot guloso resolve equipamento antes de chegar em `descartar`; o que sobra para doar são cartas de Porta (`monstro`/`salaVazia`) dadas CRUAS na mão inicial, que nenhum verbo do jogo hoje sabe jogar. **Taxa de vitória do humano medida (22,6%–37,8%) ficou ABAIXO dos 42,5% projetados**, sem explicação fechada | A dívida do bot está paga pela distância até o bot hoarding, não por ter batido a projeção (uma das quatro amostras ficou abaixo dela) — e a queda de doações revela que a mão inicial cria cartas mortas até a fase `encrenca` existir, e a taxa de vitória mais baixa que a projeção fica registrada sem causa fechada (relatório completo: `.superpowers/sdd/2026-07-27-fatia-8-plano-4a-mochila-e-o-bot-que-veste/task-9-report.md`) |
+
+### Sessão de 2026-07-28 — fechando o Plano 4a
+
+| # | Decisão | Porquê |
+|---|---|---|
+| 25 | **Ritmo aceito em 109 / 115 ações do humano** (política do bot / equipando), medido no Plano 4a. Substitui a aceitação da #22, que valia para 136/114. Remedir depois do Plano 4b | Os dois números caem **dentro** da faixa já aceita na #22 — nada piorou, então não há o que regular agora. ⚠️ Aceitar o PATAMAR não é afirmar que a mochila melhorou o ritmo: a medição não isola isso (ver #24), porque os 3 bots trocaram de política junto. A alternativa era rodar uma medição controlada com bots hoarding nos outros assentos, e ela mediria uma mesa que **não vai para produção**. 🎚️ Continua sendo dial, não regra |
+| 26 | **A `TelaMesa` vai padronizar "você não pode agora" em VISÍVEL-E-APAGADO**: o botão "Guardar" deixa de sumir quando a fase não o permite e passa a aparecer desabilitado, como "Jogar" e "Equipar". ✅ **Decidido e implementado em 2026-07-28** | A tela tinha dois vocabulários para o mesmo estado (gate de existência para um verbo, gate de habilitação para os outros), o que ensina o jogador errado duas vezes. Vence o vocabulário da maioria, e é o que dá **descoberta**: verbo que some é verbo que o jogador nunca aprende que existe. ⚠️ Custo assumido: os testes da Task 7 do Plano 4a exigem a AUSÊNCIA do botão e precisam ser reescritos para exigir `disabled` — reescrever a asserção, nunca apagá-la |
+| 28 | **Vencer um combate que o baralho de Tesouros não consegue pagar gera evento e linha de log** (`tesouroEsgotado`, com quantas ficaram sem pagar). Convive com o `loot` no pagamento parcial. E a tela passa a mostrar o estoque dos **dois** baralhos | Achado pelo Pedro **jogando** o gate ocular: *"ganho uma batalha, não ganho tesouros, e minha mão fica estagnada em 7"*. O código estava certo (baralho vazio não é erro), mas era **mudo** — a justificativa escrita era que "uma linha dizendo que nada aconteceu é ruído". A premissa estava errada: não é nada acontecendo, é **a economia da mesa tendo secado**, e medir mostrou que ela seca em **20 de 20** partidas. ⚠️ Isto conserta a VISIBILIDADE, não a economia — ver a pergunta 11 do §18. Registrado também porque é a **terceira vez** nesta fatia que "publicado mas não renderizado" esconde a tese de um plano (antes: `combatente` no 3a, `tesourosNoMonte` desde o 3a) |
+| 27 | **O item que sai do corpo para dar lugar ao equipado gera evento e linha de log**, nomeando o destino (`mochila` ou `cemiterio`). Um evento por item deslocado, na ordem em que são resolvidos | Achado convergente das DUAS revisões do fechamento do 4a, sem que uma soubesse da outra. Desde o 4a o destino é **condicional** (#8: mochila se há vaga, cemitério se não) e o jogador não escolhe — mas as duas ramificações eram indistinguíveis na tela, e a mais cara delas (a carta ser DESTRUÍDA) acontecia calada. É o único ponto do jogo em que uma carta some sem ninguém pedir, e é exatamente o que ensina "esvazie a mochila antes de trocar de equipamento" — o loop de decisão que a mochila existe para criar. ⚠️ A destruição silenciosa já vinha do 3a (lá o destino era único); o 4a acrescentou a ambiguidade, e é ela que torna o evento obrigatório |

@@ -72,6 +72,16 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
     case 'equipou':
       return `${evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId)} equipa `
         + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem)}.`;
+    // A mochila é zona ABERTA, então o evento carrega a carta e a narração pode
+    // nomeá-la — mesma regra do `equipou`, e a mesma assimetria com o `loot`.
+    // Passa por `descreverCarta` e não por `nomeDoItem` direto: hoje o resultado é
+    // byte-idêntico (`descreverCarta` devolve exatamente `nomeDoItem` para
+    // `equipamento`), mas o atalho abria mão da pressão do `never` — se a família
+    // Tesouros ganhar variante, o `equipou` acima quebra a compilação e este case
+    // continuaria compilando, calado.
+    case 'guardou':
+      return `${evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId)} guarda `
+        + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem)} na mochila.`;
     // O descarte é PÚBLICO: o cemitério já é zona aberta, esconder aqui seria teatro.
     case 'descarte':
       return `${ctx.nomeDe(evento.jogadorId)} descartou `
@@ -100,6 +110,25 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
           {evento.de === 'recompor' ? ' segue sem se recompor.' : ' encerra o turno.'}
         </small>
       );
+    // O preço de equipar, que antes acontecia calado. NOMEIA o destino porque a
+    // regra é condicional (decisão #8: a mochila se há vaga, o cemitério se não, e
+    // o jogador não escolhe) — sem dizer qual dos dois foi, o jogador não descobre
+    // que trocar de equipamento com a mochila cheia DESTRÓI uma carta, que é
+    // justamente o que ensina a esvaziá-la antes.
+    case 'desequipou': {
+      const quem = evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId);
+      const item = descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem);
+      return evento.destino === 'mochila'
+        ? `${quem} tira ${item} do corpo — vai para a mochila.`
+        : `${quem} tira ${item} do corpo — a mochila está cheia, e a carta é descartada.`;
+    }
+    // A única pista que o jogador tem de que a economia da mesa secou. NOMEIA o
+    // baralho em vez de dizer só "não ganhou nada": sem isso ele lê a própria
+    // vitória como bug — foi exatamente o que aconteceu no gate ocular do 4a.
+    case 'tesouroEsgotado':
+      return `${evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId)} venceu, mas o `
+        + `baralho de Tesouros acabou: ${String(evento.naoPagas)} `
+        + `${evento.naoPagas === 1 ? 'tesouro fica' : 'tesouros ficam'} sem pagar.`;
     default: {
       const naoTratado: never = evento;
       void naoTratado;

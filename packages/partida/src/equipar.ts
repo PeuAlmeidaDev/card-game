@@ -1,4 +1,5 @@
-import type { CartaEquipamento, EstadoPartida, InfoItem, Slot, ZonaEmJogo } from './tipos';
+import type { CartaEquipamento, EstadoPartida, EventoDaMesa, InfoItem, Slot, ZonaEmJogo } from './tipos';
+import { LIMITE_MOCHILA } from './mao';
 
 /** As duas mãos, na ordem dos slots. Nomeado porque a regra de duas mãos o lê três vezes. */
 const MAOS: readonly Slot[] = ['maoDireita', 'maoEsquerda'];
@@ -46,11 +47,22 @@ export function colocarNoSlot(
 }
 
 /**
- * Para onde vai o item que saiu do slot. Ponto **ÚNICO** (spec §7.3): nesta fatia
- * a resposta é sempre o cemitério de Tesouros, porque a mochila é do Plano 4.
- * Quando ela existir, esta função ganha o ramo "mochila, se < LIMITE_MOCHILA" e
- * **nada mais no código muda** — que é exatamente o motivo de ela existir hoje
- * com uma resposta só, em vez de o `push` no cemitério estar inline no reducer.
+ * Para onde vai o item que saiu do slot. Ponto **ÚNICO** (spec §7.3): a mochila,
+ * se ainda houver vaga (< `LIMITE_MOCHILA`); o cemitério de Tesouros, só quando
+ * ela está cheia. O jogador NÃO escolhe (decisão #8) — entre os três destinos a
+ * resposta é sempre a mesma regra, nunca uma pendência a mais por troca de item.
+ *
+ * A pergunta é feita **por item, na ordem recebida** — nunca uma vez para o lote
+ * inteiro: um montante por cima de duas armas de uma mão desloca DOIS itens, e a
+ * mochila pode caber só um. Responder de uma vez mandaria os dois para o mesmo
+ * destino, estourando o teto ou perdendo espaço.
+ *
+ * ⚠️ **Chame isto DEPOIS de já ter tirado a carta equipada da zona de origem.**
+ * Quando ela vem de uma mochila CHEIA, equipá-la libera exatamente uma vaga, e é
+ * essa vaga que o deslocado precisa achar aqui. Chamar antes leria a mochila
+ * ainda cheia e mandaria o deslocado ao cemitério sem necessidade — o teste
+ * "com DOIS deslocados e uma vaga" e o pin de ordem em `mesa.test.ts` existem
+ * para pegar exatamente essa inversão.
  *
  * ⚠️ Não reusa `descartarNoBaralhoCerto` (em `./mesa`) de propósito, e as duas não
  * são cópias: aquela responde **em qual dos dois cemitérios** uma carta de família
@@ -63,12 +75,40 @@ export function colocarNoSlot(
 export function destinoDoDesequipado(
   estado: EstadoPartida,
   deslocados: readonly CartaEquipamento[],
-): EstadoPartida {
+  jogadorId: string,
+): { readonly estado: EstadoPartida; readonly eventos: readonly EventoDaMesa[] } {
   // Sem nada deslocado, devolve o MESMO estado: um spread aqui trocaria a
-  // identidade do objeto por nada, e o caso comum (slot vazio) é este.
-  if (deslocados.length === 0) return estado;
+  // identidade do objeto por nada, e o caso comum (slot vazio) é este. Sem evento
+  // junto: slot vazio não é notícia, mesma regra que faz o `loot` calar quando o
+  // baralho acabou.
+  if (deslocados.length === 0) return { estado, eventos: [] };
+
+  const jogador = estado.jogadores.find((j) => j.id === jogadorId);
+  if (jogador === undefined) {
+    throw new Error(`destinoDoDesequipado: jogador ${jogadorId} não está na mesa`);
+  }
+
+  // Acumula em vez de responder "cabe?" uma vez para o lote: duas armas de uma
+  // mão trocadas por um montante deslocam DOIS itens, e a mochila pode caber um só.
+  // O evento nasce DENTRO do mesmo laço, e não de uma segunda passada sobre os
+  // arrays: é aqui que se sabe qual destino coube a qual carta, e reconstruir isso
+  // depois seria reimplementar a regra num segundo lugar.
+  const mochila = [...jogador.mochila];
+  const paraOCemiterio: CartaEquipamento[] = [];
+  const eventos: EventoDaMesa[] = [];
+  for (const carta of deslocados) {
+    const paraMochila = mochila.length < LIMITE_MOCHILA;
+    if (paraMochila) mochila.push(carta);
+    else paraOCemiterio.push(carta);
+    eventos.push({ tipo: 'desequipou', jogadorId, carta, destino: paraMochila ? 'mochila' : 'cemiterio' });
+  }
+
   return {
-    ...estado,
-    tesouros: { ...estado.tesouros, cemiterio: [...estado.tesouros.cemiterio, ...deslocados] },
+    estado: {
+      ...estado,
+      jogadores: estado.jogadores.map((j) => (j.id === jogadorId ? { ...j, mochila } : j)),
+      tesouros: { ...estado.tesouros, cemiterio: [...estado.tesouros.cemiterio, ...paraOCemiterio] },
+    },
+    eventos,
   };
 }

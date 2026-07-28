@@ -3,7 +3,7 @@ import { aplicarAcao } from './mesa';
 import { avancarBots } from './automacao';
 import { criarPartida } from './montagem';
 import { montarComposicao, montarComposicaoTesouros } from './baralho';
-import { LIMITE_BASE_DE_MAO, MAO_INICIAL_PADRAO, MAO_INICIAL_TESOUROS, limiteDeMao } from './mao';
+import { LIMITE_BASE_DE_MAO, LIMITE_MOCHILA, MAO_INICIAL_PADRAO, MAO_INICIAL_TESOUROS, limiteDeMao } from './mao';
 import { escolherAcao } from './bot';
 // Importado pelos helpers `comMao`: eles DERIVAM a fase da mão que montam em vez
 // de cravá-la, para não produzirem estado que o domínio nunca geraria.
@@ -14,7 +14,7 @@ import { filaDeDados, criarDadoCiclico } from './testes/dados';
 import { monstro, monstros, salaVazia, salasVazias, raca, equipamento } from './testes/cartas';
 import { catalogoDeTeste, ID_DA_CLASSE_DE_TESTE, MONSTRO_DE_TESTE } from './testes/catalogo';
 import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
-import { combatenteDe, SLOTS_VAZIOS } from './corpo';
+import { combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
 import type { DepsMesa } from './mesa';
 import type {
   Carta, ConfigPartida, EntradaJogador, CartaPorta, EstadoPartida, InfoMonstro, JogadorNaMesa,
@@ -501,8 +501,16 @@ describe('vencer larga tesouro na mão', () => {
     expect(depois.log).toContainEqual({ tipo: 'loot', jogadorId: 'p1', quantidade: 1 });
   });
 
-  it('baralho de Tesouros VAZIO não emite evento nenhum de loot', () => {
-    // `quantidade: 0` seria uma linha de log dizendo que nada aconteceu.
+  it('baralho de Tesouros VAZIO troca o `loot` por `tesouroEsgotado`, e não por silêncio', () => {
+    // ⚠️ Esta asserção foi REESCRITA em 2026-07-28. Ela dizia "não emite evento
+    // nenhum", com a justificativa de que `quantidade: 0` seria "uma linha de log
+    // dizendo que nada aconteceu". A premissa estava errada, e o Pedro bateu nela
+    // jogando: não é "nada aconteceu" — é "você venceu e o baralho não tinha como
+    // pagar", que é informação de jogo e a única pista de que a economia secou.
+    //
+    // Medido: o baralho de Tesouros esgota em 20 de 20 partidas de produção, por
+    // volta da metade da partida. O jogador via combates vencidos sem prêmio e sem
+    // nenhuma explicação em lugar nenhum da tela.
     const valendo2 = depsValendo(2);
     const aberto = comCombateAberto(valendo2);
     const vazio: EstadoPartida = { ...aberto, tesouros: { monte: [], cemiterio: [] } };
@@ -510,8 +518,33 @@ describe('vencer larga tesouro na mão', () => {
     const depois = venceOCombate(vazio, valendo2);
 
     expect(depois.log.some((e) => e.tipo === 'loot')).toBe(false);
+    expect(depois.log).toContainEqual({ tipo: 'tesouroEsgotado', jogadorId: 'p1', naoPagas: 2 });
     expect(maoDe(depois, 'p1')).toEqual([]);
     expect(depois.desfecho).toBe('emAndamento');
+  });
+
+  it('pagamento PARCIAL emite os DOIS eventos, cada um com o seu número', () => {
+    // O monstro vale 3 e o baralho tem 1: o jogador recebe 1 e fica devendo 2.
+    // Um evento só não conseguiria contar as duas metades, e é o caso que separa
+    // "o baralho está no fim" de "o baralho acabou" — informação diferente para
+    // quem está decidindo se vale a pena procurar briga.
+    const valendo3 = depsValendo(3);
+    const aberto = comCombateAberto(valendo3);
+    const quaseVazio: EstadoPartida = { ...aberto, tesouros: { monte: [equipamento('t-9')], cemiterio: [] } };
+
+    const depois = venceOCombate(quaseVazio, valendo3);
+
+    expect(depois.log).toContainEqual({ tipo: 'loot', jogadorId: 'p1', quantidade: 1 });
+    expect(depois.log).toContainEqual({ tipo: 'tesouroEsgotado', jogadorId: 'p1', naoPagas: 2 });
+  });
+
+  it('baralho que PAGA tudo não emite `tesouroEsgotado`', () => {
+    // A rede contra o evento virar ruído em toda vitória.
+    const valendo2 = depsValendo(2);
+
+    const depois = venceOCombate(comCombateAberto(valendo2), valendo2);
+
+    expect(depois.log.some((e) => e.tipo === 'tesouroEsgotado')).toBe(false);
   });
 
   it('monstro fora do catálogo na hora do loot é Error cru, nunca AcaoInvalida', () => {
@@ -631,7 +664,7 @@ describe('partida completa', () => {
     const MAX_VOLTAS = 500;
     let voltas = 0;
     while (estado.desfecho === 'emAndamento' && voltas < MAX_VOLTAS) {
-      const acao = escolherAcao(projetarPara('p1', estado, catalogoPadrao), 'p1');
+      const acao = escolherAcao(projetarPara('p1', estado, catalogoPadrao), 'p1', catalogoPadrao);
       estado = aplicarAcao(estado, acao, dadosDeps).estado;
       estado = avancarBots(estado, dadosDeps).estado;
       voltas += 1;
@@ -1290,11 +1323,15 @@ describe('aplicarAcao — equiparCarta', () => {
     expect(combatenteDe(jogadorDe(depois, 'p1'), catalogoPadrao).forca).toBe(antes + 1);
   });
 
-  it('o item deslocado vai para o cemitério de Tesouros', () => {
-    // Sem mochila nesta fatia (Plano 4). O ponto único que muda lá é
-    // `destinoDoDesequipado`, não este teste — que continua valendo para o ramo
-    // "mochila cheia".
-    const p = comSlots(comMao(nascida(), [equipamento('t-1')]), { maoDireita: equipamento('t-0') });
+  it('o item deslocado vai para o cemitério de Tesouros quando a mochila está CHEIA', () => {
+    // A mochila entrou como destino preferencial (Task 5 do Plano 4a):
+    // `destinoDoDesequipado` só cai aqui quando ela não tem vaga. Sem forjar a
+    // mochila cheia, o deslocado iria PARA ELA, e este teste pararia de exercitar
+    // o cemitério — o ramo "há vaga" tem teste próprio em `equipar.test.ts`.
+    const cheia = Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
+    const base = comSlots(comMao(nascida(), [equipamento('t-1')]), { maoDireita: equipamento('t-0') });
+    const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
+    const p: EstadoPartida = { ...base, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...base, jogadores }, 'p1')) };
 
     const { estado: depois } = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
 
@@ -1314,6 +1351,40 @@ describe('aplicarAcao — equiparCarta', () => {
       tipo: 'equipou', jogadorId: 'p1', slot: 'maoDireita',
       carta: { id: 't-1', tipo: 'equipamento', itemId: 'i-teste' },
     });
+  });
+
+  it('o evento `desequipou` CHEGA ao log pela ação real, com o destino certo', () => {
+    // Gêmeo de integração do teste de `equipar.test.ts`: lá a unidade devolve os
+    // eventos, aqui se prova que `equiparCarta` os REPASSA. Sem este, a função
+    // poderia montar os eventos e o reducer descartá-los, com a suíte verde.
+    //
+    // Mochila CHEIA de propósito: é o ramo em que a carta é DESTRUÍDA, o único
+    // momento do jogo em que isso acontece sem o jogador pedir, e o que estava
+    // invisível antes deste evento existir.
+    const cheia = Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
+    const b = comSlots(comMao(nascida(), [equipamento('t-1')]), { maoDireita: equipamento('t-0') });
+    const jogadores = b.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
+    const p: EstadoPartida = { ...b, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...b, jogadores }, 'p1')) };
+
+    const { eventos } = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+
+    expect(eventos).toContainEqual({
+      tipo: 'desequipou', jogadorId: 'p1', destino: 'cemiterio',
+      carta: { id: 't-0', tipo: 'equipamento', itemId: 'i-teste' },
+    });
+    // E na ordem: a ação pedida antes do que ela custou.
+    expect(eventos.findIndex((e) => e.tipo === 'equipou'))
+      .toBeLessThan(eventos.findIndex((e) => e.tipo === 'desequipou'));
+  });
+
+  it('slot vazio NÃO emite `desequipou` — nada saiu do corpo', () => {
+    // O caso comum. Uma linha de log dizendo que nada aconteceu é ruído na
+    // crônica, mesma regra que faz o `loot` calar com o baralho esgotado.
+    const p = comMao(nascida(), [equipamento('t-1')]);
+
+    const { eventos } = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+
+    expect(eventos.some((e) => e.tipo === 'desequipou')).toBe(false);
   });
 
   it('carta de PORTA não pode ser equipada', () => {
@@ -1396,6 +1467,180 @@ describe('aplicarAcao — equiparCarta', () => {
       .toThrow(/item-fantasma/);
     expect(() => aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([])))
       .not.toThrow(AcaoInvalida);
+  });
+
+  it('equipa uma carta vinda da MOCHILA, e ela sai de lá', () => {
+    // Uma ação, duas origens (spec §6). Duas ações separadas fariam o cliente
+    // decidir de onde a carta vem — informação que o servidor já tem e que o
+    // cliente pode ter desatualizada.
+    //
+    // A fase é DERIVADA DE NOVO depois de a mochila entrar no jogador, e não
+    // herdada de `p0`: `comMao` só olha a mão, e com ela vazia devolve `vasculhar`
+    // — a mochila ainda estava vazia no instante em que `comMao` perguntou. Se a
+    // fase ficasse presa a esse instante, o fixture pararia numa fase em que
+    // `equiparCarta` nem é legal, e o teste falharia pelo motivo errado (o gate de
+    // fase, não a busca pela carta). `faseSeAutoPula` conta a mochila como origem
+    // de equipamento desde a Task 3, então perguntar de novo com a mochila já
+    // preenchida é o que devolve `recompor`.
+    const p0 = comMao(nascida(), []);
+    const jogadores: readonly JogadorNaMesa[] = p0.jogadores.map((j) => (
+      j.id === 'p1' ? { ...j, mochila: [equipamento('t-1')] } : j
+    ));
+    const p: EstadoPartida = {
+      ...p0,
+      jogadores,
+      fase: faseDoTurnoDe(jogadorDe({ ...p0, jogadores }, 'p1')),
+    };
+
+    const r = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+
+    expect(jogadorDe(r.estado, 'p1').mochila).toEqual([]);
+    expect(itensEquipados(jogadorDe(r.estado, 'p1').emJogo.slots).map((c) => c.id)).toContain('t-1');
+  });
+
+  it('vindo de uma mochila CHEIA, o deslocado ainda cabe — a origem sai ANTES do roteamento', () => {
+    // ⚠️ Pin de ordem (achado de review adiado para a Task 5 do Plano 4a).
+    // `equiparCarta` tira a carta equipada da zona de ORIGEM antes de chamar
+    // `destinoDoDesequipado`. Equipar um item que veio de uma mochila CHEIA libera
+    // EXATAMENTE uma vaga, e é nela que o item deslocado do slot precisa caber.
+    //
+    // Um refactor que hoiste-asse a chamada de `destinoDoDesequipado` para ANTES
+    // da remoção compilaria e passaria o resto da suíte inteira: a mochila ainda
+    // estaria cheia no instante da pergunta, o deslocado cairia no cemitério, e
+    // este teste é o único que nota — os outros ou não usam mochila cheia como
+    // origem, ou não deslocam nada do slot.
+    const cheia = [equipamento('t-1'), ...Array.from({ length: LIMITE_MOCHILA - 1 }, (_, i) => equipamento(`t-cheia-${String(i)}`))];
+    const base = comSlots(comMao(nascida(), []), { maoDireita: equipamento('t-0') });
+    const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
+    const p: EstadoPartida = { ...base, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...base, jogadores }, 'p1')) };
+
+    const r = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+
+    // A mochila continua no teto: perdeu 't-1' (foi para o slot) e ganhou 't-0'
+    // (o deslocado) — nunca ficou em 4.
+    expect(jogadorDe(r.estado, 'p1').mochila).toHaveLength(LIMITE_MOCHILA);
+    expect(jogadorDe(r.estado, 'p1').mochila.map((c) => c.id)).toContain('t-0');
+    expect(r.estado.tesouros.cemiterio.map((c) => c.id)).not.toContain('t-0');
+  });
+
+  it('o deslocado que cai na mochila SEGURA a fase — o auto-pulo lê o estado final', () => {
+    // ⚠️ Gêmeo do pin de ordem acima, e o único fixture que alcança o bug: aqui a
+    // mochila tem EXATAMENTE a carta que vai para o slot, e a mão está vazia.
+    //
+    // `equiparCarta` monta `atualizado` (a mão e a mochila já sem a carta equipada)
+    // ANTES de `destinoDoDesequipado` rotear o item que saiu do slot. Passar
+    // `atualizado` para `entrarOuPular` faria `faseSeAutoPula` ler uma mochila
+    // vazia — quando o estado real já tem 't-0' dentro dela. A fase se auto-pularia
+    // com o jogador ainda tendo o que vestir, e em `jogar` isso passa o turno.
+    //
+    // O pin de ordem não alcança isto: lá a mochila cheia deixa 4 cartas para trás,
+    // então a versão stale ainda responde "tenho equipamento" e o auto-pulo não
+    // dispara. É preciso que a mochila stale fique VAZIA.
+    const base = comSlots(comMao(nascida(), []), { maoDireita: equipamento('t-0') });
+    const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: [equipamento('t-1')] } : j));
+    const p: EstadoPartida = { ...base, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...base, jogadores }, 'p1')) };
+    expect(p.fase).toBe('recompor');
+
+    const r = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+
+    // O deslocado achou vaga (a carta equipada acabou de liberar uma)...
+    expect(jogadorDe(r.estado, 'p1').mochila.map((c) => c.id)).toEqual(['t-0']);
+    // ...logo ainda há o que equipar, e a fase parada NÃO pode ter se pulado.
+    expect(r.estado.fase).toBe('recompor');
+  });
+
+  it('a mão tem PRECEDÊNCIA quando o mesmo id está nas duas zonas', () => {
+    // Não deveria acontecer (ids são únicos por carta), mas a ordem da busca é
+    // observável e precisa ser afirmada: sem isto, trocar a ordem do `??` mudaria
+    // de qual zona a carta some, e nenhum teste acusaria.
+    // ⚠️ A fase é RE-DERIVADA depois da mochila, como os vizinhos: `comMao` a
+    // calcula sobre o estado que ele monta, e `faseDoTurnoDe` LÊ a mochila
+    // (via `faseSeAutoPula`). Injetá-la depois deixaria a fase velha. Aqui o
+    // valor não muda (a mão tem equipamento nos dois casos), mas derivar por
+    // último é a regra que este arquivo já violou três vezes.
+    const p0 = comMao(nascida(), [equipamento('t-1')]);
+    const jogadores = p0.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: [equipamento('t-1')] } : j));
+    const p: EstadoPartida = { ...p0, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...p0, jogadores }, 'p1')) };
+
+    const r = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+
+    expect(maoDe(r.estado, 'p1')).toEqual([]);
+    expect(jogadorDe(r.estado, 'p1').mochila).toHaveLength(1);
+  });
+
+  it('id que não está em NENHUMA das duas zonas é AcaoInvalida', () => {
+    const p = comMao(nascida(), [equipamento('t-1')]);
+
+    expect(() => aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 'nao-existe' }, deps([])))
+      .toThrow('aplicarAcao: a carta nao-existe não está na sua mão nem na mochila');
+  });
+});
+
+describe('aplicarAcao — guardarCarta', () => {
+  const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
+
+  /** Mesma fábrica de mesa nascida das outras `describe`s deste arquivo — local ao bloco. */
+  const nascida = (cfg: ConfigPartida = soSalaVazia): EstadoPartida =>
+    criarPartida('m1', entradas, cfg, { embaralhar: semEmbaralhar });
+
+  const comMao = (estado: EstadoPartida, mao: readonly Carta[]): EstadoPartida => {
+    const jogadores = estado.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao } : j));
+    return { ...estado, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...estado, jogadores }, 'p1')) };
+  };
+
+  it('tira da mão e põe na mochila, e o evento CARREGA a carta', () => {
+    // A mochila é zona ABERTA — a mesa inteira vê o que você guardou —, então
+    // esconder a carta no evento seria teatro. Mesma assimetria do `equipou`
+    // contra o `loot`: quem decide é a zona de DESTINO, não a ação.
+    const p = comMao(nascida(), [equipamento('t-1')]);
+
+    const r = aplicarAcao(p, { tipo: 'guardarCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+
+    expect(maoDe(r.estado, 'p1')).toEqual([]);
+    expect(jogadorDe(r.estado, 'p1').mochila).toEqual([equipamento('t-1')]);
+    expect(r.eventos).toContainEqual({ tipo: 'guardou', jogadorId: 'p1', carta: equipamento('t-1') });
+  });
+
+  it('a mochila CHEIA recusa como AcaoInvalida, não como 500', () => {
+    // Pedido do cliente que a regra não permite => 400. O cliente pode ter uma
+    // vista de um instante atrás em que ainda havia vaga.
+    // ⚠️ Fase re-derivada DEPOIS da mochila (ver o gêmeo no describe de
+    // `equiparCarta`): `faseDoTurnoDe` lê a mochila, então injetá-la depois
+    // deixaria a fase velha e o teste poderia passar pelo gate de fase em vez
+    // do guard de teto que ele existe para cobrir.
+    const cheia = Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
+    const p0 = comMao(nascida(), [equipamento('t-1')]);
+    const jogadores = p0.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
+    const p: EstadoPartida = { ...p0, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...p0, jogadores }, 'p1')) };
+
+    expect(() => aplicarAcao(p, { tipo: 'guardarCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([])))
+      .toThrow(AcaoInvalida);
+    expect(() => aplicarAcao(p, { tipo: 'guardarCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([])))
+      .toThrow('aplicarAcao: a mochila está cheia');
+  });
+
+  it('carta de PORTA não vai para a mochila', () => {
+    // A mochila é `readonly CartaTesouro[]`: guardar um monstro ali criaria uma
+    // carta sem saída (mochila → mão não existe) e sem cemitério de destino.
+    //
+    // O tesouro na mão é o que sustenta a fase 1 (sem ele `recompor` se auto-pula
+    // e o fixture vira vista impossível) — mesmo motivo do gêmeo em `equiparCarta`.
+    // A carta APONTADA é a de monstro: é ela que o guard de tipo recusa.
+    const p = comMao(nascida(), [monstro('p-1'), equipamento('t-1')]);
+
+    expect(() => aplicarAcao(p, { tipo: 'guardarCarta', jogadorId: 'p1', cartaId: 'p-1' }, deps([])))
+      .toThrow('aplicarAcao: só carta de tesouro vai para a mochila');
+  });
+
+  it('guardar NÃO passa a vez — segue na mesma janela parada', () => {
+    // Guardar é decisão do próprio turno, igual a equipar: quem guardou pode ainda
+    // querer equipar outra coisa antes de abrir a porta.
+    const p = comMao(nascida(), [equipamento('t-1'), equipamento('t-2')]);
+
+    const r = aplicarAcao(p, { tipo: 'guardarCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+
+    expect(r.estado.vezDe).toBe('p1');
+    expect(r.estado.fase).toBe('recompor');
   });
 });
 

@@ -30,8 +30,10 @@ export type CartaPorta = ReceitaPorta & { readonly id: string };
 export type CartaDeRaca = Extract<CartaPorta, { readonly tipo: 'raca' }>;
 
 /**
- * **Receita** de carta do baralho de TESOUROS. Uma variante só nesta fatia;
- * maldição e classe (spec §4) entram quando tiverem verbo.
+ * **Receita** de carta do baralho de TESOUROS. Equipamento-only POR DESENHO, não
+ * por acidente desta fatia: classe é carta de PORTAS (vai para a mão, como
+ * raça) e maldição nunca entra na mochila — nenhuma das duas pertence a esta
+ * família.
  *
  * Família SEPARADA de `ReceitaPorta`, e não um `tipo` a mais na mesma união com
  * um campo `baralho`: com o campo, nada impediria um monstro etiquetado como
@@ -143,6 +145,17 @@ export interface JogadorNaMesa {
    * entraria no baralho de Portas e voltaria como Porta na compra seguinte.
    */
   readonly mao: readonly Carta[];
+  /**
+   * Zona ABERTA, teto `LIMITE_MOCHILA`, **fora** do limite de mão. Viaja inteira
+   * na projeção — ao contrário da mão, que publica só a contagem.
+   *
+   * `CartaTesouro` e não `Carta`: só tesouro se guarda. Uma Porta na mochila não
+   * teria como sair (mochila → mão não existe nesta fatia) nem como ser jogada,
+   * então estreitar aqui torna o caso impossível por TIPO em vez de por guard.
+   *
+   * O teto é cobrado em `guardarCarta`, não aqui: um array não sabe se está cheio.
+   */
+  readonly mochila: readonly CartaTesouro[];
   /** Zona ABERTA. É daqui que sai a raça do lutador — não mais da criação da partida. */
   readonly emJogo: ZonaEmJogo;
 }
@@ -169,6 +182,13 @@ export interface JogadorPublico {
   readonly derrotas: number;
   /** Zona ABERTA: a raça em jogo e o corpo equipado são informação pública. */
   readonly emJogo: ZonaEmJogo;
+  /**
+   * Zona ABERTA, inteira. Assimetria deliberada com `cartasNaMao` (que publica só
+   * a contagem): a mão é oculta e a mochila não é. Publicar só o tamanho da
+   * mochila esconderia exatamente o que a torna informação — QUE item o
+   * adversário está segurando para vestir depois.
+   */
+  readonly mochila: readonly CartaTesouro[];
   /** QUANTAS cartas ele tem — nunca QUAIS. */
   readonly cartasNaMao: number;
   /** A capacidade dele agora (o limite é regra pública, não segredo). */
@@ -285,6 +305,23 @@ export type EventoDaMesa =
    */
   | { readonly tipo: 'loot'; readonly jogadorId: string; readonly quantidade: number }
   /**
+   * Venceu, mas o baralho de Tesouros não tinha como pagar tudo — `naoPagas` é
+   * quanto ficou faltando. Convive com o `loot` no pagamento PARCIAL (monstro vale
+   * 3, baralho tem 1: sai `loot` de 1 e este com 2).
+   *
+   * ⚠️ Este evento existe porque a ausência dele era um BUG DE JOGO, não porque
+   * completa uma simetria. Até 2026-07-28 o saque vazio não emitia nada, com a
+   * justificativa de que "uma linha dizendo que nada aconteceu é ruído" — mas não é
+   * nada que acontece: é a economia da mesa tendo secado, e é a única pista que o
+   * jogador tem disso. Medido: o baralho de Tesouros esgota em **20 de 20**
+   * partidas de produção, perto da metade, e a partir daí toda vitória pagava zero
+   * em silêncio.
+   *
+   * Diz o NÚMERO, nunca quais cartas faltaram — não existem cartas a nomear, e
+   * mesmo o `loot` só conta (a mão é zona oculta).
+   */
+  | { readonly tipo: 'tesouroEsgotado'; readonly jogadorId: string; readonly naoPagas: number }
+  /**
    * Equipou. CARREGA a carta: o slot é zona ABERTA, e esconder o que a mesa
    * inteira passa a ver seria teatro. Assimetria deliberada em relação ao `loot`
    * (zona oculta, só a contagem) — o que decide é a zona de DESTINO.
@@ -295,6 +332,33 @@ export type EventoDaMesa =
    */
   | { readonly tipo: 'equipou'; readonly jogadorId: string;
       readonly slot: Slot; readonly carta: CartaEquipamento }
+  /**
+   * Guardou na mochila. CARREGA a carta, pelo mesmo motivo do `equipou`: a mochila
+   * é zona ABERTA e a mesa inteira passa a ver o conteúdo, então esconder no
+   * evento seria teatro. A assimetria com o `loot` (que só conta) é a regra firmada
+   * na fatia 7: quem decide é a zona de DESTINO, não a ação.
+   */
+  | { readonly tipo: 'guardou'; readonly jogadorId: string; readonly carta: CartaTesouro }
+  /**
+   * O item que SAIU do corpo para dar lugar ao que foi equipado, e para onde ele
+   * foi. CARREGA a carta pelo mesmo motivo dos dois acima: as duas pontas
+   * possíveis — mochila e cemitério de Tesouros — são zonas ABERTAS, então não há
+   * o que esconder.
+   *
+   * `destino` existe porque a regra é CONDICIONAL desde o Plano 4a (mochila se há
+   * vaga, cemitério se não) e o jogador não escolhe (decisão #8). Sem o campo, as
+   * duas ramificações ficam indistinguíveis no log, e a mais cara delas — a carta
+   * ser DESTRUÍDA — acontece calada. É o único ponto do jogo em que uma carta some
+   * sem ninguém pedir, e é justamente o que ensina "esvazie a mochila antes de
+   * trocar de equipamento".
+   *
+   * UM evento por item deslocado, na ordem em que `destinoDoDesequipado` os
+   * resolve: um montante por cima de duas armas de uma mão desloca DOIS itens e a
+   * mochila pode caber só um, então um evento para o lote não conseguiria nomear
+   * os dois destinos.
+   */
+  | { readonly tipo: 'desequipou'; readonly jogadorId: string;
+      readonly carta: CartaEquipamento; readonly destino: 'mochila' | 'cemiterio' }
   /**
    * O jogador declinou de agir numa fase parada. Emite evento — e não silêncio —
    * porque `versaoDe` é `log.length`: sem mover a versão, um duplo-clique em
@@ -315,8 +379,18 @@ export type AcaoDaMesa =
   | { readonly tipo: 'esquivar'; readonly jogadorId: string }
   | { readonly tipo: 'jogarCarta'; readonly jogadorId: string; readonly cartaId: string }
   | { readonly tipo: 'entregarCarta'; readonly jogadorId: string; readonly cartaId: string }
-  /** Tira um tesouro da mão e o encaixa no corpo. O slot vem do ITEM, nunca do cliente. */
+  /**
+   * Tira um tesouro da mão OU da mochila e o encaixa no corpo. As duas origens
+   * desde o Plano 4a (ver `cartaEquipavelDe`, em `./mesa`); a mão tem precedência
+   * se o id estiver nas duas. O slot vem do ITEM, nunca do cliente.
+   */
   | { readonly tipo: 'equiparCarta'; readonly jogadorId: string; readonly cartaId: string }
+  /**
+   * Tira um tesouro da mão e o põe na MOCHILA. Sempre nessa direção: mochila → mão
+   * não existe nesta fatia (spec §6/§11), e é essa mão única que faz a mochila ser
+   * uma aposta — o que entra ali só sai equipado.
+   */
+  | { readonly tipo: 'guardarCarta'; readonly jogadorId: string; readonly cartaId: string }
   /**
    * Encerra uma fase PARADA (`recompor`/`jogar`) sem fazer mais nada nela. É o
    * verbo que dá SAÍDA às duas — sem ele, `recompor` seria uma fase da qual não

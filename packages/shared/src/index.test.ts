@@ -121,6 +121,15 @@ describe('acaoDaMesaSchema', () => {
       .toEqual({ tipo: 'equiparCarta', cartaId: 't-1' });
   });
 
+  it('guardarCarta atravessa o fio com o mesmo teto de 64 do cartaId', () => {
+    expect(acaoDaMesaSchema.safeParse({ tipo: 'guardarCarta', cartaId: 't-1' }).success).toBe(true);
+    expect(acaoDaMesaSchema.safeParse({ tipo: 'guardarCarta', cartaId: '' }).success).toBe(false);
+    expect(acaoDaMesaSchema.safeParse({ tipo: 'guardarCarta', cartaId: 'x'.repeat(65) }).success).toBe(false);
+    // O SLOT continua não viajando: guardar não escolhe destino, e equipar tira o
+    // slot do item pelo catálogo do servidor.
+    expect(acaoDaMesaSchema.safeParse({ tipo: 'guardarCarta' }).success).toBe(false);
+  });
+
   it('recusa entregarCarta sem cartaId, com cartaId vazio ou longo demais', () => {
     // Mesmo teto do `jogarCarta`: o `cartaId` é refletido verbatim no 400 e no log
     // do server, então validar a FORMA sem validar o TAMANHO não é validação de borda.

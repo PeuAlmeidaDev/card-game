@@ -3,8 +3,8 @@ import { render, screen, waitFor, cleanup, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event';
 import { TelaMesa } from './TelaMesa';
 import { api } from './api';
-import { SLOTS_VAZIOS } from '@card-dungeon/shared';
-import type { Catalogo, VistaDaPartida } from '@card-dungeon/shared';
+import { SLOTS_VAZIOS, LIMITE_MOCHILA } from '@card-dungeon/shared';
+import type { Catalogo, CartaTesouro, VistaDaPartida } from '@card-dungeon/shared';
 
 const combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
 
@@ -18,8 +18,8 @@ const vistaBase: VistaDaPartida = {
   voce: 'p1',
   versao: 1,
   jogadores: [
-    { id: 'p1', nome: 'Você', ehBot: false, patente: 1, derrotas: 0, combatente, emJogo: { raca: null, slots: SLOTS_VAZIOS }, cartasNaMao: 0, limiteDeMao: 8 },
-    { id: 'p2', nome: 'Bot 1', ehBot: true, patente: 2, derrotas: 1, combatente, emJogo: { raca: null, slots: SLOTS_VAZIOS }, cartasNaMao: 0, limiteDeMao: 8 },
+    { id: 'p1', nome: 'Você', ehBot: false, patente: 1, derrotas: 0, combatente, emJogo: { raca: null, slots: SLOTS_VAZIOS }, cartasNaMao: 0, limiteDeMao: 8, mochila: [] },
+    { id: 'p2', nome: 'Bot 1', ehBot: true, patente: 2, derrotas: 1, combatente, emJogo: { raca: null, slots: SLOTS_VAZIOS }, cartasNaMao: 0, limiteDeMao: 8, mochila: [] },
   ],
   vezDe: 'p1',
   patenteAlvo: 10,
@@ -180,6 +180,43 @@ describe('TelaMesa', () => {
       params: { id: 'm1' },
       body: { acao: { tipo: 'empurrarCarta' }, versao: 1 },
     });
+  });
+
+  it('a tela mostra o estoque dos DOIS baralhos, não só o de Portas', async () => {
+    // `tesourosNoMonte` viajava na vista desde o Plano 3a e NUNCA era renderizado
+    // — a mesma falha do `combatente` publicado e invisível que o gate ocular
+    // pegou naquele plano. Custou caro: o baralho de Tesouros esgota em 20 de 20
+    // partidas de produção, e o jogador não tinha um único número na tela que
+    // explicasse por que suas vitórias pararam de pagar.
+    await abrirMesa({ ...vistaBase, cartasNoMonte: 16, tesourosNoMonte: 0 });
+
+    expect(await screen.findByText(/Cartas no monte: 16/)).toBeInTheDocument();
+    expect(screen.getByText(/Tesouros no monte: 0/)).toBeInTheDocument();
+  });
+
+  it('"Empurrar" APAGA sem outra carta para comprar, e "Encarar" continua aceso', async () => {
+    // O gêmeo que faltava do par fino de `empurrarCarta` (`mesa.ts`: monte E
+    // cemitério de Portas vazios => AcaoInvalida). Sem ele, fim de baralho + um
+    // clique = 400 na cara do jogador. Foi achado contando os pares da tabela do
+    // `aplicarAcao` um a um contra o reducer: eram TREZE, e a tabela dizia doze.
+    //
+    // "Encarar" tem que continuar aceso na MESMA vista: é a saída legal que
+    // sobra, e apagar os dois deixaria o vidente sem ação nenhuma com uma
+    // espiada pendente — trocaria um 400 por uma tela travada.
+    await abrirMesa({ ...vistaComEspiada, cartasNoMonte: 0, cartasNoCemiterio: 0 });
+
+    expect(await screen.findByRole('button', { name: /empurrar/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /encarar/i })).toBeEnabled();
+  });
+
+  it('"Empurrar" continua aceso com o monte vazio mas o cemitério cheio', async () => {
+    // O par é uma conjunção, e é por isso que o gêmeo não pode ser
+    // `cartasNoMonte === 0` sozinho: com o cemitério cheio o baralho REEMBARALHA
+    // e há sim outra carta para comprar. Aproximar pelo monte apagaria um botão
+    // que o domínio aceita — o erro oposto, e igualmente errado.
+    await abrirMesa({ ...vistaComEspiada, cartasNoMonte: 0, cartasNoCemiterio: 7 });
+
+    expect(await screen.findByRole('button', { name: /empurrar/i })).toBeEnabled();
   });
 
   it('descreve corretamente a carta pressentida de cada tipo', async () => {
@@ -443,10 +480,15 @@ describe('TelaMesa — a mão', () => {
     // raça depois de ver a porta seria reagir ao monstro). Era a MESMA classe de
     // mentira do texto original — só deslocada de "aqui" para "lá". Este teste
     // pina o texto corrigido, que atribui cada ação à(s) fase(s) certa(s).
+    //
+    // "guardar" entrou na frase junto de "equipar" porque as duas têm as MESMAS
+    // duas fases em `LEGAL` (`recompor` e `jogar`) — agrupá-las não repete o erro
+    // acima, que foi juntar ações de fases DIFERENTES. A faixa existe para
+    // enumerar as válvulas de escape do excedente, e guardar é a terceira delas.
     await abrirMesa(emDescartar([tesouro('t-9'), { id: 'p-8', tipo: 'raca', racaId: 'orc' }]));
 
     const faixa = screen.getByRole('status');
-    expect(faixa).toHaveTextContent(/equipar acontece antes, nas fases de recompor e de jogar/i);
+    expect(faixa).toHaveTextContent(/equipar e guardar acontecem antes, nas fases de recompor e de jogar/i);
     expect(faixa).toHaveTextContent(/jogar raça, só na de recompor/i);
   });
 
@@ -875,5 +917,88 @@ describe('TelaMesa — a fase e o botão Passar', () => {
     // `<strong>Combate</strong>` com o mesmo texto, e sem escopo o
     // `findByText` reprova por achar os dois.
     expect(await screen.findByText('Combate', { selector: 'p' })).toBeInTheDocument();
+  });
+});
+
+describe('TelaMesa — a mochila', () => {
+  // Tipado como `CartaTesouro` (e não o `CartaNaMao` heterogêneo dos outros
+  // `tesouro(...)` deste arquivo): a mochila só aceita a família de Tesouro
+  // (`JogadorPublico.mochila: readonly CartaTesouro[]`), e o `tsc` cobra a
+  // diferença — `Carta` é união mais larga, `CartaTesouro` é membro dela, então
+  // o valor continua livre para entrar tanto na mão (`CartaNaMao`) quanto na
+  // mochila.
+  const tesouro = (id: string): CartaTesouro => ({ id, tipo: 'equipamento', itemId: 'espada-curta' });
+
+  /** Vista numa fase parada, com a mão e a mochila de p1 sob controle do teste. */
+  const emParada = (
+    fase: 'recompor' | 'jogar',
+    suaMao: readonly CartaNaMao[],
+    mochila: readonly CartaTesouro[] = [],
+  ): VistaDaPartida => ({
+    ...vistaBase,
+    fase,
+    suaMao,
+    jogadores: vistaBase.jogadores.map((j) => (
+      j.id === 'p1' ? { ...j, cartasNaMao: suaMao.length, mochila } : j
+    )),
+  });
+
+  it('a mochila de TODOS aparece na tela, com o item nomeado', async () => {
+    // Zona aberta: esconder a do adversário seria teatro, e é dela que sai a
+    // leitura de quem está estocando o quê para vestir depois.
+    const vista: VistaDaPartida = {
+      ...vistaBase,
+      jogadores: vistaBase.jogadores.map((j) => (
+        j.id === 'p2' ? { ...j, mochila: [tesouro('t-9')] } : j
+      )),
+    };
+
+    await abrirMesa(vista);
+
+    expect(await screen.findByText(/Espada Curta/)).toBeInTheDocument();
+  });
+
+  it('em `recompor`, a carta de tesouro na mão tem "Guardar" aceso', async () => {
+    await abrirMesa(emParada('recompor', [tesouro('t-1')]));
+
+    expect(await screen.findByRole('button', { name: /guardar/i })).toBeEnabled();
+  });
+
+  it('"Guardar" APAGA com a mochila cheia — gêmeo do guard do reducer', async () => {
+    // Par fino da tabela do `aplicarAcao`: o gate de FASE deixa passar, e quem
+    // recusa é o guard de teto. Botão aceso aqui vira 400 na cara do jogador.
+    const cheia = Array.from({ length: LIMITE_MOCHILA }, (_, i) => tesouro(`t-c${String(i)}`));
+
+    await abrirMesa(emParada('recompor', [tesouro('t-1')], cheia));
+
+    expect(await screen.findByRole('button', { name: /guardar/i })).toBeDisabled();
+  });
+
+  it('carta de PORTA na mão não tem "Guardar" — o outro par fino', async () => {
+    await abrirMesa(emParada('recompor', [{ id: 'p-1', tipo: 'monstro', monstroId: 'goblin' }]));
+
+    expect(await screen.findByText(/Recompor/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /guardar/i })).not.toBeInTheDocument();
+  });
+
+  it('o item na MOCHILA tem "Equipar" na fase `jogar`', async () => {
+    await abrirMesa(emParada('jogar', [], [tesouro('t-1')]));
+
+    expect(await screen.findByRole('button', { name: /equipar/i })).toBeEnabled();
+  });
+
+  it('em `descartar` o "Guardar" EXISTE e está apagado — guardar não é saída do excedente', async () => {
+    // Guardar ali seria mover a carta para uma zona que o teto de mão não alcança,
+    // isto é, fugir do teto — e o domínio recusa (`guardarCarta` não é legal em
+    // `descartar`). O que mudou (decisão #26) é como a tela DIZ isso: apagado, e
+    // não ausente, o mesmo vocabulário de "Jogar" e "Equipar" na mesma lista.
+    //
+    // ⚠️ A asserção foi REESCRITA, não apagada: ela continua sendo o gêmeo do gate
+    // de fase do reducer. Trocá-la por nada devolveria o botão para o limbo em que
+    // ninguém nota se ele acender — que é como o "Equipar" sem stats sobreviveu a
+    // nove revisões no Plano 3a.
+    await abrirMesa(emDescartar([tesouro('t-1')]));
+
+    expect(await screen.findByRole('button', { name: /guardar/i })).toBeDisabled();
   });
 });

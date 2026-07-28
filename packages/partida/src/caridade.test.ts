@@ -8,7 +8,7 @@ import type { JogadorNaMesa } from './tipos';
 /** Jogador mínimo: nesta regra só a patente importa. */
 const jogador = (id: string, patente: number): JogadorNaMesa => ({
   id, nome: id, ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE,
-  patente, derrotas: 0, mao: [], emJogo: { raca: null, slots: { ...SLOTS_VAZIOS } },
+  patente, derrotas: 0, mao: [], mochila: [], emJogo: { raca: null, slots: { ...SLOTS_VAZIOS } },
 });
 
 describe('candidatosACaridade', () => {

@@ -24,7 +24,7 @@ const LEGAL: Record<Fase, ReadonlySet<AcaoDaMesa['tipo']>> = {
   // é o que impede a raça de virar resposta reativa ao monstro que já se viu
   // (decisão #7 do spec). `passar` é a saída — sem ela esta fase prenderia o
   // turno de quem tem uma raça na mão e não quer trocar.
-  recompor: new Set<AcaoDaMesa['tipo']>(['jogarCarta', 'equiparCarta', 'passar']),
+  recompor: new Set<AcaoDaMesa['tipo']>(['jogarCarta', 'equiparCarta', 'guardarCarta', 'passar']),
   // A espiada da Presciência continua sendo PENDÊNCIA dentro desta fase, não fase
   // própria (spec §6): `vasculhar` e `manterCarta`/`empurrarCarta` são legais na
   // mesma fase e se excluem pelo campo `espiada`, que o reducer ainda consulta.
@@ -37,7 +37,7 @@ const LEGAL: Record<Fase, ReadonlySet<AcaoDaMesa['tipo']>> = {
   // vira corpo — sem ela, o tesouro que o monstro largou só poderia ser vestido no
   // turno seguinte, e a mão estouraria no caminho. `jogarCarta` fica de fora: a
   // raça já teve a janela dela e trocá-la aqui seria trocar depois de ver a porta.
-  jogar: new Set<AcaoDaMesa['tipo']>(['equiparCarta', 'passar']),
+  jogar: new Set<AcaoDaMesa['tipo']>(['equiparCarta', 'guardarCarta', 'passar']),
   // UMA saída do excedente, não mais três: as duas janelas de gastar carta
   // acontecem ANTES desta fase — `jogarCarta` migrou para `recompor` (decisão #7)
   // e `equiparCarta` para `recompor` e `jogar`. Quem chega aqui já teve as duas e
@@ -69,7 +69,16 @@ export function acaoEhLegalNaFase(fase: Fase, tipo: AcaoDaMesa['tipo']): boolean
  */
 export function faseSeAutoPula(fase: Fase, jogador: JogadorNaMesa): boolean {
   const temRaca = jogador.mao.some((c) => c.tipo === 'raca');
-  const temEquipamento = jogador.mao.some((c) => c.tipo === 'equipamento');
+  // As DUAS origens de `equiparCarta` (spec §6): mão e mochila. Enquanto a
+  // mochila não existia, olhar só a mão era a mesma pergunta; desde que ela é
+  // origem, um jogador de mão vazia e mochila cheia ainda tem o que vestir —
+  // pulá-lo esconderia a única ação disponível. `mochila.length > 0`, não
+  // `.some((c) => c.tipo === 'equipamento')`: a mochila é tipada
+  // `readonly CartaTesouro[]`, e essa família é equipamento-only POR DESENHO
+  // (ver o docstring de `ReceitaTesouro` em `./tipos`) — classe é carta de
+  // Portas e maldição nunca entra na mochila. `.length > 0` e o `.some` são a
+  // MESMA pergunta; o `.some` sugeriria uma distinção que o modelo não tem.
+  const temEquipamento = jogador.mao.some((c) => c.tipo === 'equipamento') || jogador.mochila.length > 0;
   switch (fase) {
     case 'recompor':
       return !temRaca && !temEquipamento;

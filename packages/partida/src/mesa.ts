@@ -5,6 +5,7 @@ import type {
   Fase, FaseParada, InfoRaca, JogadorNaMesa,
 } from './tipos';
 import { tirarDoTopo } from './baralho';
+import { LIMITE_MOCHILA } from './mao';
 import { destinoDaCaridade } from './caridade';
 import { combatenteDe } from './corpo';
 import { colocarNoSlot, destinoDoDesequipado } from './equipar';
@@ -129,8 +130,14 @@ function sairDaParada(
  * `fase.test.ts` afirma para as DUAS — parar em `recompor` sem raça nem
  * equipamento na mão, ou em `jogar` sem equipamento, é violação.
  *
- * O `jogador` vem por parâmetro, e não relido de `estado`: quem chama acabou de
- * atualizá-lo, e reler pelo `find` traria a versão de antes da ação.
+ * O `jogador` vem por parâmetro porque quem chama é quem sabe QUAL versão dele já
+ * é a final. Na maioria das ações é a que o chamador acabou de montar; em
+ * `equiparCarta` NÃO é — lá o estado sofre uma segunda mutação
+ * (`destinoDoDesequipado` devolvendo o item deslocado à mochila) depois que o
+ * jogador atualizado foi fechado, e é a versão de `estado` que vale. Por isso o
+ * parâmetro existe em vez de um `find` aqui dentro: nenhuma regra fixa serve para
+ * os dois casos, e errar o lado faz a fase parada se pular com o jogador ainda
+ * tendo o que vestir.
  */
 function entrarOuPular(
   estado: EstadoPartida,
@@ -193,9 +200,16 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // guards certos; agora ela precisa entrar na tabela, e o `Record<Fase, …>` cobra.
   //
   // ⚠️ O QUE A TABELA NÃO RESPONDE. Passar aqui não garante que a ação será
-  // aceita: a elegibilidade FINA continua em cada função, e hoje são OITO pares —
+  // aceita: a elegibilidade FINA continua em cada função, e hoje são TREZE pares —
   // cada um precisa de gêmeo na tela, porque o `legal()` da `TelaMesa` lê ESTA
   // tabela e não sabe deles.
+  //
+  // ⚠️ O 13º entrou em 2026-07-28, e não era par novo: existia desde o Plano 3b e
+  // NUNCA esteve na tabela (o par "monte+cemitério vazios" de `empurrarCarta`).
+  // Foi achado recontando os pares um a um contra o reducer, e o gêmeo na tela
+  // também não existia — fim de baralho + clique era 400 na cara do jogador.
+  // A lição: conferir a tabela contra si mesma não acha o par que ninguém
+  // escreveu. A recontagem tem que sair do CÓDIGO para a tabela, nunca ao contrário.
   //
   // Uma linha por par, sem agrupar ação nem quebrar célula em duas linhas: a
   // versão agrupada já mentiu uma vez (dizia "quatro pares" com sete linhas, e a
@@ -206,9 +220,14 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   //   vasculhar            vasculhar      espiada === null             `vasculhar`
   //   vasculhar            manterCarta    espiada !== null             `resolverEspiada`
   //   vasculhar            empurrarCarta  espiada !== null             `resolverEspiada`
+  //   vasculhar            empurrarCarta  monte+cemitério não vazios   `resolverEspiada`
   //   recompor             jogarCarta     carta.tipo === 'raca'        `jogarCarta`
   //   recompor             equiparCarta   carta.tipo === 'equipamento' `equiparCarta`
   //   jogar                equiparCarta   carta.tipo === 'equipamento' `equiparCarta`
+  //   recompor             guardarCarta   carta.tipo === 'equipamento' `guardarCarta`
+  //   recompor             guardarCarta   mochila cheia                `guardarCarta`
+  //   jogar                guardarCarta   carta.tipo === 'equipamento' `guardarCarta`
+  //   jogar                guardarCarta   mochila cheia                `guardarCarta`
   //   combate              atacar         `proximaDecisao`             o motor (`AcaoIlegal`)
   //   combate              esquivar       `proximaDecisao`             o motor (`AcaoIlegal`)
   //
@@ -218,13 +237,28 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // inalcançáveis e foram removidos (os gêmeos na tela saem na Task 5, onde o
   // botão "Passar" chega).
   //
-  // Mesmo assim a lista SUBIU de sete para oito, e a conta é a lição do parágrafo
-  // acima: as linhas antigas `vasculhar/descartar` escondiam DOIS pares cada uma
-  // dentro de uma célula agrupada, então nunca foram nove pares — eram nove
-  // LINHAS sobre onze pares. `equiparCarta` deixou `descartar` na Task 3 e ficou
-  // com as DUAS fases paradas — duas linhas, nunca uma célula com duas fases —, e
-  // cada uma tem gêmeo de verdade na tela (`TelaMesa.test.tsx`: o "Equipar" aceso
-  // em `recompor` e em `jogar`, apagado em `descartar`).
+  // Os QUATRO pares de `guardarCarta` (Task 2) têm gêmeo na tela
+  // (`TelaMesa.test.tsx`, describe "a mochila"): `carta.tipo === 'equipamento'`
+  // é gate de EXISTÊNCIA do botão "Guardar" (mesmo tratamento que `equiparCarta`
+  // dá ao seu par de tipo), e "mochila cheia" é `disabled` comum.
+  //
+  // O gate de FASE deste botão JÁ FOI existência também, pelo argumento de que
+  // guardar numa fase errada não é "espere a hora certa" mas fugir do teto de
+  // mão, e que um botão apagado prometeria essa fuga. O argumento caiu porque
+  // provava demais: "Equipar" também tira carta da mão, também é ilegal em
+  // `descartar`, e sempre esteve apagado-e-visível ali. Desde a decisão #26 do
+  // game bible o gate de fase é `disabled`, como o resto da lista — a tela tem
+  // UM vocabulário para "você não pode agora", e verbo que some é verbo que o
+  // jogador nunca aprende que existe.
+  //
+  // HISTÓRICO da contagem, que é a lição do parágrafo acima — os números abaixo
+  // são de planos passados, NÃO a contagem de hoje (que é a lista de doze):
+  // no Plano 3b a lista subiu de sete para oito, e ao conferir descobriu-se que a
+  // contagem anterior também mentia — as linhas `vasculhar/descartar` escondiam
+  // DOIS pares cada uma dentro de uma célula agrupada, então nunca foram nove
+  // pares: eram nove LINHAS sobre onze pares. `equiparCarta` deixou `descartar`
+  // e ficou com as DUAS fases paradas — duas linhas, nunca uma célula com duas
+  // fases. O Plano 4a levou de oito para doze, com os quatro de `guardarCarta`.
   //
   // A `encrenca` do Plano 4 não muda esta lista: os verbos dela são novos.
   if (!acaoEhLegalNaFase(estado.fase, acao.tipo)) {
@@ -249,6 +283,10 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
 
   if (acao.tipo === 'equiparCarta') {
     return equiparCarta(estado, acao, deps);
+  }
+
+  if (acao.tipo === 'guardarCarta') {
+    return guardarCarta(estado, acao);
   }
 
   if (acao.tipo === 'passar') {
@@ -440,8 +478,14 @@ function resolverEspiada(estado: EstadoPartida, acao: AcaoDeEspiada, deps: DepsM
   return resolverCarta(base, espiada.jogadorId, compra.carta, deps);
 }
 
-/** As ações que apontam para uma carta da própria mão. */
-type AcaoDeMao = Extract<AcaoDaMesa, { readonly tipo: 'jogarCarta' | 'entregarCarta' | 'equiparCarta' }>;
+/**
+ * As ações que apontam para uma carta da própria mão — e SÓ da mão.
+ *
+ * `equiparCarta` saiu desta união no Plano 4a: ela ganhou a mochila como segunda
+ * origem e passou a resolver por `cartaEquipavelDe`, logo abaixo. Mantê-la aqui
+ * declarava como entrada legal de `cartaDaMao` uma ação que nunca mais a chama.
+ */
+type AcaoDeMao = Extract<AcaoDaMesa, { readonly tipo: 'jogarCarta' | 'entregarCarta' | 'guardarCarta' }>;
 
 /**
  * Guard comum das ações de mão: a carta apontada tem que ser sua. A fase (turno
@@ -465,6 +509,44 @@ function cartaDaMao(estado: EstadoPartida, acao: AcaoDeMao): {
   }
 
   return { jogador, carta };
+}
+
+/**
+ * A carta a equipar, venha ela da mão ou da mochila — e de ONDE veio, porque quem
+ * chama tem que removê-la da zona certa.
+ *
+ * Função própria, e não um parâmetro a mais em `cartaDaMao`: as duas respondem a
+ * perguntas diferentes. `cartaDaMao` serve as ações que só a mão alimenta
+ * (`jogarCarta`, `entregarCarta`, `guardarCarta`) e devolve `Carta` heterogênea;
+ * esta serve só `equiparCarta` e é a única que enxerga a mochila. Juntar as duas
+ * daria uma função com metade dos retornos ignorados por chamada.
+ *
+ * A MÃO tem precedência na busca, e isso é afirmado por teste: ids são únicos por
+ * carta, então o empate não deveria existir — mas a ordem é observável, e sem a
+ * asserção trocá-la mudaria de qual zona a carta some sem nada acusar.
+ */
+function cartaEquipavelDe(
+  estado: EstadoPartida,
+  acao: Extract<AcaoDaMesa, { readonly tipo: 'equiparCarta' }>,
+): {
+  readonly jogador: JogadorNaMesa;
+  readonly carta: Carta;
+  readonly origem: 'mao' | 'mochila';
+} {
+  const jogador = estado.jogadores.find((j) => j.id === acao.jogadorId);
+  if (jogador === undefined) {
+    throw new Error(`cartaEquipavelDe: jogador ${acao.jogadorId} não está na mesa`);
+  }
+
+  const naMao = jogador.mao.find((c) => c.id === acao.cartaId);
+  if (naMao !== undefined) return { jogador, carta: naMao, origem: 'mao' };
+
+  const naMochila = jogador.mochila.find((c) => c.id === acao.cartaId);
+  if (naMochila !== undefined) return { jogador, carta: naMochila, origem: 'mochila' };
+
+  // Pedido do cliente, não bug nosso: id velho (a carta já saiu) ou de outro
+  // jogador. 400, nunca 500 — mesma cadeia de `cartaDaMao`.
+  throw new AcaoInvalida(`aplicarAcao: a carta ${acao.cartaId} não está na sua mão nem na mochila`);
 }
 
 /**
@@ -630,7 +712,7 @@ function equiparCarta(
   // O guard de espiada MORREU aqui, gêmeo do de `jogarCarta`: `equiparCarta`
   // deixou de ser legal em `vasculhar`, a única fase em que a espiada existe, e a
   // pendência ficou inalcançável nesta função.
-  const { jogador, carta } = cartaDaMao(estado, acao);
+  const { jogador, carta, origem } = cartaEquipavelDe(estado, acao);
   if (carta.tipo !== 'equipamento') {
     throw new AcaoInvalida('aplicarAcao: só carta de equipamento vai para o corpo');
   }
@@ -644,7 +726,16 @@ function equiparCarta(
   const { slots, deslocados } = colocarNoSlot(jogador.emJogo.slots, carta, info);
   const atualizado: JogadorNaMesa = {
     ...jogador,
-    mao: jogador.mao.filter((c) => c.id !== carta.id),
+    // Remove da zona de ORIGEM, nunca das duas: filtrar a mão quando a carta veio
+    // da mochila seria no-op silencioso, e a carta ficaria duplicada (equipada E
+    // na mochila) — o tipo de bug que o censo de conservação de cartas pega tarde.
+    //
+    // ⚠️ ANTES de `destinoDoDesequipado`, não depois: vindo de uma mochila CHEIA,
+    // é esta remoção que libera a vaga onde o item deslocado do slot precisa
+    // caber. Invertida, a mochila ainda pareceria cheia na hora do roteamento —
+    // ver o pin de ordem em `mesa.test.ts` ("vindo de uma mochila CHEIA...").
+    mao: origem === 'mao' ? jogador.mao.filter((c) => c.id !== carta.id) : jogador.mao,
+    mochila: origem === 'mochila' ? jogador.mochila.filter((c) => c.id !== carta.id) : jogador.mochila,
     // ESPALHA a zona; não a remonta — mesmo motivo de `jogarCarta`: a raça que
     // esta função não conhece precisa sobreviver a ela.
     emJogo: { ...jogador.emJogo, slots },
@@ -653,9 +744,13 @@ function equiparCarta(
     ...estado,
     jogadores: estado.jogadores.map((j) => (j.id === atualizado.id ? atualizado : j)),
   };
-  const base = destinoDoDesequipado(comJogador, deslocados);
+  const { estado: base, eventos: doDeslocado } = destinoDoDesequipado(comJogador, deslocados, acao.jogadorId);
+  // `equipou` primeiro: o log conta a ação que o jogador pediu, e só então o que
+  // ela custou. Invertido, a linha "Espada Curta foi para o cemitério" apareceria
+  // antes de existir motivo para ela.
   const eventos: readonly EventoDaMesa[] = [
     { tipo: 'equipou', jogadorId: acao.jogadorId, slot: info.slot, carta },
+    ...doDeslocado,
   ];
 
   if (!ehFaseParada(estado.fase)) {
@@ -667,13 +762,62 @@ function equiparCarta(
 
   return entrarOuPular(
     base,
-    atualizado,
+    // ⚠️ RELÊ de `base`; não passa `atualizado`. Esta é a única ação do reducer em
+    // que o jogador sofre uma SEGUNDA mutação depois de `atualizado` ser fechado:
+    // `destinoDoDesequipado` (acima) pode ter posto o item que saiu do slot na
+    // mochila DESTE mesmo jogador. E `faseSeAutoPula` decide por
+    // `mochila.length > 0` — com a versão de antes, equipar a última carta da
+    // mochila pularia a fase parada tendo o deslocado dentro dela para vestir.
+    // Em `jogar`, isso passa o turno inteiro.
+    base.jogadores.find((j) => j.id === acao.jogadorId) ?? atualizado,
     // A fase de ORIGEM, não um literal: equipar é legal em `recompor` e em
     // `jogar`, e o jogador tem que continuar onde estava. Fixar `recompor` aqui
     // mandaria quem equipou depois de vencer um combate de volta para a fase 1.
     estado.fase,
     eventos,
   );
+}
+
+/**
+ * Mão → mochila. Direção única (spec §6): o que entra na mochila só sai equipado.
+ *
+ * O teto é cobrado AQUI e não no tipo porque um array não sabe se está cheio —
+ * mesma razão de `limiteDeMao` ser função e não propriedade do array de mão.
+ */
+function guardarCarta(
+  estado: EstadoPartida,
+  acao: Extract<AcaoDaMesa, { readonly tipo: 'guardarCarta' }>,
+): ResultadoAcao {
+  const { jogador, carta } = cartaDaMao(estado, acao);
+  if (carta.tipo !== 'equipamento') {
+    throw new AcaoInvalida('aplicarAcao: só carta de tesouro vai para a mochila');
+  }
+  if (jogador.mochila.length >= LIMITE_MOCHILA) {
+    // Pedido do cliente que a regra recusa => 400. A vista dele pode ser de um
+    // instante em que ainda havia vaga.
+    throw new AcaoInvalida('aplicarAcao: a mochila está cheia');
+  }
+
+  const atualizado: JogadorNaMesa = {
+    ...jogador,
+    mao: jogador.mao.filter((c) => c.id !== carta.id),
+    mochila: [...jogador.mochila, carta],
+  };
+  const base: EstadoPartida = {
+    ...estado,
+    jogadores: estado.jogadores.map((j) => (j.id === atualizado.id ? atualizado : j)),
+  };
+
+  if (!ehFaseParada(estado.fase)) {
+    // Inalcançável pela tabela: `guardarCarta` só é legal nas duas paradas. Se
+    // acontecer, é invariante NOSSA quebrada => Error cru, mesmo formato do guard
+    // gêmeo em `equiparCarta`.
+    throw new Error(`guardarCarta: fase não-parada ${estado.fase}`);
+  }
+
+  return entrarOuPular(base, atualizado, estado.fase, [
+    { tipo: 'guardou', jogadorId: acao.jogadorId, carta },
+  ]);
 }
 
 function agirNoCombate(estado: EstadoPartida, acao: AcaoDeCombate, deps: DepsMesa): ResultadoAcao {
@@ -827,10 +971,23 @@ function fecharCombate(
     }
     const saque = sacarTesouros(semCombate, jogadorId, info.tesouros, deps);
     comLoot = saque.estado;
-    // Só emite se algo saiu do baralho: `quantidade: 0` seria uma linha de log
-    // dizendo que nada aconteceu.
+    // `loot` só sai se algo REALMENTE saiu do baralho: `quantidade: 0` seria uma
+    // linha dizendo que o jogador recebeu nada.
     if (saque.quantidade > 0) {
       eventos.push({ tipo: 'loot', jogadorId, quantidade: saque.quantidade });
+    }
+    // ...e o que o baralho não conseguiu pagar sai como evento PRÓPRIO. Os dois
+    // convivem no pagamento parcial, cada um com o seu número.
+    //
+    // ⚠️ Até 2026-07-28 este ramo não existia, e a ausência era um bug de jogo: o
+    // vencedor não recebia nada e NADA na tela dizia por quê. Não é "nada
+    // aconteceu" — é a economia da mesa tendo secado, e medir mostrou que ela seca
+    // em 20 de 20 partidas de produção, perto da metade. O jogador não tem outra
+    // pista: `tesourosNoMonte` viaja na vista mas quase não é olhado, e a mão dele
+    // simplesmente para de crescer.
+    const naoPagas = info.tesouros - saque.quantidade;
+    if (naoPagas > 0) {
+      eventos.push({ tipo: 'tesouroEsgotado', jogadorId, naoPagas });
     }
   }
 
