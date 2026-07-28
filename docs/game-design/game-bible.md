@@ -331,10 +331,11 @@ fecha assim que todos passarem**. Timers são teto anti-AFK, não ritmo esperado
 4a NÃO isola o efeito da mochila** (decisão #24): a política "bot" mudou de identidade junto —
 no 3b era o bot que nunca equipava; no 4a é a mesma função, mas ela virou o bot guloso. A queda
 de 136 para 109 é o efeito de TROCAR o bot, não de o auto-pulo ou a mochila terem melhorado o
-ritmo isoladamente. **Remedido em 2026-07-27; a decisão de ritmo sobre estes números está EM
-ABERTO** — a aceitação da decisão #22 valia para 136/114, numa conversa real com o Pedro. Ele
-ainda não viu 109/115; ninguém aceitou este número em nome dele. Próxima remedição, de qualquer
-forma, só faz sentido depois da fase `encrenca` (Plano 4b), que muda a economia mais uma vez.
+ritmo isoladamente. **Remedido em 2026-07-27 e ACEITO pelo Pedro em 2026-07-28** (decisão #25):
+os dois números caem dentro da faixa que a decisão #22 já tinha aceitado, então nada piorou —
+mas a aceitação é do PATAMAR, não uma validação de que a mochila melhorou o ritmo, que esta
+medição não consegue afirmar. Próxima remedição só faz sentido depois da fase `encrenca`
+(Plano 4b), que muda a economia mais uma vez.
 
 ⚠️ **O auto-pulo das fases paradas NÃO está funcionando como mitigação** (decisão #23).
 `recompor` evita **0 cliques na mediana** — ela exige mão sem raça E sem equipamento, e todo
@@ -535,3 +536,10 @@ turno, fase de ajuda/atrapalhar antes da batalha, mão de 7, sem ouro, morte sem
 | 22 | **Ritmo aceito em 136 ações do humano** por partida (contra 107 do Plano 3a, +27%). Remedir depois do Plano 4 | O Plano 4 muda a economia de novo (mochila, bot guloso): regular agora é mirar em alvo móvel. 🎚️ Continua sendo dial, não regra |
 | 23 | **O auto-pulo das fases paradas está quase inerte** e NÃO é a mitigação de ritmo que o §6.1 do spec prometia | Medido: `recompor` evitou **0 cliques na mediana**, porque todo Tesouro desta fatia é equipamento e a mão quase sempre carrega algum. ⚠️ Estreitá-lo para "slot vazio compatível" **tiraria a troca de equipamento antes da porta**, que é a razão de a fase existir — a mitigação de ritmo terá que vir de outro lugar |
 | 24 | **A dívida "bot nunca equipa" está PAGA** (Plano 4a): força final medida 5,71–6,16 nas quatro amostras (contra 3,67 do bot hoarding) — mas SÓ três das quatro batem os 5,95 projetados no Plano 3a; a política equipando em N=31 deu 5,71, 4,0% abaixo da projeção. A dívida está paga mesmo assim: até o valor mais baixo medido supera o bot hoarding em +56%. **Tesouros doados por caridade caíram de 994 para ~0** — o bot guloso resolve equipamento antes de chegar em `descartar`; o que sobra para doar são cartas de Porta (`monstro`/`salaVazia`) dadas CRUAS na mão inicial, que nenhum verbo do jogo hoje sabe jogar. **Taxa de vitória do humano medida (22,6%–37,8%) ficou ABAIXO dos 42,5% projetados**, sem explicação fechada | A dívida do bot está paga pela distância até o bot hoarding, não por ter batido a projeção (uma das quatro amostras ficou abaixo dela) — e a queda de doações revela que a mão inicial cria cartas mortas até a fase `encrenca` existir, e a taxa de vitória mais baixa que a projeção fica registrada sem causa fechada (relatório completo: `.superpowers/sdd/2026-07-27-fatia-8-plano-4a-mochila-e-o-bot-que-veste/task-9-report.md`) |
+
+### Sessão de 2026-07-28 — fechando o Plano 4a
+
+| # | Decisão | Porquê |
+|---|---|---|
+| 25 | **Ritmo aceito em 109 / 115 ações do humano** (política do bot / equipando), medido no Plano 4a. Substitui a aceitação da #22, que valia para 136/114. Remedir depois do Plano 4b | Os dois números caem **dentro** da faixa já aceita na #22 — nada piorou, então não há o que regular agora. ⚠️ Aceitar o PATAMAR não é afirmar que a mochila melhorou o ritmo: a medição não isola isso (ver #24), porque os 3 bots trocaram de política junto. A alternativa era rodar uma medição controlada com bots hoarding nos outros assentos, e ela mediria uma mesa que **não vai para produção**. 🎚️ Continua sendo dial, não regra |
+| 26 | **A `TelaMesa` vai padronizar "você não pode agora" em VISÍVEL-E-APAGADO**: o botão "Guardar" deixa de sumir quando a fase não o permite e passa a aparecer desabilitado, como "Jogar" e "Equipar". ⏸️ **Decidido em 2026-07-28, implementação PENDENTE** — entra na leva de correções que fecha o Plano 4a; até lá o código ainda faz o "Guardar" sumir | A tela tinha dois vocabulários para o mesmo estado (gate de existência para um verbo, gate de habilitação para os outros), o que ensina o jogador errado duas vezes. Vence o vocabulário da maioria, e é o que dá **descoberta**: verbo que some é verbo que o jogador nunca aprende que existe. ⚠️ Custo assumido: os testes da Task 7 do Plano 4a exigem a AUSÊNCIA do botão e precisam ser reescritos para exigir `disabled` — reescrever a asserção, nunca apagá-la |

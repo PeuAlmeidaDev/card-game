@@ -140,9 +140,10 @@ MESMA função `escolherAcao`, só que ela virou o bot guloso (ver abaixo). Toda
 o 3b muda duas coisas ao mesmo tempo: a política do humano (o eixo controlado) e a política dos
 outros 3 assentos (efeito colateral deste plano ter trocado o bot). Não dá para isolar "o
 efeito da mochila no ritmo" sem reintroduzir bots hoarding nos outros 3 assentos — o que não é a
-mesa que vai para produção. **A decisão de ritmo sobre 109/115 está EM ABERTO** — a decisão #22
-do game bible ("Pedro decidiu ACEITAR") vale para 136/114, de uma conversa real; ninguém aceitou
-109/115 em nome dele, e não é desta task fazê-lo. Detalhe completo, com a checagem de robustez em
+mesa que vai para produção. **O Pedro ACEITOU 109/115 em 2026-07-28** (decisão #25 do game
+bible, que substitui a #22): os dois números caem dentro da faixa que a #22 já aceitava, então
+nada piorou. ⚠️ A aceitação é do **patamar** — não é validação de que a mochila melhorou o
+ritmo, que esta medição não consegue afirmar. Detalhe completo, com a checagem de robustez em
 N=90 e a nota de variância de amostra:
 `.superpowers/sdd/2026-07-27-fatia-8-plano-4a-mochila-e-o-bot-que-veste/task-9-report.md`.
 
