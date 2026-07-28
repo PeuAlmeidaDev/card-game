@@ -945,12 +945,18 @@ describe('TelaMesa — a mochila', () => {
     expect(await screen.findByRole('button', { name: /equipar/i })).toBeEnabled();
   });
 
-  it('em `descartar` NÃO existe "Guardar" — guardar não é saída do excedente', async () => {
-    // Contra-intuitivo e de propósito: guardar ali seria mover a carta para uma
-    // zona que o teto de mão não alcança, isto é, fugir do teto. Botão AUSENTE,
-    // e botão ausente só se nota quando alguém escreve o teste que o procura.
+  it('em `descartar` o "Guardar" EXISTE e está apagado — guardar não é saída do excedente', async () => {
+    // Guardar ali seria mover a carta para uma zona que o teto de mão não alcança,
+    // isto é, fugir do teto — e o domínio recusa (`guardarCarta` não é legal em
+    // `descartar`). O que mudou (decisão #26) é como a tela DIZ isso: apagado, e
+    // não ausente, o mesmo vocabulário de "Jogar" e "Equipar" na mesma lista.
+    //
+    // ⚠️ A asserção foi REESCRITA, não apagada: ela continua sendo o gêmeo do gate
+    // de fase do reducer. Trocá-la por nada devolveria o botão para o limbo em que
+    // ninguém nota se ele acender — que é como o "Equipar" sem stats sobreviveu a
+    // nove revisões no Plano 3a.
     await abrirMesa(emDescartar([tesouro('t-1')]));
 
-    expect(screen.queryByRole('button', { name: /guardar/i })).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /guardar/i })).toBeDisabled();
   });
 });

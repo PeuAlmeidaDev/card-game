@@ -229,15 +229,19 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // inalcançáveis e foram removidos (os gêmeos na tela saem na Task 5, onde o
   // botão "Passar" chega).
   //
-  // Os QUATRO pares de `guardarCarta` (Task 2) ganham gêmeo na tela na Task 7
+  // Os QUATRO pares de `guardarCarta` (Task 2) têm gêmeo na tela
   // (`TelaMesa.test.tsx`, describe "a mochila"): `carta.tipo === 'equipamento'`
-  // vira gate de EXISTÊNCIA do botão "Guardar" (mesmo tratamento que
-  // `equiparCarta` já dá ao seu par de tipo), e "mochila cheia" vira `disabled`
-  // comum. O gate de FASE deste botão específico também é EXISTÊNCIA — não só
-  // `disabled` como o resto da lista —, porque guardar numa fase errada não é
-  // "espere a hora certa" (a mão pode entregar a qualquer momento): é fugir do
-  // teto de mão para uma zona que ele não alcança, e prometer essa fuga com um
-  // botão desabilitado já seria a mentira.
+  // é gate de EXISTÊNCIA do botão "Guardar" (mesmo tratamento que `equiparCarta`
+  // dá ao seu par de tipo), e "mochila cheia" é `disabled` comum.
+  //
+  // O gate de FASE deste botão JÁ FOI existência também, pelo argumento de que
+  // guardar numa fase errada não é "espere a hora certa" mas fugir do teto de
+  // mão, e que um botão apagado prometeria essa fuga. O argumento caiu porque
+  // provava demais: "Equipar" também tira carta da mão, também é ilegal em
+  // `descartar`, e sempre esteve apagado-e-visível ali. Desde a decisão #26 do
+  // game bible o gate de fase é `disabled`, como o resto da lista — a tela tem
+  // UM vocabulário para "você não pode agora", e verbo que some é verbo que o
+  // jogador nunca aprende que existe.
   //
   // Mesmo assim a lista SUBIU de sete para oito, e a conta é a lição do parágrafo
   // acima: as linhas antigas `vasculhar/descartar` escondiam DOIS pares cada uma

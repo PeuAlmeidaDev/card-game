@@ -383,22 +383,26 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
                   Equipar
                 </button>
               )}
-              {/* O par fino de `guardarCarta` (ver a tabela no `aplicarAcao`), e os
-                  DOIS gates de EXISTÊNCIA (não só `disabled`) de propósito:
-                  - `carta.tipo === 'equipamento'` → só tesouro se guarda, mesmo
-                    gate de existência que `equiparCarta` já usa acima.
-                  - `legal('guardarCarta')` → aqui na EXISTÊNCIA, e não só no
-                    `disabled` como o resto dos botões desta lista. Guardar em
-                    `descartar` seria abrir uma saída que o teto de mão não
-                    alcança — sinalizar isso com um botão desabilitado ainda
-                    prometeria a saída; o botão certo é AUSENTE.
-                  O teto da mochila (`minhaMochila.length >= LIMITE_MOCHILA`) já é
-                  DISABLED normal, como os outros pares finos — cheia é reversível
-                  (esvazia equipando), diferente da fase errada. */}
-              {carta.tipo === 'equipamento' && legal('guardarCarta') && (
+              {/* Os pares finos de `guardarCarta` (ver a tabela no `aplicarAcao`).
+                  UM gate de existência e o resto em `disabled`:
+                  - `carta.tipo === 'equipamento'` → EXISTÊNCIA, mesmo tratamento
+                    que `equiparCarta` dá ao seu par de tipo logo acima. Uma carta
+                    de Porta nunca vai poder ser guardada, em fase nenhuma: o botão
+                    não descreve um estado, descreve a carta errada.
+                  - `legal('guardarCarta')` → DISABLED, como o resto desta lista.
+                    Já foi gate de existência, com o argumento de que um botão
+                    apagado "prometeria" uma fuga do teto de mão que `descartar`
+                    não permite. O argumento provava demais: "Equipar" também
+                    reduz a mão, também é ilegal em `descartar`, e sempre esteve
+                    apagado-e-visível ali. Sumir com o verbo era o único jeito
+                    garantido de o jogador nunca aprender que ele existe — decisão
+                    #26 do game bible.
+                  - teto da mochila → DISABLED, e por outro motivo: cheia é
+                    reversível esvaziando pela equipagem, fase errada não é. */}
+              {carta.tipo === 'equipamento' && (
                 <button
                   type="button"
-                  disabled={minhaMochila.length >= LIMITE_MOCHILA}
+                  disabled={!legal('guardarCarta') || minhaMochila.length >= LIMITE_MOCHILA}
                   onClick={() => void agir({ tipo: 'guardarCarta', cartaId: carta.id })}
                 >
                   Guardar
