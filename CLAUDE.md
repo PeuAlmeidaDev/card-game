@@ -115,8 +115,11 @@ lendo a origem certa.
 
 **Censo de conservação e sonda de sigilo, remedidos com a mochila em jogo:** 80 partidas,
 34.991 ações, censo id-a-id **depois de CADA ação** em todas as zonas (os dois baralhos, toda
-mão, toda mochila, todo slot equipado — deduplicado por id via `itensEquipados`, a arma de duas
-mãos não pode contar dobrado). **Zero cartas sumiram ou duplicaram.** A mochila é a primeira
+mão, toda mochila, todo slot equipado, e a raça em jogo de cada jogador — deduplicado por id via
+`itensEquipados`, a arma de duas mãos não pode contar dobrado). ⚠️ A raça em jogo (`emJogo.raca`)
+é zona à parte dos slots de equipamento, e foi exatamente a que a primeira versão do script
+esqueceu — pego num smoke test antes da medição real, ver o relatório da Task 9. **Zero cartas
+sumiram ou duplicaram.** A mochila é a primeira
 zona alimentada por DUAS origens (`guardarCarta` da mão, `destinoDoDesequipado` do slot) —
 exercitada 948 vezes em `guardarCarta`, 169 equipagens de item de duas mãos e 50 desequipados
 roteados ao cemitério por mochila cheia, sem uma única divergência. A sonda de sigilo (mesmas 80
@@ -137,16 +140,23 @@ MESMA função `escolherAcao`, só que ela virou o bot guloso (ver abaixo). Toda
 o 3b muda duas coisas ao mesmo tempo: a política do humano (o eixo controlado) e a política dos
 outros 3 assentos (efeito colateral deste plano ter trocado o bot). Não dá para isolar "o
 efeito da mochila no ritmo" sem reintroduzir bots hoarding nos outros 3 assentos — o que não é a
-mesa que vai para produção. Detalhe completo, com a checagem de robustez em N=90 e a nota de
-variância de amostra: `.superpowers/sdd/2026-07-27-fatia-8-plano-4a-mochila-e-o-bot-que-veste/task-9-report.md`.
+mesa que vai para produção. **A decisão de ritmo sobre 109/115 está EM ABERTO** — a decisão #22
+do game bible ("Pedro decidiu ACEITAR") vale para 136/114, de uma conversa real; ninguém aceitou
+109/115 em nome dele, e não é desta task fazê-lo. Detalhe completo, com a checagem de robustez em
+N=90 e a nota de variância de amostra:
+`.superpowers/sdd/2026-07-27-fatia-8-plano-4a-mochila-e-o-bot-que-veste/task-9-report.md`.
 
 ⚠️ **O auto-pulo continua com mediana 0 em `recompor`** nas duas políticas (igual ao 3b — já
 estava no piso, não deu para medir "piorar ainda mais"). `jogar` também caiu para mediana 0 nas
 duas (era 0/**9** no 3b) — de novo efeito dominante dos 3 bots terem mudado, não do humano.
 
-**Dívida "o bot nunca equipa" — PAGA.** Força final dos bots medida: **6,05–6,16** (média, duas
-rodadas) contra os **3,67** do bot hoarding e os **5,95** projetados no Plano 3a para um bot
-guloso — bate com a projeção (+2% a +3,5%). **Taxa de vitória do humano medida: 22,6%–37,8%**
+**Dívida "o bot nunca equipa" — PAGA.** Força final dos bots medida: **5,71–6,16** (média, as
+quatro amostras — duas rodadas × duas políticas do humano) contra os **3,67** do bot hoarding e
+os **5,95** projetados no Plano 3a. ⚠️ Não bate limpo com a projeção: três das quatro amostras
+ficam ACIMA dela (+1,5% a +3,5%), mas a política equipando em N=31 deu **5,71 — 4,0% ABAIXO**
+dos 5,95 projetados. A dívida continua PAGA de qualquer forma: mesmo o valor mais baixo medido
+(5,71) fica **+56%** acima dos 3,67 do bot que nunca equipava — a projeção não precisa ter sido
+batida para a dívida estar quitada. **Taxa de vitória do humano medida: 22,6%–37,8%**
 (varia por rodada e política) contra os **80%** do bot antigo e os **42,5%** projetados — PIOR
 que a projeção nas três rodadas que rodei, sem explicação fechada (ver o relatório da Task 9 para
 as duas hipóteses candidatas). **Tesouros doados por bots via caridade: ~0** (era **994**, com
