@@ -1,6 +1,22 @@
 # Fatia 8 — TESOUROS (e o verbo das cartas mudas) · design
 
-- **Status:** aprovado em sessão de `brainstorming` (2026-07-25). Fonte de verdade desta fatia.
+- **Status:** aprovado em sessão de `brainstorming` (2026-07-25). Fonte de verdade desta fatia,
+  **exceto onde o game bible o superou** — ver o bloco abaixo.
+
+> 🔴 **LEIA ANTES DE ESCREVER O PLANO 4b.** A sessão de `grilling` de **2026-07-29** (Fase 0 do
+> roteiro para o MVP, decisões **#29–#50** do `game-bible.md`) mudou coisas que este spec afirma.
+> **Onde divergirem, o bible vence** — é a regra do `CLAUDE.md`.
+>
+> | O que este spec diz | O que vale hoje |
+> |---|---|
+> | `CartaPorta` inclui `{ tipo: 'salaVazia' }` (§ do modelo de dados) e a fase 3 abre com *"a porta não trouxe combate"* | A **`salaVazia` foi REMOVIDA do jogo** (#42). Porta que não é monstro **vai para a mão**, e é isso que abre a `encrenca` |
+> | `saquear` = *"compra 1 Portal virado pra mão, sem combate"* — a opção segura | `saquear` compra **às cegas** e pode trazer **maldição para a mão** (#31). **Não é a opção segura** — é a aposta que impede a `encrenca` de virar fase de um clique |
+> | A família Tesouros é equipamento-only (decisão #21 do bible, citada aqui) | São **três** tipos: equipamento, **carta de combate** (com alvo) e **instantâneo** (#29, #43) |
+> | As fases do turno referidas por número | **Chame pelo NOME** (#48): `recompor`, `vasculhar`, `encrenca`, `combate`, `jogar`, `descartar`. *"Fase 5"* é ambíguo entre os 6 passos do bible e as 5 fases do código |
+> | *"decisão #N"* sem qualificador | **Qualifique sempre** (#34): este spec, o spec da fatia 7 e o §19 do bible têm numerações **independentes que colidem** |
+>
+> ⚠️ **O que este spec continua sendo a melhor fonte:** o §6/§6.1 (anatomia das fases e auto-pulo)
+> e as decisões #7 e #8 **deste** spec, que o código implementa hoje.
 - **Base:** `main` `119e105` (fatia 7 — A MÃO — completa e mergeada, PR #19; 303 testes).
 - **Branch:** `feat/fatia-8-tesouros`.
 - **Convenção:** ✅ decidido · 🎚️ dial (número a calibrar em playtest) · ⬜ em aberto ·
