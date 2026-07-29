@@ -19,6 +19,8 @@ autoral a definir**. Inspirado nas *mecânicas* do Munchkin; tema, nomes e arte 
 | **`docs/game-design/game-bible.md`** | **O JOGO** (mundo, formato da partida, turno, cartas, economia, roteiro de fatias). Documento vivo. **Ler antes de qualquer decisão de design.** |
 | `docs/superpowers/specs/` | Specs de implementação, um por fatia. |
 | `docs/superpowers/plans/` | Planos de execução (tasks TDD, um commit cada). |
+| `docs/game-design/mecanica-cartas.md` | ⚠️ **NÃO é fonte de verdade.** Registro de design da fatia 6 (raças). Até 2026-07-29 o cabeçalho dele afirmava *"este doc corrige o bible"* — descrevia **um evento de 2026-07-24 que o bible já absorveu**, escrito como autoridade permanente. Corrigido. **O bible vence.** |
+| `docs/game-design/roteiro-para-o-mvp.md` | ⚠️ **Cumprido e histórico.** A Fase 0 aconteceu em 2026-07-29; a definição do MVP nasceu no bible (**§3.1**). Vale como registro de por que o MVP não existia. |
 
 Os specs anteriores a 2026-07-22 foram escritos quando o jogo era uma **run solo**. Onde eles
 divergirem do game bible, **o game bible vence**.
@@ -41,9 +43,21 @@ mudança de roteiro. Vale inclusive para decisão tomada de passagem numa conver
 **Por que isto virou regra (2026-07-27):** um docstring em `partida/src/tipos.ts` afirmava que
 *"maldição e classe entram na família Tesouros quando tiverem verbo"*. O game bible **já dizia o
 contrário** desde sempre — §4 põe maldições e classes no baralho de **Portais**, e maldição
-resolve com **efeito imediato** (nunca vai para a mão, logo nunca para a mochila). O comentário
-derivou da fonte de verdade sem ninguém notar, e um implementador **e** um revisor gastaram um
-ciclo inteiro raciocinando sobre um cenário que o jogo não tem.
+**nunca entra na mochila** (que é `readonly CartaTesouro[]`; maldição é carta de Porta). O
+comentário derivou da fonte de verdade sem ninguém notar, e um implementador **e** um revisor
+gastaram um ciclo inteiro raciocinando sobre um cenário que o jogo não tem.
+
+🔴 **E este parágrafo, que existe para ensinar a não derivar da fonte de verdade, DERIVOU DA
+FONTE DE VERDADE.** Até 2026-07-29 ele justificava a conclusão acima com *"maldição resolve com
+efeito imediato (**nunca vai para a mão**, logo nunca para a mochila)"*. A conclusão está certa;
+a premissa **não**. O bible sempre desenhou **dois** caminhos para maldição (decisão #31): efeito
+imediato é regra do **passo 2 do §6** (revelada no vasculhar), mas o `saquear` do passo 3 *"compra
+1 Portal virado pra mão"* — e o passo 5 já listava *"usar maldições"* entre as ações da mão. A
+frase colapsou dois caminhos num só e escreveu o resultado entre parênteses, como se fosse
+dedução óbvia. ⚠️ **Ia custar caro:** `saquear` é o verbo do **Plano 4b**, o próximo — ele nasceria
+como "compra uma carta", sem perguntar o que acontece quando a carta é maldição. Lição: a regra
+"ler o bible antes de escrever" vale **também para o texto que ensina a regra**, e parêntese que
+começa com *"logo"* é dedução — o lugar onde a derivação se disfarça de fato.
 
 ⚠️ **A direção do erro importa:** não foi o game bible que ficou desatualizado — foi o CÓDIGO
 que se afastou dele. Por isso a regra não é só "escreva no bible depois"; é **ler o bible antes
@@ -255,15 +269,40 @@ quebra a compilação de **exatamente 2 arquivos**, `narrarEvento.tsx` e `partic
 dois em `web`; nada em `partida`/`shared`/`server`, porque as respostas do contrato são
 `c.type<T>()` e o Zod está na entrada.
 
-**Próximo passo: Plano 4b — a fase `encrenca`.** Os verbos `procurarEncrenca`/`saquear` (spec §6,
-fase 3 do turno) — a Task 9 do Plano 4a mediu por que ela importa: cartas de Porta
-(`monstro`/`salaVazia`) dadas na mão inicial ficam mortas até existir um verbo que as jogue de
-dentro da mão, e é isso que hoje esvazia a caridade de tesouro (ver "Dívida... PAGA" acima).
+## ⚠️ SESSÃO DE 2026-07-29 — a Fase 0 aconteceu. **Releia o bible antes de agir.**
+
+Uma sessão de `grilling` produziu **22 decisões (#29–#50)** e mudou coisas que este arquivo
+afirmava. **O `game-bible.md` é a fonte de verdade; o que está escrito acima pode estar velho.**
+
+- ✅ **O MVP finalmente TEM definição:** **`game-bible.md` §3.1**. Seis blocos.
+- ✅ **Ordem vigente (§17, decisão #45):** `4b encrenca` → **`Maldições/Bad Stuff`** →
+  **`Frontend animado`** → **`Online`** → `Interferência` → `Habilidades` (fora do MVP) →
+  `Contas/ranking/crônica`.
+  🔴 **A ordem que este arquivo trazia OMITIA O ONLINE, e isso era DERIVA** — o §17 tinha
+  argumento escrito (*"interferência é mecânica de rede"*) que nunca foi revogado.
+- 🔴 **Decisões que invalidam o texto acima — nenhuma delas está CONSTRUÍDA ainda** (são desenho,
+  e o código continua como está descrito no "Estado atual"): a `salaVazia` **sai do jogo** (#42);
+  `item de batalha` + `item que atrapalha batalha` **colapsaram** em `carta de combate` com alvo
+  (#43); o `instantâneo` passa a ser jogável **pelo lutador no meio do combate** (#44), o que faz
+  o snapshot do §7 virar **sequência**; a montagem do baralho vira **receita explícita** (#36);
+  a carta de raça vira **artefato de transformação** consumido no uso (#38).
+- 🔴 **O motor é 1v1 LITERAL** (`criarCombate(jogador, monstro)`), e a **interferência carrega a
+  generalização para N** — custo que nunca foi contado (#33).
+- ⚠️ **Fases do turno: chame pelo NOME, nunca por número** (#48) — `recompor`, `vasculhar`,
+  `encrenca`, `combate`, `jogar`, `descartar`. O bible numerava 6 passos e o código tem 5 fases:
+  *"fase 5"* era ambíguo. **Mesmo defeito da #34** (*"decisão #N"* existe em **três** registros:
+  o bible, o spec da fatia 7 e o spec da fatia 8 — sempre qualifique de qual).
+  ➡️ **Regra geral: em documento com mais de uma lista paralela, NOMEIE — não numere.**
+
+**Próximo passo: Plano 4b — a fase `encrenca`.** Os verbos `procurarEncrenca`/`saquear` (§6 do
+bible) — a Task 9 do Plano 4a mediu por que ela importa: cartas de Porta dadas na mão inicial
+ficam mortas até existir um verbo que as jogue de dentro da mão, e é isso que hoje esvazia a
+caridade de tesouro (ver "Dívida... PAGA" acima).
+⚠️ **Duas coisas novas que o 4b tem que encarar e que o plano ainda não sabia:** (1) `saquear`
+compra Porta **às cegas** e pode trazer **maldição para a mão** (#31) — ele não é "a opção
+segura"; (2) a `salaVazia` sai do jogo (#42), então **toda** porta não-monstro vai para a mão.
 Fora de escopo, já declarado: mochila → mão (adiada para a fatia da interferência) e escolher o
 que queimar com a mochila cheia.
-
-Roteiro completo e justificativa em §17 do game bible (Mesa → Interferência → Personagem
-dinâmico → Habilidades → Contas/ranking/crônica).
 
 ## Stack (alvo)
 

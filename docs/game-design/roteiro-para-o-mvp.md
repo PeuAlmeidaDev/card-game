@@ -1,5 +1,35 @@
 # Roteiro para o MVP — onde estamos e o que falta
 
+> # ✅ A FASE 0 ACONTECEU EM 2026-07-29. ESTE DOCUMENTO ESTÁ CUMPRIDO.
+>
+> **A definição do MVP agora existe, e mora no bible: `game-bible.md` §3.1.**
+> A ordem dos blocos vigente está no **§17** do bible (decisão #45). As 22 decisões da sessão
+> (**#29 a #50**) estão no §19.
+>
+> ⚠️ **Tudo abaixo desta linha é o retrato de 2026-07-28** — o estado *antes* da Fase 0. Onde
+> divergir do bible, **o bible vence**, como o §5 deste documento sempre disse. Guardado por
+> valor histórico: ele é o documento que provou que o MVP nunca tinha sido definido.
+>
+> **O que a Fase 0 respondeu, ponto a ponto:**
+>
+> | Ponto | Resultado |
+> |---|---|
+> | 0.1 — #21 × §4 | A família Itens tem os **4 tipos por desenho**; a #21 foi rebaixada a fato de implementação (**#29**). Junto vieram o `modificador de monstro` das Portas (**#30**), os dois caminhos da maldição (**#31**), a divisão do modificador em três famílias (**#32**) e a descoberta de que **o motor é 1v1 literal e a interferência já cobra a generalização** (**#33**) |
+> | 0.2 — pergunta 11 | Diagnóstico aceito: **não é dial mal calibrado, é loop meio construído**. O baralho de Itens (32) é **menor que a absorção permanente da mesa** (40). Resposta estrutural: **consumíveis ≥ 50%** (**#40**) + a evacuação do §10 (**#46**) |
+> | 0.3 — pergunta 10 | **Fechada sem mudar mecânica** (**#37**): o incômodo vinha de o baralho ser **38% raça sem ninguém ter decidido**, não de a mão ser apertada |
+> | 0.4 — composição | **Receita explícita** substitui a derivação do catálogo (**#36**); receita-alvo de **168 cartas** na mesa de 4 (**#41**) |
+> | 0.5 — quantidades | Pisos de variedade como 🎚️ dials (**#39**) — a #36 rebaixou esta pergunta de "balanceamento" para "variedade" |
+> | 0.6 — o Online | **Deriva confirmada:** o `CLAUDE.md` perdeu o item; o §17 tinha argumento nunca revogado. Ordem nova em **#45**, com o **animado antes do Online** por escolha do Pedro |
+> | 0.7 — a definição | **Escrita: `game-bible.md` §3.1** (**#50**) |
+>
+> **E a Fase 0 rendeu o que não estava no roteiro:** uma **varredura de coerência** do bible
+> inteiro (7 incongruências corrigidas, entre elas uma **citação quebrada** que sustentava a
+> premissa da pergunta 10), a decisão **#35** (playback do turno alheio) que criou um bloco de
+> roteiro inexistente, a **#44** (instantâneo no meio do combate) que flexionou uma regra
+> estrutural, e duas ocorrências do **mesmo defeito de identificador** — *"decisão #N"* (**#34**)
+> e *"fase N"* (**#48**) — que produziram a regra: **em documento com mais de uma lista paralela,
+> nomeie; não numere.**
+
 > **Escrito em 2026-07-28**, logo após o merge do Plano 4a (PR #24).
 > Documento de **orientação**, não de execução. Os planos de execução vivem em
 > `docs/superpowers/plans/`; a fonte de verdade do jogo continua sendo o `game-bible.md`.
