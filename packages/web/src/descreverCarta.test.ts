@@ -7,11 +7,6 @@ const nomeDoMonstro = (id: string): string => (id === 'goblin' ? 'Goblin' : id);
 const nomeDoItem = (id: string): string => (id === 'espada-curta' ? 'Espada Curta' : id);
 
 describe('descreverCarta', () => {
-  it('descreve cada tipo de carta', () => {
-    expect(descreverCarta({ id: 'a', tipo: 'monstro', monstroId: 'goblin' }, nomeDaRaca, nomeDoMonstro, nomeDoItem)).toBe('um Goblin');
-    expect(descreverCarta({ id: 'b', tipo: 'salaVazia' }, nomeDaRaca, nomeDoMonstro, nomeDoItem)).toBe('uma sala vazia');
-  });
-
   it('nomeia a raça da carta', () => {
     // "uma carta de raça" era informação zero num baralho cheio de raças: o vidente
     // pressente o QUÊ, e é isso que faz a Presciência valer a decisão.

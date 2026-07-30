@@ -80,17 +80,17 @@ const MAO_QUE_ESTOURA = 9;
  * nela. O enchimento até `MAO_QUE_ESTOURA` mora aqui, num ponto só, para que o
  * próximo giro do dial quebre um lugar em vez de cinco fixtures.
  *
- * Enche com SALA VAZIA porque ela entra na mão de verdade (a mão inicial vem do
- * baralho de Portas, que tem salas vazias na composição) e não acende nem
- * "Jogar" nem "Equipar" — a carta que o teste passa continua sendo a única do
- * tipo dela na tela.
+ * Enche com MONSTRO (decisão #42 tirou a sala vazia do jogo) porque não acende
+ * nem "Jogar" nem "Equipar" — só `raca` e `equipamento` desenham botão na linha
+ * da carta — e a carta que o teste passa continua sendo a única do tipo dela na
+ * tela quando esse tipo é diferente do filler.
  */
 const emDescartar = (cartas: readonly CartaNaMao[] = []): VistaDaPartida => {
   const suaMao: readonly CartaNaMao[] = [
     ...cartas,
     ...Array.from(
       { length: MAO_QUE_ESTOURA - cartas.length },
-      (_, i): CartaNaMao => ({ id: `vazia-${i}`, tipo: 'salaVazia' }),
+      (_, i): CartaNaMao => ({ id: `m-${i}`, tipo: 'monstro', monstroId: 'm-teste' }),
     ),
   ];
   return {
@@ -596,7 +596,7 @@ describe('TelaMesa — a mão', () => {
   });
 
   it('na fase `vasculhar`, entregar fica apagado — a caridade resolve excedente', async () => {
-    await abrirMesa({ ...vistaBase, suaMao: [{ id: 'p-0', tipo: 'salaVazia' }] });
+    await abrirMesa({ ...vistaBase, suaMao: [{ id: 'p-0', tipo: 'raca', racaId: 'r-teste' }] });
 
     expect(await screen.findByRole('button', { name: /entregar/i })).toBeDisabled();
     expect(screen.getByRole('button', { name: /vasculhar local/i })).toBeEnabled();

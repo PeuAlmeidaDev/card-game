@@ -44,7 +44,7 @@ describe('participantesDe', () => {
     // runtime: um `case` novo cair no `default` e devolver `[]`, o que sumiria com
     // o evento de TODO filtro por jogador em silêncio.
     const umDeCada: readonly EventoDaMesa[] = [
-      { tipo: 'porta', jogadorId: 'p1', carta: { id: 'c1', tipo: 'salaVazia' } },
+      { tipo: 'porta', jogadorId: 'p1', carta: { id: 'c1', tipo: 'raca', racaId: 'r-teste' } },
       { tipo: 'achado', jogadorId: 'p1' },
       { tipo: 'combate', jogadorId: 'p1', eventos: [] },
       { tipo: 'patente', jogadorId: 'p1', patente: 2 },
@@ -52,7 +52,7 @@ describe('participantesDe', () => {
       { tipo: 'vez', jogadorId: 'p1' },
       { tipo: 'racaEmJogo', jogadorId: 'p1', carta: { id: 'r1', tipo: 'raca', racaId: 'elfo' } },
       { tipo: 'entrega', jogadorId: 'p1', paraJogadorId: 'p2', rolagem: null },
-      { tipo: 'descarte', jogadorId: 'p1', carta: { id: 'c2', tipo: 'salaVazia' } },
+      { tipo: 'descarte', jogadorId: 'p1', carta: { id: 'c2', tipo: 'raca', racaId: 'r-teste' } },
       { tipo: 'loot', jogadorId: 'p1', quantidade: 1 },
       { tipo: 'equipou', jogadorId: 'p1', carta: { id: 't1', tipo: 'equipamento', itemId: 'espada-curta' }, slot: 'maoDireita' },
       { tipo: 'guardou', jogadorId: 'p1', carta: { id: 't1', tipo: 'equipamento', itemId: 'espada-curta' } },

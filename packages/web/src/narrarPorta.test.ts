@@ -11,11 +11,6 @@ describe('narrarPorta', () => {
     expect(narrarPorta(carta, 'Você', nomeDaRaca, nomeDoMonstro)).toBe('Você dá de cara com um Goblin!');
   });
 
-  it('narra a sala vazia como anticlímax', () => {
-    const carta: CartaPorta = { id: 'p-1', tipo: 'salaVazia' };
-    expect(narrarPorta(carta, 'Você', nomeDaRaca, nomeDoMonstro)).toBe('Você vasculha o local e não encontra nada.');
-  });
-
   it('nomeia a raça encontrada', () => {
     const carta: CartaPorta = { id: 'p-2', tipo: 'raca', racaId: 'elfo' };
     expect(narrarPorta(carta, 'Bot 1', (id) => (id === 'elfo' ? 'Elfo' : id), nomeDoMonstro))
