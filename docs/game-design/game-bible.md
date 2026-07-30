@@ -103,6 +103,7 @@ de ~40–60 min contra 3 pessoas, sabota e negocia com elas, e sai com posição
 
 | # | Bloco | Entrega | Por que está DENTRO |
 |---|---|---|---|
+| 0 | **Corte da `salaVazia`** | remove a `salaVazia` (#42) e fixa a composição interina `2×monstro + 1×raça` (#52) | Fatia própria **antes** do 4b (#51): as duas mudanças prometem ressuscitar a **mesma** métrica (a caridade), e medi-las juntas repete o erro das #24/#25 |
 | 1 | **Plano 4b — `encrenca`** | `procurarEncrenca` e `saquear` | **Última peça estrutural da fatia 8.** Sem ela o §6 tem uma fase sem verbo, e cartas de Porta morrem na mão |
 | 2 | **Maldições / Bad Stuff** | maldição (2 caminhos, #31), **morte/evacuação** do §10 | É a **1ª carta que mira outro jogador** e o **conserto da economia** — sem ela o baralho de Itens seca em 20/20 partidas (#46) |
 | 3 | **Frontend animado** | mesa desenhada, playback do turno alheio 1x/2x (#35) | Torna o jogo demonstrável, e a interferência **exige** enxergar bem o combate alheio |
@@ -472,6 +473,17 @@ do zero e ainda pegar o 2º lugar é exatamente o tipo de história que §14 que
   a proporção do baralho ser **acidente do tamanho do catálogo** — no baralho que o código monta
   hoje, 38% monstro / 38% raça / 23% `salaVazia`, números que ninguém escolheu (a `salaVazia` sai
   do jogo pela #42, mas ainda está em código).
+- 🎚️ **Composição INTERINA de Portas, decidida em 2026-07-30 (decisão #52):** com a `salaVazia`
+  fora, `2× monstro + 1× raça` por jogador = **15 cartas/jogador**, **60 na mesa de 4** (contra 52
+  hoje). Densidade **67% monstro / 33% raça**. É interina porque a receita-alvo do #41 só é
+  aplicável quando as quatro famílias que faltam existirem em código; esta é a melhor aproximação
+  possível com **duas** famílias de 5 entradas. ⚠️ **Não existe uma composição de 13**: a decisão
+  #11 do **spec da fatia 8** proibiu o rodízio (`i % n`), então só resta multiplicação uniforme, e
+  com duas famílias de 5 os únicos baralhos possíveis são 10, 15 ou 20 por jogador. ✅ Efeito
+  colateral bom, medido no código antes de decidir: o cemitério de Portas é alimentado por
+  `monstro` e (hoje) `salaVazia`, nunca por `raca` (que vai para a mão) — a alimentação sobe de
+  **61% para 67%** das portas compradas, então o baralho de Portas recicla **mais**, e o colapso
+  que secou o de Itens **não tem análogo aqui**.
 - ✅ **Reshuffle já existe e não é a peça que falta** (`packages/partida/src/baralho.ts:54-58`): o
   cemitério volta ao monte quando ele zera. O problema da pergunta 11 é o **cemitério vazio**, não
   a ausência de reshuffle.
@@ -646,6 +658,7 @@ Copiamos a *ideia mecânica*, nunca a *expressão*.
 
 | # | Bloco | O que entrega | No MVP? |
 |---|---|---|---|
+| 0 | **Corte da `salaVazia`** | executa a #42 e fixa a composição interina da #52. **Fatia própria e ANTES do 4b** (decisão #51), para que a caridade seja medida uma vez de cada vez | ✅ |
 | 1 | **Plano 4b — `encrenca`** | os verbos `procurarEncrenca` e `saquear`. **Última peça ESTRUTURAL da fatia 8** — fecha a anatomia do turno do §6 | ✅ |
 | 2 | **Maldições / Bad Stuff** | a 1ª carta que **mira outro jogador**, + a **morte/evacuação** do §10 — que é o **conserto da economia** (#46) | ✅ |
 | 3 | **Frontend animado** | a mesa desenhada + playback do turno alheio, 1x/2x (#35) | ✅ |
@@ -653,6 +666,12 @@ Copiamos a *ideia mecânica*, nunca a *expressão*.
 | 5 | **Interferência** | janelas A/B + contratos no server + **motor para N** (#33) + `carta de combate` e `instantâneo` | ✅ §12: *"requisito estrutural, não item adiável"* |
 | 6 | **Habilidades de classe** | a fatia 5 antiga, inteira. Traz **classe como carta** | ⬜ |
 | 7 | **Contas, ranking, crônica** | login, rating, histórico | ✅ — sem isso não há fila ranqueada (§3) |
+
+⚠️ **O bloco novo entrou como `0`, e isso é de propósito.** A #51 acrescentou uma fatia **antes** do
+que era o bloco 1, e renumerar de 1 a 8 invalidaria toda citação já escrita de *"bloco 1 = 4b"* —
+que é o defeito das decisões #34 e #48 (**número é identificador frágil**) aplicado à própria lista
+que aquelas decisões consertaram. Quando este bloco fechar, ele sai da tabela e a numeração
+sobrevive intacta.
 
 ⚠️ **O `CLAUDE.md` omitia o Online desta lista** — era **deriva**, não corte: o argumento do §17 para
 "online antes da interferência" nunca foi revogado (ver #45).
@@ -869,3 +888,11 @@ turno, fase de ajuda/atrapalhar antes da batalha, mão de 7, sem ouro, morte sem
 | 48 | **O §6 abandona a numeração e passa a chamar as fases pelo NOME** (`recompor`, `vasculhar`, `encrenca`, `combate`, `jogar`, `descartar`) — os mesmos nomes do código | Achado pela pergunta do Pedro: *"qual a fase 5?"*. O bible numerava **6 passos**; o código tem **5 fases nomeadas** (falta `encrenca`). *"Fase 5"* podia ser o passo 5 do bible (`jogar`) **ou** a 5ª das cinco fases do código (`descartar`) — coisas diferentes. 🎯 **É o MESMO defeito da #34** (*"decisão #N"* colidindo entre três registros), na mesma sessão, com outro identificador: **número é identificador frágil quando existe mais de uma lista**. A regra geral que sai daqui: **em documento com mais de uma lista paralela, nomeie — não numere** |
 | 49 | **Habilidade ATIVA de classe fica FORA do MVP.** Classe entra como **carta de Porta com modificadores + passiva**, reaproveitando integralmente a máquina de `PassivaCombate` que as raças já usam | Escolha do Pedro em 2026-07-29 (*"prefiro que já entre com passiva"*). O critério: **a máquina de passiva já existe e está provada em produção** (`packages/cartas/src/passivas.ts`, 3 passivas, usadas pelas raças); a de habilidade ativa **não existe em lugar nenhum**. E a razão principal da habilidade ativa — *dar decisão ao combate* — **foi resolvida na mesma sessão pela #44** (instantâneo nas pausas do motor), o que a rebaixou de "única resposta ao problema" para "enriquecimento", que é o que se corta de um MVP. ⚠️ Custo aceito: Guerreiro e Ladino ficam sendo modificadores + uma passiva, menos sabor do que o §5 promete — mas é escolha real (+força/+vida vs +habilidade/+agilidade) e **nada do que for construído é jogado fora** quando a ativa chegar |
 | 50 | **A DEFINIÇÃO DO MVP está escrita — §3.1 deste documento.** Seis blocos (`4b` → `Maldições/Bad Stuff` → `Frontend animado` → `Online` → `Interferência` → `Contas/ranking/crônica`), o que fica de fora, e os números. Fecha as perguntas 3 e 4 do §18 | Era o **entregável da Fase 0** do `docs/game-design/roteiro-para-o-mvp.md`. ⚠️ **O problema que ela resolve não era falta de plano — era o MVP nunca ter sido definido como escopo fechado:** o bible tinha o formato (#3) e o requisito da interferência (§12), mas **nenhuma lista de entregas**, e duas perguntas do §18 eram literalmente *"o que vai no MVP"*. Enquanto isso valesse, *"faltam N passos"* não tinha resposta possível. ⚠️ **Continua sem estimativa de sessões, de propósito:** a fatia 8 virou 4 planos e um deles virou 4a/4b — a decomposição só aparece quando o spec é escrito, e chutar aqui seria inventar um número que depois seria cobrado |
+
+### Sessão de 2026-07-30 — o corte da `salaVazia` ganha fatia própria
+
+| # | Decisão | Porquê |
+|---|---|---|
+| 51 | **O corte da `salaVazia` (#42) vira FATIA PRÓPRIA, executada ANTES do Plano 4b** — entra no §17 e no §3.1 como **bloco 0** | A #42 decidiu **o quê** e não decidiu **quando**, e o quando importa porque **duas mudanças diferentes prometem ressuscitar a MESMA métrica**: a #42 diz que tirar a sala vazia devolve pressão de mão e faz a caridade voltar a disparar (medida inerte, 994 → ~0); o bloco 1 diz que a `encrenca` faz o mesmo, dando verbo às cartas de Porta que morrem na mão. Rodadas juntas, o número que sair **não se atribui a nenhuma das duas** — é literalmente o que as decisões #24 e #25 registram sobre a comparação 3b→4a, que moveu a política do bot junto com a mochila e por isso não isolou nada. ⚠️ **Custo aceito:** adia o bloco 1 do MVP por uma fatia, e o PR carrega junto os dois commits de doc da Fase 0. ➡️ **Razão de execução que só apareceu ao medir o código, e que reforça a ordem:** `salaVazia` tem **72 referências** em `packages/`, **47 delas em `mesa.test.ts`**, onde ela é o **fixture canônico de "porta que resolve sem combate"** (`composicaoPorJogador: [{ tipo: 'salaVazia' }]`). Feita **depois** do 4b, os testes novos do 4b nasceriam escritos sobre um fixture que morre na fatia seguinte |
+| 52 | **Composição interina de Portas: `2× monstro + 1× raça` por jogador = 15 cartas/jogador, 60 na mesa de 4.** Densidade **67% monstro / 33% raça** (hoje: 38/38/23) | Escolha do Pedro em 2026-07-30, contra a recomendação da IA, **com o custo posto na mesa**. ⚠️ **Não existe uma composição de 13:** tirar a `salaVazia` tira 3 das 13 cartas por jogador e deixa **duas** famílias de **5** entradas cada; a decisão #11 do **spec da fatia 8** proibiu o rodízio (`i % n`, que dobrava silenciosamente o monstro mais fraco), então só resta multiplicação uniforme — e ela só produz 10, 15 ou 20 por jogador. *"Manter ~13"* arredonda para 15. ⚠️ **Custo assumido:** a densidade de monstro **quase dobra** (38% → 67% das portas compradas), o que mexe em ritmo, patente e taxa de vitória **junto** com a remoção da sala vazia — então a medição desta fatia carrega **duas** variáveis, e o que a #51 isola é o par (sala vazia + densidade) contra o par (`encrenca`), **não** cada uma das quatro coisas. Registrado para que ninguém leia o número da caridade como efeito só da sala vazia. ✅ **O que sustenta a escolha, e que a recomendação da IA tinha errado:** ela anda na direção da receita-alvo do #41, que mira raça em **12,5%** das Portas — hoje é 38%, o `2×+1×` leva a **33%**, e o `1×+1×` recomendado levaria a **50%**, direção errada. ✅ **Segundo efeito bom, medido antes de decidir:** o cemitério de Portas é alimentado por `monstro` e `salaVazia`, **nunca** por `raca` (`mesa.ts:330-347` usa `base`, não `revelada`, no ramo da raça) — a alimentação sobe de **61% para 67%** das portas compradas, e o baralho passa a reciclar mais, não menos |
+| 53 | **O `Error` cru de baralho vazio é MEDIDO nesta fatia, e o conserto vai para onde a medição mandar** — não se desenha saída para um caso ainda não observado | `tirarDoTopo` (`packages/partida/src/baralho.ts:61-64`) lança **`Error` cru** com monte **e** cemitério vazios, e `Error` cru é **500**, não o 400 de `AcaoInvalida`. 🔴 **E `vasculhar` (`mesa.ts:414-435`) chama esse `tirarDoTopo` sem guard nenhum** — só `empurrarCarta` tem o par (`mesa.ts:461`), o mesmo par que ficou **fora da tabela de pares finos até o Plano 4a**. ⚠️ **A exposição é PRÉ-EXISTENTE, não criada por esta fatia** — e, com a #52, ela fica **menos** provável, não mais: 60 cartas contra as 52 de hoje, com alimentação de cemitério maior. Por isso a fatia **mede** em vez de consertar às cegas: instrumenta *"monte e cemitério de Portas ambos vazios"* no soak de produção e reporta a frequência. Se acontecer, conserta aqui; se não, **entrega o número medido ao 4b**, que precisa responder de qualquer forma — o `saquear` compra Porta **para a mão**, e mão é a zona que esvazia baralho sem devolver nada ao cemitério. ⚠️ **O que NÃO se pode fazer é declarar o caso impossível sem medir:** *"`saquear` está sempre disponível, então a fase nunca é beco sem saída"* (`mesa.ts:166`) é exatamente essa afirmação, já escrita e **já falsa**, e é a 9ª ocorrência do vício que este projeto cataloga |

@@ -275,7 +275,8 @@ Uma sessão de `grilling` produziu **22 decisões (#29–#50)** e mudou coisas q
 afirmava. **O `game-bible.md` é a fonte de verdade; o que está escrito acima pode estar velho.**
 
 - ✅ **O MVP finalmente TEM definição:** **`game-bible.md` §3.1**. Seis blocos.
-- ✅ **Ordem vigente (§17, decisão #45):** `4b encrenca` → **`Maldições/Bad Stuff`** →
+- ✅ **Ordem vigente (§17, decisões #45 e #51):** **`corte da salaVazia` (bloco 0, acrescentado em
+  2026-07-30)** → `4b encrenca` → **`Maldições/Bad Stuff`** →
   **`Frontend animado`** → **`Online`** → `Interferência` → `Habilidades` (fora do MVP) →
   `Contas/ranking/crônica`.
   🔴 **A ordem que este arquivo trazia OMITIA O ONLINE, e isso era DERIVA** — o §17 tinha
@@ -294,15 +295,37 @@ afirmava. **O `game-bible.md` é a fonte de verdade; o que está escrito acima p
   o bible, o spec da fatia 7 e o spec da fatia 8 — sempre qualifique de qual).
   ➡️ **Regra geral: em documento com mais de uma lista paralela, NOMEIE — não numere.**
 
-**Próximo passo: Plano 4b — a fase `encrenca`.** Os verbos `procurarEncrenca`/`saquear` (§6 do
+## ⚠️ SESSÃO DE 2026-07-30 — o 4b NÃO é mais o próximo. Nasceu um bloco 0.
+
+**Próximo passo: a fatia do CORTE DA `salaVazia`** — bloco **0** do §17 e do §3.1, decisões
+**#51–#53** do bible. Branch `feat/fatia-8-sala-vazia-sai-do-jogo`, partindo de
+`docs/roteiro-para-o-mvp` (os dois commits da Fase 0 viajam neste PR).
+
+- **Por que virou fatia própria (#51):** a #42 e o 4b prometem ressuscitar a **mesma** métrica —
+  a caridade, medida inerte (994 → ~0). Juntas, o número não se atribui a nenhuma: é o erro que
+  as #24/#25 já registram sobre a comparação 3b→4a. ➡️ Razão de execução: `salaVazia` tem **72
+  referências** (47 só em `mesa.test.ts`), onde ela é o **fixture canônico de "porta que resolve
+  sem combate"** — feita depois, o 4b escreveria testes sobre um fixture que morre em seguida.
+- **O que a fatia entrega:** remove a `salaVazia` e fixa a composição interina **`2× monstro +
+  1× raça` = 15/jogador, 60 na mesa de 4** (#52), densidade **67% monstro / 33% raça**.
+  ⚠️ **Não existe composição de 13** — sobram duas famílias de 5 e o rodízio está proibido pela
+  decisão #11 do **spec da fatia 8**, então a multiplicação uniforme só dá 10, 15 ou 20.
+  ⚠️ **A medição desta fatia carrega DUAS variáveis** (remoção + densidade); ela isola esse par
+  contra a `encrenca`, não as quatro coisas entre si.
+- **O que a fatia MEDE e não conserta (#53):** `tirarDoTopo` (`baralho.ts:61-64`) lança `Error`
+  cru = **500** com monte e cemitério vazios, e **`vasculhar` (`mesa.ts:414-435`) não tem guard
+  nenhum** — só `empurrarCarta` tem (`mesa.ts:461`). Exposição **pré-existente**, e com 60 cartas
+  fica **menos** provável. Instrumentar no soak e entregar o número ao 4b.
+
+**Depois dele: Plano 4b — a fase `encrenca`.** Os verbos `procurarEncrenca`/`saquear` (§6 do
 bible) — a Task 9 do Plano 4a mediu por que ela importa: cartas de Porta dadas na mão inicial
 ficam mortas até existir um verbo que as jogue de dentro da mão, e é isso que hoje esvazia a
 caridade de tesouro (ver "Dívida... PAGA" acima).
 ⚠️ **Duas coisas novas que o 4b tem que encarar e que o plano ainda não sabia:** (1) `saquear`
 compra Porta **às cegas** e pode trazer **maldição para a mão** (#31) — ele não é "a opção
-segura"; (2) a `salaVazia` sai do jogo (#42), então **toda** porta não-monstro vai para a mão.
-Fora de escopo, já declarado: mochila → mão (adiada para a fatia da interferência) e escolher o
-que queimar com a mochila cheia.
+segura"; (2) a `salaVazia` já terá saído do jogo (#42/#51), então **toda** porta não-monstro vai
+para a mão. Fora de escopo, já declarado: mochila → mão (adiada para a fatia da interferência) e
+escolher o que queimar com a mochila cheia.
 
 ## Stack (alvo)
 
