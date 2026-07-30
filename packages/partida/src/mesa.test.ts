@@ -2028,8 +2028,9 @@ describe('aplicarAcao — vasculhar com a mão estourada', () => {
 
 describe('a composição BASELINE não pode nascer travada', () => {
   // Guard de fronteira, não de comportamento — mas sobre a composição BASELINE
-  // dos testes (`COMPOSICAO_DE_TESTE`, sem carta de raça), não sobre a
-  // composição de PRODUÇÃO: essa mora em `packages/server/src/app.ts`
+  // dos testes (`COMPOSICAO_DE_TESTE`, que TEM carta de raça desde o corte da
+  // sala vazia — 5 monstro + 3 raça, `'r-teste'` que o catálogo de teste não
+  // conhece), não sobre a composição de PRODUÇÃO: essa mora em `packages/server/src/app.ts`
   // (montada com `MONSTROS_SACAVEIS` e `RACAS_SACAVEIS` porque é lá que
   // catálogo e mesa se encontram) e tem o próprio alarme em
   // `packages/server/src/app.test.ts` ("o baralho de produção TEM carta de

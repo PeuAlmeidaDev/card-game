@@ -197,11 +197,15 @@ describe('criarPartida', () => {
 describe('criarPartida — a fase inicial', () => {
   it('mão inicial sem raça e sem tesouro nasce já em `vasculhar` — o auto-pulo da fase 1', () => {
     // A fase inicial é CALCULADA, e desde o Plano 3b ela tem três respostas
-    // possíveis. Este fixture cai na do meio: `COMPOSICAO_DE_TESTE` não tem carta
-    // de raça e o `config` não distribui Tesouros, então a mão inicial é só
-    // monstro/sala vazia — nada a recompor, e `recompor` se auto-pula (spec §6.1).
-    // O título nomeia o fixture, não uma constante: se a composição de teste um dia
-    // trouxer raça, a resposta certa passa a ser `recompor` e é o título que avisa.
+    // possíveis. Este fixture cai na do meio: `COMPOSICAO_DE_TESTE` TEM carta de
+    // raça desde o corte da sala vazia, mas as 3 dela ficam nas posições 6–8 de
+    // cada bloco de 8 — com `semEmbaralhar` e `MAO_INICIAL_PADRAO` (4), a mão do
+    // primeiro assento (`slice(0, 4)`) só alcança as 4 primeiras cartas, que são
+    // monstro. O `config` também não distribui Tesouros. Então a mão inicial é só
+    // monstro — nada a recompor, e `recompor` se auto-pula (spec §6.1). Isto é
+    // POSICIONAL, não "a composição não tem raça": se `MAO_INICIAL_PADRAO` subir
+    // além de 5, ou a ordem de `montarComposicao` mudar, este fixture pode passar
+    // a receber raça e a resposta certa vira `recompor` — é o título que avisa.
     const p = criarPartida('m1', entradas, { ...config, maoInicial: MAO_INICIAL_PADRAO }, { embaralhar: semEmbaralhar });
 
     expect(p.jogadores[0]?.mao.every((c) => c.tipo !== 'raca' && c.tipo !== 'equipamento')).toBe(true);
