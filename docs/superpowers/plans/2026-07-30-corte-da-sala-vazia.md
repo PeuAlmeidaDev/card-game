@@ -188,7 +188,9 @@ git commit -m "test(partida): o baseline dos testes troca sala vazia por carta d
 - Consumes: `COMPOSICAO_DE_TESTE` já migrado (Task 1); as fábricas `salaVazia()`/`salasVazias()` de
   `testes/cartas.ts` **ainda existem** (morrem na Task 5).
 - Produces: nenhum `{ tipo: 'salaVazia' }` e nenhuma chamada a `salaVazia()`/`salasVazias()` sobrando
-  em `packages/partida/src/*.test.ts`. A checagem é literal: `grep -rn "salaVazia" packages/partida/src/*.test.ts` devolve vazio.
+  em `packages/partida/src/*.test.ts`, **com uma exceção declarada**: os `describe('montarComposicao'…)`
+  de `baralho.test.ts` continuam citando `salaVazia` porque descrevem a **assinatura antiga**, que a
+  Task 4 reescreve inteira. Migrá-los aqui seria escrever duas vezes o mesmo teste.
 
 - [ ] **Step 1: Listar os call-sites e classificá-los ANTES de editar**
 
