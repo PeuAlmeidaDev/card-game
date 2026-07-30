@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { Carta, CartaTesouro, InfoItem } from './tipos';
 import { montarComposicao, tirarDoTopo } from './baralho';
-import { monstro, salaVazia } from './testes/cartas';
+import { monstro } from './testes/cartas';
 
 const idem = <T,>(itens: readonly T[]): T[] => [...itens];
 
@@ -65,15 +65,15 @@ describe('montarComposicao — cartas de raça', () => {
 
 describe('tirarDoTopo', () => {
   it('tira o topo SEM jogá-lo no cemitério (a carta não é revelada)', () => {
-    const r = tirarDoTopo({ monte: [monstro('m1'), salaVazia('v1')], cemiterio: [] }, idem);
+    const r = tirarDoTopo({ monte: [monstro('m1'), monstro('m2')], cemiterio: [] }, idem);
     expect(r.carta).toEqual(monstro('m1'));
-    expect(r.baralho.monte).toEqual([salaVazia('v1')]);
+    expect(r.baralho.monte).toEqual([monstro('m2')]);
     expect(r.baralho.cemiterio).toEqual([]); // <- diferença central: nada foi revelado
   });
 
   it('embaralha o cemitério de volta quando o monte está vazio', () => {
-    const r = tirarDoTopo({ monte: [], cemiterio: [salaVazia('v1')] }, idem);
-    expect(r.carta).toEqual(salaVazia('v1'));
+    const r = tirarDoTopo({ monte: [], cemiterio: [monstro('m1')] }, idem);
+    expect(r.carta).toEqual(monstro('m1'));
     expect(r.baralho.monte).toEqual([]);
     expect(r.baralho.cemiterio).toEqual([]);
   });

@@ -101,7 +101,7 @@ describe('criarPartida', () => {
     // Sem o guard, `slice` devolve mãos curtas em silêncio e a mesa abre com
     // jogadores desiguais — configuração errada tem que falhar alto, na criação.
     expect(() => criarPartida('m1', entradas,
-      { ...config, composicaoPorJogador: [{ tipo: 'salaVazia' }], maoInicial: 4 },
+      { ...config, composicaoPorJogador: [{ tipo: 'monstro', monstroId: 'm-teste' }], maoInicial: 4 },
       { embaralhar: semEmbaralhar }))
       .toThrow('criarPartida: o baralho não tem cartas para a mão inicial');
   });
@@ -112,7 +112,7 @@ describe('criarPartida', () => {
     // um cemitério vazio e explodiria (`tirarDoTopo: baralho vazio`), um 500 na
     // mesa que este mesmo validador acabou de aprovar.
     expect(() => criarPartida('m1', entradas,
-      { ...config, composicaoPorJogador: [{ tipo: 'salaVazia' }], maoInicial: 1 },
+      { ...config, composicaoPorJogador: [{ tipo: 'monstro', monstroId: 'm-teste' }], maoInicial: 1 },
       { embaralhar: semEmbaralhar }))
       .toThrow('criarPartida: o baralho não tem cartas para a mão inicial');
   });

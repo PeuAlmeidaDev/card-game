@@ -287,7 +287,7 @@ describe('a fase nunca mente sobre o estado', () => {
 
     // Baralho COM carta de raça e mão inicial de verdade: é o que faz a mão
     // estourar durante o jogo e a fase `descartar` ser realmente visitada.
-    const composicao = montarComposicao(3, Array.from({ length: 5 }, () => 'm-teste'), ['elfo', 'anao']);
+    const composicao = montarComposicao(0, Array.from({ length: 8 }, () => 'm-teste'), ['elfo', 'anao']);
     // 🎚️ Dial LOCAL girado de novo nesta fatia: `LIMITE_BASE_DE_MAO` subiu de 4
     // para 7, e com 5 cartas a mão parou de estourar — `descartar` deixou de ser
     // visitada e a asserção de cobertura lá embaixo falhou. A saída é esta (mais
@@ -295,9 +295,15 @@ describe('a fase nunca mente sobre o estado', () => {
     //
     // `LIMITE_BASE_DE_MAO + 1` = o teto exato de quem está sem raça em jogo: a
     // mesa nasce cheia mas não estourada (`vasculhar`), e é a primeira carta que
-    // entra na mão — sala vazia comprada ou tesouro lootado — que empurra o turno
-    // para `descartar`. Nascer já estourado também visitaria a fase, mas provaria
-    // menos: o caminho que interessa é a TRANSIÇÃO durante o jogo.
+    // entra na mão — carta de raça comprada ou tesouro lootado — que empurra o
+    // turno para `descartar`. Nascer já estourado também visitaria a fase, mas
+    // provaria menos: o caminho que interessa é a TRANSIÇÃO durante o jogo.
+    //
+    // 🎚️ O tamanho da composição (10 por jogador) é preservado do fixture
+    // anterior, que era 5 monstro + 3 sala vazia + 2 raça: o corte da sala vazia
+    // (decisão #42) virou as 3 em monstro, e não em raça, porque raça vai para a
+    // MÃO — três a mais por bloco mudariam o ritmo de estouro que este fixture
+    // calibra.
     let estado = criarPartida('m1', quatro,
       {
         patenteAlvo: 4,
