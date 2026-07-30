@@ -649,6 +649,10 @@ git commit -m "feat(partida): a sala vazia sai do jogo"
 **Files:**
 - Create: `<scratchpad>/economia-sala-vazia.mjs` — **fora do repositório**, não commitado
 - Create: `.superpowers/sdd/2026-07-30-corte-da-sala-vazia/task-6-medicao.md`
+  ⚠️ **`.superpowers/sdd/` é GITIGNORED** (`.superpowers/sdd/.gitignore` contém `*`). O relatório
+  **não é commitável** e não deve ser — é o mesmo precedente do relatório da Task 9 do Plano 4a,
+  que o game bible cita por caminho e que nunca esteve no git. **Os NÚMEROS** é que entram no
+  repositório, pela Task 7, dentro do `CLAUDE.md`.
 
 **Interfaces:**
 - Consumes: o jogo já sem `salaVazia` e com a composição `2×/1×`.
@@ -708,12 +712,10 @@ Os mesmos N do Plano 4a, para as comparações valerem.
   o número medido vai para o Plano 4b junto com a nota de que `saquear` compra Porta **para a mão**,
   que é a zona que esvazia baralho sem devolver nada ao cemitério.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: NÃO commitar — devolver os números**
 
-```bash
-git add .superpowers/sdd/2026-07-30-corte-da-sala-vazia/
-git commit -m "docs: mede caridade, ritmo e beco sem saída depois do corte da sala vazia"
-```
+Não há commit nesta task: o script mora no scratchpad e o relatório mora num diretório
+gitignored. O produto desta task são **os quatro números**, que a Task 7 escreve no `CLAUDE.md`.
 
 ---
 
