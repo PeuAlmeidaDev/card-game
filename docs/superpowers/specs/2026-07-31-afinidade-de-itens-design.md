@@ -244,10 +244,16 @@ reduzida), em vez de entregar `info` cru ao `montarCombatente`.
 
 `equiparCarta` levanta `AcaoInvalida` quando `afinidadeCom(...) === 'proibida'`.
 
-⚠️ Isso vira a **14ª linha** da tabela de pares finos do `aplicarAcao`, **com gêmeo obrigatório na
-tela**. A regra é uma linha por par, e a recontagem sai **do reducer para a tabela, nunca ao
+⚠️ Isso acrescenta **uma linha** à tabela de pares finos do `aplicarAcao`, **com gêmeo obrigatório
+na tela**. A regra é uma linha por par, e a recontagem sai **do reducer para a tabela, nunca ao
 contrário** — a tabela já mentiu quatro vezes, e a quarta foi por **omissão**, que só se acha
 recontando a partir do código.
+
+🔴 **Não crave o número total aqui.** A primeira redação deste spec dizia *"a 14ª linha"*, contando
+a partir das 13 de hoje — e isso **já nasceu errado**, porque a decisão #61 do bible pôs o **Plano
+4b na frente desta fatia**, e ele acrescenta os pares dele antes. Número total em prosa é a mesma
+família de defeito das decisões #34/#48: identificador frágil que vira citação quebrada na primeira
+fatia que passar na frente.
 
 ### 6.2 Trocar de raça derruba o que perdeu afinidade
 
