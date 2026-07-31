@@ -163,11 +163,16 @@ function entrarOuPular(
  * LIMPO, e `passar` na fase esquecida saía como `Error` cru — **500 numa partida
  * legítima**, não o 400 de `AcaoInvalida`.
  *
- * ⚠️ A `encrenca` do Plano 4 **não** é candidata: o spec §6 dá a ela
- * `procurarEncrenca` e `saquear`, e nenhum `passar` — `saquear` está sempre
- * disponível, então a fase nunca é beco sem saída. O risco aqui não é uma fase
- * específica do roteiro; é `FaseParada` ser uma união mantida à mão, que qualquer
- * um alarga sem passar por esta função.
+ * ⚠️ A `encrenca` do Plano 4b **não** é candidata — mas com ressalva, não certeza:
+ * o spec §6 dá a ela `procurarEncrenca` e `saquear`, e nenhum `passar`. `saquear`
+ * é o **candidato** a impedir o beco sem saída, e isso **não foi medido** — só o
+ * corte da `salaVazia` foi: *"monte e cemitério de Portas ambos vazios"* deu
+ * **zero em 80 partidas** (decisão #53/#55 do game bible). 🔴 **Zero em 80 não é
+ * prova de impossibilidade.** `tirarDoTopo` (`baralho.ts`) ainda lança `Error`
+ * cru com os dois vazios — que é **500**, não o 400 de `AcaoInvalida` — e
+ * `vasculhar` chama `tirarDoTopo` sem guard nenhum. O risco aqui não é só uma
+ * fase específica do roteiro; é também `FaseParada` ser uma união mantida à mão,
+ * que qualquer um alarga sem passar por esta função.
  *
  * Os dois `throw` que dependem deste predicado (no `aplicarAcao` e no
  * `equiparCarta`) se descrevem como "inalcançável pela tabela". Continuam sendo —

@@ -141,6 +141,17 @@ describe('mesa', () => {
   // `vasculhar` de qualquer assento revela monstro, não raça. Precisa desde que
   // a composição de Portas deixou de ter `salaVazia` (decisão #42): sem ela, o
   // topo do monte depois da mão inicial já não cai automaticamente num monstro.
+  //
+  // ⚠️ DEPENDÊNCIA NÃO DECLARADA em código, só aqui: isto só produz um monte
+  // PURO de monstro porque `RACAS_SACAVEIS.length` (4) × 4 assentos = 16 cartas
+  // de raça no baralho inteiro, e é exatamente igual a `MAO_INICIAL_PADRAO` (4)
+  // × 4 assentos = 16 vagas de mão inicial — as 16 raças cabem TODAS na mão
+  // inicial e nada mais sobra delas no monte. Se qualquer um dos dois dials
+  // mudar (mais/menos raças sacáveis, ou mão inicial maior/menor), o monte para
+  // de ser puro e o teste que depende disto falha ALTO, não em silêncio: o
+  // `vasculhar` revelaria uma raça (que não chama `rolar`), e a asserção de
+  // `res.statusCode` (500) reprovaria — não há caminho em que a mudança de dial
+  // passa despercebida.
   const ehMonstro = (x: unknown): boolean =>
     typeof x === 'object' && x !== null && (x as { tipo?: unknown }).tipo === 'monstro';
   const monstroNoMonte: Embaralhar = (itens) => [

@@ -24,7 +24,10 @@ baralho).
 > baralho de hoje **12/jogador, 48 na mesa**; com a #52 **14/jogador, 56 na mesa**, densidade
 > **71,4% monstro / 28,6% raça**. Os blocos de código das Tasks 1-4 abaixo preservam os números
 > errados **de propósito** — eles são o registro do que foi pedido, e o código já está corrigido no
-> repositório. **Toda conta nova sai de `MONSTROS_SACAVEIS.length` e `RACAS_SACAVEIS.length`.**
+> repositório. ⚠️ **Esta errata cobre só os blocos de código das Tasks 1-4** — a Task 7 (o GATE
+> OCULAR, Step 4) ficou **fora do escopo dela**, e foi exatamente por isso que o item 3 do roteiro
+> chegou a mandar procurar 60/52, dois números que nem sequer são um contador de monte. **Toda
+> conta nova sai de `MONSTROS_SACAVEIS.length` e `RACAS_SACAVEIS.length`.**
 > Ver decisão **#54** do game bible.
 
 ## Global Constraints
@@ -764,7 +767,11 @@ Roteiro para o Pedro, em `localhost:5173`:
 1. Vasculhar até virar uma porta que **não** é monstro. Confirmar que o log diz
    *"encontra uma carta de X"* e que **nunca** aparece *"não encontra nada"*.
 2. Confirmar que a mão **cresce** nessa vasculhada (era o caso em que ela não crescia).
-3. Confirmar que o contador de Portas no monte começa em **60**, não 52.
+3. Confirmar que o contador de Portas no monte começa em **40**, não 32. ⚠️ Nem 60 nem 52
+   estão certos — nenhum dos dois é um contador de MONTE: são o tamanho total do baralho
+   (56 hoje / 48 antes desta fatia). Com 16 cartas distribuídas na mão inicial (4 por
+   jogador × 4), o `cartasNoMonte` que a tela mostra é **40** hoje, **32** antes — afirmado
+   por `packages/server/src/app.test.ts:301` (`14 * 4 - 4 * 4`).
 4. ⚠️ **Item contra-intuitivo, tem que ser procurado de propósito:** jogar uma partida inteira e
    confirmar que a fase `recompor` **aparece muito mais que antes** — porque agora quase todo turno
    deixa uma raça na mão. Se ela continuar se auto-pulando na maioria dos turnos, o `faseSeAutoPula`

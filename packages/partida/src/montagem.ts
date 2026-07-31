@@ -51,8 +51,9 @@ export function criarPartida(
   // Baralho da MESA: a composição por jogador multiplicada pelo tamanho da mesa.
   const receitas = Array.from({ length: jogadores.length }, () => config.composicaoPorJogador).flat();
   // Embaralha ANTES de carimbar: se o id nascesse sobre a composição ORDENADA
-  // (ex.: 5 monstros seguidos de 3 salas vazias por jogador), `p-i` viraria uma
-  // função pública e determinística do tipo da carta — sem vazar nada hoje (só
+  // (ex.: 2 monstros seguidos de 1 raça por jogador, a composição de produção
+  // desde a decisão #52), `p-i` viraria uma função pública e determinística do
+  // tipo da carta — sem vazar nada hoje (só
   // a espiada cruza o fio com carta oculta, e a projeção já a entrega só ao
   // dono), mas basta um evento público futuro carregar `cartaId` para o id
   // entregar qual carta era. Carimbar depois do embaralho quebra essa correlação.

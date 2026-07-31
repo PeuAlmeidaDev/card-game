@@ -5,18 +5,20 @@ import type { CartaPorta } from '@card-dungeon/shared';
  * (`'Você'` ou o nome do jogador), mesma convenção de `narrarCombate` — quem
  * decide a pessoa é a tela, que sabe quem é `voce`.
  *
- * Frase por tipo, e não um molde único: o monstro é o momento de tensão do turno
- * e merece a exclamação; a carta de raça só anuncia o que foi encontrado, sem
- * alarde. Um texto só para os dois tipos apaga essa diferença.
+ * Frase por tipo, e não um molde único — mas hoje só o `case 'monstro'` é
+ * caminho vivo: o evento `porta` só é emitido em `mesa.ts:361`, alcançável só
+ * quando a carta revelada é monstro. O `case 'raca'` é DEFENSIVO, não um
+ * caminho vivo: desde a separação porta aberta × porta fechada, a carta de raça
+ * que vai para a mão sai pelo evento `achado`, sem carta junto. Ele fica porque
+ * o `never` do `default` exige cobrir a união inteira de `CartaPorta`, e a
+ * frase que escreve (*"encontra uma carta de X"*, sem alarde, contra a
+ * exclamação do monstro) é a que valeria no dia em que um caminho vivo existir
+ * para `raca` — não deve virar desculpa para reanexar carta oculta ao evento
+ * `porta` antes desse dia chegar.
  *
  * O `default` tem duas funções: a atribuição a `never` faz o compilador cobrar
  * esta função quando um tipo de carta entrar na união, e o retorno neutro evita
  * que um bundle antigo com um tipo desconhecido derrube a tela.
- *
- * O caso `raca` é DEFENSIVO, não um caminho vivo: desde a separação porta aberta ×
- * porta fechada, a carta que vai para a mão sai pelo evento `achado`, sem carta
- * junto. Ele fica porque o `never` exige cobrir a união inteira de `CartaPorta` —
- * e não deve virar desculpa para reanexar carta oculta ao evento `porta`.
  */
 export function narrarPorta(
   carta: CartaPorta,

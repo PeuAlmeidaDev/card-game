@@ -873,7 +873,11 @@ describe('aplicarAcao — espiada (Presciência)', () => {
     expect(r.estado.espiada).toBeNull();
     expect(r.estado.combate).not.toBeNull();      // a mantida foi resolvida na hora
     expect(r.estado.portas.cemiterio.map((c) => c.tipo)).toEqual(['monstro']); // a mantida foi revelada
-    expect(r.eventos.some((e) => e.tipo === 'porta')).toBe(true);
+    // Não só presença: o evento `porta` carrega a CARTA (`tipo: 'porta'; carta: CartaPorta`,
+    // tipos.ts:259) — a asserção única no pacote de que o payload é o certo, não só o tipo certo.
+    expect(r.eventos.find((e) => e.tipo === 'porta')).toMatchObject({
+      carta: { id: 'p-0', tipo: 'monstro', monstroId: 'm-teste' },
+    });
   });
 
   it('empurrarCarta manda o topo pro fundo e resolve a próxima às cegas', () => {
