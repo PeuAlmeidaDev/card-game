@@ -428,9 +428,34 @@ function resolverCarta(
   );
 }
 
+function vasculhar(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): ResultadoAcao {
+  if (estado.espiada !== null) {
+    throw new AcaoInvalida('aplicarAcao: há uma espiada pendente');
+  }
+
+  const jogador = estado.jogadores.find((j) => j.id === jogadorId);
+
+  const temPresciencia = racaDoLutador(deps, jogador)?.espiaTopo ?? false;
+
+  if (temPresciencia) {
+    // Presciência: espia o topo SEM revelar. Nenhum evento público (o topo é
+    // segredo do vidente); manter/empurrar resolvem depois. A vez não passa.
+    const t = tirarDoTopo(estado.portas, deps.embaralhar);
+    return registrar(
+      { ...estado, portas: t.baralho, espiada: { jogadorId, carta: t.carta } },
+      [],
+    );
+  }
+
+  const t = tirarDoTopo(estado.portas, deps.embaralhar);
+  const base: EstadoPartida = { ...estado, portas: t.baralho };
+  return resolverCarta(base, jogadorId, t.carta, deps);
+}
+
 /**
  * Compra 1 carta de Portas **virada**, direto para a mão (spec §6). É a alternativa
- * a lutar, e é o que impede a `encrenca` de ser um beco sem saída.
+ * a lutar, e é o que impede a `encrenca` de ser um beco sem saída. Irmã de
+ * `vasculhar`, logo acima: as duas compram do mesmo baralho de Portas.
  *
  * ⚠️ **Sem guard de baralho vazio, de propósito.** A decisão #62 do bible diz que o
  * baralho de Portas nunca acaba; se acabar, é invariante NOSSA quebrada — o `Error`
@@ -459,30 +484,6 @@ function saquear(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): Resu
     'jogar',
     [{ tipo: 'saqueou', jogadorId }],
   );
-}
-
-function vasculhar(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): ResultadoAcao {
-  if (estado.espiada !== null) {
-    throw new AcaoInvalida('aplicarAcao: há uma espiada pendente');
-  }
-
-  const jogador = estado.jogadores.find((j) => j.id === jogadorId);
-
-  const temPresciencia = racaDoLutador(deps, jogador)?.espiaTopo ?? false;
-
-  if (temPresciencia) {
-    // Presciência: espia o topo SEM revelar. Nenhum evento público (o topo é
-    // segredo do vidente); manter/empurrar resolvem depois. A vez não passa.
-    const t = tirarDoTopo(estado.portas, deps.embaralhar);
-    return registrar(
-      { ...estado, portas: t.baralho, espiada: { jogadorId, carta: t.carta } },
-      [],
-    );
-  }
-
-  const t = tirarDoTopo(estado.portas, deps.embaralhar);
-  const base: EstadoPartida = { ...estado, portas: t.baralho };
-  return resolverCarta(base, jogadorId, t.carta, deps);
 }
 
 /** As ações que só fazem sentido com uma espiada pendente. */
