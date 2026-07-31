@@ -104,7 +104,8 @@ propósito: `versaoDe` é `log.length`, e sem mover a versão um duplo-clique es
 `entrarOuPular` (ponto único); `sairDaParada` garante que passar à mão e ser pulado terminem no
 mesmo lugar. **A decisão #7 do spec passou a valer:** `jogarCarta` só é legal em `recompor`,
 `equiparCarta` em `recompor` e `jogar`, e `descartar` ficou **só** com a caridade. Todo caminho
-de encontro (sala vazia, raça→mão, fim de combate) entrega o turno a `jogar` em vez de chamar
+de encontro (sala vazia — removida em 2026-07-30 —, raça→mão, fim de combate) entrega o turno a
+`jogar` em vez de chamar
 `encerrarTurno` — é a janela em que o loot vira corpo. O `bot.ts` virou `switch` exaustivo sobre
 `vista.fase`: a dívida do **"quinto leitor da regra de excedente" está PAGA**. A `TelaMesa` ganhou
 indicador de fase (`Record<Fase, string>`) e o botão **"Passar"**.
@@ -174,11 +175,13 @@ dos 5,95 projetados. A dívida continua PAGA de qualquer forma: mesmo o valor ma
 batida para a dívida estar quitada. **Taxa de vitória do humano medida: 22,6%–37,8%**
 (varia por rodada e política) contra os **80%** do bot antigo e os **42,5%** projetados — PIOR
 que a projeção nas três rodadas que rodei, sem explicação fechada (ver o relatório da Task 9 para
-as duas hipóteses candidatas). **Tesouros doados por bots via caridade: ~0** (era **994**, com
-**145** para o humano) — o bot guloso resolve equipamento ANTES de chegar em `descartar`, e o
-que sobra para doar são cartas de Porta (`monstro`/`salaVazia`) que a mão inicial recebeu CRUAS
-(nunca resolvidas — `criarPartida` distribui direto do topo do baralho) e que **nenhum verbo do
-jogo hoje sabe jogar** — é exatamente o buraco que a fase `encrenca` do Plano 4b fecha.
+as duas hipóteses candidatas). **Tesouros doados por bots via caridade: ~0** (no **Plano 3a** eram
+**994**, com **145** para o humano) — o bot guloso resolve equipamento ANTES de chegar em
+`descartar`, e o que sobra para doar são cartas de Porta (`monstro`; a `salaVazia` foi removida em
+2026-07-30) que a mão inicial recebeu CRUAS (nunca resolvidas — `criarPartida` distribui direto do
+topo do baralho) e que **nenhum verbo do jogo hoje sabe jogar** — é o buraco que a fase `encrenca`
+do Plano 4b fecha. ⚠️ **Remedido em 2026-07-30 e CONFIRMADO em zero** (decisão #55 do bible): o
+corte da `salaVazia` devolveu pressão de mão e **não** ressuscitou a caridade de tesouro.
 
 **Dívida "a mesa nasce exatamente no teto" (4+4 = 8 = limite de quem está sem raça) — segue
 verdadeira estruturalmente**, sem mudança: nasce em `recompor`, e qualquer carta que entre no
@@ -281,8 +284,9 @@ afirmava. **O `game-bible.md` é a fonte de verdade; o que está escrito acima p
   `Contas/ranking/crônica`.
   🔴 **A ordem que este arquivo trazia OMITIA O ONLINE, e isso era DERIVA** — o §17 tinha
   argumento escrito (*"interferência é mecânica de rede"*) que nunca foi revogado.
-- 🔴 **Decisões que invalidam o texto acima — nenhuma delas está CONSTRUÍDA ainda** (são desenho,
-  e o código continua como está descrito no "Estado atual"): a `salaVazia` **sai do jogo** (#42);
+- 🔴 **Decisões que invalidam o texto acima. ✅ A #42 (a `salaVazia` sai do jogo) foi CONSTRUÍDA
+  em 2026-07-30** — ver a seção da sessão de 2026-07-30. **As demais continuam sendo só desenho,
+  e o código continua como está descrito no "Estado atual"**:
   `item de batalha` + `item que atrapalha batalha` **colapsaram** em `carta de combate` com alvo
   (#43); o `instantâneo` passa a ser jogável **pelo lutador no meio do combate** (#44), o que faz
   o snapshot do §7 virar **sequência**; a montagem do baralho vira **receita explícita** (#36);
@@ -295,39 +299,74 @@ afirmava. **O `game-bible.md` é a fonte de verdade; o que está escrito acima p
   o bible, o spec da fatia 7 e o spec da fatia 8 — sempre qualifique de qual).
   ➡️ **Regra geral: em documento com mais de uma lista paralela, NOMEIE — não numere.**
 
-## ⚠️ SESSÃO DE 2026-07-30 — o 4b NÃO é mais o próximo. Nasceu um bloco 0.
+## ⚠️ SESSÃO DE 2026-07-30 — o bloco 0 está CONSTRUÍDO. A promessa dele NÃO se cumpriu.
 
-**Próximo passo: a fatia do CORTE DA `salaVazia`** — bloco **0** do §17 e do §3.1, decisões
-**#51–#53** do bible. Branch `feat/fatia-8-sala-vazia-sai-do-jogo`, partindo de
-`docs/roteiro-para-o-mvp` (os dois commits da Fase 0 viajam neste PR).
+**A fatia do CORTE DA `salaVazia` está construída** — bloco **0** do §17 e do §3.1, decisões
+**#51–#55** do bible. Branch `feat/fatia-8-sala-vazia-sai-do-jogo`, partindo de
+`docs/roteiro-para-o-mvp` (os dois commits da Fase 0 viajam neste PR). Sete commits de código,
+**500 testes verdes**, typecheck e lint limpos. Pronta para o PR; **falta o gate ocular do Pedro**.
 
-- **Por que virou fatia própria (#51):** a #42 e o 4b prometem ressuscitar a **mesma** métrica —
-  a caridade, medida inerte (994 → ~0). Juntas, o número não se atribui a nenhuma: é o erro que
-  as #24/#25 já registram sobre a comparação 3b→4a. ➡️ Razão de execução: `salaVazia` tem **72
-  referências** (47 só em `mesa.test.ts`), onde ela é o **fixture canônico de "porta que resolve
-  sem combate"** — feita depois, o 4b escreveria testes sobre um fixture que morre em seguida.
-- **O que a fatia entrega:** remove a `salaVazia` e fixa a composição interina **`2× monstro +
-  1× raça` = 14/jogador, 56 na mesa de 4** (#52 com os números corrigidos pela **#54**), densidade
-  **71,4% monstro / 28,6% raça** (hoje: 12/jogador, 48 na mesa, 41,7 / 25 / 33,3).
+- **O que entrou em produção:** a `salaVazia` **não existe mais** (#42) e a composição de Portas
+  é **`2× monstro + 1× raça` = 14/jogador, 56 na mesa de 4** (#52 com os números corrigidos pela
+  **#54**), densidade **71,4% monstro / 28,6% raça** (antes: 12/jogador, 48 na mesa,
+  41,7 / 25 / 33,3). A composição é **declarada**, não derivada do catálogo — é a #36 valendo de
+  verdade pela primeira vez.
   🔴 **`RACAS_SACAVEIS` exclui o Humano — são 4 raças sacáveis, não 5.** Três decisões do bible
   (#36, #41, #52) afirmaram cinco e erraram toda conta de densidade em cima disso; a #54 registra a
   correção. **Conta de baralho sai de `MONSTROS_SACAVEIS.length` e `RACAS_SACAVEIS.length`**, nunca
   de "quantas raças o §5 lista".
-  ⚠️ **A medição desta fatia carrega DUAS variáveis** (remoção + densidade); ela isola esse par
-  contra a `encrenca`, não as quatro coisas entre si.
-- **O que a fatia MEDE e não conserta (#53):** `tirarDoTopo` (`baralho.ts:61-64`) lança `Error`
-  cru = **500** com monte e cemitério vazios, e **`vasculhar` (`mesa.ts:414-435`) não tem guard
-  nenhum** — só `empurrarCarta` tem (`mesa.ts:461`). Exposição **pré-existente**, e com 60 cartas
-  fica **menos** provável. Instrumentar no soak e entregar o número ao 4b.
 
-**Depois dele: Plano 4b — a fase `encrenca`.** Os verbos `procurarEncrenca`/`saquear` (§6 do
+**📊 Os quatro números medidos (80 partidas para caridade e beco, 31 para ritmo; dials de
+produção, dado e embaralho reais):**
+
+| Medida | Resultado |
+|---|---|
+| Doações de caridade de **Tesouro** | 🔴 **ZERO em 80 partidas** (0 chegando ao humano) |
+| Doações de caridade de **Porta** (métrica nova) | **49** (10 chegando ao humano) |
+| Ritmo — mediana de ações do humano (N=31) | **101** (política bot) / **104** (equipando) |
+| Beco sem saída (monte **e** cemitério de Portas vazios) | **zero em 80 partidas** |
+
+🔴 **A justificativa (2) da #42 não se cumpriu na métrica que ela nomeou** (*"devolve pressão de
+mão, e isso ressuscita a caridade"*). A caridade de **tesouro** continua em ~0, **como no
+Plano 4a** — ⚠️ **nunca escreva "caiu de 994"**: os 994/145 são do **Plano 3a**, e o 4a já media
+~0. O que subiu foi outra coisa, a doação de carta de **Porta** morta na mão. **Causa verificada
+no código, não hipótese:** `vestirOuGuardar` (`packages/partida/src/bot.ts:99-148`) intercepta
+**todo** equipamento da mão em `recompor` e `jogar`, e como `CartaTesouro` só tem o variante
+`equipamento` hoje, nenhum tesouro sobrevive até `descartar`. ✅ **A #42 NÃO é revogada** — a
+remoção continua certa pelos outros motivos dela (tom/mesa animada, e a pressão de mão que **de
+fato** subiu). Registrado como decisão **#55**; a alavanca real sobre a economia é a **#40**
+(consumíveis ≥50%), não pressão de mão.
+
+- ⚠️ **O que a medição NÃO isola:** a fatia mudou **duas coisas ao mesmo tempo** (remoção da
+  `salaVazia` **+** densidade de monstro 41,7%→71,4%). O que a #51 isola é esse **par** contra a
+  `encrenca` — não as duas entre si. E os 3 bots continuam usando a mesma `escolherAcao` da
+  política "bot" do humano, então comparações contra medições antigas movem todos os assentos
+  juntos (#24/#25).
+- ⚠️ **A queda de ritmo (109/115 → 101/104) é PEQUENA, não achado** — cabe na variação que N=31 já
+  produziu entre rodadas do 4a, e não houve rodada de confirmação. O que ela diz, por negação: a
+  #42 temia que sem a `salaVazia` *"o descarte virasse tirania"*; o ritmo **não subiu**, então a
+  preocupação **não se confirmou nesta amostra** — o que não é o mesmo que descartada, porque
+  ninguém mediu *quantos turnos terminam em `descartar`*.
+- **O que a fatia MEDIU e não consertou (#53):** `tirarDoTopo` (`baralho.ts:61-64`) lança `Error`
+  cru = **500** com monte e cemitério vazios, e **`vasculhar` (`mesa.ts:414-435`) não tem guard
+  nenhum** — só `empurrarCarta` tem (`mesa.ts:461`). Exposição **pré-existente**, e com 56 cartas
+  (contra 48) fica **menos** provável. Medida: **zero em 80 partidas** — 🔴 escreva assim, **nunca
+  "não acontece"**; é a checagem depois de CADA ação, não prova de impossibilidade. Como não deu
+  maior que zero, não virou task aqui: **o número vai para o 4b**, que precisa refazê-lo — `saquear` compra
+  Porta **para a mão**, e mão é a zona que esvazia baralho sem devolver nada ao cemitério.
+
+**Próximo: Plano 4b — a fase `encrenca`.** Os verbos `procurarEncrenca`/`saquear` (§6 do
 bible) — a Task 9 do Plano 4a mediu por que ela importa: cartas de Porta dadas na mão inicial
-ficam mortas até existir um verbo que as jogue de dentro da mão, e é isso que hoje esvazia a
-caridade de tesouro (ver "Dívida... PAGA" acima).
+ficam mortas até existir um verbo que as jogue de dentro da mão. 📌 **O 4b herda três números
+como baseline a remedir:** caridade de Tesouro **0** / de Porta **49**, ritmo **101/104**, beco
+sem saída **0/80**. ⚠️ E herda uma expectativa **rebaixada**: a `encrenca` dá verbo à Porta morta
+na mão, mas **não** há evidência de que pressão de mão ressuscite caridade de Tesouro (#55) —
+não repita a promessa da #42 com outro nome.
 ⚠️ **Duas coisas novas que o 4b tem que encarar e que o plano ainda não sabia:** (1) `saquear`
 compra Porta **às cegas** e pode trazer **maldição para a mão** (#31) — ele não é "a opção
-segura"; (2) a `salaVazia` já terá saído do jogo (#42/#51), então **toda** porta não-monstro vai
-para a mão. Fora de escopo, já declarado: mochila → mão (adiada para a fatia da interferência) e
+segura"; (2) a `salaVazia` **já saiu do jogo** (#42/#51, construído em 2026-07-30), então **toda**
+porta não-monstro vai para a mão — e o baralho é **71,4% monstro**, então isso acontece menos que
+antes. Fora de escopo, já declarado: mochila → mão (adiada para a fatia da interferência) e
 escolher o que queimar com a mochila cheia.
 
 ## Stack (alvo)
