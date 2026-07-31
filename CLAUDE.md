@@ -68,8 +68,10 @@ vai para o spec ou para um teste que falha quando a hora chegar.
 
 Visão do jogo **fechada** em 2 sessões de `grilling` (9 + 13 decisões) — ver §19 do game bible.
 
-**Construído e mergeado:** `motor`, `personagem`, `progressao`, `cartas`, `partida`, `shared`,
-`server`, `web`. Fatias 1–7 completas. **Fatia 8 "TESOUROS": Planos 1, 2, 3a ("Tesouros e o
+**Construído e mergeado:** `motor`, `personagem`, `cartas`, `partida`, `shared`, `server`, `web` —
+**sete** pacotes. ⚠️ Até 2026-07-31 esta lista trazia um oitavo, `progressao`, em três lugares
+(aqui, na Stack e no diagrama). **Ele não existe desde o commit `ca52c7a`**, que o renomeou para
+`partida` ao trocar a run solo pela mesa. Fatias 1–7 completas. **Fatia 8 "TESOUROS": Planos 1, 2, 3a ("Tesouros e o
 corpo"), 3b ("As fases do corpo") e 4a ("Mochila e o bot que veste") mergeados.**
 
 O Plano 2 trocou os guards espalhados do reducer por uma **máquina de fases**:
@@ -372,7 +374,7 @@ escolher o que queimar com a mochila cheia.
 ## Stack (alvo)
 
 Monorepo pnpm workspaces, Node ≥ 22.13 (dev em 24; exigido pelo `pnpm@11.9`), **TypeScript strict** (+ `noUncheckedIndexedAccess`).
-Pacotes de domínio (`motor`, `personagem`, `progressao`, `partida`, `cartas`) = **TS puro** (dado
+Pacotes de domínio (`motor`, `personagem`, `partida`, `cartas`) = **TS puro** (dado
 injetado, zero framework). `shared` = contrato ts-rest + Zod. `server` = **Fastify + ts-rest**.
 `web` = **React + Vite**. Testes: **vitest**. Lint: **ESLint flat**.
 
@@ -382,7 +384,7 @@ injetado, zero framework). `shared` = contrato ts-rest + Zod. `server` = **Fasti
 ## Arquitetura
 
 ```
-web (React+Vite) ──ts-rest/REST──▶ server (Fastify) ──chama──▶ motor / personagem / progressao /
+web (React+Vite) ──ts-rest/REST──▶ server (Fastify) ──chama──▶ motor / personagem /
                                                                 partida / cartas
                                                                 (TS puro, dado injetado)
 ```
