@@ -301,12 +301,13 @@ afirmava. **O `game-bible.md` é a fonte de verdade; o que está escrito acima p
   o bible, o spec da fatia 7 e o spec da fatia 8 — sempre qualifique de qual).
   ➡️ **Regra geral: em documento com mais de uma lista paralela, NOMEIE — não numere.**
 
-## ⚠️ SESSÃO DE 2026-07-30 — o bloco 0 está CONSTRUÍDO. A promessa dele NÃO se cumpriu.
+## ⚠️ SESSÃO DE 2026-07-30 — o bloco 0 está MERGEADO. A promessa dele NÃO se cumpriu.
 
-**A fatia do CORTE DA `salaVazia` está construída** — bloco **0** do §17 e do §3.1, decisões
-**#51–#55** do bible. Branch `feat/fatia-8-sala-vazia-sai-do-jogo`, partindo de
-`docs/roteiro-para-o-mvp` (os dois commits da Fase 0 viajam neste PR). Sete commits de código,
-**500 testes verdes**, typecheck e lint limpos. Pronta para o PR; **falta o gate ocular do Pedro**.
+**A fatia do CORTE DA `salaVazia` está construída e mergeada** — bloco **0** do §17 e do §3.1,
+decisões **#51–#55** do bible. Branch `feat/fatia-8-sala-vazia-sai-do-jogo`, partindo de
+`docs/roteiro-para-o-mvp` (os dois commits da Fase 0 viajaram neste PR). Sete commits de código,
+**500 testes verdes**, typecheck e lint limpos. **Gate ocular fechado pelo Pedro em 2026-07-31** —
+o contador de Portas no monte bate em **40**, e os outros quatro itens do roteiro passaram.
 
 - **O que entrou em produção:** a `salaVazia` **não existe mais** (#42) e a composição de Portas
   é **`2× monstro + 1× raça` = 14/jogador, 56 na mesa de 4** (#52 com os números corrigidos pela
@@ -370,6 +371,61 @@ segura"; (2) a `salaVazia` **já saiu do jogo** (#42/#51, construído em 2026-07
 porta não-monstro vai para a mão — e o baralho é **71,4% monstro**, então isso acontece menos que
 antes. Fora de escopo, já declarado: mochila → mão (adiada para a fatia da interferência) e
 escolher o que queimar com a mochila cheia.
+
+## ⚠️ SESSÃO DE 2026-07-31 — três fatias novas nasceram de um pedido de FAXINA
+
+**Nenhuma regra de jogo foi construída nesta sessão.** Saíram dela: um spec, um delta de spec,
+**oito decisões do bible (#56–#63)** e uma auditoria com **5 correções de código**.
+
+🔑 **A cadeia importa, porque explica o escopo:** o Pedro pediu para remover o topo da tela (o
+construtor da fatia 2 — seletor de classe, preview, botão "Duelar"). A remoção esbarrou no
+`classeId`, que **não é decorativo**: é ele que monta o combatente do humano. A resposta foi ir ao
+destino — **classe vira carta** (#60) —, o que exigiu o **Aprendiz** como ausência, que exigiu uma
+compensação, que revelou que **itens exclusivos não existem**. Daí saíram três fatias.
+
+**▶️ ORDEM VIGENTE (decisão #61), e o 4b continua na frente:**
+`4b encrenca` → **`afinidade`** → **`escolha do descarte`** → **`classe como carta`** → Maldições.
+⚠️ **Por que o 4b primeiro:** a `afinidade` leva o baralho de Tesouros de **32 para 48 cartas**, e o
+4b tem **três baselines herdados a remedir**. Rodar antes contamina — é a #51 com outra roupa.
+⚠️ **Custo aceito:** o topo da tela fica no ar por mais quatro fatias.
+
+**Specs prontos, sem plano ainda:**
+`docs/superpowers/specs/2026-07-31-afinidade-de-itens-design.md` ·
+`docs/superpowers/specs/2026-07-31-fatia-8-plano-4b-encrenca-delta.md` (DELTA — o §6/§6.1 do spec
+da fatia 8 continua sendo a fonte).
+
+**As duas decisões que o 4b fechou:**
+- **#62 — o baralho de PORTAS nunca acaba.** É REGRA, não consequência do reshuffle (que recicla o
+  cemitério, e a caridade só move carta de mão para mão). Sustenta a `encrenca` ter **duas opções
+  sempre**, sem `passar` e sem auto-pulo. ➡️ A promessa vira **predicado na invariante de partida**,
+  não comentário. ✅ O `Error` cru de `tirarDoTopo` **fica**: faltar Porta é invariante nossa (500),
+  não pedido inválido (400).
+- **#63 — o bot passa a AVALIAR o combate** (rodadas esperadas para matar, margem 🎚️ 1,2×).
+  🔴 **Revoga a decisão #9 do spec da fatia 8.** Os três *"burro por definição"* de `bot.ts` mudam
+  junto. ⚠️ Ele passa a lutar só favorecido ⇒ fica mais forte ⇒ a medição do 4b **tem que separar**
+  o efeito da `encrenca` do efeito do bot novo.
+
+### 🔬 A auditoria (probe-first): 4 sondas, 5 correções
+
+- 🐛 **`bot.ts` tinha o par de mãos escrito à mão** e `equipar.ts` tinha `MAOS` não exportado.
+  Mutar o par deixava **240/240 verdes**. 🔑 **Causa raiz: o catálogo de TESTE não tinha arma de
+  duas mãos** — a regra era *inexercitável*, não só desprotegida.
+- 🐛 **`calcularPreview` (web) tinha DIVERGIDO de `montarCombatente`:** sem o `PISO = 1`, a tela
+  mostrava `Agilidade -5` onde o servidor montaria `1`. Corrigido re-exportando por `shared`.
+- **6 dos 7 exports de função do `motor` não tinham consumidor** — barril enxugado.
+- **`ehBot` era publicado e nunca renderizado** (5ª ocorrência). Renderizado, porque o bloco
+  `Online` põe humanos nesses assentos e o nome deixa de distinguir.
+- **O `CLAUDE.md` citava o pacote `progressao`** — ele não existe desde `ca52c7a`.
+
+🔴 **E um achado meu ESTAVA ERRADO, pelo defeito que ele mesmo denunciava:** reportei que *"o bible
+diz 3 classes e o catálogo tem 2"*. O `| Classes | 3 |` é da **receita-ALVO** do §11 (quantas
+CARTAS de classe o baralho deve ter), não do catálogo — que o bible marca como `⬜`. Li uma lista de
+design como contagem de implementação: **é literalmente a #54**. ➡️ Acontece com quem está
+procurando esse erro nos outros.
+
+📌 **Sobra disso, para a fatia `classe como carta`:** a receita-alvo pede **3 cartas de classe por
+jogador** e o catálogo tem **2 classes** — com "1 cópia por classe sacável" (#60) dá **2**. A
+receita-alvo **não é construível** com o catálogo de hoje.
 
 ## Stack (alvo)
 
