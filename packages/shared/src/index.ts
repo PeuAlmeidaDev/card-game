@@ -85,6 +85,10 @@ export const acaoDaMesaSchema = z.discriminatedUnion('tipo', [
   // Sem campo nenhum além do tipo: `passar` é a intenção de não fazer nada nesta
   // fase, e QUAL fase é ela vem do estado autoritativo, nunca do cliente.
   z.object({ tipo: z.literal('passar') }),
+  // Sem campo nenhum além do tipo, mesmo motivo de `passar`: `saquear` não aponta
+  // carta nenhuma — a carta comprada vem do TOPO do baralho de Portas, decidido
+  // pelo estado autoritativo, nunca escolhida pelo cliente.
+  z.object({ tipo: z.literal('saquear') }),
 ]) satisfies z.ZodType<{ tipo: AcaoDaMesa['tipo'] }>;
 
 /** A intenção validada. A rota completa com o `jogadorId` da sessão. */

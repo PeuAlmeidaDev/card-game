@@ -137,6 +137,12 @@ describe('acaoDaMesaSchema', () => {
     expect(acaoDaMesaSchema.safeParse({ tipo: 'entregarCarta', cartaId: '' }).success).toBe(false);
     expect(acaoDaMesaSchema.safeParse({ tipo: 'entregarCarta', cartaId: 'x'.repeat(65) }).success).toBe(false);
   });
+
+  it('aceita saquear, só com o tipo', () => {
+    // Sem `cartaId`: a carta comprada é o TOPO do baralho de Portas, decidido pelo
+    // estado autoritativo — o cliente não escolhe qual carta vem.
+    expect(acaoDaMesaSchema.parse({ tipo: 'saquear' })).toEqual({ tipo: 'saquear' });
+  });
 });
 
 describe('acaoRequisicaoSchema', () => {

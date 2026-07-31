@@ -2475,3 +2475,45 @@ describe('o guard de fase é ponto único', () => {
       .toThrow('aplicarAcao: passar não é legal na fase descartar');
   });
 });
+
+describe('saquear', () => {
+  it('tira a carta do topo do monte e a põe NA MÃO, sem revelar', () => {
+    const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
+    const antes = { ...p, fase: 'encrenca' as const };
+    const maoAntes = antes.jogadores[0]!.mao.length;
+    const monteAntes = antes.portas.monte.length;
+
+    const r = aplicarAcao(antes, { tipo: 'saquear', jogadorId: 'p1' }, deps([]));
+
+    expect(r.estado.jogadores[0]!.mao).toHaveLength(maoAntes + 1);
+    expect(r.estado.portas.monte).toHaveLength(monteAntes - 1);
+    // A carta NÃO passa pelo cemitério: ela foi do monte direto para a mão.
+    expect(r.estado.portas.cemiterio).toHaveLength(antes.portas.cemiterio.length);
+  });
+
+  it('o evento `saqueou` NÃO carrega a carta — a mão é zona oculta', () => {
+    const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
+    const r = aplicarAcao({ ...p, fase: 'encrenca' as const }, { tipo: 'saquear', jogadorId: 'p1' }, deps([]));
+
+    const saqueou = r.eventos.find((e) => e.tipo === 'saqueou');
+    expect(saqueou).toEqual({ tipo: 'saqueou', jogadorId: 'p1' });
+    // O log inteiro viaja para todos na projeção: um campo `carta` aqui anunciaria
+    // à mesa o conteúdo de uma mão que `JogadorPublico` existe para esconder.
+    expect(JSON.stringify(saqueou)).not.toContain('monstroId');
+  });
+
+  it('depois de saquear, o turno vai para `jogar`', () => {
+    // `saquear` é o fim do encontro deste turno: a janela seguinte é a de vestir o
+    // que se tem. Com um equipamento na mão, `jogar` PARA (não se auto-pula).
+    const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
+    const comEquip: EstadoPartida = {
+      ...p,
+      fase: 'encrenca',
+      jogadores: p.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao: [equipamento('t-1')] } : j)),
+    };
+
+    const r = aplicarAcao(comEquip, { tipo: 'saquear', jogadorId: 'p1' }, deps([]));
+
+    expect(r.estado.fase).toBe('jogar');
+  });
+});

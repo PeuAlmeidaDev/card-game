@@ -235,6 +235,15 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   //   jogar                guardarCarta   mochila cheia                `guardarCarta`
   //   combate              atacar         `proximaDecisao`             o motor (`AcaoIlegal`)
   //   combate              esquivar       `proximaDecisao`             o motor (`AcaoIlegal`)
+  //   encrenca             saquear        — (nenhuma; ver #62)         —
+  //
+  // `saquear` (Plano 4b, Task 2) NÃO soma ao total de TREZE pares acima: a
+  // recontagem partiu do `switch`, e a função não tem NENHUM guard fino — a
+  // decisão #62 do bible (baralho de Portas nunca acaba) é o que dispensa um `if`
+  // de baralho vazio, e sem guard não há recusa de domínio para a tela imitar. A
+  // linha existe para provar que a recontagem CHEGOU até `saquear`, não para
+  // declarar um par novo — é o mesmo cuidado que achou o par órfão de
+  // `empurrarCarta` em 2026-07-28, aplicado ao verbo que acabou de nascer.
   //
   // Um botão novo escrito só com `legal(tipo)` acende nesses estados e leva 400.
   // Os dois pares `espiada !== null` de `jogarCarta` e `equiparCarta` MORRERAM:
@@ -309,14 +318,18 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
     return agirNoCombate(estado, acao, deps);
   }
 
-  // `procurarEncrenca`/`saquear`: o VOCABULÁRIO entrou no Plano 4b (Task 1) — o
-  // corpo dos dois verbos é das Tasks 2 e 3, que ainda não existe. Hoje isto é
-  // inalcançável: `LEGAL` (`fase.ts`) só libera os dois na fase `encrenca`, e
-  // nenhuma transição do reducer produz essa fase até a Task 4. A atribuição ao
-  // tipo explícito (em vez de `never`) é a checagem de exaustividade: se um tipo
-  // novo entrar em `AcaoDaMesa` sem ganhar um `if` acima, a compilação quebra aqui.
-  const semCorpoAinda: 'procurarEncrenca' | 'saquear' = acao.tipo;
-  throw new Error(`aplicarAcao: ${semCorpoAinda} ainda não tem corpo (Plano 4b, Tasks 2/3)`);
+  if (acao.tipo === 'saquear') {
+    return saquear(estado, acao.jogadorId, deps);
+  }
+
+  // `procurarEncrenca`: o VOCABULÁRIO entrou no Plano 4b (Task 1) — o corpo do
+  // verbo é da Task 3, que ainda não existe. Hoje isto é inalcançável: `LEGAL`
+  // (`fase.ts`) só libera `procurarEncrenca` na fase `encrenca`, e nenhuma
+  // transição do reducer produz essa fase até a Task 4. A atribuição ao tipo
+  // explícito (em vez de `never`) é a checagem de exaustividade: se um tipo novo
+  // entrar em `AcaoDaMesa` sem ganhar um `if` acima, a compilação quebra aqui.
+  const semCorpoAinda: 'procurarEncrenca' = acao.tipo;
+  throw new Error(`aplicarAcao: ${semCorpoAinda} ainda não tem corpo (Plano 4b, Task 3)`);
 }
 
 /**
@@ -412,6 +425,39 @@ function resolverCarta(
       },
     },
     eventos,
+  );
+}
+
+/**
+ * Compra 1 carta de Portas **virada**, direto para a mão (spec §6). É a alternativa
+ * a lutar, e é o que impede a `encrenca` de ser um beco sem saída.
+ *
+ * ⚠️ **Sem guard de baralho vazio, de propósito.** A decisão #62 do bible diz que o
+ * baralho de Portas nunca acaba; se acabar, é invariante NOSSA quebrada — o `Error`
+ * cru de `tirarDoTopo` (500) é a resposta certa, não o 400 de `AcaoInvalida`. Quem
+ * confere a promessa é o predicado da invariante em `fase.test.ts`, não um `if`
+ * aqui: um guard silencioso transformaria a violação da regra em jogo normal.
+ *
+ * A carta vai para a MÃO sem passar pelo cemitério — daí o evento ser `saqueou`
+ * (que não carrega a carta) e não `porta` (que carrega).
+ */
+function saquear(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): ResultadoAcao {
+  const t = tirarDoTopo(estado.portas, deps.embaralhar);
+  const jogadores = estado.jogadores.map((j) => (
+    j.id === jogadorId ? { ...j, mao: [...j.mao, t.carta] } : j
+  ));
+  const comACarta = jogadores.find((j) => j.id === jogadorId);
+  if (comACarta === undefined) {
+    throw new Error(`saquear: jogador ${jogadorId} não está na mesa`);
+  }
+  // O jogador ATUALIZADO, com a carta já na mão: a pergunta do auto-pulo de `jogar`
+  // é sobre a mão de AGORA. Mesmo motivo, e mesma armadilha de ordem, do ramo
+  // `raca` de `resolverCarta`.
+  return entrarOuPular(
+    { ...estado, portas: t.baralho, jogadores },
+    comACarta,
+    'jogar',
+    [{ tipo: 'saqueou', jogadorId }],
   );
 }
 
