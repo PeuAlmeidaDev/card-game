@@ -6,8 +6,8 @@ import type { CartaPorta } from '@card-dungeon/shared';
  * decide a pessoa é a tela, que sabe quem é `voce`.
  *
  * Frase por tipo, e não um molde único: o monstro é o momento de tensão do turno
- * e merece a exclamação; sala vazia é anticlímax por definição. Um texto só para
- * todos os tipos apaga essa diferença.
+ * e merece a exclamação; a carta de raça só anuncia o que foi encontrado, sem
+ * alarde. Um texto só para os dois tipos apaga essa diferença.
  *
  * O `default` tem duas funções: a atribuição a `never` faz o compilador cobrar
  * esta função quando um tipo de carta entrar na união, e o retorno neutro evita
@@ -27,8 +27,6 @@ export function narrarPorta(
   switch (carta.tipo) {
     case 'monstro':
       return `${quem} dá de cara com um ${nomeDoMonstro(carta.monstroId)}!`;
-    case 'salaVazia':
-      return `${quem} vasculha o local e não encontra nada.`;
     case 'raca':
       return `${quem} encontra uma carta de ${nomeDaRaca(carta.racaId)}.`;
     default: {

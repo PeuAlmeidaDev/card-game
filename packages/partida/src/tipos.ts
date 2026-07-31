@@ -12,7 +12,6 @@ import type { Classe, Equipamento } from '@card-dungeon/personagem';
  */
 export type ReceitaPorta =
   | { readonly tipo: 'monstro'; readonly monstroId: string }
-  | { readonly tipo: 'salaVazia' }
   | { readonly tipo: 'raca'; readonly racaId: string };
 
 /**

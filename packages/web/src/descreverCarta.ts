@@ -30,14 +30,12 @@ export function descreverCarta(
   switch (carta.tipo) {
     case 'monstro':
       return `um ${nomeDoMonstro(carta.monstroId)}`;
-    case 'salaVazia':
-      return 'uma sala vazia';
     case 'raca':
       return `uma carta de ${nomeDaRaca(carta.racaId)}`;
-    // O NOME, sem artigo — e é o único caso aqui que não tem um. Os outros três
-    // descrevem uma CATEGORIA ("um monstro", "uma sala vazia", "uma carta de X")
-    // e o artigo faz parte da frase; o item tem nome próprio, e um artigo fixo
-    // erraria o gênero em cinco dos oito itens do catálogo ("uma Elmo de Couro").
+    // O NOME, sem artigo — e é o único caso aqui que não tem um. Os outros dois
+    // descrevem uma CATEGORIA ("um monstro", "uma carta de X") e o artigo faz
+    // parte da frase; o item tem nome próprio, e um artigo fixo erraria o gênero
+    // em cinco dos oito itens do catálogo ("uma Elmo de Couro").
     // As três frases que consomem isto seguem lendo bem: "Bot 1 descartou Espada
     // Curta.", "Bot 1 equipa Espada Curta." e o rótulo na mão.
     case 'equipamento':

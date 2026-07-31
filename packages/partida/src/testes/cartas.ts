@@ -11,7 +11,6 @@ import type { CartaPorta, CartaDeRaca, CartaEquipamento } from '../tipos';
 // teste mandar). Trocar o id real por este também faz a carta forjada resolver
 // pelo catálogo default, em vez de depender de ele aprovar qualquer coisa.
 export const monstro = (id: string, monstroId = 'm-teste'): CartaPorta => ({ id, tipo: 'monstro', monstroId });
-export const salaVazia = (id: string): CartaPorta => ({ id, tipo: 'salaVazia' });
 // Anotado como `CartaDeRaca` (não `CartaPorta`): ela continua atribuível a todo
 // lugar que espera `CartaPorta` (inclusive `monte: [...]`), mas agora também
 // encaixa direto em `emJogo.raca` (`CartaDeRaca | null`) sem precisar de `as`.
@@ -35,6 +34,3 @@ export const equipamento = (id: string, itemId = 'i-teste'): CartaEquipamento =>
  */
 export const monstros = (n: number): CartaPorta[] =>
   Array.from({ length: n }, (_, i) => monstro(`m${String(i + 1)}`));
-
-export const salasVazias = (n: number): CartaPorta[] =>
-  Array.from({ length: n }, (_, i) => salaVazia(`s${String(i + 1)}`));
