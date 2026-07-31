@@ -307,9 +307,12 @@ afirmava. **O `game-bible.md` é a fonte de verdade; o que está escrito acima p
   referências** (47 só em `mesa.test.ts`), onde ela é o **fixture canônico de "porta que resolve
   sem combate"** — feita depois, o 4b escreveria testes sobre um fixture que morre em seguida.
 - **O que a fatia entrega:** remove a `salaVazia` e fixa a composição interina **`2× monstro +
-  1× raça` = 15/jogador, 60 na mesa de 4** (#52), densidade **67% monstro / 33% raça**.
-  ⚠️ **Não existe composição de 13** — sobram duas famílias de 5 e o rodízio está proibido pela
-  decisão #11 do **spec da fatia 8**, então a multiplicação uniforme só dá 10, 15 ou 20.
+  1× raça` = 14/jogador, 56 na mesa de 4** (#52 com os números corrigidos pela **#54**), densidade
+  **71,4% monstro / 28,6% raça** (hoje: 12/jogador, 48 na mesa, 41,7 / 25 / 33,3).
+  🔴 **`RACAS_SACAVEIS` exclui o Humano — são 4 raças sacáveis, não 5.** Três decisões do bible
+  (#36, #41, #52) afirmaram cinco e erraram toda conta de densidade em cima disso; a #54 registra a
+  correção. **Conta de baralho sai de `MONSTROS_SACAVEIS.length` e `RACAS_SACAVEIS.length`**, nunca
+  de "quantas raças o §5 lista".
   ⚠️ **A medição desta fatia carrega DUAS variáveis** (remoção + densidade); ela isola esse par
   contra a `encrenca`, não as quatro coisas entre si.
 - **O que a fatia MEDE e não conserta (#53):** `tirarDoTopo` (`baralho.ts:61-64`) lança `Error`
