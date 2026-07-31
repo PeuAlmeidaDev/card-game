@@ -18,6 +18,15 @@ da remoção, para que a revisão consiga rejeitar um sem rejeitar o outro.
 flat. Pacotes tocados: `partida` (domínio), `web` (narração e tela), `server` (a borda que monta o
 baralho).
 
+> 🔴 **ERRATA (2026-07-30, achada durante a execução da Task 4).** Este plano foi escrito supondo
+> que o catálogo tem **5 monstros e 5 raças**. São **5 monstros e 4 RAÇAS SACÁVEIS** —
+> `RACAS_SACAVEIS` (`packages/cartas/src/racas.ts:60`) filtra o Humano fora. Os números certos:
+> baralho de hoje **12/jogador, 48 na mesa**; com a #52 **14/jogador, 56 na mesa**, densidade
+> **71,4% monstro / 28,6% raça**. Os blocos de código das Tasks 1-4 abaixo preservam os números
+> errados **de propósito** — eles são o registro do que foi pedido, e o código já está corrigido no
+> repositório. **Toda conta nova sai de `MONSTROS_SACAVEIS.length` e `RACAS_SACAVEIS.length`.**
+> Ver decisão **#54** do game bible.
+
 ## Global Constraints
 
 - **Branch:** `feat/fatia-8-sala-vazia-sai-do-jogo`, **já criado**, partindo de
@@ -705,7 +714,7 @@ Os mesmos N do Plano 4a, para as comparações valerem.
 - A comparação com o 4a: caridade era **994 doações / 145 ao humano**; ritmo era **109 (bot) /
   115 (equipando)**.
 - ⚠️ **Uma seção obrigatória chamada "o que esta medição NÃO isola":** a decisão #52 mudou a
-  densidade de monstro de 38% para 67% **na mesma fatia** que removeu a sala vazia. Qualquer leitura
+  densidade de monstro de **41,7% para 71,4%** **na mesma fatia** que removeu a sala vazia. Qualquer leitura
   de *"a caridade voltou por causa da sala vazia"* é inválida. Escreva isso antes dos números, não
   depois.
 - A recomendação sobre o beco sem saída: se a medida 4 for > 0, ela vira task nesta fatia; se for 0,
@@ -728,7 +737,7 @@ gitignored. O produto desta task são **os quatro números**, que a Task 7 escre
 
 - [ ] **Step 1: Atualizar o `CLAUDE.md`**
 
-Registrar: a fatia está construída, a composição de produção é `2×/1×` = 15/jogador (60 na mesa),
+Registrar: a fatia está construída, a composição de produção é `2×/1×` = **14/jogador (56 na mesa)**,
 os quatro números medidos na Task 6, e o que a medição **não** isola.
 
 ⚠️ Precedente do projeto: o `CLAUDE.md` diz *"mergeado"* **no commit que precede o merge**.
