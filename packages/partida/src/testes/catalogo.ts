@@ -73,19 +73,38 @@ export const ITEM_FRACO = {
   slot: 'maoDireita' as const, duasMaos: false, modificadores: { forca: 1 },
 };
 
+/**
+ * A ÚNICA arma de duas mãos do dublê. Até 2026-07-31 o catálogo de teste não
+ * tinha nenhuma, e por isso **nenhum teste do bot conseguia exercitar a regra de
+ * duas mãos** — provado por mutação: trocar `['maoDireita', 'maoEsquerda']` por
+ * `['maoDireita']` em `bot.ts` deixava os 240 testes verdes.
+ *
+ * 🎚️ Força **4** não é decorativa, é o que separa a regra certa da quebrada:
+ * contra as duas mãos ocupadas por Forte (3) + Fraco (1), o custo real é 4 e o
+ * ganho é 0 (não equipa); contando só a mão direita, o custo cairia para 3 e o
+ * ganho viraria 1 (equipa). Mexer neste número apaga a distinção e o teste volta
+ * a passar dos dois jeitos.
+ */
+export const ID_DO_ITEM_DUAS_MAOS = 'i-duas-maos';
+export const ITEM_DUAS_MAOS = {
+  id: ID_DO_ITEM_DUAS_MAOS, nome: 'Item de Duas Mãos',
+  slot: 'maoDireita' as const, duasMaos: true, modificadores: { forca: 4 },
+};
+
 export function catalogoDeTeste(
   parcial: Partial<CatalogoDaMesa> = {},
 ): CatalogoDaMesa {
   return {
     raca: () => undefined,
     monstro: (id) => (id === ID_DO_MONSTRO_DE_TESTE ? MONSTRO_DE_TESTE : undefined),
-    // Catálogo de teste conhece UMA classe e TRÊS itens, pelo mesmo princípio do
+    // Catálogo de teste conhece UMA classe e QUATRO itens, pelo mesmo princípio do
     // monstro: um dublê que aprova qualquer id não é dublê, é a ausência de um.
     classe: (id) => (id === ID_DA_CLASSE_DE_TESTE ? CLASSE_DE_TESTE : undefined),
     item: (id) => {
       if (id === ID_DO_ITEM_DE_TESTE) return ITEM_DE_TESTE;
       if (id === ID_DO_ITEM_FORTE) return ITEM_FORTE;
       if (id === ID_DO_ITEM_FRACO) return ITEM_FRACO;
+      if (id === ID_DO_ITEM_DUAS_MAOS) return ITEM_DUAS_MAOS;
       return undefined;
     },
     ...parcial,

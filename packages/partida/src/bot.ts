@@ -1,5 +1,9 @@
 import type { AcaoDaMesa, CartaEquipamento, CatalogoDaMesa, JogadorPublico, Slot, VistaDaPartida } from './tipos';
 import { LIMITE_MOCHILA } from './mao';
+// O par de mãos vem do MESMO lugar que `colocarNoSlot` usa: o custo que o bot
+// calcula tem que ser o custo que o reducer vai cobrar, e duas listas escritas à
+// mão divergem em silêncio (o slot que nascer não entra na cópia).
+import { MAOS } from './equipar';
 
 /**
  * Política do bot desta fatia: burro por definição — executa a ação óbvia da fase
@@ -115,7 +119,7 @@ function vestirOuGuardar(
     const info = catalogo.item(carta.itemId);
     if (info === undefined) continue;
     // O que ele DESLOCA: os slots que ele vai ocupar. Duas mãos desloca os dois.
-    const alvos: readonly Slot[] = info.duasMaos ? ['maoDireita', 'maoEsquerda'] : [info.slot];
+    const alvos: readonly Slot[] = info.duasMaos ? MAOS : [info.slot];
     const ocupantes = new Map<string, string>();
     for (const slot of alvos) {
       const atual = eu.emJogo.slots[slot];

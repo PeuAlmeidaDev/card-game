@@ -7,7 +7,9 @@ import { projetarPara } from './projecao';
 import { filaDeDados } from './testes/dados';
 import { equipamento, monstro as cartaMonstro, monstros, raca } from './testes/cartas';
 import { LIMITE_BASE_DE_MAO, LIMITE_MOCHILA } from './mao';
-import { catalogoDeTeste, ID_DA_CLASSE_DE_TESTE, ID_DO_ITEM_FORTE, ID_DO_ITEM_FRACO } from './testes/catalogo';
+import {
+  catalogoDeTeste, ID_DA_CLASSE_DE_TESTE, ID_DO_ITEM_DUAS_MAOS, ID_DO_ITEM_FORTE, ID_DO_ITEM_FRACO,
+} from './testes/catalogo';
 import { COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import type {
   Carta, CartaDeRaca, CartaEquipamento, CartaTesouro, EntradaJogador, EstadoPartida, Fase, Slot, VistaDaPartida,
@@ -437,6 +439,46 @@ describe('escolherAcao', () => {
 
     expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
       .toEqual({ tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-forte' });
+  });
+
+  it('NÃO equipa a arma de duas mãos que não paga as DUAS mãos que desloca', () => {
+    // 🕳️ Buraco de cobertura achado por mutação em 2026-07-31: trocar
+    // `['maoDireita', 'maoEsquerda']` por `['maoDireita']` em `bot.ts` deixava os
+    // 240 testes VERDES. A causa era o dublê — o catálogo de teste não tinha
+    // nenhuma arma de duas mãos, então a regra era inexercitável, não só
+    // desprotegida.
+    //
+    // 🎚️ Os números são o que separa a regra certa da quebrada: Forte (3) +
+    // Fraco (1) = custo 4 contra o valor 4 da arma ⇒ ganho 0, não equipa.
+    // Contando só a mão direita, o custo cairia a 3 e o ganho viraria 1 ⇒ equipa.
+    const vista = vistaEm('recompor', {
+      suaMao: [equipamento('t-2m', ID_DO_ITEM_DUAS_MAOS)],
+      slots: {
+        maoDireita: equipamento('t-forte', ID_DO_ITEM_FORTE),
+        maoEsquerda: equipamento('t-fraco', ID_DO_ITEM_FRACO),
+      },
+      mochila: [],
+    });
+
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
+      .toEqual({ tipo: 'guardarCarta', jogadorId: 'p1', cartaId: 't-2m' });
+  });
+
+  it('equipa a arma de duas mãos quando ela paga as duas', () => {
+    // O par do teste acima, e ele não é redundante: sozinho, o anterior também
+    // ficaria verde com um bot que NUNCA equipa arma de duas mãos. Os dois juntos
+    // é que prendem a regra — o custo é das duas mãos, não a arma é proibida.
+    // Fraco (1) + Fraco (1) = custo 2 contra 4 ⇒ ganho 2, equipa.
+    const vista = vistaEm('recompor', {
+      suaMao: [equipamento('t-2m', ID_DO_ITEM_DUAS_MAOS)],
+      slots: {
+        maoDireita: equipamento('t-e1', ID_DO_ITEM_FRACO),
+        maoEsquerda: equipamento('t-e2', ID_DO_ITEM_FRACO),
+      },
+    });
+
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
+      .toEqual({ tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-2m' });
   });
 
   it('guarda o que não melhora, se a mochila tem vaga', () => {

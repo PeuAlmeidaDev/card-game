@@ -178,7 +178,14 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
       <ul>
         {vista.jogadores.map((j) => (
           <li key={j.id}>
-            <strong>{j.nome}</strong> — patente {j.patente} · {j.derrotas} derrota(s)
+            {/* O `ehBot` viajava na vista e NUNCA era renderizado — a 5ª ocorrência
+                do padrão neste projeto, achada na auditoria de 2026-07-31. Hoje ele
+                é redundante com o nome ("Bot 1", "Você"), e por isso é a mais
+                benigna das cinco; mas os nomes são gerados pelo servidor e o bloco
+                `Online` (§17) põe HUMANOS nos assentos dos bots — na hora em que os
+                nomes virarem nomes de gente, quem distingue é este campo, e ele
+                estaria aqui sem nunca ter sido exercitado. */}
+            <strong>{j.nome}</strong>{j.ehBot && <span aria-label="controlado pelo computador"> (bot)</span>} — patente {j.patente} · {j.derrotas} derrota(s)
             {j.emJogo.raca !== null && ` · ${nomeDaRaca(j.emJogo.raca.racaId)}`}
             {' · '}força {j.combatente.forca} · vida {j.combatente.vida} · habilidade {j.combatente.habilidade} · agilidade {j.combatente.agilidade}
             {' · '}{j.cartasNaMao}/{j.limiteDeMao} cartas

@@ -120,6 +120,23 @@ describe('TelaMesa', () => {
     espiada: { jogadorId: 'p1', carta: { id: 'p-0', tipo: 'monstro', monstroId: 'goblin' } },
   };
 
+  it('marca quem é bot, e só quem é bot', async () => {
+    // `ehBot` viajava na vista desde a fatia 5 e NUNCA foi renderizado (auditoria
+    // de 2026-07-31). Hoje o nome já entrega ("Bot 1"), mas os nomes vêm do
+    // SERVIDOR — o bloco `Online` põe humanos nesses assentos, e aí o campo é a
+    // única coisa que distingue. A asserção é conjunta de propósito: marcar todo
+    // mundo passaria num teste que só procurasse o "(bot)" do p2.
+    await abrirMesa(vistaBase);
+
+    // `selector: 'strong'` porque o nome aparece na linha do jogador E no painel
+    // de log; o `<strong>` é o da lista de assentos.
+    const bot = await screen.findByText('Bot 1', { selector: 'strong' });
+    expect(bot.closest('li')?.textContent).toContain('(bot)');
+
+    const humano = screen.getByText('Você', { selector: 'strong' });
+    expect(humano.closest('li')?.textContent).not.toContain('(bot)');
+  });
+
   it('mostra o que o vidente pressentiu e oferece encarar ou empurrar', async () => {
     await abrirMesa(vistaComEspiada);
 
