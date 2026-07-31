@@ -52,8 +52,10 @@ describe('montarComposicao', () => {
   });
 
   it('a densidade de PRODUÇÃO é 2 monstros para 1 raça (decisão #52 do game bible)', () => {
-    // 5 monstros e 5 raças no catálogo, os números de hoje. O que este teste
-    // trava não é o tamanho do catálogo — é a PROPORÇÃO que a #52 escolheu.
+    // 5 e 5 aqui é um catálogo SINTÉTICO, escolhido para o teste — não é o
+    // catálogo de produção (que hoje tem 5 monstros sacáveis e 4 raças sacáveis,
+    // 14 por jogador; ver `packages/server/src/app.ts`). O que este teste trava
+    // não é o tamanho do catálogo — é a PROPORÇÃO que a #52 escolheu.
     const cinco = (p: string) => Array.from({ length: 5 }, (_, i) => `${p}${String(i)}`);
     const c = montarComposicao({
       monstroIds: cinco('m'), copiasPorMonstro: 2, racaIds: cinco('r'), copiasPorRaca: 1,
@@ -65,7 +67,9 @@ describe('montarComposicao', () => {
 
   it('a repetição do BARALHO vem da mesa, não da composição', () => {
     // A composição é POR JOGADOR e `criarPartida` a multiplica pelo tamanho da
-    // mesa: 15 por jogador viram 60 numa mesa de 4.
+    // mesa: os 3 daqui virariam 12 numa mesa de 4 — exemplo abstrato deste
+    // fixture, não o baralho de produção (que hoje é 14 por jogador / 56 na
+    // mesa; ver `packages/server/src/app.ts`).
     const c = montarComposicao({
       monstroIds: ['goblin'], copiasPorMonstro: 2, racaIds: ['elfo'], copiasPorRaca: 1,
     });

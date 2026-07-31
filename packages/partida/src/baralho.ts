@@ -33,7 +33,10 @@ export interface ReceitaDeBaralho {
  * borda.
  *
  * ⚠️ **A repetição por ASSENTO não acontece aqui:** `criarPartida` multiplica esta
- * composição pelo número de jogadores. 15 por jogador viram 60 numa mesa de 4.
+ * composição pelo número de jogadores — exemplo ABSTRATO, não o baralho de
+ * produção: 3 por jogador viram 12 numa mesa de 4. O tamanho de produção depende
+ * do catálogo (que este módulo não conhece) e mora na borda —
+ * `packages/server/src/app.ts`, hoje 14 por jogador / 56 na mesa de 4.
  *
  * ⚠️ **Não existe `salaVazia`** desde 2026-07-30 (decisão #42): porta que não é
  * monstro vai para a mão.
