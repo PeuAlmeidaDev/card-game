@@ -186,7 +186,7 @@ describe('versaoDe — a versão anda quando a espiada abre', () => {
   const criar = () => criarPartida('m1', entradas,
     {
       patenteAlvo: 10,
-      composicaoPorJogador: [{ tipo: 'salaVazia' as const }],
+      composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }],
       composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE,
     },
     { embaralhar: semEmbaralhar });

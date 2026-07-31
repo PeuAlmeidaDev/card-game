@@ -69,12 +69,12 @@ describe('PainelLog', () => {
   it('narra o evento de porta com o que a carta revela', () => {
     const log: readonly EventoDaMesa[] = [
       { tipo: 'porta', jogadorId: 'p1', carta: { id: 'p-0', tipo: 'monstro', monstroId: 'goblin' } },
-      { tipo: 'porta', jogadorId: 'p2', carta: { id: 'p-1', tipo: 'salaVazia' } },
+      { tipo: 'porta', jogadorId: 'p2', carta: { id: 'p-1', tipo: 'raca', racaId: 'r-teste' } },
     ];
     render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} />);
 
     expect(screen.getByText(/Você dá de cara com um Goblin!/)).toBeInTheDocument();
-    expect(screen.getByText(/Bot 1 vasculha o local e não encontra nada\./)).toBeInTheDocument();
+    expect(screen.getByText(/Bot 1 encontra uma carta de r-teste\./)).toBeInTheDocument();
   });
 
   it('narra a porta alheia com o nome do jogador, não como "Você"', () => {

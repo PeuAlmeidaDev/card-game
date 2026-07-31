@@ -19,6 +19,8 @@ autoral a definir**. Inspirado nas *mecânicas* do Munchkin; tema, nomes e arte 
 | **`docs/game-design/game-bible.md`** | **O JOGO** (mundo, formato da partida, turno, cartas, economia, roteiro de fatias). Documento vivo. **Ler antes de qualquer decisão de design.** |
 | `docs/superpowers/specs/` | Specs de implementação, um por fatia. |
 | `docs/superpowers/plans/` | Planos de execução (tasks TDD, um commit cada). |
+| `docs/game-design/mecanica-cartas.md` | ⚠️ **NÃO é fonte de verdade.** Registro de design da fatia 6 (raças). Até 2026-07-29 o cabeçalho dele afirmava *"este doc corrige o bible"* — descrevia **um evento de 2026-07-24 que o bible já absorveu**, escrito como autoridade permanente. Corrigido. **O bible vence.** |
+| `docs/game-design/roteiro-para-o-mvp.md` | ⚠️ **Cumprido e histórico.** A Fase 0 aconteceu em 2026-07-29; a definição do MVP nasceu no bible (**§3.1**). Vale como registro de por que o MVP não existia. |
 
 Os specs anteriores a 2026-07-22 foram escritos quando o jogo era uma **run solo**. Onde eles
 divergirem do game bible, **o game bible vence**.
@@ -41,9 +43,21 @@ mudança de roteiro. Vale inclusive para decisão tomada de passagem numa conver
 **Por que isto virou regra (2026-07-27):** um docstring em `partida/src/tipos.ts` afirmava que
 *"maldição e classe entram na família Tesouros quando tiverem verbo"*. O game bible **já dizia o
 contrário** desde sempre — §4 põe maldições e classes no baralho de **Portais**, e maldição
-resolve com **efeito imediato** (nunca vai para a mão, logo nunca para a mochila). O comentário
-derivou da fonte de verdade sem ninguém notar, e um implementador **e** um revisor gastaram um
-ciclo inteiro raciocinando sobre um cenário que o jogo não tem.
+**nunca entra na mochila** (que é `readonly CartaTesouro[]`; maldição é carta de Porta). O
+comentário derivou da fonte de verdade sem ninguém notar, e um implementador **e** um revisor
+gastaram um ciclo inteiro raciocinando sobre um cenário que o jogo não tem.
+
+🔴 **E este parágrafo, que existe para ensinar a não derivar da fonte de verdade, DERIVOU DA
+FONTE DE VERDADE.** Até 2026-07-29 ele justificava a conclusão acima com *"maldição resolve com
+efeito imediato (**nunca vai para a mão**, logo nunca para a mochila)"*. A conclusão está certa;
+a premissa **não**. O bible sempre desenhou **dois** caminhos para maldição (decisão #31): efeito
+imediato é regra do **passo 2 do §6** (revelada no vasculhar), mas o `saquear` do passo 3 *"compra
+1 Portal virado pra mão"* — e o passo 5 já listava *"usar maldições"* entre as ações da mão. A
+frase colapsou dois caminhos num só e escreveu o resultado entre parênteses, como se fosse
+dedução óbvia. ⚠️ **Ia custar caro:** `saquear` é o verbo do **Plano 4b**, o próximo — ele nasceria
+como "compra uma carta", sem perguntar o que acontece quando a carta é maldição. Lição: a regra
+"ler o bible antes de escrever" vale **também para o texto que ensina a regra**, e parêntese que
+começa com *"logo"* é dedução — o lugar onde a derivação se disfarça de fato.
 
 ⚠️ **A direção do erro importa:** não foi o game bible que ficou desatualizado — foi o CÓDIGO
 que se afastou dele. Por isso a regra não é só "escreva no bible depois"; é **ler o bible antes
@@ -90,7 +104,8 @@ propósito: `versaoDe` é `log.length`, e sem mover a versão um duplo-clique es
 `entrarOuPular` (ponto único); `sairDaParada` garante que passar à mão e ser pulado terminem no
 mesmo lugar. **A decisão #7 do spec passou a valer:** `jogarCarta` só é legal em `recompor`,
 `equiparCarta` em `recompor` e `jogar`, e `descartar` ficou **só** com a caridade. Todo caminho
-de encontro (sala vazia, raça→mão, fim de combate) entrega o turno a `jogar` em vez de chamar
+de encontro (sala vazia — removida em 2026-07-30 —, raça→mão, fim de combate) entrega o turno a
+`jogar` em vez de chamar
 `encerrarTurno` — é a janela em que o loot vira corpo. O `bot.ts` virou `switch` exaustivo sobre
 `vista.fase`: a dívida do **"quinto leitor da regra de excedente" está PAGA**. A `TelaMesa` ganhou
 indicador de fase (`Record<Fase, string>`) e o botão **"Passar"**.
@@ -160,11 +175,13 @@ dos 5,95 projetados. A dívida continua PAGA de qualquer forma: mesmo o valor ma
 batida para a dívida estar quitada. **Taxa de vitória do humano medida: 22,6%–37,8%**
 (varia por rodada e política) contra os **80%** do bot antigo e os **42,5%** projetados — PIOR
 que a projeção nas três rodadas que rodei, sem explicação fechada (ver o relatório da Task 9 para
-as duas hipóteses candidatas). **Tesouros doados por bots via caridade: ~0** (era **994**, com
-**145** para o humano) — o bot guloso resolve equipamento ANTES de chegar em `descartar`, e o
-que sobra para doar são cartas de Porta (`monstro`/`salaVazia`) que a mão inicial recebeu CRUAS
-(nunca resolvidas — `criarPartida` distribui direto do topo do baralho) e que **nenhum verbo do
-jogo hoje sabe jogar** — é exatamente o buraco que a fase `encrenca` do Plano 4b fecha.
+as duas hipóteses candidatas). **Tesouros doados por bots via caridade: ~0** (no **Plano 3a** eram
+**994**, com **145** para o humano) — o bot guloso resolve equipamento ANTES de chegar em
+`descartar`, e o que sobra para doar são cartas de Porta (`monstro`; a `salaVazia` foi removida em
+2026-07-30) que a mão inicial recebeu CRUAS (nunca resolvidas — `criarPartida` distribui direto do
+topo do baralho) e que **nenhum verbo do jogo hoje sabe jogar** — é o buraco que a fase `encrenca`
+do Plano 4b fecha. ⚠️ **Remedido em 2026-07-30 e CONFIRMADO em zero** (decisão #55 do bible): o
+corte da `salaVazia` devolveu pressão de mão e **não** ressuscitou a caridade de tesouro.
 
 **Dívida "a mesa nasce exatamente no teto" (4+4 = 8 = limite de quem está sem raça) — segue
 verdadeira estruturalmente**, sem mudança: nasce em `recompor`, e qualquer carta que entre no
@@ -255,15 +272,102 @@ quebra a compilação de **exatamente 2 arquivos**, `narrarEvento.tsx` e `partic
 dois em `web`; nada em `partida`/`shared`/`server`, porque as respostas do contrato são
 `c.type<T>()` e o Zod está na entrada.
 
-**Próximo passo: Plano 4b — a fase `encrenca`.** Os verbos `procurarEncrenca`/`saquear` (spec §6,
-fase 3 do turno) — a Task 9 do Plano 4a mediu por que ela importa: cartas de Porta
-(`monstro`/`salaVazia`) dadas na mão inicial ficam mortas até existir um verbo que as jogue de
-dentro da mão, e é isso que hoje esvazia a caridade de tesouro (ver "Dívida... PAGA" acima).
-Fora de escopo, já declarado: mochila → mão (adiada para a fatia da interferência) e escolher o
-que queimar com a mochila cheia.
+## ⚠️ SESSÃO DE 2026-07-29 — a Fase 0 aconteceu. **Releia o bible antes de agir.**
 
-Roteiro completo e justificativa em §17 do game bible (Mesa → Interferência → Personagem
-dinâmico → Habilidades → Contas/ranking/crônica).
+Uma sessão de `grilling` produziu **22 decisões (#29–#50)** e mudou coisas que este arquivo
+afirmava. **O `game-bible.md` é a fonte de verdade; o que está escrito acima pode estar velho.**
+
+- ✅ **O MVP finalmente TEM definição:** **`game-bible.md` §3.1**. Seis blocos.
+- ✅ **Ordem vigente (§17, decisões #45 e #51):** **`corte da salaVazia` (bloco 0, acrescentado em
+  2026-07-30)** → `4b encrenca` → **`Maldições/Bad Stuff`** →
+  **`Frontend animado`** → **`Online`** → `Interferência` → `Habilidades` (fora do MVP) →
+  `Contas/ranking/crônica`.
+  🔴 **A ordem que este arquivo trazia OMITIA O ONLINE, e isso era DERIVA** — o §17 tinha
+  argumento escrito (*"interferência é mecânica de rede"*) que nunca foi revogado.
+- 🔴 **Decisões que invalidam o texto acima. ✅ A #42 (a `salaVazia` sai do jogo) foi CONSTRUÍDA
+  em 2026-07-30** — ver a seção da sessão de 2026-07-30. **As demais continuam sendo só desenho,
+  e o código continua como está descrito no "Estado atual"**:
+  `item de batalha` + `item que atrapalha batalha` **colapsaram** em `carta de combate` com alvo
+  (#43); o `instantâneo` passa a ser jogável **pelo lutador no meio do combate** (#44), o que faz
+  o snapshot do §7 virar **sequência**; a montagem do baralho vira **receita explícita** (#36);
+  a carta de raça vira **artefato de transformação** consumido no uso (#38).
+- 🔴 **O motor é 1v1 LITERAL** (`criarCombate(jogador, monstro)`), e a **interferência carrega a
+  generalização para N** — custo que nunca foi contado (#33).
+- ⚠️ **Fases do turno: chame pelo NOME, nunca por número** (#48) — `recompor`, `vasculhar`,
+  `encrenca`, `combate`, `jogar`, `descartar`. O bible numerava 6 passos e o código tem 5 fases:
+  *"fase 5"* era ambíguo. **Mesmo defeito da #34** (*"decisão #N"* existe em **três** registros:
+  o bible, o spec da fatia 7 e o spec da fatia 8 — sempre qualifique de qual).
+  ➡️ **Regra geral: em documento com mais de uma lista paralela, NOMEIE — não numere.**
+
+## ⚠️ SESSÃO DE 2026-07-30 — o bloco 0 está CONSTRUÍDO. A promessa dele NÃO se cumpriu.
+
+**A fatia do CORTE DA `salaVazia` está construída** — bloco **0** do §17 e do §3.1, decisões
+**#51–#55** do bible. Branch `feat/fatia-8-sala-vazia-sai-do-jogo`, partindo de
+`docs/roteiro-para-o-mvp` (os dois commits da Fase 0 viajam neste PR). Sete commits de código,
+**500 testes verdes**, typecheck e lint limpos. Pronta para o PR; **falta o gate ocular do Pedro**.
+
+- **O que entrou em produção:** a `salaVazia` **não existe mais** (#42) e a composição de Portas
+  é **`2× monstro + 1× raça` = 14/jogador, 56 na mesa de 4** (#52 com os números corrigidos pela
+  **#54**), densidade **71,4% monstro / 28,6% raça** (antes: 12/jogador, 48 na mesa,
+  41,7 / 25 / 33,3). A composição é **declarada**, não derivada do catálogo — é a #36 valendo de
+  verdade pela primeira vez.
+  🔴 **`RACAS_SACAVEIS` exclui o Humano — são 4 raças sacáveis, não 5.** Três decisões do bible
+  (#36, #41, #52) afirmaram cinco e erraram toda conta de densidade em cima disso; a #54 registra a
+  correção. **Conta de baralho sai de `MONSTROS_SACAVEIS.length` e `RACAS_SACAVEIS.length`**, nunca
+  de "quantas raças o §5 lista".
+
+**📊 Os quatro números medidos (80 partidas para caridade e beco, 31 para ritmo; dials de
+produção, dado e embaralho reais):**
+
+| Medida | Resultado |
+|---|---|
+| Doações de caridade de **Tesouro** | 🔴 **ZERO em 80 partidas** (0 chegando ao humano) |
+| Doações de caridade de **Porta** (métrica nova) | **49** (10 chegando ao humano) |
+| Ritmo — mediana de ações do humano (N=31) | **101** (política bot) / **104** (equipando) |
+| Beco sem saída (monte **e** cemitério de Portas vazios) | **zero em 80 partidas** |
+
+🔴 **A justificativa (2) da #42 não se cumpriu na métrica que ela nomeou** (*"devolve pressão de
+mão, e isso ressuscita a caridade"*). A caridade de **tesouro** continua em ~0, **como no
+Plano 4a** — ⚠️ **nunca escreva "caiu de 994"**: os 994/145 são do **Plano 3a**, e o 4a já media
+~0. O que subiu foi outra coisa, a doação de carta de **Porta** morta na mão. **Causa verificada
+no código, não hipótese:** `vestirOuGuardar` (`packages/partida/src/bot.ts:99-148`) intercepta
+**todo** equipamento da mão em `recompor` e `jogar`, e como `CartaTesouro` só tem o variante
+`equipamento` hoje, nenhum tesouro sobrevive até `descartar`. ✅ **A #42 NÃO é revogada** — a
+remoção continua certa pelos outros motivos dela (tom/mesa animada, e a pressão de mão que **de
+fato** subiu). Registrado como decisão **#55**; a alavanca real sobre a economia é a **#40**
+(consumíveis ≥50%), não pressão de mão.
+
+- ⚠️ **O que a medição NÃO isola:** a fatia mudou **duas coisas ao mesmo tempo** (remoção da
+  `salaVazia` **+** densidade de monstro 41,7%→71,4%). O que a #51 isola é esse **par** contra a
+  `encrenca` — não as duas entre si. E os 3 bots continuam usando a mesma `escolherAcao` da
+  política "bot" do humano, então comparações contra medições antigas movem todos os assentos
+  juntos (#24/#25).
+- ⚠️ **A queda de ritmo (109/115 → 101/104) é PEQUENA, não achado** — cabe na variação que N=31 já
+  produziu entre rodadas do 4a, e não houve rodada de confirmação. O que ela diz, por negação: a
+  #42 temia que sem a `salaVazia` *"o descarte virasse tirania"*; o ritmo **não subiu**, então a
+  preocupação **não se confirmou nesta amostra** — o que não é o mesmo que descartada, porque
+  ninguém mediu *quantos turnos terminam em `descartar`*.
+- **O que a fatia MEDIU e não consertou (#53):** `tirarDoTopo` (`baralho.ts:61-64`) lança `Error`
+  cru = **500** com monte e cemitério vazios, e **`vasculhar` (`mesa.ts:414-435`) não tem guard
+  nenhum** — só `empurrarCarta` tem (`mesa.ts:461`). Exposição **pré-existente**, e com 56 cartas
+  (contra 48) fica **menos** provável. Medida: **zero em 80 partidas** — 🔴 escreva assim, **nunca
+  "não acontece"**; é a checagem depois de CADA ação, não prova de impossibilidade. Como não deu
+  maior que zero, não virou task aqui: **o número vai para o 4b**, que precisa refazê-lo — `saquear` compra
+  Porta **para a mão**, e mão é a zona que esvazia baralho sem devolver nada ao cemitério.
+
+**Próximo: Plano 4b — a fase `encrenca`.** Os verbos `procurarEncrenca`/`saquear` (§6 do
+bible) — a Task 9 do Plano 4a mediu por que ela importa: cartas de Porta dadas na mão inicial
+ficam mortas até existir um verbo que as jogue de dentro da mão. 📌 **O 4b herda três números
+como baseline a remedir:** caridade de Tesouro **0** / de Porta **49**, ritmo **101/104**, beco
+sem saída **0/80**. ⚠️ E herda uma expectativa **rebaixada**: a `encrenca` dá verbo à Porta morta
+na mão, mas **não** há evidência de que pressão de mão ressuscite caridade de Tesouro (#55) —
+não repita a promessa da #42 com outro nome.
+⚠️ **Duas coisas novas que o 4b tem que encarar e que o plano ainda não sabia:** (1) `saquear`
+compra Porta **às cegas** e pode trazer **maldição para a mão** (#31) — ele não é "a opção
+segura"; (2) a `salaVazia` **já saiu do jogo** (#42/#51, construído em 2026-07-30), então **toda**
+porta não-monstro vai para a mão — e o baralho é **71,4% monstro**, então isso acontece menos que
+antes. Fora de escopo, já declarado: mochila → mão (adiada para a fatia da interferência) e
+escolher o que queimar com a mochila cheia.
 
 ## Stack (alvo)
 

@@ -119,10 +119,10 @@ function sairDaParada(
 /**
  * ENTRA numa fase parada — ou a pula, se `passar` for a única ação legal nela
  * (auto-pulo, spec §6.1). Ponto ÚNICO da entrada, para quem CHEGA na fase e para
- * quem acabou de agir DENTRO dela. São cinco chamadores: os dois de dentro
- * (`jogarCarta` e `equiparCarta`) e os três que CHEGAM em `jogar` — a sala vazia,
- * a raça que foi para a mão e o fim do combate. A entrada em `recompor` não passa
- * por aqui: ela é o começo do turno, e quem a decide é `faseDoTurnoDe`.
+ * quem acabou de agir DENTRO dela. São cinco chamadores: os três de dentro
+ * (`jogarCarta`, `equiparCarta` e `guardarCarta`) e os dois que CHEGAM em `jogar`
+ * — a raça que foi para a mão e o fim do combate. A entrada em `recompor` não
+ * passa por aqui: ela é o começo do turno, e quem a decide é `faseDoTurnoDe`.
  *
  * A permanência tem que fazer a mesma pergunta que a entrada: equipar o último
  * item deixaria a fase sem nenhuma ação além de `passar`, e cobrar esse clique
@@ -163,11 +163,16 @@ function entrarOuPular(
  * LIMPO, e `passar` na fase esquecida saía como `Error` cru — **500 numa partida
  * legítima**, não o 400 de `AcaoInvalida`.
  *
- * ⚠️ A `encrenca` do Plano 4 **não** é candidata: o spec §6 dá a ela
- * `procurarEncrenca` e `saquear`, e nenhum `passar` — `saquear` está sempre
- * disponível, então a fase nunca é beco sem saída. O risco aqui não é uma fase
- * específica do roteiro; é `FaseParada` ser uma união mantida à mão, que qualquer
- * um alarga sem passar por esta função.
+ * ⚠️ A `encrenca` do Plano 4b **não** é candidata — mas com ressalva, não certeza:
+ * o spec §6 dá a ela `procurarEncrenca` e `saquear`, e nenhum `passar`. `saquear`
+ * é o **candidato** a impedir o beco sem saída, e isso **não foi medido** — só o
+ * corte da `salaVazia` foi: *"monte e cemitério de Portas ambos vazios"* deu
+ * **zero em 80 partidas** (decisão #53/#55 do game bible). 🔴 **Zero em 80 não é
+ * prova de impossibilidade.** `tirarDoTopo` (`baralho.ts`) ainda lança `Error`
+ * cru com os dois vazios — que é **500**, não o 400 de `AcaoInvalida` — e
+ * `vasculhar` chama `tirarDoTopo` sem guard nenhum. O risco aqui não é só uma
+ * fase específica do roteiro; é também `FaseParada` ser uma união mantida à mão,
+ * que qualquer um alarga sem passar por esta função.
  *
  * Os dois `throw` que dependem deste predicado (no `aplicarAcao` e no
  * `equiparCarta`) se descrevem como "inalcançável pela tabela". Continuam sendo —
@@ -305,10 +310,10 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
 
 /**
  * Resolve uma carta JÁ comprada (o baralho em `base` já reflete a compra) e é
- * dona do seu DESTINO: `monstro` abre combate; `salaVazia` e `raca` (esta indo
- * para a mão de quem vasculhou) entregam o turno à fase `jogar`, que se auto-pula
- * e encerra o turno quando não há equipamento na mão. É o núcleo compartilhado do
- * vasculhar atômico e da resolução da espiada.
+ * dona do seu DESTINO: `monstro` abre combate; `raca` (indo para a mão de quem
+ * vasculhou) entrega o turno à fase `jogar`, que se auto-pula e encerra o turno
+ * quando não há equipamento na mão. É o núcleo compartilhado do vasculhar
+ * atômico e da resolução da espiada.
  *
  * O EVENTO sai por ramo, não antes do `switch`, porque quem decide se a carta
  * pode ser anunciada é o DESTINO dela — e é este `switch` que o conhece. Um
@@ -333,18 +338,6 @@ function resolverCarta(
   };
 
   switch (carta.tipo) {
-    case 'salaVazia': {
-      // A sala vazia não trouxe encontro, mas o turno ainda tem a janela de vestir
-      // o que já estava na mão. No destino do spec §6 quem recebe este caminho é a
-      // fase `encrenca` (Plano 4); enquanto ela não existe, `jogar` é o próximo
-      // ponto do turno — e o auto-pulo faz a mesa nem mostrá-la a quem não tem
-      // equipamento na mão, que é o caso comum.
-      const daVez = base.jogadores.find((j) => j.id === jogadorId);
-      if (daVez === undefined) {
-        throw new Error(`resolverCarta: jogador ${jogadorId} não está na mesa`);
-      }
-      return entrarOuPular(revelada, daVez, 'jogar', [{ tipo: 'porta', jogadorId, carta }]);
-    }
     case 'raca': {
       // A carta sacada NÃO vai ao cemitério: ela fica com quem vasculhou. Por isso
       // o estado usado aqui é `base` (sem a carta), e não `revelada`.
@@ -563,7 +556,6 @@ function cartaEquipavelDe(
 function descartarNoBaralhoCerto(estado: EstadoPartida, carta: Carta): EstadoPartida {
   switch (carta.tipo) {
     case 'monstro':
-    case 'salaVazia':
     case 'raca':
       return { ...estado, portas: { ...estado.portas, cemiterio: [...estado.portas.cemiterio, carta] } };
     case 'equipamento':

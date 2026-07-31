@@ -11,7 +11,7 @@ import { faseDoTurnoDe } from './fase';
 import { projetarPara } from './projecao';
 import { AcaoInvalida } from './erros';
 import { filaDeDados, criarDadoCiclico } from './testes/dados';
-import { monstro, monstros, salaVazia, salasVazias, raca, equipamento } from './testes/cartas';
+import { monstro, monstros, raca, equipamento } from './testes/cartas';
 import { catalogoDeTeste, ID_DA_CLASSE_DE_TESTE, MONSTRO_DE_TESTE } from './testes/catalogo';
 import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import { combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
@@ -95,10 +95,22 @@ const jogadorDe = (estado: EstadoPartida, id: string): JogadorNaMesa => {
 /** A mão de um jogador, por id. Ela é `readonly Carta[]` desde o loot. */
 const maoDe = (estado: EstadoPartida, id: string): readonly Carta[] => jogadorDe(estado, id).mao;
 
+/**
+ * `n` cartas de Porta com um PREFIXO de id próprio (`d1`, `d2`, …).
+ *
+ * Existe porque dois jogadores da mesma mesa precisam de mãos forjadas ao mesmo
+ * tempo e `monstros(n)` sempre devolve `m1`…`mn`: usada nos dois lados, a mesma
+ * carta ficaria com o mesmo id nas duas mãos — logo na carta que a caridade move
+ * de uma para a outra. Era o papel de `salasVazias`, que morre com a sala vazia
+ * (decisão #42); o que importava ali nunca foi o TIPO, e sim o id não colidir.
+ */
+const cartasComIds = (prefixo: string, n: number): CartaPorta[] =>
+  Array.from({ length: n }, (_, i) => monstro(`${prefixo}${String(i + 1)}`));
+
 describe('aplicarAcao — vasculhar', () => {
   it('o id acompanha a carta quando ela sai do monte', () => {
     const p = criarPartida('m1', entradas,
-      { ...config, composicaoPorJogador: [{ tipo: 'salaVazia' }] },
+      { ...config, composicaoPorJogador: [{ tipo: 'monstro', monstroId: 'm-teste' }] },
       { embaralhar: semEmbaralhar });
     const topo = p.portas.monte[0];
 
@@ -116,15 +128,20 @@ describe('aplicarAcao — vasculhar', () => {
       .toThrow('aplicarAcao: não é a vez de p2');
   });
 
-  it('sala vazia registra o evento e passa a vez', () => {
-    const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'salaVazia' }] },
+  it('porta que não luta registra o evento e passa a vez', () => {
+    // 🎚️ Era a sala vazia que ocupava este papel; com o corte dela (decisão #42
+    // do game bible) a única porta que não abre combate é a carta de RAÇA, e ela
+    // muda o evento: vai para a MÃO, zona oculta, então sai `achado` (sem a
+    // carta) no lugar de `porta` (com ela). A vez ainda passa porque a mão deste
+    // fixture está vazia — a raça sacada não estoura nada e `jogar` se auto-pula.
+    const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'raca', racaId: 'r-teste' }] },
       { embaralhar: semEmbaralhar });
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
 
     expect(r.estado.vezDe).toBe('p2');
     expect(r.estado.combate).toBeNull();
     expect(r.eventos).toHaveLength(2);
-    expect(r.eventos[0]).toMatchObject({ tipo: 'porta', jogadorId: 'p1', carta: { tipo: 'salaVazia' } });
+    expect(r.eventos[0]).toEqual({ tipo: 'achado', jogadorId: 'p1' });
     expect(r.eventos[1]).toEqual({ tipo: 'vez', jogadorId: 'p2' });
   });
 
@@ -132,7 +149,9 @@ describe('aplicarAcao — vasculhar', () => {
     // `eventos` é o delta da ação; `log` é a crônica inteira. Sem esta asserção,
     // esquecer de gravar no log passaria despercebido — todo o resto do estado
     // continuaria certo e nenhum outro teste falharia.
-    const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'salaVazia' }] },
+    // Raça, e não monstro: as duas ações precisam ser de jogadores DIFERENTES, e
+    // só a porta que não abre combate passa a vez dentro da própria ação.
+    const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'raca', racaId: 'r-teste' }] },
       { embaralhar: semEmbaralhar });
     const r1 = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
     const r2 = aplicarAcao(r1.estado, { tipo: 'vasculhar', jogadorId: 'p2' }, deps([]));
@@ -277,14 +296,15 @@ describe('aplicarAcao — combate', () => {
     // seguinte cairia em (-1+1)%n = 0, passando a vez para o primeiro jogador em
     // silêncio. Estado corrompido tem que ser barulhento — e é 500, não 400.
     const p = criarPartida('m1', entradas,
-      { ...config, composicaoPorJogador: [{ tipo: 'salaVazia' as const }] },
+      { ...config, composicaoPorJogador: [{ tipo: 'raca' as const, racaId: 'r-teste' }] },
       { embaralhar: semEmbaralhar });
     const corrompido = { ...p, vezDe: 'fantasma' };
 
-    // 🎚️ Quem lança MUDOU de guard, não de natureza: desde que a sala vazia
-    // entrega o turno a `jogar`, ela precisa do jogador da vez para perguntar se a
-    // fase se auto-pula — e o `find` que falha estoura antes de o turno chegar ao
-    // `proximoJogador`. Continua Error cru => 500, que é o que este teste protege.
+    // 🎚️ Quem lança MUDOU de guard, não de natureza: desde que a carta que não
+    // abre combate entrega o turno a `jogar`, ela precisa do jogador da vez para
+    // pôr a carta na mão dele e perguntar se a fase se auto-pula — e o `find` que
+    // falha estoura antes de o turno chegar ao `proximoJogador`. Continua Error
+    // cru => 500, que é o que este teste protege.
     expect(() => aplicarAcao(corrompido, { tipo: 'vasculhar', jogadorId: 'fantasma' }, deps([])))
       .toThrow('resolverCarta: jogador fantasma não está na mesa');
     expect(() => aplicarAcao(corrompido, { tipo: 'vasculhar', jogadorId: 'fantasma' }, deps([])))
@@ -807,16 +827,18 @@ describe('aplicarAcao — espiada (Presciência)', () => {
   });
 
   it('com Presciência, vasculhar ESPIA o topo em vez de resolver (sem evento, sem gastar a vez)', () => {
-    // composicaoPorJogador = [salaVazia] → monte = [salaVazia, salaVazia] (× 2 jogadores)
+    // composicaoPorJogador = [monstro] → monte = [monstro, monstro] (× 2 jogadores).
+    // O tipo da carta não importa aqui: espiar NÃO resolve, então ela nem chega a
+    // ter destino — é a troca mais barata para o corte da sala vazia.
     const p = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
       { embaralhar: semEmbaralhar });
     const antesVersao = p.log.length;
 
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([]));
 
     expect(r.estado.espiada?.jogadorId).toBe('p1');
-    expect(r.estado.espiada?.carta.tipo).toBe('salaVazia');
+    expect(r.estado.espiada?.carta.tipo).toBe('monstro');
     expect(r.estado.combate).toBeNull();
     expect(r.estado.vezDe).toBe('p1');            // a vez NÃO passou
     expect(r.estado.log.length).toBe(antesVersao); // nenhum evento público
@@ -834,58 +856,80 @@ describe('aplicarAcao — espiada (Presciência)', () => {
     expect(projetarPara('p2', comEspiada, catalogoPadrao).espiada).toBeNull();
   });
 
-  it('manterCarta revela e resolve o topo espiado (salaVazia passa a vez)', () => {
+  it('manterCarta revela e resolve o topo espiado (o monstro abre combate)', () => {
+    // 🎚️ A prova de "resolveu" mudou de PROVA, não de natureza: era a sala vazia
+    // passando a vez; com o corte dela (decisão #42) a carta escolhida é o
+    // monstro, porque ela é a que continua indo para o CEMITÉRIO — e é o
+    // cemitério que separa `manterCarta` (revela) de `empurrarCarta` (esconde).
+    // A carta de raça provaria menos aqui: ela não passa pelo cemitério, então a
+    // asserção central deste teste não teria como falhar.
     const p = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
       { embaralhar: semEmbaralhar });
     const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])).estado;
 
     const r = aplicarAcao(comEspiada, { tipo: 'manterCarta', jogadorId: 'p1' }, depsVidente([]));
 
     expect(r.estado.espiada).toBeNull();
-    expect(r.estado.vezDe).toBe('p2');            // salaVazia resolvida → vez passou
-    expect(r.estado.portas.cemiterio.map((c) => c.tipo)).toEqual(['salaVazia']); // a mantida foi revelada
-    expect(r.eventos.some((e) => e.tipo === 'porta')).toBe(true);
+    expect(r.estado.combate).not.toBeNull();      // a mantida foi resolvida na hora
+    expect(r.estado.portas.cemiterio.map((c) => c.tipo)).toEqual(['monstro']); // a mantida foi revelada
+    // Não só presença: o evento `porta` carrega a CARTA (`tipo: 'porta'; carta: CartaPorta`,
+    // tipos.ts:259) — a asserção única no pacote de que o payload é o certo, não só o tipo certo.
+    expect(r.eventos.find((e) => e.tipo === 'porta')).toMatchObject({
+      carta: { id: 'p-0', tipo: 'monstro', monstroId: 'm-teste' },
+    });
   });
 
   it('empurrarCarta manda o topo pro fundo e resolve a próxima às cegas', () => {
-    // monte (semEmbaralhar) = [salaVazia, monstro] (composicao construída para o
-    // topo ser salaVazia e a próxima monstro).
+    // monte (semEmbaralhar) = duas cartas de monstro.
+    //
+    // ⚠️ A empurrada é rastreada pelo ID, não pelo tipo. Antes ela era a sala
+    // vazia e o tipo bastava para distingui-la da próxima; com o corte dela
+    // (decisão #42), a única porta que não abre combate é a RAÇA — e usá-la aqui
+    // tornaria a asserção VAZIA, porque raça revelada vai para a mão e não para o
+    // cemitério: o teste passaria mesmo com o bug que ele existe para pegar.
     const p = criarPartida('m1', entradas,
       {
         patenteAlvo: 10,
-        composicaoPorJogador: [{ tipo: 'salaVazia' as const }, { tipo: 'monstro' as const, monstroId: 'm-teste' }],
+        composicaoPorJogador: [
+          { tipo: 'monstro' as const, monstroId: 'm-teste' },
+          { tipo: 'monstro' as const, monstroId: 'm-teste' },
+        ],
         composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE,
       },
       { embaralhar: semEmbaralhar });
     const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])).estado;
-    expect(comEspiada.espiada?.carta.tipo).toBe('salaVazia'); // topo espiado
+    const empurrada = comEspiada.espiada?.carta.id; // topo espiado
+    expect(empurrada).toBeDefined();
 
     const r = aplicarAcao(comEspiada, { tipo: 'empurrarCarta', jogadorId: 'p1' }, depsVidente([1]));
 
     expect(r.estado.espiada).toBeNull();
-    expect(r.estado.combate).not.toBeNull(); // a PRÓXIMA (monstro) foi comprada às cegas e abriu combate
-    // a salaVazia empurrada NÃO foi revelada: não está no cemitério (foi pro fundo do monte)
-    expect(r.estado.portas.cemiterio.some((c) => c.tipo === 'salaVazia')).toBe(false);
-    // Só o monstro comprado às cegas foi descartado — o tamanho pega um
-    // descarte duplicado que `.some` sozinho deixaria passar.
+    expect(r.estado.combate).not.toBeNull(); // a PRÓXIMA foi comprada às cegas e abriu combate
+    // a empurrada NÃO foi revelada: não está no cemitério (foi pro fundo do monte)
+    expect(r.estado.portas.cemiterio.map((c) => c.id)).not.toContain(empurrada);
+    // Só a carta comprada às cegas foi descartada — o tamanho pega um descarte
+    // duplicado que a asserção de ausência sozinha deixaria passar.
     expect(r.estado.portas.cemiterio).toHaveLength(1);
   });
 
   it('empurrar com o monte vazio reembaralha o cemitério ANTES (a empurrada não volta pública)', () => {
     const p0 = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
       { embaralhar: semEmbaralhar });
-    // Estado forjado: monte com só 1 carta (salaVazia); cemitério com 1 monstro já revelado.
-    const p = { ...p0, portas: { monte: [salaVazia('v1')], cemiterio: [monstro('m1')] } };
+    // Estado forjado: monte com só 1 carta; cemitério com 1 carta já revelada. As
+    // duas são de monstro (o corte da sala vazia, decisão #42) e por isso a
+    // empurrada é rastreada pelo ID — ver o gêmeo acima para por que a raça não
+    // serve nesta asserção.
+    const p = { ...p0, portas: { monte: [monstro('v1')], cemiterio: [monstro('m1')] } };
     const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])).estado;
     expect(comEspiada.portas.monte).toEqual([]);                // tirarDoTopo esvaziou o monte
-    expect(comEspiada.espiada?.carta).toEqual(salaVazia('v1'));
+    expect(comEspiada.espiada?.carta).toEqual(monstro('v1'));
 
     const r = aplicarAcao(comEspiada, { tipo: 'empurrarCarta', jogadorId: 'p1' }, depsVidente([1])).estado;
-    expect(r.combate).not.toBeNull();                          // a próxima às cegas foi o monstro
-    expect(r.portas.cemiterio.some((c) => c.tipo === 'salaVazia')).toBe(false); // a empurrada NÃO virou pública
-    expect(r.portas.cemiterio.some((c) => c.tipo === 'monstro')).toBe(true);
+    expect(r.combate).not.toBeNull();                          // a próxima às cegas foi a do cemitério
+    expect(r.portas.cemiterio.map((c) => c.id)).not.toContain('v1'); // a empurrada NÃO virou pública
+    expect(r.portas.cemiterio.map((c) => c.id)).toContain('m1');
     // Só o monstro comprado às cegas foi descartado — o tamanho pega um
     // descarte duplicado que `.some` sozinho deixaria passar.
     expect(r.portas.cemiterio).toHaveLength(1);
@@ -898,9 +942,9 @@ describe('aplicarAcao — espiada (Presciência)', () => {
     // inalcançável só porque as cartas se conservam; a mão de 7 da fatia 8
     // (cartas saem do baralho para as mãos) o torna real.
     const p0 = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
       { embaralhar: semEmbaralhar });
-    const p = { ...p0, portas: { monte: [salaVazia('v1')], cemiterio: [] } };
+    const p = { ...p0, portas: { monte: [monstro('v1')], cemiterio: [] } };
     const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])).estado;
     expect(comEspiada.portas.monte).toEqual([]);
     expect(comEspiada.portas.cemiterio).toEqual([]);
@@ -910,12 +954,12 @@ describe('aplicarAcao — espiada (Presciência)', () => {
     expect(() => aplicarAcao(comEspiada, { tipo: 'empurrarCarta', jogadorId: 'p1' }, depsVidente([1])))
       .toThrow('aplicarAcao: não há outra carta para comprar — a espiada tem que ser mantida');
     // e a espiada continua lá, resolvível por manterCarta
-    expect(comEspiada.espiada?.carta).toEqual(salaVazia('v1'));
+    expect(comEspiada.espiada?.carta).toEqual(monstro('v1'));
   });
 
   it('recusa vasculhar de novo enquanto há espiada pendente', () => {
     const p = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
       { embaralhar: semEmbaralhar });
     const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([])).estado;
 
@@ -924,8 +968,10 @@ describe('aplicarAcao — espiada (Presciência)', () => {
   });
 
   it('SEM Presciência, vasculhar continua atômico (nenhuma espiada)', () => {
+    // Raça, e não monstro: a segunda asserção é "resolveu na hora", provada pela
+    // vez tendo passado — e monstro abriria combate, prendendo a vez em p1.
     const p = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'raca' as const, racaId: 'r-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
       { embaralhar: semEmbaralhar });
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])); // deps() sem catálogo de raça
     expect(r.estado.espiada).toBeNull();
@@ -940,7 +986,7 @@ describe('aplicarAcao — espiada (Presciência)', () => {
         return racaId === 'elfo' ? { passivaCombate: null, espiaTopo: true } : undefined;
       },
     });
-    const estado = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'salaVazia' }] },
+    const estado = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'monstro', monstroId: 'm-teste' }] },
       { embaralhar: semEmbaralhar });
     const comElfo: EstadoPartida = {
       ...estado,
@@ -969,10 +1015,23 @@ describe('avancarBots — teto de ações automáticas', () => {
       { id: 'b1', nome: 'Bot 1', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
       { id: 'b2', nome: 'Bot 2', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
     ];
+    // 🎚️ O baralho "sem monstro" era de salas vazias, que voltavam ao cemitério a
+    // cada compra e circulavam para sempre. Com o corte da sala vazia (decisão #42)
+    // a única porta que não abre combate é a de RAÇA, e ela vai para a MÃO — o
+    // baralho SECA. O tamanho abaixo é o que impede isso: cada bot tranca até
+    // `LIMITE_BASE_DE_MAO + 1` cartas na mão e 1 na zona em jogo, e a carta só
+    // volta ao cemitério pela caridade (que aqui sempre descarta, porque ninguém
+    // está atrás de ninguém — a mesa inteira fica na patente 1, que é o ponto do
+    // teste). Curto demais, `tirarDoTopo` lançaria "baralho vazio" ANTES do teto e
+    // trocaria o alarme que este teste protege por outro.
+    const semMonstro = Array.from(
+      { length: LIMITE_BASE_DE_MAO + 4 },
+      () => ({ tipo: 'raca' as const, racaId: 'r-teste' }),
+    );
     const p = criarPartida('m1', soBots,
       {
         patenteAlvo: 3,
-        composicaoPorJogador: [{ tipo: 'salaVazia' }],
+        composicaoPorJogador: semMonstro,
         composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE,
       },
       { embaralhar: semEmbaralhar });
@@ -989,7 +1048,7 @@ describe('avancarBots — teto de ações automáticas', () => {
     // do server como 400 CULPANDO O HUMANO, com a partida morta (a espiada é do
     // bot, a vez é do bot, o humano não tem ação legal).
     const p0 = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'raca' as const, racaId: 'r-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
       { embaralhar: semEmbaralhar });
     const vezDoBot = { ...p0, vezDe: 'p2' };
 
@@ -1000,7 +1059,9 @@ describe('avancarBots — teto de ações automáticas', () => {
   });
 
   it('não dispara numa rodada normal de bots', () => {
-    const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'salaVazia' }] },
+    // Raça: é a porta que passa a vez dentro da própria ação, e é isso que leva o
+    // turno ao bot sem abrir combate no meio.
+    const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'raca', racaId: 'r-teste' }] },
       { embaralhar: semEmbaralhar });
     // passa a vez para o bot p2; avancarBots roda o turno dele e devolve a vez a p1
     const vezDoBot = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
@@ -1013,11 +1074,12 @@ describe('avancarBots — teto de ações automáticas', () => {
 
 describe('vasculhar — carta de raça', () => {
   it('a carta de raça vai para a mão de quem vasculhou, e o turno encerra', () => {
-    // O baralho de produção só ganha raça no Plano 4; aqui o monte é forjado.
-    // A carta vai para uma zona OCULTA, então o evento é `achado` (porta fechada):
-    // diz que aconteceu, nunca o quê. Quem sacou descobre pela própria mão.
+    // O monte é forjado para ter UMA carta e id conhecido — a composição da mesa
+    // só existe para a partida nascer. A carta vai para uma zona OCULTA, então o
+    // evento é `achado` (porta fechada): diz que aconteceu, nunca o quê. Quem
+    // sacou descobre pela própria mão.
     const p0 = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
       { embaralhar: semEmbaralhar });
     const p = { ...p0, portas: { ...p0.portas, monte: [raca('r1', 'elfo')] } };
 
@@ -1038,7 +1100,7 @@ describe('vasculhar — carta de raça', () => {
     // o log. Foi assim que a sonda que motivou este teste montou um "trapaceador"
     // que acertou as raças sacadas dos 4 jogadores da mesa.
     const p0 = criarPartida('m1', entradas,
-      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
+      { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
       { embaralhar: semEmbaralhar });
     const p = { ...p0, portas: { ...p0.portas, monte: [raca('carta-secreta', 'raca-secreta')] } };
 
@@ -1102,7 +1164,7 @@ describe('a raça vem da ZONA EM JOGO', () => {
 });
 
 describe('aplicarAcao — jogarCarta', () => {
-  const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
+  const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
   /**
    * Mesa com a mão de p1 forjada, na fase 1 do turno. A fase vem JUNTO com a mão,
    * como os fixtures de `descartar` deste arquivo já fazem: uma mão com carta de
@@ -1123,13 +1185,13 @@ describe('aplicarAcao — jogarCarta', () => {
     // o domínio nunca geraria — e o teste que o usar passa a exercitar um caminho
     // inalcançável, em silêncio. É a forma EXATA dos 7 testes que ficaram verdes e
     // vazios no Plano 3a quando o teto de mão subiu de 4 para 7.
-    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const p0 = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
 
     expect(comMao(p0, monstros(1)).fase).toBe('vasculhar');
   });
 
   it('move a carta da mão para a zona em jogo e NÃO passa a vez', () => {
-    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const p0 = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const p = comMao(p0, [raca('r1', 'anao')]);
 
     const r = aplicarAcao(p, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r1' }, deps([]));
@@ -1142,7 +1204,7 @@ describe('aplicarAcao — jogarCarta', () => {
 
   it('a raça anterior vai para o cemitério', () => {
     // Zona ABERTA: a raça trocada era pública, então o descarte dela é público.
-    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const p0 = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const comAnterior: EstadoPartida = {
       ...comMao(p0, [raca('r2', 'orc')]),
       jogadores: comMao(p0, [raca('r2', 'orc')]).jogadores.map((j) => (
@@ -1159,7 +1221,7 @@ describe('aplicarAcao — jogarCarta', () => {
   it('recusa carta que não está na sua mão', () => {
     // A mão do outro é secreta, mas o id não: sem este guard bastaria adivinhar
     // um id para jogar a carta ALHEIA na própria zona.
-    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const p0 = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const p = comMao(p0, [raca('r1', 'anao')]);
 
     expect(() => aplicarAcao(p, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r9' }, deps([])))
@@ -1172,7 +1234,7 @@ describe('aplicarAcao — jogarCarta', () => {
     // A raça na mão é o que sustenta a fase 1: sem ela `recompor` se auto-pula e o
     // fixture seria uma vista que o domínio não produz. A carta APONTADA é a de
     // monstro — é ela que o guard de tipo recusa.
-    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const p0 = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const p = comMao(p0, [monstro('m9'), raca('r1', 'anao')]);
 
     expect(() => aplicarAcao(p, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'm9' }, deps([])))
@@ -1184,7 +1246,7 @@ describe('aplicarAcao — jogarCarta', () => {
     // existindo, jogar raça não é mais legal em `vasculhar`, que é a única fase em
     // que a espiada existe: a pendência ficou inalcançável e o guard saiu. Quem
     // recusa agora é a tabela, e é o que esta mensagem prova.
-    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const p0 = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     // `passar` primeiro: a mão com raça abre o turno em `recompor`, e vasculhar é
     // da fase 2. É o caminho do jogador, não uma fase forjada.
     const naFase2 = aplicarAcao(comMao(p0, [raca('r1', 'anao')]),
@@ -1259,7 +1321,7 @@ describe('aplicarAcao — jogarCarta', () => {
     // que o jogador dava lá nunca destravava nada. A conta migrou para o lado de
     // dentro do teto, que é onde `recompor` acontece — e derivada do dial, para
     // sobreviver ao próximo giro dele.
-    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const p0 = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const noTetoDoHumano = comMao(p0, [...monstros(LIMITE_BASE_DE_MAO), raca('r9', 'orc')]);
     const antes = jogadorDe(noTetoDoHumano, 'p1');
     expect(limiteDeMao(antes) - antes.mao.length).toBe(0);   // no teto, sem folga
@@ -1274,13 +1336,18 @@ describe('aplicarAcao — jogarCarta', () => {
 });
 
 describe('aplicarAcao — equiparCarta', () => {
-  const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
+  // 🎚️ Era a composição de sala vazia; virou raça (não monstro) no corte dela
+  // (decisão #42) para o default do `nascida` continuar sendo de um tipo
+  // DIFERENTE de `soMonstro` — é essa diferença que o comentário abaixo protege.
+  // O baralho não é vasculhado até o fim em nenhum teste deste bloco: onde ele é
+  // tocado, a espiada fica pendente e a carta nunca chega a ter destino.
+  const soRaca = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'raca' as const, racaId: 'r-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
   const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
 
   // `ConfigPartida` explícito: sem a anotação o TS infere o tipo do DEFAULT
-  // (`salaVazia`) e passar `soMonstro` vira erro de compilação — que o vitest não
+  // (`raca`) e passar `soMonstro` vira erro de compilação — que o vitest não
   // mostra, porque o esbuild apaga os tipos.
-  const nascida = (cfg: ConfigPartida = soSalaVazia): EstadoPartida =>
+  const nascida = (cfg: ConfigPartida = soRaca): EstadoPartida =>
     criarPartida('m1', entradas, cfg, { embaralhar: semEmbaralhar });
 
   /**
@@ -1577,10 +1644,10 @@ describe('aplicarAcao — equiparCarta', () => {
 });
 
 describe('aplicarAcao — guardarCarta', () => {
-  const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
+  const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
 
   /** Mesma fábrica de mesa nascida das outras `describe`s deste arquivo — local ao bloco. */
-  const nascida = (cfg: ConfigPartida = soSalaVazia): EstadoPartida =>
+  const nascida = (cfg: ConfigPartida = soMonstro): EstadoPartida =>
     criarPartida('m1', entradas, cfg, { embaralhar: semEmbaralhar });
 
   const comMao = (estado: EstadoPartida, mao: readonly Carta[]): EstadoPartida => {
@@ -1645,7 +1712,7 @@ describe('aplicarAcao — guardarCarta', () => {
 });
 
 describe('aplicarAcao — entregarCarta (a caridade)', () => {
-  const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
+  const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
 
   /**
    * Mão estourada por UMA carta com raça em jogo (limite = `LIMITE_BASE_DE_MAO`).
@@ -1675,7 +1742,7 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
   });
 
   it('a carta sai da mão do doador e entra na mão de quem está atrás', () => {
-    const p = comPatentes(estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar })),
+    const p = comPatentes(estourado(criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar })),
       { p1: 5, p2: 1 });
 
     const r = aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([]));
@@ -1690,7 +1757,7 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
     // O `log` inteiro viaja para todos na projeção. Se o evento carregasse a
     // carta, a doação privada seria anunciada em alto e bom som — o mesmo modo
     // de falha que a espiada evita ao não emitir evento nenhum.
-    const p = comPatentes(estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar })),
+    const p = comPatentes(estourado(criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar })),
       { p1: 5, p2: 1 });
 
     const r = aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([]));
@@ -1702,7 +1769,7 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
 
   it('sem ninguém atrás, a carta vai para o cemitério e o evento MOSTRA a carta', () => {
     // Assimetria deliberada do spec §5: quem está em último revela o que dispensa.
-    const p = comPatentes(estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar })),
+    const p = comPatentes(estourado(criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar })),
       { p1: 1, p2: 1 });
 
     const r = aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([]));
@@ -1720,7 +1787,7 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
     // impede o alarme de tocar.
     const comTesouro = [equipamento('t-1'), ...monstros(LIMITE_BASE_DE_MAO)];
     const p = comPatentes(
-      estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }), comTesouro),
+      estourado(criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar }), comTesouro),
       { p1: 1, p2: 1 },   // ninguém atrás => cemitério
     );
 
@@ -1733,7 +1800,7 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
   it('descartar uma PORTA continua indo para o cemitério de Portas', () => {
     // O gêmeo do teste acima. Sem ele, um roteamento que mandasse TUDO para
     // Tesouros passaria — e o baralho de Portas nunca mais se recomporia.
-    const p = comPatentes(estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar })),
+    const p = comPatentes(estourado(criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar })),
       { p1: 1, p2: 1 });
 
     const r = aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([]));
@@ -1747,7 +1814,7 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
     // `descartarNoBaralhoCerto` chamado no ramo errado duplicaria a carta.
     const comTesouro = [equipamento('t-1'), ...monstros(LIMITE_BASE_DE_MAO)];
     const p = comPatentes(
-      estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }), comTesouro),
+      estourado(criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar }), comTesouro),
       { p1: 5, p2: 1 },
     );
 
@@ -1765,7 +1832,7 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
       { id: 'p3', nome: 'Bot 2', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
       { id: 'p4', nome: 'Bot 3', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
     ];
-    const p = comPatentes(estourado(criarPartida('m1', quatro, soSalaVazia, { embaralhar: semEmbaralhar })),
+    const p = comPatentes(estourado(criarPartida('m1', quatro, soMonstro, { embaralhar: semEmbaralhar })),
       { p1: 5, p2: 4, p3: 1, p4: 1 });
 
     const r = aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([2]));
@@ -1778,7 +1845,7 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
   });
 
   it('quando a mão passa a caber, a vez passa', () => {
-    const p = comPatentes(estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar })),
+    const p = comPatentes(estourado(criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar })),
       { p1: 5, p2: 1 });
 
     const r = aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([]));
@@ -1788,7 +1855,7 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
 
   it('estourado por duas cartas, a vez só passa na segunda entrega', () => {
     const acimaPorDois = monstros(LIMITE_BASE_DE_MAO + 2);
-    const p = comPatentes(estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }), acimaPorDois),
+    const p = comPatentes(estourado(criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar }), acimaPorDois),
       { p1: 5, p2: 1 });
 
     const uma = aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([]));
@@ -1801,12 +1868,14 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
   it('quem RECEBE pode ficar acima do limite sem que nada o cobre agora', () => {
     // Senão uma doação viraria cascata dentro de um turno só. O destinatário
     // acerta as contas no fim do PRÓPRIO turno.
-    const p = comPatentes(estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar })),
+    const p = comPatentes(estourado(criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar })),
       { p1: 5, p2: 1 });
     // p2 já está NO teto dele: sem raça em jogo o limite é `LIMITE_BASE_DE_MAO + 1`.
     // 🎚️ Derivado do dial — cravado em 5 cartas, o "teto" virou folga quando o
     // limite subiu para 8, e o teste passaria sem o destinatário estourar nada.
-    const noTetoDeP2 = salasVazias(LIMITE_BASE_DE_MAO + 1);
+    // Ids `d1`…: prefixo próprio para não colidir com os `m1`… da mão de p1, que
+    // é justamente de onde sai a carta entregue.
+    const noTetoDeP2 = cartasComIds('d', LIMITE_BASE_DE_MAO + 1);
     const cheio: EstadoPartida = {
       ...p,
       jogadores: p.jogadores.map((j) => (j.id === 'p2' ? { ...j, mao: noTetoDeP2 } : j)),
@@ -1822,7 +1891,7 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
   it('recusa entregar quando a mão NÃO está acima do limite', () => {
     // Doação voluntária é política — escolher a quem alimentar é o kingmaking que
     // a regra do destino existe para matar. A caridade resolve um excedente.
-    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const p0 = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const dentro: EstadoPartida = {
       ...p0,
       jogadores: p0.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao: [monstro('m1')] } : j)),
@@ -1835,7 +1904,7 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
   });
 
   it('recusa carta que não está na sua mão', () => {
-    const p = comPatentes(estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar })),
+    const p = comPatentes(estourado(criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar })),
       { p1: 5, p2: 1 });
 
     expect(() => aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'x9' }, deps([])))
@@ -1857,7 +1926,7 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
   });
 
   it('a entrega move a versão — o retry cai no 409, não no 400', () => {
-    const p = comPatentes(estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar })),
+    const p = comPatentes(estourado(criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar })),
       { p1: 5, p2: 1 });
 
     const r = aplicarAcao(p, { tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([]));
@@ -1867,7 +1936,11 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
 });
 
 describe('encerrarTurno — o limite de mão segura a vez', () => {
-  const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
+  const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
+  // A porta que NÃO abre combate, desde o corte da sala vazia (decisão #42): ela
+  // é a única que encerra o turno dentro da própria compra — e cresce a mão em 1,
+  // o que aqui é a feature, não o efeito colateral.
+  const soRaca = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'raca' as const, racaId: 'r-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
   // 🎚️ As duas derivadas do dial (cravadas em 5 e 4, pararam de valer quando
   // `LIMITE_BASE_DE_MAO` subiu para 7): `base + 1` cartas com raça em jogo
   // (limite = o base) estoura por 1, e `base` cartas fica exatamente no teto.
@@ -1899,7 +1972,7 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
   it('com a mão acima do limite, a vez NÃO passa', () => {
     // A carta de raça sacada vai para a MÃO (não para a zona) — é ela que estoura
     // o limite como CONSEQUÊNCIA da compra, não como precondição do vasculhar.
-    const p0 = comMaoNoLimiteEZona(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }));
+    const p0 = comMaoNoLimiteEZona(criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar }));
     const p: EstadoPartida = { ...p0, portas: { ...p0.portas, monte: [raca('r9', 'elfo')] } };
 
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
@@ -1913,7 +1986,7 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
     // Se a ação não movesse a versão, um retry de rede escaparia do guard de 409
     // no server e morreria como 400 no reducer. Foi exatamente o achado A3 da
     // espiada; aqui não se repete porque o evento `porta` já foi emitido.
-    const p0 = comMaoNoLimiteEZona(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }));
+    const p0 = comMaoNoLimiteEZona(criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar }));
     const p: EstadoPartida = { ...p0, portas: { ...p0.portas, monte: [raca('r9', 'elfo')] } };
 
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
@@ -1922,7 +1995,8 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
   });
 
   it('com a mão dentro do limite, a vez passa como sempre', () => {
-    const p = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    // Raça, e não monstro: é a compra que encerra o turno dentro da própria ação.
+    const p = criarPartida('m1', entradas, soRaca, { embaralhar: semEmbaralhar });
 
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
 
@@ -1934,14 +2008,33 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
     // A MESMA mão que estoura com raça em jogo fica exatamente no teto sem ela:
     // o Adaptável do Humano vale `+ 1`, e `maoEstourada` tem `base + 1` cartas.
     // O jogador está no teto, não acima dele.
-    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    //
+    // 🎚️ O turno termina por uma DERROTA em combate, e não por uma porta que
+    // passa a vez sozinha. Com o corte da sala vazia (decisão #42) toda porta ou
+    // abre combate ou vai para a MÃO, e a segunda cresceria a mão de `base + 1`
+    // para `base + 2` — o cenário viraria "acima do teto" e o teste deixaria de
+    // exercitar o `>`. Perder não saqueia nada, então a mão chega intacta ao
+    // `encerrarTurno`, que é o ponto sob teste.
+    const forte = { forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1, tesouros: 1 };
+    const depsForte = depsComMonstro(forte);
+    const p0 = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const p: EstadoPartida = {
       ...p0,
       jogadores: p0.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao: maoEstourada } : j)),
     };
+    // A fase de `p0` (`vasculhar`) continua sendo a que `faseDoTurnoDe` devolve
+    // para esta mão: `base + 1` não passa do teto de quem está sem raça em jogo,
+    // e não há nada a recompor numa mão só de monstros.
+    expect(faseDoTurnoDe(jogadorDe(p, 'p1'))).toBe('vasculhar');
 
-    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
+    // monstro mais ágil ataca primeiro e acerta; a esquiva de 2 > 1 falha e o
+    // dano (1 + 30) mata o jogador — mesmo orçamento de dados de "perder o
+    // combate conta derrota e passa a vez".
+    const comCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsForte([1])).estado;
+    const r = aplicarAcao(comCombate, { tipo: 'esquivar', jogadorId: 'p1' }, depsForte([2]));
 
+    const depois = jogadorDe(r.estado, 'p1');
+    expect(depois.mao).toHaveLength(limiteDeMao(depois));   // exatamente NO teto
     expect(r.estado.vezDe).toBe('p2');
   });
 
@@ -1954,7 +2047,6 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
     // pode mais vir de ANTES do vasculhar (senão o combate nem abriria). Ela é
     // forjada DEPOIS que o combate já está aberto, só para provar que
     // `fecharCombate` também passa pela porta única.
-    const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const fraco = { forca: 1, vida: 1, habilidade: 0, agilidade: 0, level: 1, tesouros: 1 };
     const depsFraco = {
@@ -1972,7 +2064,7 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
 });
 
 describe('aplicarAcao — vasculhar com a mão estourada', () => {
-  const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
+  const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
   // 🎚️ Derivada do dial: `base + 1` cartas com raça em jogo (limite = o base)
   // estoura por 1. Cravada em 5, parou de estourar quando o teto subiu para 7.
   const acimaDoTeto = monstros(LIMITE_BASE_DE_MAO + 1);
@@ -1989,7 +2081,7 @@ describe('aplicarAcao — vasculhar com a mão estourada', () => {
     // Sem esta recusa, "a vez não passa" vira "jogue para sempre": o jogador
     // vasculharia de novo a cada turno preso, sacando mais cartas e afundando
     // mais — ganhando turnos extras de graça por estar acima do limite.
-    const p = estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }));
+    const p = estourado(criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar }));
 
     expect(() => aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])))
       .toThrow(AcaoInvalida);
@@ -2003,7 +2095,7 @@ describe('aplicarAcao — vasculhar com a mão estourada', () => {
     // abre o turno estourado vai direto para `descartar` — `faseDoTurnoDe` põe o
     // excedente na frente do auto-pulo —, então nem passa por `recompor`: a raça
     // na mão espera o próximo turno.
-    const p0 = estourado(criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar }));
+    const p0 = estourado(criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar }));
     const comRacaNaMao: EstadoPartida = {
       ...p0,
       jogadores: p0.jogadores.map((j) => (
@@ -2020,7 +2112,7 @@ describe('aplicarAcao — vasculhar com a mão estourada', () => {
   });
 
   it('dentro do limite, vasculhar segue normal', () => {
-    const p = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
 
     expect(() => aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]))).not.toThrow();
   });
@@ -2028,8 +2120,9 @@ describe('aplicarAcao — vasculhar com a mão estourada', () => {
 
 describe('a composição BASELINE não pode nascer travada', () => {
   // Guard de fronteira, não de comportamento — mas sobre a composição BASELINE
-  // dos testes (`COMPOSICAO_DE_TESTE`, sem carta de raça), não sobre a
-  // composição de PRODUÇÃO: essa mora em `packages/server/src/app.ts`
+  // dos testes (`COMPOSICAO_DE_TESTE`, que TEM carta de raça desde o corte da
+  // sala vazia — 5 monstro + 3 raça, `'r-teste'` que o catálogo de teste não
+  // conhece), não sobre a composição de PRODUÇÃO: essa mora em `packages/server/src/app.ts`
   // (montada com `MONSTROS_SACAVEIS` e `RACAS_SACAVEIS` porque é lá que
   // catálogo e mesa se encontram) e tem o próprio alarme em
   // `packages/server/src/app.test.ts` ("o baralho de produção TEM carta de
@@ -2090,7 +2183,10 @@ describe('a composição BASELINE não pode nascer travada', () => {
     // Baralho de Portas LOCAL (10 por jogador, sem raça) porque o baseline de 8
     // não financia esta mão: `LIMITE_BASE_DE_MAO + 2` = 9 cartas × 4 assentos = 36,
     // e `criarPartida` recusaria a mesa antes de o teste chegar à asserção.
-    const soPortas = montarComposicao(5, Array.from({ length: 5 }, () => 'm-teste'));
+    const soPortas = montarComposicao({
+      monstroIds: Array.from({ length: 10 }, () => 'm-teste'),
+      copiasPorMonstro: 1, racaIds: [], copiasPorRaca: 1,
+    });
     const p = criarPartida('m1', mesaDeProducao, {
       ...producao,
       composicaoPorJogador: soPortas,
@@ -2115,7 +2211,9 @@ describe('a composição BASELINE não pode nascer travada', () => {
 
 describe('a fase acompanha o que o turno fez', () => {
   const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
-  const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
+  // A outra ponta do `switch` de `resolverCarta` desde o corte da sala vazia
+  // (decisão #42): a porta que NÃO abre combate é a de raça.
+  const soRaca = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'raca' as const, racaId: 'r-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
 
   it('carta de monstro leva a mesa para `combate`', () => {
     const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
@@ -2139,8 +2237,11 @@ describe('a fase acompanha o que o turno fez', () => {
     expect(r.estado.fase).toBe('combate');
   });
 
-  it('sala vazia passa a vez e devolve a mesa a `vasculhar`', () => {
-    const p = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+  it('a porta que não luta passa a vez e devolve a mesa a `vasculhar`', () => {
+    // 🎚️ Era a sala vazia; com o corte dela (decisão #42) quem ocupa este ramo do
+    // `switch` de `resolverCarta` é a raça. A vez passa porque a mão nasce vazia
+    // neste fixture — a carta sacada não estoura nada, e `jogar` se auto-pula.
+    const p = criarPartida('m1', entradas, soRaca, { embaralhar: semEmbaralhar });
 
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
 
@@ -2151,7 +2252,7 @@ describe('a fase acompanha o que o turno fez', () => {
   it('a espiada pendente NÃO é fase própria — o turno segue em `vasculhar`', () => {
     // Spec §6: a Presciência é pendência DENTRO da fase, e quem a resolve é o
     // campo `espiada`, não a fase.
-    const p = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
 
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente([]));
 
@@ -2164,7 +2265,7 @@ describe('a fase acompanha o que o turno fez', () => {
     // dita pela fase: `LIMITE_BASE_DE_MAO` cartas com raça em jogo = NO limite; a
     // raça sacada é a que passa dele. 🎚️ Derivado do dial pelo mesmo motivo dos
     // outros: cravado em 4, virava folga quando o teto subiu.
-    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const p0 = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const noLimite: EstadoPartida = {
       ...p0,
       jogadores: p0.jogadores.map((j) => (
@@ -2186,7 +2287,7 @@ describe('a fase acompanha o que o turno fez', () => {
     // A caridade pode empurrar o destinatário acima do teto DELE. Sem calcular a
     // fase na passagem da vez, ele receberia o turno em `vasculhar` — uma fase
     // cuja única ação o excedente proíbe. Tela morta, agora sem guard que a salve.
-    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const p0 = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const doadorEstourado: EstadoPartida = {
       ...p0,
       jogadores: p0.jogadores.map((j) => {
@@ -2198,7 +2299,10 @@ describe('a fase acompanha o que o turno fez', () => {
         }
         // p2 já NO teto dele (sem raça em jogo => limite `base + 1`): as cartas
         // doadas são as que o estouram.
-        return { ...j, mao: salasVazias(LIMITE_BASE_DE_MAO + 1) };
+        // Ids `d1`…: a mão de p1 é `monstros(...)` e reusar aquela fábrica poria o
+        // MESMO id nas duas mãos — logo nas cartas que a entrega move de uma para
+        // a outra.
+        return { ...j, mao: cartasComIds('d', LIMITE_BASE_DE_MAO + 1) };
       }),
       // Forjado direto no estado: a fase tem que vir junto, senão o fixture mente.
       fase: 'descartar',
@@ -2219,7 +2323,7 @@ describe('a fase acompanha o que o turno fez', () => {
     // turno (`recompor` e `jogar`) — ou nasceu estourado, e aí o excedente vem
     // antes de qualquer janela. A única saída aqui é a caridade, e desde a Task 3
     // isso é literal: `fase.ts` não deixa mais nada nesta fase.
-    const p0 = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const p0 = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const estourado: EstadoPartida = {
       ...p0,
       jogadores: p0.jogadores.map((j) => (
@@ -2244,7 +2348,9 @@ describe('a fase acompanha o que o turno fez', () => {
     // distribui do topo do baralho, e este baralho começa com a carta de raça.
     const comRacaNaMao = criarPartida('m1', entradas, {
       patenteAlvo: 10,
-      composicaoPorJogador: [{ tipo: 'raca' as const, racaId: 'orc' }, { tipo: 'salaVazia' as const }],
+      // A segunda receita é só lastro: o baralho precisa sobrar carta depois da
+      // mão inicial, e ela nunca é comprada neste teste.
+      composicaoPorJogador: [{ tipo: 'raca' as const, racaId: 'orc' }, { tipo: 'monstro' as const, monstroId: 'm-teste' }],
       composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE,
       maoInicial: 1,
     }, { embaralhar: semEmbaralhar });
@@ -2263,9 +2369,15 @@ describe('a fase acompanha o que o turno fez', () => {
     // fase 1 ao jogador, e nenhum evento é emitido por isso (ele não declinou de
     // nada). Sem este par, `faseDoTurnoDe` poderia devolver `recompor` sempre e
     // o teste acima continuaria verde.
+    // Duas receitas de monstro: a mão inicial de 1 carta tem que ser de Porta que
+    // NÃO é raça (senão a fase 1 não se auto-pula), e o baralho tem que sobrar
+    // carta para o monte.
     const semNadaARecompor = criarPartida('m1', entradas, {
-      ...soSalaVazia,
-      composicaoPorJogador: [{ tipo: 'salaVazia' as const }, { tipo: 'salaVazia' as const }],
+      ...soMonstro,
+      composicaoPorJogador: [
+        { tipo: 'monstro' as const, monstroId: 'm-teste' },
+        { tipo: 'monstro' as const, monstroId: 'm-teste' },
+      ],
       maoInicial: 1,
     }, { embaralhar: semEmbaralhar });
 
@@ -2304,8 +2416,8 @@ describe('o guard de fase é ponto único', () => {
   it('a espiada pendente continua sendo guarda DENTRO da fase, não fase', () => {
     // `vasculhar` e `manterCarta` são legais na MESMA fase; o que as separa é o
     // campo `espiada`. Estes dois guards são os únicos que sobrevivem à tabela.
-    const soSalaVazia = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'salaVazia' as const }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
-    const p = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
+    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
 
     expect(() => aplicarAcao(p, { tipo: 'manterCarta', jogadorId: 'p1' }, deps([])))
       .toThrow('aplicarAcao: não há espiada para resolver');
@@ -2327,12 +2439,12 @@ describe('o guard de fase é ponto único', () => {
     // existem — e afirmava "as três" exercitando UMA. Um teste cujo título
     // descreve um mundo que acabou é pior que um teste faltando: ele ensina errado
     // a quem lê para entender a regra.
-    const soSalaVazia = {
+    const soPorta = {
       patenteAlvo: 10,
-      composicaoPorJogador: [{ tipo: 'salaVazia' as const }],
+      composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }],
       composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE,
     };
-    const p = criarPartida('m1', entradas, soSalaVazia, { embaralhar: semEmbaralhar });
+    const p = criarPartida('m1', entradas, soPorta, { embaralhar: semEmbaralhar });
 
     expect(p.fase).toBe('vasculhar');
     expect(() => aplicarAcao(p, { tipo: 'passar', jogadorId: 'p1' }, deps([])))

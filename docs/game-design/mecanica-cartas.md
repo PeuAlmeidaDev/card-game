@@ -1,10 +1,22 @@
 # Mecânica das Cartas — design (documento vivo)
 
 - **Status:** documento vivo. Nasceu em 2026-07-24 numa sessão de `brainstorming`.
-- **Propósito:** ser a fonte de verdade da **mecânica das cartas** — como uma carta é
-  representada (dado × código × arte), onde ela mora, e o design de cada família de cartas.
-  Complementa o game bible (que fixa o *jogo*); onde o bible divergir do que está aqui sobre
-  cartas, **este doc corrige o bible** e o bible é atualizado no mesmo commit.
+- **Propósito:** registrar o design de **como uma carta é representada** (dado × código × arte) e
+  onde ela mora. **Escopo real: a fatia 6 (RAÇAS)** — ver §1.
+- 🔴 **CORREÇÃO DE PRECEDÊNCIA (2026-07-29).** Até hoje esta linha dizia: *"onde o bible divergir
+  do que está aqui sobre cartas, **este doc corrige o bible**"*. **Isso não vale, e provavelmente
+  nunca valeu como regra permanente.** Ele descrevia **um evento**: em 2026-07-24 este documento
+  corrigiu o bible num ponto (§5 — *raça é passiva, não stats*), e **o bible absorveu a correção**
+  no mesmo dia (§5 do bible cita este arquivo). A frase transformou **um acerto pontual em
+  autoridade permanente** — o mesmo vício que a sessão de 2026-07-29 desfez na decisão #21 do
+  bible e no parêntese sobre maldição do `CLAUDE.md`.
+  ➡️ **A fonte de verdade do jogo é o `game-bible.md`**, como a tabela do `CLAUDE.md` sempre disse
+  — e esta tabela nunca listou este arquivo. **Onde este documento divergir do bible, o BIBLE
+  vence.** Ele fica como registro de design da fatia 6, valioso e histórico.
+- ⚠️ **O que a sessão de 2026-07-29 decidiu sobre cartas e NÃO está aqui:** as três famílias de
+  Itens (#43), o instantâneo no meio do combate (#44), o `modificador de monstro` e suas três
+  formas (#30/#32), os dois caminhos da maldição (#31), a carta de raça como **artefato de
+  transformação** (#38) e a **receita explícita** de baralho (#36). Tudo no `game-bible.md`.
 - **Convenção:** ✅ = decidido · ⬜ = em aberto · 🎚️ = *dial* (número a calibrar em playtest) ·
   ⚠️ = risco/dívida conhecida · *nome provisório* = nomenclatura autoral fica pra sessão à parte
   (bible §16).
