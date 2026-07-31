@@ -1,8 +1,14 @@
 import type { CartaEquipamento, EstadoPartida, EventoDaMesa, InfoItem, Slot, ZonaEmJogo } from './tipos';
 import { LIMITE_MOCHILA } from './mao';
 
-/** As duas mãos, na ordem dos slots. Nomeado porque a regra de duas mãos o lê três vezes. */
-const MAOS: readonly Slot[] = ['maoDireita', 'maoEsquerda'];
+/**
+ * As duas mãos, na ordem dos slots. Nomeado porque a regra de duas mãos o lê três
+ * vezes aqui — e **exportado** desde 2026-07-31, porque havia um QUARTO leitor
+ * fora deste arquivo: `bot.ts` escrevia o par à mão para calcular o custo de
+ * equipar uma arma grande. A cópia não era teórica: uma mutação nela deixou os
+ * 240 testes verdes, porque o catálogo de teste não tinha arma de duas mãos.
+ */
+export const MAOS: readonly Slot[] = ['maoDireita', 'maoEsquerda'];
 
 /**
  * Põe a carta no slot que o item declara e devolve o corpo novo mais o que saiu.
