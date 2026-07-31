@@ -56,6 +56,27 @@ describe('App', () => {
     expect(screen.getByText(/Vida 15/)).toBeInTheDocument();
   });
 
+  it('o preview aplica o PISO do domínio — não soma por conta própria', async () => {
+    // 🐛 Regressão de 2026-07-31: o `calcularPreview` que morava neste arquivo
+    // refazia a soma à mão e NÃO aplicava o `PISO = 1` de
+    // `personagem/src/montar.ts:12`. Com uma classe fortemente negativa a tela
+    // mostrava `Agilidade -5` — um personagem que o servidor nunca montaria.
+    // Hoje quem soma é `montarCombatente`, re-exportado por `shared`.
+    const amaldicoado: Catalogo = {
+      ...catalogo,
+      classes: [{ id: 'amaldicoado', nome: 'Amaldiçoado', modificadores: { agilidade: -10 } }],
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(json(amaldicoado))),
+    );
+    render(<App />);
+
+    // base 5 - 10 = -5, mas o piso do domínio é 1.
+    expect(await screen.findByText(/Agilidade 1/)).toBeInTheDocument();
+    expect(screen.queryByText(/Agilidade -5/)).not.toBeInTheDocument();
+  });
+
   it('não tem seletor de raça: a raça é carta sacável, não escolha de menu', async () => {
     mockFetch();
     render(<App />);

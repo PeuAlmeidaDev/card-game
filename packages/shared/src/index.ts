@@ -153,6 +153,13 @@ export { SLOTS_VAZIOS } from '@card-dungeon/partida';
 // cliente é a cópia que fica para trás quando o dial girar.
 export { LIMITE_MOCHILA } from '@card-dungeon/partida';
 
+// Valor, e este chegou tarde: o cliente somava classe + base por conta própria
+// (`calcularPreview`, em `App.tsx`) porque `web` não alcança `personagem`. A
+// cópia JÁ tinha divergido — `montarCombatente` aplica `PISO = 1` e a do cliente
+// não, então a tela mostrava `Agilidade -5` onde o servidor montaria `1`. Custo
+// zero hoje (nenhuma classe do catálogo é tão negativa), bomba amanhã.
+export { montarCombatente } from '@card-dungeon/personagem';
+
 const c = initContract();
 
 /**

@@ -1,19 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api } from './api';
 import { TelaMesa } from './TelaMesa';
-import type { Catalogo, Combatente, ModificadoresDeStat, ResultadoDuelo } from '@card-dungeon/shared';
-
-function calcularPreview(base: Combatente, mods: readonly ModificadoresDeStat[]): Combatente {
-  const soma = (stat: 'forca' | 'vida' | 'habilidade' | 'agilidade'): number =>
-    mods.reduce((acc, m) => acc + (m[stat] ?? 0), base[stat]);
-  return {
-    forca: soma('forca'),
-    vida: soma('vida'),
-    habilidade: soma('habilidade'),
-    agilidade: soma('agilidade'),
-    level: base.level,
-  };
-}
+import { montarCombatente } from '@card-dungeon/shared';
+import type { Catalogo, ResultadoDuelo } from '@card-dungeon/shared';
 
 function descrever(r: ResultadoDuelo): string {
   if (r.tipo === 'vitoria') return `Vitória de '${r.vencedor}' em ${r.turnos} turnos`;
@@ -42,8 +31,14 @@ export function App() {
   // carta de Tesouro, sacada em jogo) e a raça saiu na 7 (é passiva, não stat) —
   // somar aqui algo que o servidor não monta seria a tela prometendo um
   // personagem que não vai existir.
-  const mods: ModificadoresDeStat[] = classe ? [classe.modificadores] : [];
-  const stats = calcularPreview(catalogo.base, mods);
+  //
+  // ⚠️ Quem soma é o DOMÍNIO (`montarCombatente`, via `shared`), nunca este
+  // arquivo. Havia aqui um `calcularPreview` que refazia a conta à mão e já tinha
+  // divergido: ele não aplicava o `PISO = 1` do `montar.ts`, então a tela
+  // mostrava `Agilidade -5` num personagem que o servidor montaria com `1`. Sem
+  // classe (catálogo vazio), o preview é a própria `base` — ela já vem pronta do
+  // domínio, e não há o que somar.
+  const stats = classe ? montarCombatente(classe, []) : catalogo.base;
 
   async function duelar(): Promise<void> {
     setTexto('Rolando os dados…');
