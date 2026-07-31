@@ -65,33 +65,32 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
   const acharMonstro = (id: string) => monstros.find((m) => m.id === id);
 
   /**
-   * Baralho de produção (spec §8): **uma carta para cada monstro do bestiário**,
-   * 3 salas vazias, e **uma carta para cada raça sacável** — por jogador. Numa
-   * mesa de 4 isso dá 48 cartas com 4 cópias de cada uma; a repetição vem da
-   * multiplicação por assento, não daqui.
-   *
-   * A regra é a MESMA para monstro e para raça de propósito. A alternativa — uma
-   * contagem fixa de cartas de monstro preenchida em rodízio pelo bestiário —
-   * fazia a densidade depender do tamanho do catálogo: 5 cartas sobre 4 monstros
-   * punha o mais fraco em dobro, uma decisão de balanceamento que ninguém tomou e
-   * que nada no código declarava. Derivar a quantidade do catálogo faz a
-   * repetição desaparecer em vez de precisar ser escolhida, e o dial que passa a
-   * existir (quantos monstros o jogo tem) mora onde ele é visível: em `MONSTROS`.
-   *
-   * Montado no `server` porque é aqui que catálogo e mesa se encontram: `partida`
-   * não conhece `cartas` de propósito, e as regras não devem conhecer.
+   * Baralho de produção (game bible §3.1/§17, decisão #52): 2 cópias por monstro
+   * do bestiário, 1 cópia por raça sacável — por jogador. Montado no `server`
+   * porque é aqui que catálogo e mesa se encontram: `partida` não conhece
+   * `cartas` de propósito, e as regras não devem conhecer.
    */
-  const composicaoDeProducao = montarComposicao(
-    3,
-    monstros.map((m) => m.id),
-    RACAS_SACAVEIS.map((r) => r.id),
-  );
+  const composicaoDeProducao = montarComposicao({
+    monstroIds: monstros.map((m) => m.id),
+    // 🎚️ Decisão #52 do game bible (2026-07-30): 2 monstros para 1 raça.
+    // Com o catálogo de hoje (5 monstros, 4 raças sacáveis — Humano fica de fora,
+    // ver `RACAS_SACAVEIS`) dá 14 cartas por jogador, 56 na mesa de 4. Densidade
+    // ~71% monstro / ~29% raça — a #41 mira raça em ~12,5%, e este é o passo
+    // possível na direção dela com o catálogo de hoje.
+    // ⚠️ NÃO derive estes números do tamanho do catálogo: foi exatamente isso que
+    // a #36 proibiu.
+    copiasPorMonstro: 2,
+    racaIds: RACAS_SACAVEIS.map((r) => r.id),
+    copiasPorRaca: 1,
+  });
 
   /**
    * Baralho de Tesouros de produção: **uma carta para cada item do catálogo**,
-   * por jogador — a mesma regra que o baralho de Portas usa para monstro e raça
-   * (spec §8). Derivar do catálogo em vez de fixar uma contagem é o que faz a
-   * repetição desaparecer em vez de precisar ser escolhida.
+   * por jogador. ⚠️ Desde a decisão #52 esta regra NÃO é mais a mesma que Portas
+   * usa: Portas declara `copiasPorMonstro`/`copiasPorRaca` na borda (a #36
+   * proíbe derivar a proporção do catálogo); Tesouros ainda deriva a contagem do
+   * catálogo porque `montarComposicaoTesouros` não tem um dial de cópia — não há
+   * proporção para assinar quando existe uma família só (`equipamento`).
    */
   const composicaoTesourosDeProducao = montarComposicaoTesouros(ITENS_SACAVEIS.map((i) => i.id));
 

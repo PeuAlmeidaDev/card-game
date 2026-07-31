@@ -287,7 +287,10 @@ describe('a fase nunca mente sobre o estado', () => {
 
     // Baralho COM carta de raça e mão inicial de verdade: é o que faz a mão
     // estourar durante o jogo e a fase `descartar` ser realmente visitada.
-    const composicao = montarComposicao(0, Array.from({ length: 8 }, () => 'm-teste'), ['elfo', 'anao']);
+    const composicao = montarComposicao({
+      monstroIds: Array.from({ length: 8 }, () => 'm-teste'),
+      copiasPorMonstro: 1, racaIds: ['elfo', 'anao'], copiasPorRaca: 1,
+    });
     // 🎚️ Dial LOCAL girado de novo nesta fatia: `LIMITE_BASE_DE_MAO` subiu de 4
     // para 7, e com 5 cartas a mão parou de estourar — `descartar` deixou de ser
     // visitada e a asserção de cobertura lá embaixo falhou. A saída é esta (mais

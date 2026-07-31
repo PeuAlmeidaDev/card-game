@@ -17,49 +17,59 @@ const _itemTemSlot: InfoItem = {
 void _itemTemSlot;
 
 describe('montarComposicao', () => {
-  it('monta a quantidade pedida de cada tipo', () => {
-    const cartas = montarComposicao(1, ['goblin', 'goblin']);
-    expect(cartas).toEqual([
+  it('cria `copiasPorMonstro` cartas para cada id de monstro', () => {
+    expect(montarComposicao({
+      monstroIds: ['goblin', 'ogro'], copiasPorMonstro: 2, racaIds: [], copiasPorRaca: 1,
+    })).toEqual([
       { tipo: 'monstro', monstroId: 'goblin' },
-      { tipo: 'monstro', monstroId: 'goblin' },
-      { tipo: 'salaVazia' },
-    ]);
-  });
-});
-
-describe('montarComposicao — cartas de monstro', () => {
-  it('compõe uma carta de monstro para cada id recebido', () => {
-    const composicao = montarComposicao(2, ['goblin', 'ogro', 'goblin']);
-    expect(composicao.filter((r) => r.tipo === 'monstro')).toEqual([
       { tipo: 'monstro', monstroId: 'goblin' },
       { tipo: 'monstro', monstroId: 'ogro' },
-      { tipo: 'monstro', monstroId: 'goblin' },
+      { tipo: 'monstro', monstroId: 'ogro' },
     ]);
-    expect(composicao.filter((r) => r.tipo === 'salaVazia')).toHaveLength(2);
   });
-});
 
-describe('montarComposicao — cartas de raça', () => {
-  it('cria UMA carta por id de raça, na ordem recebida', () => {
-    expect(montarComposicao(0, ['goblin'], ['elfo', 'anao'])).toEqual([
+  it('cria `copiasPorRaca` cartas para cada id de raça, depois dos monstros', () => {
+    expect(montarComposicao({
+      monstroIds: ['goblin'], copiasPorMonstro: 1, racaIds: ['elfo', 'anao'], copiasPorRaca: 1,
+    })).toEqual([
       { tipo: 'monstro', monstroId: 'goblin' },
       { tipo: 'raca', racaId: 'elfo' },
       { tipo: 'raca', racaId: 'anao' },
     ]);
   });
 
-  it('a repetição vem da MESA, não da composição', () => {
-    // A composição é POR JOGADOR e `criarPartida` a multiplica pelo tamanho da
-    // mesa. Com 4 ids e 4 assentos saem 4 cópias de cada raça — é assim que o
-    // spec §8 chega em "raças se repetem no baralho" sem repetir nada aqui.
-    const cinco = Array.from({ length: 5 }, () => 'goblin');
-    const porJogador = montarComposicao(3, cinco, ['elfo', 'anao', 'aquatico', 'orc']);
-    expect(porJogador).toHaveLength(12);
-    expect(porJogador.filter((c) => c.tipo === 'raca')).toHaveLength(4);
+  it('cópia é POR ID, e as cópias de um mesmo id ficam juntas', () => {
+    // A ordem importa porque `criarPartida` embaralha DEPOIS: um teste que use
+    // `semEmbaralhar` lê esta ordem literalmente.
+    expect(montarComposicao({
+      monstroIds: ['goblin'], copiasPorMonstro: 1, racaIds: ['elfo'], copiasPorRaca: 3,
+    })).toEqual([
+      { tipo: 'monstro', monstroId: 'goblin' },
+      { tipo: 'raca', racaId: 'elfo' },
+      { tipo: 'raca', racaId: 'elfo' },
+      { tipo: 'raca', racaId: 'elfo' },
+    ]);
   });
 
-  it('lista vazia de raças é igual a não passar nada', () => {
-    expect(montarComposicao(1, ['goblin'], [])).toEqual(montarComposicao(1, ['goblin']));
+  it('a densidade de PRODUÇÃO é 2 monstros para 1 raça (decisão #52 do game bible)', () => {
+    // 5 monstros e 5 raças no catálogo, os números de hoje. O que este teste
+    // trava não é o tamanho do catálogo — é a PROPORÇÃO que a #52 escolheu.
+    const cinco = (p: string) => Array.from({ length: 5 }, (_, i) => `${p}${String(i)}`);
+    const c = montarComposicao({
+      monstroIds: cinco('m'), copiasPorMonstro: 2, racaIds: cinco('r'), copiasPorRaca: 1,
+    });
+    expect(c).toHaveLength(15);
+    expect(c.filter((r) => r.tipo === 'monstro')).toHaveLength(10);
+    expect(c.filter((r) => r.tipo === 'raca')).toHaveLength(5);
+  });
+
+  it('a repetição do BARALHO vem da mesa, não da composição', () => {
+    // A composição é POR JOGADOR e `criarPartida` a multiplica pelo tamanho da
+    // mesa: 15 por jogador viram 60 numa mesa de 4.
+    const c = montarComposicao({
+      monstroIds: ['goblin'], copiasPorMonstro: 2, racaIds: ['elfo'], copiasPorRaca: 1,
+    });
+    expect(c).toHaveLength(3);
   });
 });
 

@@ -29,11 +29,12 @@ import type { ReceitaPorta, ReceitaTesouro } from '../tipos';
  * teste cruza os arquivos, então uma editada isolada só faria aquele arquivo
  * passar a testar outro baralho, sem nada denunciar.
  */
-export const COMPOSICAO_DE_TESTE: readonly ReceitaPorta[] = montarComposicao(
-  0,
-  Array.from({ length: 5 }, () => 'm-teste'),
-  Array.from({ length: 3 }, () => 'r-teste'),
-);
+export const COMPOSICAO_DE_TESTE: readonly ReceitaPorta[] = montarComposicao({
+  monstroIds: Array.from({ length: 5 }, () => 'm-teste'),
+  copiasPorMonstro: 1,
+  racaIds: Array.from({ length: 3 }, () => 'r-teste'),
+  copiasPorRaca: 1,
+});
 
 /**
  * Baralho de Tesouros baseline dos testes: 2 itens por jogador. `'i-teste'`

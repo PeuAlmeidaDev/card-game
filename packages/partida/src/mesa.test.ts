@@ -2179,7 +2179,10 @@ describe('a composição BASELINE não pode nascer travada', () => {
     // Baralho de Portas LOCAL (10 por jogador, sem raça) porque o baseline de 8
     // não financia esta mão: `LIMITE_BASE_DE_MAO + 2` = 9 cartas × 4 assentos = 36,
     // e `criarPartida` recusaria a mesa antes de o teste chegar à asserção.
-    const soPortas = montarComposicao(0, Array.from({ length: 10 }, () => 'm-teste'));
+    const soPortas = montarComposicao({
+      monstroIds: Array.from({ length: 10 }, () => 'm-teste'),
+      copiasPorMonstro: 1, racaIds: [], copiasPorRaca: 1,
+    });
     const p = criarPartida('m1', mesaDeProducao, {
       ...producao,
       composicaoPorJogador: soPortas,

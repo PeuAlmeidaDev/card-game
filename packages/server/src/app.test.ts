@@ -136,6 +136,17 @@ describe('mesa', () => {
     ...itens.filter((i) => ehRaca(i)),
     ...itens.filter((i) => !ehRaca(i)),
   ];
+  // Embaralhamento DIRIGIDO oposto: sobe as cartas de RAÇA para a mão inicial
+  // (esvaziando-as do baralho) e deixa só monstro no monte — então o primeiro
+  // `vasculhar` de qualquer assento revela monstro, não raça. Precisa desde que
+  // a composição de Portas deixou de ter `salaVazia` (decisão #42): sem ela, o
+  // topo do monte depois da mão inicial já não cai automaticamente num monstro.
+  const ehMonstro = (x: unknown): boolean =>
+    typeof x === 'object' && x !== null && (x as { tipo?: unknown }).tipo === 'monstro';
+  const monstroNoMonte: Embaralhar = (itens) => [
+    ...itens.filter((i) => !ehMonstro(i)),
+    ...itens.filter((i) => ehMonstro(i)),
+  ];
   // `[4, 12]` faz o combate progredir: o atacante acerta e o defensor falha a
   // esquiva. Com o dado sempre 1 o defensor SEMPRE esquiva (empate favorece o
   // defensor), ninguém toma dano e o combate só para no teto de MAX_TURNOS —
@@ -197,7 +208,11 @@ describe('mesa', () => {
       rolar: () => {
         throw new Error('SEGREDO-INTERNO-nao-deveria-vazar');
       },
-      embaralhar: semEmbaralhar,
+      // Dirigido para monstro, não `semEmbaralhar`: sem `salaVazia` para acolchoar
+      // o baralho (decisão #42), a ordem crua deixava o topo do monte cair numa
+      // carta de raça — `vasculhar` não chamava `rolar` e o teste não provava
+      // nada. Precisa ser monstro no monte para o combate acionar o dado.
+      embaralhar: monstroNoMonte,
       monstros: [{ id: 'goblin', nome: 'Goblin', forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1, tesouros: 1 }],
     });
     const naFase2 = await passar(app, await criar(app));
@@ -281,9 +296,9 @@ describe('mesa', () => {
     const app = buildApp({ embaralhar: racasNoTopo });
     const vista = await criar(app);
 
-    // 12 cartas por jogador (5 monstro + 3 sala vazia + 4 raça) × 4 assentos,
-    // menos as 4 da mão inicial de cada um.
-    expect(vista.cartasNoMonte).toBe(12 * 4 - 4 * 4);
+    // 14 cartas por jogador (10 monstro + 4 raça sacável, decisão #52) × 4
+    // assentos, menos as 4 da mão inicial de cada um.
+    expect(vista.cartasNoMonte).toBe(14 * 4 - 4 * 4);
     expect(vista.suaMao.some((c) => c.tipo === 'raca')).toBe(true);
     await app.close();
   });
