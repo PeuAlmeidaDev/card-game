@@ -41,6 +41,15 @@ export function escolherAcao(vista: VistaDaPartida, jogadorId: string, catalogo:
       if (eu === undefined) return { tipo: 'passar', jogadorId };
       return vestirOuGuardar(vista, jogadorId, eu, catalogo);
     }
+    case 'encrenca': {
+      // 🎚️ Política PROVISÓRIA desta task: luta com o primeiro monstro que tiver.
+      // A Task 5 troca isto pela avaliação da decisão #63 do bible — e os dois
+      // testes acima continuam valendo, porque lá o monstro do dublê é fraco.
+      const monstro = vista.suaMao.find((c) => c.tipo === 'monstro');
+      return monstro !== undefined
+        ? { tipo: 'procurarEncrenca', jogadorId, cartaId: monstro.id }
+        : { tipo: 'saquear', jogadorId };
+    }
     case 'vasculhar':
       // A espiada é pendência DENTRO desta fase: se o bot a ignorasse, ele
       // vasculharia de novo, o reducer recusaria e a mesa morreria com a vez presa

@@ -305,7 +305,18 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
     ]);
   }
 
-  return agirNoCombate(estado, acao, deps);
+  if (acao.tipo === 'atacar' || acao.tipo === 'esquivar') {
+    return agirNoCombate(estado, acao, deps);
+  }
+
+  // `procurarEncrenca`/`saquear`: o VOCABULÁRIO entrou no Plano 4b (Task 1) — o
+  // corpo dos dois verbos é das Tasks 2 e 3, que ainda não existe. Hoje isto é
+  // inalcançável: `LEGAL` (`fase.ts`) só libera os dois na fase `encrenca`, e
+  // nenhuma transição do reducer produz essa fase até a Task 4. A atribuição ao
+  // tipo explícito (em vez de `never`) é a checagem de exaustividade: se um tipo
+  // novo entrar em `AcaoDaMesa` sem ganhar um `if` acima, a compilação quebra aqui.
+  const semCorpoAinda: 'procurarEncrenca' | 'saquear' = acao.tipo;
+  throw new Error(`aplicarAcao: ${semCorpoAinda} ainda não tem corpo (Plano 4b, Tasks 2/3)`);
 }
 
 /**

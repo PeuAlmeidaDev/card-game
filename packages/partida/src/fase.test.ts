@@ -88,6 +88,27 @@ describe('acaoEhLegalNaFase', () => {
     expect(acaoEhLegalNaFase('descartar', 'guardarCarta')).toBe(false);
   });
 
+  it('em `encrenca` valem SÓ procurar encrenca e saquear', () => {
+    expect(acaoEhLegalNaFase('encrenca', 'procurarEncrenca')).toBe(true);
+    expect(acaoEhLegalNaFase('encrenca', 'saquear')).toBe(true);
+    // Sem `passar`: a fase COBRA uma escolha (decisão #62 do bible). Quem sustenta
+    // isso é a regra de que o baralho de Portas nunca acaba, então `saquear` está
+    // sempre disponível.
+    expect(acaoEhLegalNaFase('encrenca', 'passar')).toBe(false);
+    expect(acaoEhLegalNaFase('encrenca', 'vasculhar')).toBe(false);
+    expect(acaoEhLegalNaFase('encrenca', 'equiparCarta')).toBe(false);
+    expect(acaoEhLegalNaFase('encrenca', 'jogarCarta')).toBe(false);
+    expect(acaoEhLegalNaFase('encrenca', 'entregarCarta')).toBe(false);
+  });
+
+  it('os verbos da `encrenca` não valem em NENHUMA outra fase', () => {
+    // O gêmeo do teste acima: sem ele, pôr os dois verbos em toda fase passaria.
+    for (const fase of ['recompor', 'vasculhar', 'combate', 'jogar', 'descartar'] as const) {
+      expect(acaoEhLegalNaFase(fase, 'procurarEncrenca')).toBe(false);
+      expect(acaoEhLegalNaFase(fase, 'saquear')).toBe(false);
+    }
+  });
+
   it('em `descartar` sobra SÓ a caridade', () => {
     // 🎚️ Mudança de REGRA (decisão #7), não de estrutura: a raça só entra em jogo
     // na fase 1 e o tesouro vira corpo nas duas janelas paradas (`recompor` e
@@ -170,6 +191,10 @@ describe('faseSeAutoPula (spec §6.1)', () => {
     // o turno; pular `descartar` seria perdoar o excedente.
     const vazio = comMao([]);
     expect(faseSeAutoPula('vasculhar', vazio)).toBe(false);
+    // `encrenca` nunca se pula: ela sempre tem as duas opções, porque o baralho de
+    // Portas nunca acaba (decisão #62 do bible). Uma fase que se pulasse aqui
+    // esconderia a escolha que ela existe para cobrar.
+    expect(faseSeAutoPula('encrenca', vazio)).toBe(false);
     expect(faseSeAutoPula('combate', vazio)).toBe(false);
     expect(faseSeAutoPula('descartar', vazio)).toBe(false);
   });
@@ -196,10 +221,13 @@ describe('faseDoTurnoDe abre o turno em `recompor`', () => {
 describe('a fase nunca mente sobre o estado', () => {
   /**
    * Guardar a fase (em vez de derivá-la a cada leitura) é decisão do spec §6 — no
-   * destino, `recompor`, `encrenca` e `jogar` são todas "turno parado" e nenhuma
-   * é derivável. O preço é a dessincronização silenciosa: uma transição esquecida
-   * não quebra teste nenhum, só deixa a mesa numa fase de onde não se sai. Esta é
-   * a conta que paga o campo guardado.
+   * destino, nenhuma fase é derivável do resto do estado. `recompor` e `jogar`
+   * são "turno parado" (saem por `passar`); `encrenca` NÃO é — ela cobra uma
+   * escolha entre `procurarEncrenca`/`saquear` e nunca se pula (decisão #62 do
+   * bible, ver `faseSeAutoPula`). O preço de guardar em vez de derivar é a
+   * dessincronização silenciosa: uma transição esquecida não quebra teste
+   * nenhum, só deixa a mesa numa fase de onde não se sai. Esta é a conta que
+   * paga o campo guardado.
    *
    * Só vale com `desfecho === 'emAndamento'`: a partida terminada não tem turno,
    * e `fecharCombate` a deixa com uma fase neutra de propósito.
@@ -215,17 +243,23 @@ describe('a fase nunca mente sobre o estado', () => {
     }
     // `switch` exaustivo, não uma lista de `if (e.fase === '…')`: os `if`s eram uma
     // permissão POR NOME de fase, e uma fase nova (`recompor`, `encrenca`, `jogar`
-    // — todas "turno parado", todas fases em que a mão muda) cai fora de todos
+    // — todas fases em que a mão muda, "turno parado" ou não) cai fora de todos
     // eles em silêncio — a `Record<Fase, …>` da tabela de ações cobra a fase nova,
     // mas nada cobrava a COERÊNCIA dela com o estado. O `default` com `never` move
-    // esse esquecimento de "passa quieto" para erro de compilação: quem escrever o
-    // Plano 3 é obrigado a decidir o que a fase nova significa para o excedente.
+    // esse esquecimento de "passa quieto" para erro de compilação: quem escrever a
+    // fase nova é obrigado a decidir o que ela significa para o excedente.
     switch (e.fase) {
       case 'descartar':
         if (!estourado) erros.push('fase=descartar sem excedente na mão de quem tem a vez');
         break;
       case 'vasculhar':
         if (estourado) erros.push('fase=vasculhar com a mão de quem tem a vez estourada');
+        break;
+      case 'encrenca':
+        // Mesma regra de `vasculhar`: quem está acima do teto vai para `descartar`
+        // antes, então esta fase nunca convive com mão estourada. A Task 6
+        // acrescenta o predicado do baralho.
+        if (estourado) erros.push('fase=encrenca com a mão de quem tem a vez estourada');
         break;
       case 'combate':
         // Hoje inalcançável — nenhuma ação mexe na mão durante o combate, e só se

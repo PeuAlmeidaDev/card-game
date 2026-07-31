@@ -521,6 +521,20 @@ describe('escolherAcao', () => {
       .toEqual({ tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' });
   });
 
+  it('em `encrenca` sem monstro na mão, saqueia', () => {
+    const vista = vistaEm('encrenca', { suaMao: [equipamento('t-1')] });
+
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
+      .toEqual({ tipo: 'saquear', jogadorId: 'p1' });
+  });
+
+  it('em `encrenca` com monstro na mão, procura encrenca com ele', () => {
+    const vista = vistaEm('encrenca', { suaMao: [cartaMonstro('m1')] });
+
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
+      .toEqual({ tipo: 'procurarEncrenca', jogadorId: 'p1', cartaId: 'm1' });
+  });
+
   it('o bot não recalcula o excedente — quem manda é a fase', () => {
     // A mão CABE (nenhum excedente), mas a fase diz `descartar`. O bot obedece à
     // fase: era esta divergência que, no dia em que o teto deixasse de ser `>`,
