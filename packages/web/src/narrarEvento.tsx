@@ -129,6 +129,10 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
       return `${evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId)} venceu, mas o `
         + `baralho de Tesouros acabou: ${String(evento.naoPagas)} `
         + `${evento.naoPagas === 1 ? 'tesouro fica' : 'tesouros ficam'} sem pagar.`;
+    // A mão é zona OCULTA — o evento não carrega a carta, e a narração não pode
+    // dizer o quê foi comprado. Mesma regra do `achado` e do `loot`.
+    case 'saqueou':
+      return `${evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId)} saqueia a porta fechada e leva uma carta.`;
     default: {
       const naoTratado: never = evento;
       void naoTratado;

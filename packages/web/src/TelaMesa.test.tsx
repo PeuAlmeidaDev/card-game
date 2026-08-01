@@ -937,6 +937,32 @@ describe('TelaMesa — a fase e o botão Passar', () => {
   });
 });
 
+describe('TelaMesa — a fase `encrenca`', () => {
+  it('na fase `encrenca`, os dois verbos acendem e os outros apagam', async () => {
+    await abrirMesa({ ...vistaBase, fase: 'encrenca' });
+
+    expect(await screen.findByRole('button', { name: /saquear/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /vasculhar local/i })).toBeDisabled();
+  });
+
+  it('"Procurar encrenca" só acende na carta de MONSTRO', async () => {
+    // Par fino: a tabela de fases aprova `procurarEncrenca` na fase inteira e não
+    // sabe do tipo da carta. Sem este gêmeo, clicar na raça leva 400.
+    await abrirMesa({
+      ...vistaBase,
+      fase: 'encrenca',
+      suaMao: [
+        { id: 'p-m', tipo: 'monstro', monstroId: 'goblin' },
+        { id: 'p-r', tipo: 'raca', racaId: 'orc' },
+      ],
+    });
+
+    const botoes = await screen.findAllByRole('button', { name: /procurar encrenca/i });
+    expect(botoes).toHaveLength(1);
+    expect(botoes[0]).toBeEnabled();
+  });
+});
+
 describe('TelaMesa — a mochila', () => {
   // Tipado como `CartaTesouro` (e não o `CartaNaMao` heterogêneo dos outros
   // `tesouro(...)` deste arquivo): a mochila só aceita a família de Tesouro

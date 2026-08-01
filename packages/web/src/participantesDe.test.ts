@@ -8,6 +8,10 @@ describe('participantesDe', () => {
     expect(participantesDe({ tipo: 'loot', jogadorId: 'p2', quantidade: 3 })).toEqual(['p2']);
   });
 
+  it('saqueou indexa só quem saqueou', () => {
+    expect(participantesDe({ tipo: 'saqueou', jogadorId: 'p2' })).toEqual(['p2']);
+  });
+
   it('a entrega envolve as DUAS pontas — é a razão de esta função existir', () => {
     // O filtro do `PainelLog` indexava o evento só por `jogadorId` (o doador), e
     // com isso o botão "Você" ESCONDIA a carta que você recebeu: ela ficava
@@ -57,6 +61,7 @@ describe('participantesDe', () => {
       { tipo: 'equipou', jogadorId: 'p1', carta: { id: 't1', tipo: 'equipamento', itemId: 'espada-curta' }, slot: 'maoDireita' },
       { tipo: 'guardou', jogadorId: 'p1', carta: { id: 't1', tipo: 'equipamento', itemId: 'espada-curta' } },
       { tipo: 'passou', jogadorId: 'p1', de: 'recompor' },
+      { tipo: 'saqueou', jogadorId: 'p1' },
     ];
 
     for (const evento of umDeCada) {
