@@ -251,6 +251,21 @@ describe('a fase nunca mente sobre o estado', () => {
     if ((e.fase === 'combate') !== (e.combate !== null)) {
       erros.push(`fase=${e.fase} com combate ${e.combate === null ? 'fechado' : 'aberto'}`);
     }
+    // 🔑 Decisão #62 do bible: o baralho de Portas NUNCA acaba. É a regra que
+    // sustenta a `encrenca` não ter `passar` — `saquear` está sempre disponível.
+    //
+    // ⚠️ O reshuffle NÃO garante isso sozinho: ele recicla o cemitério, e o
+    // cemitério fica vazio se as cartas estiverem todas em mãos. A caridade não
+    // ajuda — `entregarCarta` move a carta de uma mão para outra. A margem de hoje
+    // depende de TRÊS dials ao mesmo tempo (tamanho do baralho, limite de mão,
+    // número de assentos), e girar qualquer um pode comê-la em silêncio.
+    //
+    // Por isso a promessa é conferida AQUI, depois de cada ação de uma partida
+    // inteira, em vez de escrita num comentário. Se este alarme tocar, a alternativa
+    // era um `Error` cru de `tirarDoTopo` — 500 na cara do jogador.
+    if (e.portas.monte.length === 0 && e.portas.cemiterio.length === 0) {
+      erros.push('monte E cemitério de Portas vazios — a decisão #62 diz que o baralho nunca acaba');
+    }
     // `switch` exaustivo, não uma lista de `if (e.fase === '…')`: os `if`s eram uma
     // permissão POR NOME de fase, e uma fase nova (`recompor`, `encrenca`, `jogar`
     // — todas fases em que a mão muda, "turno parado" ou não) cai fora de todos
