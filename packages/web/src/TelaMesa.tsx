@@ -398,10 +398,14 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
                   Jogar
                 </button>
               )}
-              {/* O par fino de `procurarEncrenca` (ver a tabela no `aplicarAcao`):
-                  `legal()` aprova a fase inteira e não sabe do TIPO da carta — só o
-                  reducer cobra que ela seja `monstro`. Sem este gêmeo, clicar na
-                  raça na fase `encrenca` leva 400. */}
+              {/* Os DOIS pares finos de `procurarEncrenca` (ver a tabela no
+                  `aplicarAcao`, `mesa.ts`): a carta está na SUA mão, e ela é do
+                  TIPO `monstro`. `legal()` só aprova a fase inteira, não sabe de
+                  nenhum dos dois. O primeiro guard já tem gêmeo ESTRUTURAL — este
+                  botão só existe dentro de `vista.suaMao.map`, então "está na
+                  mão" é automático, nunca precisou de condição escrita. O
+                  segundo é o `carta.tipo === 'monstro'` abaixo: sem ele, clicar
+                  na raça na fase `encrenca` leva 400. */}
               {carta.tipo === 'monstro' && (
                 <button
                   type="button"
