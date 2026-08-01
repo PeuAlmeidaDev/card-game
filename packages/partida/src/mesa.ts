@@ -389,11 +389,16 @@ function resolverCarta(
       if (comACarta === undefined) {
         throw new Error(`resolverCarta: jogador ${jogadorId} não está na mesa`);
       }
-      // O jogador ATUALIZADO (com a carta já na mão): a raça sacada não dá o que
-      // fazer em `jogar` — ela espera a fase 1 do próximo turno —, mas um
-      // equipamento que já estivesse na mão dá, e é por isso que a pergunta é
-      // feita sobre a mão de agora e não sobre a de antes do saque.
-      return entrarOuPular({ ...base, jogadores }, comACarta, 'jogar', [{ tipo: 'achado', jogadorId }]);
+      // A porta que não é monstro abre a `encrenca` (spec §6): você não lutou, então
+      // escolhe entre jogar um monstro da mão ou saquear. `registrar` e NÃO
+      // `entrarOuPular`: a `encrenca` não é fase parada e nunca se auto-pula
+      // (decisão #62 do bible) — passar por `entrarOuPular` pediria uma `FaseParada`,
+      // que ela não é, e o tipo recusa.
+      //
+      // ⚠️ A janela de vestir NÃO se perdeu: os dois verbos da `encrenca` terminam
+      // em `jogar` (o `saquear` diretamente, o `procurarEncrenca` pelo fim do
+      // combate), então o loot continua tendo onde virar corpo.
+      return registrar({ ...base, jogadores, fase: 'encrenca' }, [{ tipo: 'achado', jogadorId }]);
     }
     case 'monstro':
       break;
