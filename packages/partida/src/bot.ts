@@ -1,3 +1,4 @@
+import type { Combatente } from '@card-dungeon/motor';
 import type { AcaoDaMesa, CartaEquipamento, CatalogoDaMesa, JogadorPublico, Slot, VistaDaPartida } from './tipos';
 import { LIMITE_MOCHILA } from './mao';
 // O par de mãos vem do MESMO lugar que `colocarNoSlot` usa: o custo que o bot
@@ -6,8 +7,15 @@ import { LIMITE_MOCHILA } from './mao';
 import { MAOS } from './equipar';
 
 /**
- * Política do bot desta fatia: burro por definição — executa a ação óbvia da fase
- * em que a mesa está. Recebe a VISTA PROJETADA, nunca o estado: o bot enxerga o
+ * Política do bot desta fatia: burro por definição na maior parte — executa a
+ * ação óbvia da fase em que a mesa está —, com UMA exceção: em `encrenca` ele
+ * AVALIA o combate antes de topar a luta (decisão #63 do bible, ver
+ * `melhorEncrenca`/`rodadasParaMatar` abaixo). Isto REVOGA a decisão #9 do spec da
+ * fatia 8, que dizia *"o bot que avalia risco é da fatia da interferência"* —
+ * deixou de ser verdade em 2026-07-31. Fora dessa fase o bot continua sem
+ * estratégia: vasculha sempre que pode, mantém a espiada sempre (não blefa),
+ * ataca sempre no round de combate, e entrega a primeira carta do descarte sem
+ * critério nenhum. Recebe a VISTA PROJETADA, nunca o estado: o bot enxerga o
  * jogo pelo mesmo buraco que um humano, o que torna a projeção uma invariante
  * testável.
  *
@@ -42,18 +50,17 @@ export function escolherAcao(vista: VistaDaPartida, jogadorId: string, catalogo:
       return vestirOuGuardar(vista, jogadorId, eu, catalogo);
     }
     case 'encrenca': {
-      // 🎚️ Política PROVISÓRIA desta task: luta com o primeiro monstro que tiver.
-      // A Task 5 troca isto pela avaliação da decisão #63 do bible — e os dois
-      // testes acima continuam valendo, porque lá o monstro do dublê é fraco.
-      const monstro = vista.suaMao.find((c) => c.tipo === 'monstro');
-      return monstro !== undefined
-        ? { tipo: 'procurarEncrenca', jogadorId, cartaId: monstro.id }
+      if (eu === undefined) return { tipo: 'saquear', jogadorId };
+      const alvo = melhorEncrenca(vista, eu, catalogo);
+      return alvo !== undefined
+        ? { tipo: 'procurarEncrenca', jogadorId, cartaId: alvo }
         : { tipo: 'saquear', jogadorId };
     }
     case 'vasculhar':
       // A espiada é pendência DENTRO desta fase: se o bot a ignorasse, ele
       // vasculharia de novo, o reducer recusaria e a mesa morreria com a vez presa
-      // nele. Burro por definição = mantém sempre (não usa a informação, não blefa).
+      // nele. Ainda burro aqui — a decisão #63 só mudou `encrenca` — mantém sempre
+      // (não usa a informação, não blefa).
       return vista.espiada !== null
         ? { tipo: 'manterCarta', jogadorId }
         : { tipo: 'vasculhar', jogadorId };
@@ -72,7 +79,8 @@ export function escolherAcao(vista: VistaDaPartida, jogadorId: string, catalogo:
         // existe acima do limite. Error cru => 500, não 400 culpando ninguém.
         throw new Error('escolherAcao: fase `descartar` com a mão vazia');
       }
-      // Burro por definição: entrega a primeira carta, sem critério nenhum.
+      // Ainda burro aqui — a decisão #63 só mudou `encrenca` — entrega a primeira
+      // carta, sem critério nenhum.
       return { tipo: 'entregarCarta', jogadorId, cartaId: primeira.id };
     }
     default: {
@@ -88,9 +96,91 @@ export function escolherAcao(vista: VistaDaPartida, jogadorId: string, catalogo:
 // cobre.
 
 /**
- * Soma dos modificadores de um item. Métrica GULOSA, não inteligente (decisão #9):
- * trata +2 de força e +2 de agilidade como equivalentes, o que é falso para quem
- * joga bem e proposital aqui — o bot que avalia risco é da fatia da interferência.
+ * 🎚️ Quanto o bot exige de vantagem para topar a luta (decisão #63 do bible).
+ *
+ * Existe porque `rodadasParaMatar` erra para o lado OTIMISTA: ela ignora a esquiva
+ * e as passivas de raça do adversário. Sem margem, o bot aceitaria empates
+ * técnicos que na mesa real ele perde.
+ */
+const MARGEM_DE_ENCRENCA = 1.2;
+
+/**
+ * Quantas rodadas `A` leva para derrubar `B`, em expectativa. É a métrica da
+ * decisão #63 — e ela substitui a comparação por soma de stats, que MENTE: vida 20
+ * com habilidade 2 soma o mesmo que vida 2 com habilidade 20, e dentro do motor
+ * essas duas coisas não se parecem em nada.
+ *
+ * `dano` é o do motor, exatamente (`level + forca`); a chance de acerto é
+ * `habilidade / 12` (o atacante acerta quando a rolagem de 1d12 é ≤ habilidade).
+ *
+ * ⚠️ **Ignora a esquiva e as passivas de raça, de propósito.** A esquiva NÃO é
+ * simétrica — quem tem habilidade baixa acerta pouco, mas acerta com rolagem
+ * baixa, que é difícil de esquivar —, e modelá-la aqui seria pôr metade do motor
+ * dentro do bot. As duas omissões erram para o lado otimista, e é isso que
+ * `MARGEM_DE_ENCRENCA` paga.
+ */
+function rodadasParaMatar(atacante: Combatente, defensor: Combatente): number {
+  const dano = atacante.level + atacante.forca;
+  // Dano zero ou negativo não mata nunca: `Infinity` é a resposta honesta, e ela
+  // faz a comparação recusar a luta sem nenhum caso especial no chamador.
+  if (dano <= 0) return Infinity;
+  const golpes = Math.ceil(defensor.vida / dano);
+  if (atacante.habilidade <= 0) return Infinity;
+  return golpes / (atacante.habilidade / 12);
+}
+
+/**
+ * O monstro da mão que vale a pena encarar — o de MENOR risco entre os que passam
+ * a margem —, ou `undefined` se nenhum passa.
+ *
+ * Empate de agilidade vai para quem ataca primeiro: o motor dá a iniciativa a quem
+ * tem mais agilidade, então perder o desempate significa levar um golpe antes de
+ * dar o primeiro.
+ */
+function melhorEncrenca(
+  vista: VistaDaPartida,
+  eu: JogadorPublico,
+  catalogo: CatalogoDaMesa,
+): string | undefined {
+  let melhorId: string | undefined;
+  let melhorRisco = Infinity;
+
+  for (const carta of vista.suaMao) {
+    if (carta.tipo !== 'monstro') continue;
+    const info = catalogo.monstro(carta.monstroId);
+    // Id que o catálogo não conhece vale "não sei" — e não sei não vira luta. Mesma
+    // política do `valorDe`: o bot nunca lança, porque sempre há alternativa.
+    if (info === undefined) continue;
+
+    const adversario: Combatente = {
+      forca: info.forca, vida: info.vida, habilidade: info.habilidade,
+      agilidade: info.agilidade, level: info.level,
+    };
+    const minhas = rodadasParaMatar(eu.combatente, adversario);
+    const dele = rodadasParaMatar(adversario, eu.combatente);
+    const eleAtacaPrimeiro = adversario.agilidade > eu.combatente.agilidade;
+    // Quem apanha primeiro precisa de mais folga: uma rodada de vantagem some se o
+    // adversário abrir a troca.
+    const exigido = eleAtacaPrimeiro ? MARGEM_DE_ENCRENCA * 1.5 : MARGEM_DE_ENCRENCA;
+
+    if (minhas * exigido < dele && minhas < melhorRisco) {
+      melhorRisco = minhas;
+      melhorId = carta.id;
+    }
+  }
+  return melhorId;
+}
+
+/**
+ * Soma dos modificadores de um item. Métrica GULOSA, não inteligente para
+ * EQUIPAR (decisão #9 do spec da fatia 8, que segue valendo aqui): trata +2 de
+ * força e +2 de agilidade como equivalentes, o que é falso para quem joga bem e
+ * proposital nesta função. ⚠️ O que a #9 dizia sobre o bot NUNCA avaliar risco —
+ * "isso é da fatia da interferência" — está REVOGADO desde 2026-07-31 (decisão
+ * #63 do bible): a avaliação de risco já chegou nesta fatia, só que para a
+ * decisão de ENTRAR em combate (`melhorEncrenca`/`rodadasParaMatar` acima), não
+ * para escolher equipamento. Esta função continua gulosa por escolha, não por
+ * o bot ainda não saber avaliar risco.
  *
  * Item que o catálogo não conhece vale 0 em vez de lançar: o bot é uma POLÍTICA,
  * não o reducer. Uma exceção aqui derrubaria a mesa por uma decisão que sempre tem

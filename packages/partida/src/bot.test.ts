@@ -9,6 +9,7 @@ import { equipamento, monstro as cartaMonstro, monstros, raca } from './testes/c
 import { LIMITE_BASE_DE_MAO, LIMITE_MOCHILA } from './mao';
 import {
   catalogoDeTeste, ID_DA_CLASSE_DE_TESTE, ID_DO_ITEM_DUAS_MAOS, ID_DO_ITEM_FORTE, ID_DO_ITEM_FRACO,
+  ID_DO_MONSTRO_FORTE,
 } from './testes/catalogo';
 import { COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import type {
@@ -533,6 +534,35 @@ describe('escolherAcao', () => {
 
     expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
       .toEqual({ tipo: 'procurarEncrenca', jogadorId: 'p1', cartaId: 'm1' });
+  });
+
+  it('em `encrenca`, RECUSA o monstro que o mata primeiro e saqueia', () => {
+    // Decisão #63 do bible. Sem esta recusa o bot é um kamikaze: ele lutaria com o
+    // que estivesse na mão, perderia o turno e a mesa mediria uma `encrenca` que
+    // ninguém usaria de verdade.
+    const vista = vistaEm('encrenca', { suaMao: [cartaMonstro('m1', ID_DO_MONSTRO_FORTE)] });
+
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
+      .toEqual({ tipo: 'saquear', jogadorId: 'p1' });
+  });
+
+  it('em `encrenca` com um forte e um fraco na mão, escolhe o FRACO', () => {
+    // O par do teste acima: sozinho, ele ficaria verde com um bot que nunca luta.
+    const vista = vistaEm('encrenca', {
+      suaMao: [cartaMonstro('m-forte', ID_DO_MONSTRO_FORTE), cartaMonstro('m-fraco')],
+    });
+
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
+      .toEqual({ tipo: 'procurarEncrenca', jogadorId: 'p1', cartaId: 'm-fraco' });
+  });
+
+  it('monstro que o catálogo não conhece é RECUSADO, não assumido', () => {
+    // O bot é uma POLÍTICA: id órfão vale "não sei", e não sei não vira luta.
+    // Lançar aqui derrubaria a mesa por uma decisão que sempre tem alternativa.
+    const vista = vistaEm('encrenca', { suaMao: [cartaMonstro('m1', 'nao-existe')] });
+
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
+      .toEqual({ tipo: 'saquear', jogadorId: 'p1' });
   });
 
   it('o bot não recalcula o excedente — quem manda é a fase', () => {

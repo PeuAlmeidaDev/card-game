@@ -19,6 +19,20 @@ export const MONSTRO_DE_TESTE = {
 export const ID_DO_MONSTRO_DE_TESTE = 'm-teste';
 
 /**
+ * O monstro que o bot deve RECUSAR (decisão #63 do bible). `MONSTRO_DE_TESTE` é
+ * fraco de propósito — é ele que faz as dezenas de asserções de combate existentes
+ * valerem —, então sem um segundo monstro a política de avaliação seria
+ * inexercitável: o bot aceitaria todos e o teste passaria dos dois jeitos.
+ *
+ * 🎚️ Os números existem para cair do lado errado da conta com folga, não para
+ * serem realistas.
+ */
+export const ID_DO_MONSTRO_FORTE = 'm-forte';
+export const MONSTRO_FORTE = {
+  forca: 30, vida: 200, habilidade: 11, agilidade: 9, level: 5, tesouros: 3,
+} as const;
+
+/**
  * Catálogo de teste: por padrão não conhece raça nenhuma (todo jogador é o
  * baseline Humano) e conhece **um** monstro, `'m-teste'`. Cada teste sobrescreve
  * só o que precisa — passar o objeto inteiro em cada call-site faria a
@@ -96,7 +110,11 @@ export function catalogoDeTeste(
 ): CatalogoDaMesa {
   return {
     raca: () => undefined,
-    monstro: (id) => (id === ID_DO_MONSTRO_DE_TESTE ? MONSTRO_DE_TESTE : undefined),
+    monstro: (id) => {
+      if (id === ID_DO_MONSTRO_DE_TESTE) return MONSTRO_DE_TESTE;
+      if (id === ID_DO_MONSTRO_FORTE) return MONSTRO_FORTE;
+      return undefined;
+    },
     // Catálogo de teste conhece UMA classe e QUATRO itens, pelo mesmo princípio do
     // monstro: um dublê que aprova qualquer id não é dublê, é a ausência de um.
     classe: (id) => (id === ID_DA_CLASSE_DE_TESTE ? CLASSE_DE_TESTE : undefined),
