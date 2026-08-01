@@ -237,6 +237,16 @@ describe('a fase nunca mente sobre o estado', () => {
     const erros: string[] = [];
     const daVez = e.jogadores.find((j) => j.id === e.vezDe);
     const estourado = daVez !== undefined && daVez.mao.length > limiteDeMao(daVez);
+    // Só para `encrenca` (ver o `case` abaixo): o overflow que ela pode conviver
+    // é ESTREITO, +1 no máximo, por construção — não "qualquer excesso". A
+    // ÚNICA entrada nesta fase é o ramo `raca` de `resolverCarta`, alcançável só
+    // a partir de `vasculhar` (que este mesmo predicado, no `case 'vasculhar'`,
+    // já prova NÃO estourado), e o que `vasculhar` faz é somar EXATAMENTE 1
+    // carta à mão antes de abrir `encrenca`. Um predicado que aceitasse
+    // QUALQUER estouro aqui (`estourado`, sem teto) não pegaria uma regressão
+    // futura que tornasse a fase reentrante ou lhe desse uma segunda porta de
+    // entrada — só o teto fino pega isso.
+    const estouradoAlemDeUm = daVez !== undefined && daVez.mao.length > limiteDeMao(daVez) + 1;
 
     if ((e.fase === 'combate') !== (e.combate !== null)) {
       erros.push(`fase=${e.fase} com combate ${e.combate === null ? 'fechado' : 'aberto'}`);
@@ -264,8 +274,16 @@ describe('a fase nunca mente sobre o estado', () => {
         // `fase: 'encrenca'`, sem checar o limite. `encrenca` PODE conviver com mão
         // estourada agora, de propósito (decisão #62: `saquear` sempre disponível,
         // e o excedente só volta a ser cobrado quando `jogar`/`encerrarTurno`
-        // fecharem o encontro) — sem checagem aqui é o comportamento certo, não uma
-        // omissão. A Task 6 acrescenta o predicado do baralho.
+        // fecharem o encontro).
+        //
+        // 🔴 FIX (revisão, round 1): a primeira versão deste `case` não checava
+        // NADA — afrouxamento mais largo que o necessário. O overflow que
+        // `encrenca` pode ter é ESTREITO (+1, ver `estouradoAlemDeUm` acima); um
+        // predicado que aceitasse qualquer estouro não dispararia se uma task
+        // futura desse à fase uma segunda entrada, ou a tornasse reentrante
+        // (`saquear` empilhando estouro sobre estouro sem nunca passar por
+        // `vasculhar` de novo). A Task 6 acrescenta o predicado do baralho.
+        if (estouradoAlemDeUm) erros.push('fase=encrenca com a mão de quem tem a vez estourada por MAIS de 1');
         break;
       case 'combate':
         // Hoje inalcançável — nenhuma ação mexe na mão durante o combate, e só se
@@ -329,18 +347,40 @@ describe('a fase nunca mente sobre o estado', () => {
     // estourar durante o jogo e a fase `descartar` ser realmente visitada.
     //
     // 🎚️ Proporção regirada na Task 4 do Plano 4b (1 monstro + 9 raça, mesmo
-    // TAMANHO de 10 por jogador): antes (8 monstro + 2 raça) a raça sacada em
-    // `vasculhar` entregava direto a `jogar`/`descartar` via
-    // `entrarOuPular`/`encerrarTurno`. Agora ela abre a `encrenca`, e o bot
-    // (`escolherAcao`) prefere `procurarEncrenca` sempre que houver monstro na
-    // mão — o que DESCARTA o excesso lutando, sem nunca sobrar para `saquear`. Com
-    // baralho majoritariamente monstro (a proporção antiga), a mão de um jogador
-    // quase sempre tem monstro disponível, e a fase `descartar` nunca é mais
-    // alcançada por essa via (medido: 0 em 20000 ações simuladas). Invertendo a
+    // TAMANHO de 10 por jogador — o OPOSTO da densidade de produção, 71,4%
+    // monstro / 28,6% raça, decisão #52 do bible): antes (8 monstro + 2 raça,
+    // mais perto da produção) a raça sacada em `vasculhar` entregava direto a
+    // `jogar`/`descartar` via `entrarOuPular`/`encerrarTurno`. Agora ela abre a
+    // `encrenca`, e o bot (`escolherAcao`) prefere `procurarEncrenca` sempre que
+    // houver monstro na mão — o que DESCARTA o excesso lutando, sem nunca sobrar
+    // para `saquear`. Com baralho majoritariamente monstro (a proporção antiga,
+    // mais perto da de produção), a mão de um jogador quase sempre tem monstro
+    // disponível, e a fase `descartar` deixa de ser alcançada por essa via —
+    // qualitativo, não recravar número aqui: não há script versionado que
+    // reproduza uma contagem exata, e o relatório da Task 4 já publicou um número
+    // (~934 ações) que não bate com uma tentativa anterior deste comentário
+    // (20000) por um fator de 20 — nenhum dos dois é reproduzível. Invertendo a
     // proporção (monstro ESCASSO), o jogador eventualmente esgota os monstros da
     // mão, `encrenca` cai em `saquear` (que só ADICIONA carta, sem descartar
     // nada) e a mão estourada sobrevive até `jogar` se auto-pular — é isso que
     // finalmente alcança `encerrarTurno` com o excedente intacto.
+    //
+    // ⚠️ **Acoplado à política PROVISÓRIA do bot** (`bot.ts`, `case 'encrenca'`,
+    // que se autodeclara "política PROVISÓRIA desta task" e cita a Task 5 como
+    // quem a substitui pela avaliação da decisão #63 do bible): a razão de
+    // `descartar` sumir com densidade de produção é "o bot prefere lutar sempre
+    // que há monstro na mão", uma regra que pode não sobreviver à Task 5. Quando
+    // ela mudar, reconferir se este comentário (e a proporção invertida abaixo)
+    // ainda descrevem a causa certa.
+    //
+    // ⚠️ **O achado NÃO é só sobre o teste — é sinal sobre o JOGO real:** com a
+    // densidade de produção, `descartar` (a fase que cobra o excedente de mão)
+    // pode estar praticamente inalcançável via raça, porque o bot guloso sempre
+    // descarrega o excesso lutando antes de a cobrança chegar. Girar o fixture
+    // para monstro escasso RESTAURA a cobertura de teste, mas ENTERRA esse sinal
+    // se ninguém o persegue fora daqui. Registrado com destaque no relatório da
+    // Task 4 (seção "Fix round 1") para a Task 8 (medição) investigar se isso
+    // também vale com dials de produção e bots reais.
     const composicao = montarComposicao({
       monstroIds: Array.from({ length: 1 }, () => 'm-teste'),
       copiasPorMonstro: 1,

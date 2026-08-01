@@ -1182,17 +1182,26 @@ describe('vasculhar — a porta de raça abre a `encrenca`', () => {
     expect(r.eventos.some((e) => e.tipo === 'achado')).toBe(true);
   });
 
-  it('a `encrenca` NÃO se auto-pula, nem com a mão sem nada a fazer', () => {
+  it('a `encrenca` NÃO se auto-pula, mesmo com a mão sem NENHUM monstro para procurar', () => {
     // `saquear` está sempre disponível (decisão #62), então não existe "nada a
-    // fazer" aqui. Uma fase que se pulasse esconderia a escolha.
+    // fazer" aqui — nem quando a mão tem carta, mas nenhuma delas serve ao OUTRO
+    // verbo da fase (`procurarEncrenca`, que só aceita monstro). Uma fase que se
+    // pulasse esconderia a escolha.
+    //
+    // 🔴 FIX (revisão, round 1 — MINOR 7): a versão anterior deste teste forjava
+    // `mao: []`, mas `configSoRaca` já não dá mão inicial nenhuma — era um
+    // no-op, e o teste ficava idêntico em substância ao de cima (a mesma mão
+    // vazia, a mesma ação). Trocado por um equipamento na mão: ele PROVA a
+    // mesma coisa por um caminho diferente — mão não-vazia, mas sem monstro,
+    // ainda assim sem auto-pulo.
     const p = criarPartida('m1', entradas, configSoRaca, { embaralhar: semEmbaralhar });
-    const maoSoRaca: EstadoPartida = {
+    const maoSemMonstro: EstadoPartida = {
       ...p,
       fase: 'vasculhar',
-      jogadores: p.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao: [] } : j)),
+      jogadores: p.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao: [equipamento('t-1')] } : j)),
     };
 
-    const r = aplicarAcao(maoSoRaca, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
+    const r = aplicarAcao(maoSemMonstro, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
 
     expect(r.estado.fase).toBe('encrenca');
   });
@@ -2055,36 +2064,68 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
     )),
   });
 
-  it('com a mão acima do limite, a vez NÃO passa', () => {
+  it('com a mão acima do limite, a vez NÃO passa — e o excedente é cobrado quando `saquear` fecha o encontro', () => {
     // A carta de raça sacada vai para a MÃO (não para a zona) — é ela que estoura
     // o limite como CONSEQUÊNCIA da compra, não como precondição do vasculhar.
     //
-    // ⚠️ Continua verde depois da Task 4 do Plano 4b, mas por um motivo NOVO: a
-    // vez não passa porque a raça agora nunca passa a vez (ela abre a `encrenca`,
-    // que não checa o limite de mão — ver `fase.test.ts`, "a fase nunca mente
-    // sobre o estado"), não mais porque a mão estourada bloqueava o auto-pulo de
-    // `jogar`. O nome do teste ainda descreve o resultado certo; só o "porquê" no
-    // comentário acima deixou de ser a causa.
+    // 🔴 FIX (revisão, round 1): a versão anterior deste teste parava logo depois
+    // do `vasculhar` com só três asserções (mão cresceu, vez ficou, sem evento
+    // `vez`) — e essas três valem IGUAL para uma mão estourada e para uma mão
+    // VAZIA (é exatamente o que "a porta que não luta abre a `encrenca`..." prova
+    // com `mao: []`). O teste tinha VIRADO VAZIO: passaria mesmo se
+    // `limiteDeMao` devolvesse `Infinity`, porque a raça agora nunca passa a vez,
+    // estourada ou não (ela abre a `encrenca` incondicionalmente — ver
+    // `fase.test.ts`, "a fase nunca mente sobre o estado"). Documentar isso não
+    // bastava; o teste tinha que continuar até um estado que ainda discrimina.
+    //
+    // A extensão: `saquear` fecha o encontro (mão sem equipamento, `jogar` se
+    // auto-pula) e é aí que `encerrarTurno` volta a perguntar pelo limite — o
+    // ÚNICO lugar que liga "a raça estourou a mão" a "o excedente é cobrado" no
+    // MESMO teste. Antes essa garantia só existia composta, em dois testes que
+    // não se conheciam (este e "a compra que estoura a mão abre a `encrenca`…").
     const p0 = comMaoNoLimiteEZona(criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar }));
-    const p: EstadoPartida = { ...p0, portas: { ...p0.portas, monte: [raca('r9', 'elfo')] } };
+    // Duas cartas no monte, não uma: a primeira é a raça que este teste testa: a
+    // segunda sustenta o `saquear` do segundo passo — sem ela o monte ficaria
+    // vazio (cemitério também vazio) e `tirarDoTopo` lançaria "baralho vazio" em
+    // vez de deixar o teste chegar a `descartar`. `saquear` não resolve a carta
+    // (vai crua para a mão), então o TIPO da segunda carta é irrelevante aqui.
+    const p: EstadoPartida = { ...p0, portas: { ...p0.portas, monte: [raca('r9', 'elfo'), monstro('m9')] } };
 
-    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
+    const abriuEncrenca = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
 
-    expect(r.estado.jogadores[0]?.mao).toHaveLength(maoNoLimite.length + 1); // a compra estourou a mão
+    expect(abriuEncrenca.estado.jogadores[0]?.mao).toHaveLength(maoNoLimite.length + 1); // a compra estourou a mão
+    expect(abriuEncrenca.estado.fase).toBe('encrenca');
+    expect(abriuEncrenca.estado.vezDe).toBe('p1');
+    expect(abriuEncrenca.eventos.some((e) => e.tipo === 'vez')).toBe(false);
+
+    const r = aplicarAcao(abriuEncrenca.estado, { tipo: 'saquear', jogadorId: 'p1' }, deps([]));
+
+    // O excedente finalmente aparece — em `descartar`, sem a vez ter passado.
+    expect(r.estado.fase).toBe('descartar');
     expect(r.estado.vezDe).toBe('p1');
     expect(r.eventos.some((e) => e.tipo === 'vez')).toBe(false);
   });
 
-  it('mesmo sem passar a vez, o log anda — a versão precisa se mover', () => {
-    // Se a ação não movesse a versão, um retry de rede escaparia do guard de 409
-    // no server e morreria como 400 no reducer. Foi exatamente o achado A3 da
-    // espiada; aqui não se repete porque o evento `porta` já foi emitido.
+  it('mesmo sem passar a vez, o log anda em CADA etapa — a versão precisa se mover', () => {
+    // Se uma ação não movesse a versão, um retry de rede escaparia do guard de
+    // 409 no server e morreria como 400 no reducer. Foi exatamente o achado A3
+    // da espiada.
+    //
+    // 🔴 FIX (revisão, round 1): pelo mesmo motivo do teste acima, checar só o
+    // `log` depois do `vasculhar` não provava nada específico sobre a mão
+    // estourada — QUALQUER raça sacada segura a vez e cresce o log, cheia ou
+    // vazia a mão. A garantia que importa é mais ampla: TODA vez que a vez fica
+    // parada (aqui, duas vezes seguidas — `vasculhar`→`encrenca` e
+    // `saquear`→`descartar`), o log tem que andar mesmo assim, ou as DUAS
+    // paradas escapariam do guard de 409 no retry.
     const p0 = comMaoNoLimiteEZona(criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar }));
-    const p: EstadoPartida = { ...p0, portas: { ...p0.portas, monte: [raca('r9', 'elfo')] } };
+    const p: EstadoPartida = { ...p0, portas: { ...p0.portas, monte: [raca('r9', 'elfo'), monstro('m9')] } };
 
-    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
+    const abriuEncrenca = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
+    expect(abriuEncrenca.estado.log.length).toBeGreaterThan(p.log.length);
 
-    expect(r.estado.log.length).toBeGreaterThan(p.log.length);
+    const r = aplicarAcao(abriuEncrenca.estado, { tipo: 'saquear', jogadorId: 'p1' }, deps([]));
+    expect(r.estado.log.length).toBeGreaterThan(abriuEncrenca.estado.log.length);
   });
 
   it('com a mão dentro do limite, a vez passa como sempre', () => {
