@@ -2517,3 +2517,56 @@ describe('saquear', () => {
     expect(r.estado.fase).toBe('jogar');
   });
 });
+
+describe('procurarEncrenca', () => {
+  it('joga o monstro da mão, abre combate e manda a carta ao cemitério', () => {
+    const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
+    const comMonstro: EstadoPartida = {
+      ...p,
+      fase: 'encrenca',
+      jogadores: p.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao: [monstro('m-mao')] } : j)),
+    };
+    const cemiterioAntes = comMonstro.portas.cemiterio.length;
+
+    // ⚠️ Este verbo ABRE COMBATE, então consome dado. `[4, 12, 12]` é o orçamento de
+    // um lance que o arquivo já usa (ver o comentário do helper `venceOCombate`,
+    // no topo do arquivo): acerto, esquiva falha, contra-ataque errado. Se sobrar
+    // ou faltar dado, ajuste pelo helper — não invente números.
+    const r = aplicarAcao(comMonstro, { tipo: 'procurarEncrenca', jogadorId: 'p1', cartaId: 'm-mao' }, deps([4, 12, 12]));
+
+    expect(r.estado.fase).toBe('combate');
+    expect(r.estado.combate).not.toBeNull();
+    expect(r.estado.jogadores[0]!.mao).toHaveLength(0);
+    // A carta jogada é DESCARTADA, não devolvida ao monte: ela foi usada.
+    expect(r.estado.portas.cemiterio).toHaveLength(cemiterioAntes + 1);
+    expect(r.estado.portas.cemiterio.some((c) => c.id === 'm-mao')).toBe(true);
+  });
+
+  it('recusa carta que não está na mão', () => {
+    const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
+
+    expect(() => aplicarAcao(
+      { ...p, fase: 'encrenca' },
+      { tipo: 'procurarEncrenca', jogadorId: 'p1', cartaId: 'nao-existe' },
+      deps([]),
+    )).toThrow(AcaoInvalida);
+  });
+
+  it('recusa carta que não é monstro — raça não procura encrenca', () => {
+    // É par fino: a tabela de fases aprova `procurarEncrenca` em `encrenca` e não
+    // sabe do TIPO da carta. Sem este guard, jogar uma raça aqui cairia no ramo
+    // `raca` de `resolverCarta` e a carta voltaria para a mão de onde saiu.
+    const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
+    const comRaca: EstadoPartida = {
+      ...p,
+      fase: 'encrenca',
+      jogadores: p.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao: [raca('r-1', 'orc')] } : j)),
+    };
+
+    expect(() => aplicarAcao(
+      comRaca,
+      { tipo: 'procurarEncrenca', jogadorId: 'p1', cartaId: 'r-1' },
+      deps([]),
+    )).toThrow(AcaoInvalida);
+  });
+});
