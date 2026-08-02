@@ -130,14 +130,11 @@ function sairDaParada(
  * `fase.test.ts` afirma para as DUAS — parar em `recompor` sem raça nem
  * equipamento na mão, ou em `jogar` sem equipamento, é violação.
  *
- * O `jogador` vem por parâmetro porque quem chama é quem sabe QUAL versão dele já
- * é a final. Na maioria das ações é a que o chamador acabou de montar; em
- * `equiparCarta` NÃO é — lá o estado sofre uma segunda mutação
- * (`destinoDoDesequipado` devolvendo o item deslocado à mochila) depois que o
- * jogador atualizado foi fechado, e é a versão de `estado` que vale. Por isso o
- * parâmetro existe em vez de um `find` aqui dentro: nenhuma regra fixa serve para
- * os dois casos, e errar o lado faz a fase parada se pular com o jogador ainda
- * tendo o que vestir.
+ * O `jogador` vem por parâmetro, não de um `find` aqui dentro: nenhuma regra fixa
+ * decide qual versão é a final, e um chamador cujo estado sofre uma mutação
+ * DEPOIS de fechar o jogador (`destinoDoDesequipado` movendo um item deslocado
+ * para a mochila) precisa reler de `estado`, não passar a versão de antes — senão
+ * a fase parada se pula com o jogador ainda tendo o que vestir.
  */
 function entrarOuPular(
   estado: EstadoPartida,
@@ -897,13 +894,10 @@ function jogarCarta(
 
   return entrarOuPular(
     base,
-    // ⚠️ RELÊ de `base`; não passa `atualizado`. Esta função virou a SEGUNDA do
-    // reducer em que o jogador sofre uma mutação depois de `atualizado` ser
-    // fechado — `destinoDoDesequipado` pode ter posto o item derrubado na mochila
-    // DELE, e `faseSeAutoPula` decide por `mochila.length > 0`. Com a versão de
-    // antes, derrubar um item por perda de afinidade pularia a fase parada tendo
-    // o item dentro da mochila para vestir. É o gêmeo exato do único bug de
-    // comportamento do Plano 4a.
+    // ⚠️ RELÊ de `base`; não passa `atualizado`. `destinoDoDesequipado` (acima)
+    // pode ter posto o item derrubado na mochila DELE depois que `atualizado` foi
+    // fechado — passar `atualizado` pularia a fase parada com o item ainda
+    // dentro da mochila para vestir.
     base.jogadores.find((j) => j.id === acao.jogadorId) ?? atualizado,
     // `recompor` fixo, e não `estado.fase`: a tabela só declara `jogarCarta` legal
     // aqui. Um dia em que ela declarar noutra fase, este literal é a linha que
@@ -967,8 +961,8 @@ function equiparCarta(
     // ver o pin de ordem em `mesa.test.ts` ("vindo de uma mochila CHEIA...").
     mao: origem === 'mao' ? jogador.mao.filter((c) => c.id !== carta.id) : jogador.mao,
     mochila: origem === 'mochila' ? jogador.mochila.filter((c) => c.id !== carta.id) : jogador.mochila,
-    // ESPALHA a zona; não a remonta — mesmo motivo de `jogarCarta`: a raça que
-    // esta função não conhece precisa sobreviver a ela.
+    // ESPALHA a zona; não a remonta — o que esta função não conhece precisa
+    // sobreviver a ela.
     emJogo: { ...jogador.emJogo, slots },
   };
   const comJogador: EstadoPartida = {
@@ -993,13 +987,10 @@ function equiparCarta(
 
   return entrarOuPular(
     base,
-    // ⚠️ RELÊ de `base`; não passa `atualizado`. Esta é a única ação do reducer em
-    // que o jogador sofre uma SEGUNDA mutação depois de `atualizado` ser fechado:
-    // `destinoDoDesequipado` (acima) pode ter posto o item que saiu do slot na
-    // mochila DESTE mesmo jogador. E `faseSeAutoPula` decide por
-    // `mochila.length > 0` — com a versão de antes, equipar a última carta da
-    // mochila pularia a fase parada tendo o deslocado dentro dela para vestir.
-    // Em `jogar`, isso passa o turno inteiro.
+    // ⚠️ RELÊ de `base`; não passa `atualizado`. `destinoDoDesequipado` (acima)
+    // pode ter posto o item na mochila DESTE jogador depois que `atualizado` foi
+    // fechado — passar `atualizado` pularia a fase parada com o deslocado ainda
+    // dentro dela para vestir.
     base.jogadores.find((j) => j.id === acao.jogadorId) ?? atualizado,
     // A fase de ORIGEM, não um literal: equipar é legal em `recompor` e em
     // `jogar`, e o jogador tem que continuar onde estava. Fixar `recompor` aqui

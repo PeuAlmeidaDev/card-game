@@ -88,10 +88,8 @@ export const ITEM_FRACO = {
 };
 
 /**
- * A ÚNICA arma de duas mãos do dublê. Até 2026-07-31 o catálogo de teste não
- * tinha nenhuma, e por isso **nenhum teste do bot conseguia exercitar a regra de
- * duas mãos** — provado por mutação: trocar `['maoDireita', 'maoEsquerda']` por
- * `['maoDireita']` em `bot.ts` deixava os 240 testes verdes.
+ * Arma de duas mãos SEM afinidade — para o item exclusivo de duas mãos, ver
+ * `ITEM_EXCLUSIVO_DUAS_MAOS`, abaixo.
  *
  * 🎚️ Força **4** não é decorativa, é o que separa a regra certa da quebrada:
  * contra as duas mãos ocupadas por Forte (3) + Fraco (1), o custo real é 4 e o
@@ -147,19 +145,17 @@ export const ITEM_EXCLUSIVO_DE_CLASSE = {
 };
 
 /**
- * O exclusivo de duas mãos (Task 6 da afinidade). Sem ele a dedup de
- * `itensSemAfinidade`/`tirarDosSlots` — que reusa `itensEquipados` para não
- * derrubar a mesma instância duas vezes — é *inexercitável*, não só
- * desprotegida: é literalmente a lição do `ITEM_DUAS_MAOS` (a ausência de arma
- * de duas mãos no catálogo de teste deixou 240 testes verdes sobre a regra de
- * duas mãos do bot quebrada), agora do lado da troca de raça.
+ * O exclusivo de duas mãos. Sem ele a dedup de `itensSemAfinidade`/
+ * `tirarDosSlots` (via `itensEquipados`) seria *inexercitável*, mesma lição do
+ * `ITEM_DUAS_MAOS`. Números alinhados com `ITEM_EXCLUSIVO`: nenhum teste os lê
+ * isoladamente, e divergir sem motivo só convidaria a pergunta errada depois.
  */
 export const ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS = 'i-exclusivo-duas-maos';
 export const ITEM_EXCLUSIVO_DUAS_MAOS = {
   id: ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS, nome: 'Item Exclusivo de Duas Mãos',
   slot: 'maoDireita' as const, duasMaos: true,
-  modificadores: { forca: 5 },
-  exclusivo: { eixo: 'raca' as const, id: ID_DA_RACA_DONA, semAfinidade: { forca: 2 } },
+  modificadores: { forca: 4 },
+  exclusivo: { eixo: 'raca' as const, id: ID_DA_RACA_DONA, semAfinidade: { forca: 1 } },
 };
 
 export function catalogoDeTeste(

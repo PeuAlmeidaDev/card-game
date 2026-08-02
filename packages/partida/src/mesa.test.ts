@@ -14,7 +14,7 @@ import { filaDeDados, criarDadoCiclico } from './testes/dados';
 import { monstro, monstros, raca, equipamento } from './testes/cartas';
 import {
   catalogoDeTeste, ID_DA_CLASSE_DE_TESTE, MONSTRO_DE_TESTE, ID_DO_ITEM_EXCLUSIVO, ID_DA_RACA_OUTRA,
-  ID_DO_ITEM_DE_TESTE, ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS,
+  ID_DA_RACA_DONA, ID_DO_ITEM_DE_TESTE, ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS,
 } from './testes/catalogo';
 import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import { combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
@@ -1471,6 +1471,22 @@ describe('trocar de raça derruba o que perdeu afinidade', () => {
 
     expect(depois.jogadores[0]?.emJogo.slots.capacete).toBeNull();
     expect(depois.jogadores[0]?.mochila.map((c) => c.id)).toContain('t-1');
+  });
+
+  it('o exclusivo da raça que você ACABOU DE VESTIR não cai', () => {
+    // O outro contrapositivo: sem ele, um guard escrito como `info.exclusivo !==
+    // null` (derruba todo exclusivo, sem checar QUAL raça) passaria os outros
+    // quatro testes deste describe e derrubaria o elmo de Orc de quem acabou de
+    // virar Orc — o oposto exato da feature.
+    const item = equipamento('t-1', ID_DO_ITEM_EXCLUSIVO);
+    const cartaDeRaca = raca('p-9', ID_DA_RACA_DONA);
+    const estado = comCorpo(nascida(), { capacete: item }, [cartaDeRaca]);
+
+    const { estado: depois } = aplicarAcao(
+      estado, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'p-9' }, deps([]),
+    );
+
+    expect(depois.jogadores[0]?.emJogo.slots.capacete?.id).toBe('t-1');
   });
 
   it('o item que CONTINUA válido não cai', () => {
