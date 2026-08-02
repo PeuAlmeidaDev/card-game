@@ -1,6 +1,9 @@
 import type { Combatente } from '@card-dungeon/motor';
 import { montarCombatente } from '@card-dungeon/personagem';
-import type { CartaEquipamento, CatalogoDaMesa, JogadorNaMesa, Slot, ZonaEmJogo } from './tipos';
+import type { Equipamento } from '@card-dungeon/personagem';
+import type {
+  CartaEquipamento, CatalogoDaMesa, EixoDeAfinidade, InfoItem, JogadorNaMesa, Slot, ZonaEmJogo,
+} from './tipos';
 
 /**
  * O corpo vazio. Constante e não função porque o objeto é sempre espalhado por
@@ -23,6 +26,55 @@ export function itensEquipados(slots: ZonaEmJogo['slots']): readonly CartaEquipa
     if (carta !== null) porId.set(carta.id, carta);
   }
   return [...porId.values()];
+}
+
+/**
+ * `plena` = o valor cheio; `sem` = o valor reduzido que a carta declara;
+ * `proibida` = você tem a especialização ERRADA e não veste.
+ */
+export type GrauDeAfinidade = 'plena' | 'sem' | 'proibida';
+
+/** O que a zona tem NO EIXO perguntado, ou `null` se nada. */
+function idNoEixo(eixo: EixoDeAfinidade, emJogo: ZonaEmJogo): string | null {
+  switch (eixo) {
+    case 'raca':
+      return emJogo.raca?.racaId ?? null;
+    case 'classe':
+      return null;
+    default: {
+      const naoTratado: never = eixo;
+      throw new Error(`idNoEixo: eixo não tratado: ${JSON.stringify(naoTratado)}`);
+    }
+  }
+}
+
+/** A pergunta da afinidade, num ponto ÚNICO — reducer, bot e tela leem daqui. */
+export function afinidadeCom(info: InfoItem, emJogo: ZonaEmJogo): GrauDeAfinidade {
+  const exclusivo = info.exclusivo;
+  if (exclusivo === null) return 'plena';
+
+  const meu = idNoEixo(exclusivo.eixo, emJogo);
+  if (meu === null) return 'sem';
+  return meu === exclusivo.donoId ? 'plena' : 'proibida';
+}
+
+/** O que este item soma PARA ESTE CORPO — cheio ou reduzido. */
+export function contribuicaoDe(info: InfoItem, emJogo: ZonaEmJogo): Equipamento {
+  const grau = afinidadeCom(info, emJogo);
+  switch (grau) {
+    case 'plena':
+      return info;
+    case 'sem':
+      // O teste de `null` é o narrowing que o compilador exige, não uma segunda
+      // leitura da regra: `sem` só sai de item exclusivo.
+      return info.exclusivo === null ? info : { ...info, modificadores: info.exclusivo.semAfinidade };
+    case 'proibida':
+      throw new Error(`contribuicaoDe: item ${info.id} está no corpo e é proibido para esta zona`);
+    default: {
+      const naoTratado: never = grau;
+      throw new Error(`contribuicaoDe: grau não tratado: ${JSON.stringify(naoTratado)}`);
+    }
+  }
 }
 
 /**
@@ -49,7 +101,7 @@ export function combatenteDe(jogador: JogadorNaMesa, catalogo: CatalogoDaMesa): 
     if (info === undefined) {
       throw new Error(`combatenteDe: item ${carta.itemId} não está no catálogo`);
     }
-    return info;
+    return contribuicaoDe(info, jogador.emJogo);
   });
   return { ...montarCombatente(classe, itens), level: jogador.patente };
 }

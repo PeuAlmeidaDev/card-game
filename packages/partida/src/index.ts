@@ -1,11 +1,12 @@
 export type {
   CartaPorta, CartaDeRaca, ReceitaPorta, ReceitaTesouro, CartaTesouro, CartaEquipamento, Carta, Slot, InfoItem,
+  Afinidade, EixoDeAfinidade,
   Embaralhar, InfoRaca, InfoMonstro, CatalogoDaMesa, JogadorNaMesa,
   JogadorPublico, ZonaEmJogo, PosicaoFinal, EventoDaMesa, AcaoDaMesa, CombateNaMesa, EspiadaPendente,
   EstadoPartida, VistaDaPartida, ConfigPartida, EntradaJogador, Baralho, Fase,
 } from './tipos';
 export { montarComposicao, montarComposicaoTesouros, tirarDoTopo, type ReceitaDeBaralho } from './baralho';
-export { combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
+export { combatenteDe, itensEquipados, afinidadeCom, contribuicaoDe, SLOTS_VAZIOS, type GrauDeAfinidade } from './corpo';
 export { aplicarAcao } from './mesa';
 export { avancarBots } from './automacao';
 export { criarPartida } from './montagem';

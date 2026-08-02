@@ -1,8 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
-import { catalogoDeTeste, CLASSE_DE_TESTE } from './testes/catalogo';
-import { equipamento } from './testes/cartas';
-import type { JogadorNaMesa } from './tipos';
+import { afinidadeCom, combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
+import {
+  catalogoDeTeste, CLASSE_DE_TESTE,
+  ID_DA_RACA_DONA, ID_DA_RACA_OUTRA, ID_DO_ITEM_EXCLUSIVO,
+  ITEM_DE_TESTE, ITEM_EXCLUSIVO, ITEM_EXCLUSIVO_DE_CLASSE,
+} from './testes/catalogo';
+import { equipamento, raca } from './testes/cartas';
+import type { JogadorNaMesa, ZonaEmJogo } from './tipos';
 
 const jogador = (over: Partial<JogadorNaMesa> = {}): JogadorNaMesa => ({
   id: 'p1', nome: 'Você', ehBot: false, classeId: CLASSE_DE_TESTE.id,
@@ -72,5 +76,98 @@ describe('combatenteDe', () => {
       jogador({ emJogo: { raca: null, slots: { ...SLOTS_VAZIOS, pes: item } } }),
       catalogoDeTeste(),
     )).toThrowError(/item nao-existe/);
+  });
+
+  it('exclusivo da PRÓPRIA raça soma o valor CHEIO', () => {
+    const item = equipamento('t-1', ID_DO_ITEM_EXCLUSIVO);
+    const c = combatenteDe(
+      jogador({ emJogo: { raca: raca('p-1', ID_DA_RACA_DONA), slots: { ...SLOTS_VAZIOS, capacete: item } } }),
+      catalogoDeTeste(),
+    );
+    // BASE.forca (3) + CLASSE_DE_TESTE (0) + cheio (4) = 7.
+    expect(c.forca).toBe(7);
+  });
+
+  it('exclusivo alheio, estando SEM raça, soma o REDUZIDO', () => {
+    const item = equipamento('t-1', ID_DO_ITEM_EXCLUSIVO);
+    const c = combatenteDe(
+      jogador({ emJogo: { raca: null, slots: { ...SLOTS_VAZIOS, capacete: item } } }),
+      catalogoDeTeste(),
+    );
+    // BASE.forca (3) + reduzido (1) = 4. Se somasse o cheio daria 7; se somasse
+    // zero daria 3. Os três números são distintos DE PROPÓSITO — é o que separa
+    // "rende menos" de "não rende" e de "rende tudo".
+    expect(c.forca).toBe(4);
+  });
+
+  it('pôr a raça dona DEPOIS de equipar já rende o cheio — sem código nenhum', () => {
+    // O caso simétrico sai de graça: `combatenteDe` recalcula a cada consulta e
+    // não existe campo denormalizado para dessincronizar. Foi o que a morte do
+    // `combatenteBase` (Plano 3a) comprou. Vale um teste, não vale código — e o
+    // teste existe justamente para que ninguém "implemente" isto depois.
+    const item = equipamento('t-1', ID_DO_ITEM_EXCLUSIVO);
+    const slots = { ...SLOTS_VAZIOS, capacete: item };
+    const semRaca = combatenteDe(jogador({ emJogo: { raca: null, slots } }), catalogoDeTeste());
+    const comRaca = combatenteDe(
+      jogador({ emJogo: { raca: raca('p-1', ID_DA_RACA_DONA), slots } }),
+      catalogoDeTeste(),
+    );
+    expect(comRaca.forca).toBe(semRaca.forca + 3);
+  });
+
+  it('item PROIBIDO no corpo é invariante NOSSA: Error cru, não AcaoInvalida', () => {
+    // `equiparCarta` recusa (Task 4) e `jogarCarta` derruba na troca de raça
+    // (Task 6), então este estado não deveria existir. Se existir, alguém furou o
+    // reducer — 500 sem vazar, nunca "culpa sua". Mesma cadeia do id que o
+    // catálogo não conhece, logo acima.
+    const item = equipamento('t-1', ID_DO_ITEM_EXCLUSIVO);
+    expect(() => combatenteDe(
+      jogador({ emJogo: { raca: raca('p-1', ID_DA_RACA_OUTRA), slots: { ...SLOTS_VAZIOS, capacete: item } } }),
+      catalogoDeTeste(),
+    )).toThrowError(/proibido/);
+  });
+});
+
+const zona = (racaEmJogo: string | null): ZonaEmJogo => ({
+  raca: racaEmJogo === null ? null : raca('p-1', racaEmJogo),
+  slots: { ...SLOTS_VAZIOS },
+});
+
+describe('afinidadeCom', () => {
+  it('item COMUM é sempre plena, mesmo com raça em jogo', () => {
+    expect(afinidadeCom(ITEM_DE_TESTE, zona(ID_DA_RACA_DONA))).toBe('plena');
+    expect(afinidadeCom(ITEM_DE_TESTE, zona(null))).toBe('plena');
+  });
+
+  it('exclusivo da raça que você TEM em jogo é plena', () => {
+    expect(afinidadeCom(ITEM_EXCLUSIVO, zona(ID_DA_RACA_DONA))).toBe('plena');
+  });
+
+  it('exclusivo de outra raça, estando SEM raça em jogo, é `sem` — não proibida', () => {
+    // Decisão #1 do spec: a afinidade é ESCALONADA. O exclusivo alheio na mão de
+    // quem não se especializou não é carta morta, rende menos. Binária
+    // transformaria todo exclusivo em lixo para 3 dos 4 jogadores, num baralho
+    // que já sofre de carta morta.
+    expect(afinidadeCom(ITEM_EXCLUSIVO, zona(null))).toBe('sem');
+  });
+
+  it('exclusivo de outra raça, tendo a raça ERRADA em jogo, é proibida', () => {
+    // Quem tem a raça errada NÃO é "quem não tem raça": a matriz da decisão #1 não
+    // tem essa célula, e inventá-la exigiria uma terceira categoria de valor.
+    expect(afinidadeCom(ITEM_EXCLUSIVO, zona(ID_DA_RACA_OUTRA))).toBe('proibida');
+  });
+
+  it('o eixo `classe` responde `sem` para TODO MUNDO — e isso não é um buraco', () => {
+    // `ZonaEmJogo` não tem campo `classe` nesta fatia, então NINGUÉM tem classe em
+    // jogo — e pelo princípio da decisão #2 do spec ("quem não tem X usa os
+    // exclusivos de X") isso significa que todos são "quem não tem X". A resposta
+    // certa é `sem`, não um `TODO` nem um caso especial: é a regra funcionando
+    // contra a zona que existe.
+    //
+    // ⚠️ Afirmar isto por TESTE é obrigatório. Sem ele, a fatia `classe como
+    // carta` pode "consertar" um comportamento que já estava correto.
+    expect(afinidadeCom(ITEM_EXCLUSIVO_DE_CLASSE, zona(null))).toBe('sem');
+    expect(afinidadeCom(ITEM_EXCLUSIVO_DE_CLASSE, zona(ID_DA_RACA_DONA))).toBe('sem');
+    expect(afinidadeCom(ITEM_EXCLUSIVO_DE_CLASSE, zona(ID_DA_RACA_OUTRA))).toBe('sem');
   });
 });

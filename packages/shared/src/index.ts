@@ -10,19 +10,23 @@ import type {
 } from '@card-dungeon/personagem';
 import type {
   AcaoDaMesa,
+  Afinidade,
   Carta,
   CartaEquipamento,
   CartaPorta,
   CartaTesouro,
+  EixoDeAfinidade,
   EspiadaPendente,
   EventoDaMesa,
   Fase,
+  GrauDeAfinidade,
   JogadorPublico,
   PosicaoFinal,
   Slot,
   VistaDaPartida,
+  ZonaEmJogo,
 } from '@card-dungeon/partida';
-import type { Slot as SlotDaCarta, ItemCarta } from '@card-dungeon/cartas';
+import type { Slot as SlotDaCarta, ItemCarta, EixoDeAfinidade as EixoDaCarta } from '@card-dungeon/cartas';
 
 /**
  * Corpo do POST /api/duelo e /api/partida: as escolhas do jogador (ids).
@@ -136,6 +140,17 @@ const _coberturaSlot: _CoberturaSlot = true;
 void _coberturaSlot;
 
 /**
+ * Trava as duas uniões `EixoDeAfinidade` — a de `partida` (a regra) e a de
+ * `cartas` (o dado). Mesma duplicação, mesma tupla e mesmo preço do `Slot`, acima.
+ *
+ * ⚠️ Guard de COMPILAÇÃO. Quem acusa é o `pnpm typecheck`, nunca a suíte.
+ */
+type _CoberturaEixo =
+  [EixoDeAfinidade] extends [EixoDaCarta] ? ([EixoDaCarta] extends [EixoDeAfinidade] ? true : never) : never;
+const _coberturaEixo: _CoberturaEixo = true;
+void _coberturaEixo;
+
+/**
  * Corpo do POST /api/partida/:id/acao: a ação MAIS a versão do estado que o
  * cliente acredita estar vendo. O servidor recusa com 409 se não bater — é o que
  * impede que um duplo-clique ou um retry de rede role o dado duas vezes.
@@ -167,6 +182,10 @@ export { LIMITE_MOCHILA } from '@card-dungeon/partida';
 // não, então a tela mostrava `Agilidade -5` onde o servidor montaria `1`. Custo
 // zero hoje (nenhuma classe do catálogo é tão negativa), bomba amanhã.
 export { montarCombatente } from '@card-dungeon/personagem';
+
+// Valor, pelo mesmo motivo: a afinidade é regra, e mostrar o valor CHEIO na tela
+// de quem veste reduzido é a tela mentindo.
+export { afinidadeCom, contribuicaoDe } from '@card-dungeon/partida';
 
 const c = initContract();
 
@@ -268,4 +287,9 @@ export type {
   // então o que não passar por aqui simplesmente não existe para o cliente.
   Slot,
   ItemCarta,
+  // Mesma jogada, para o eixo de especialização.
+  Afinidade,
+  EixoDeAfinidade,
+  GrauDeAfinidade,
+  ZonaEmJogo,
 };

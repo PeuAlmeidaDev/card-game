@@ -67,7 +67,7 @@ export const CLASSE_DE_TESTE = {
 export const ID_DO_ITEM_DE_TESTE = 'i-teste';
 export const ITEM_DE_TESTE = {
   id: ID_DO_ITEM_DE_TESTE, nome: 'Item de Teste',
-  slot: 'maoDireita' as const, duasMaos: false, modificadores: { forca: 1 },
+  slot: 'maoDireita' as const, duasMaos: false, modificadores: { forca: 1 }, exclusivo: null,
 };
 
 /**
@@ -79,19 +79,17 @@ export const ITEM_DE_TESTE = {
 export const ID_DO_ITEM_FORTE = 'i-forte';
 export const ITEM_FORTE = {
   id: ID_DO_ITEM_FORTE, nome: 'Item Forte',
-  slot: 'maoDireita' as const, duasMaos: false, modificadores: { forca: 3 },
+  slot: 'maoDireita' as const, duasMaos: false, modificadores: { forca: 3 }, exclusivo: null,
 };
 export const ID_DO_ITEM_FRACO = 'i-fraco';
 export const ITEM_FRACO = {
   id: ID_DO_ITEM_FRACO, nome: 'Item Fraco',
-  slot: 'maoDireita' as const, duasMaos: false, modificadores: { forca: 1 },
+  slot: 'maoDireita' as const, duasMaos: false, modificadores: { forca: 1 }, exclusivo: null,
 };
 
 /**
- * A ÚNICA arma de duas mãos do dublê. Até 2026-07-31 o catálogo de teste não
- * tinha nenhuma, e por isso **nenhum teste do bot conseguia exercitar a regra de
- * duas mãos** — provado por mutação: trocar `['maoDireita', 'maoEsquerda']` por
- * `['maoDireita']` em `bot.ts` deixava os 240 testes verdes.
+ * Arma de duas mãos SEM afinidade — para o item exclusivo de duas mãos, ver
+ * `ITEM_EXCLUSIVO_DUAS_MAOS`, abaixo.
  *
  * 🎚️ Força **4** não é decorativa, é o que separa a regra certa da quebrada:
  * contra as duas mãos ocupadas por Forte (3) + Fraco (1), o custo real é 4 e o
@@ -102,7 +100,79 @@ export const ITEM_FRACO = {
 export const ID_DO_ITEM_DUAS_MAOS = 'i-duas-maos';
 export const ITEM_DUAS_MAOS = {
   id: ID_DO_ITEM_DUAS_MAOS, nome: 'Item de Duas Mãos',
-  slot: 'maoDireita' as const, duasMaos: true, modificadores: { forca: 4 },
+  slot: 'maoDireita' as const, duasMaos: true, modificadores: { forca: 4 }, exclusivo: null,
+};
+
+/** Ids NEUTROS de propósito: `partida` é cego ao catálogo. */
+export const ID_DA_RACA_DONA = 'r-dona';
+export const ID_DA_RACA_OUTRA = 'r-outra';
+
+/**
+ * 🎚️ Cheio (4) ≠ reduzido (1) ≠ nada (0): os três valores separam as TRÊS
+ * respostas de `afinidadeCom`. Um reduzido de 0 apagaria a do meio.
+ */
+export const ID_DO_ITEM_EXCLUSIVO = 'i-exclusivo';
+export const ITEM_EXCLUSIVO = {
+  id: ID_DO_ITEM_EXCLUSIVO, nome: 'Item Exclusivo',
+  slot: 'capacete' as const, duasMaos: false,
+  modificadores: { forca: 4 },
+  exclusivo: { eixo: 'raca' as const, donoId: ID_DA_RACA_DONA, semAfinidade: { forca: 1 } },
+};
+
+/** Comum, no MESMO slot do `ITEM_EXCLUSIVO` — para testar quem desloca quem. */
+export const ID_DO_ITEM_DE_CAPACETE = 'i-capacete';
+export const ITEM_DE_CAPACETE = {
+  id: ID_DO_ITEM_DE_CAPACETE, nome: 'Item de Capacete',
+  slot: 'capacete' as const, duasMaos: false, modificadores: { forca: 3 }, exclusivo: null,
+};
+
+/**
+ * 🎚️ Soma líquida NEGATIVA (−2), sem a qual o filtro de
+ * `candidatosQueEuPossoVestir` é INEXERCITÁVEL: com todo item somando ≥ 0,
+ * `ganho = 0 − custo` nunca passa de `melhorGanho = 0`.
+ */
+export const ID_DO_ITEM_LASTRO = 'i-lastro';
+export const ITEM_LASTRO = {
+  id: ID_DO_ITEM_LASTRO, nome: 'Lastro',
+  slot: 'capacete' as const, duasMaos: false, modificadores: { agilidade: -2 }, exclusivo: null,
+};
+
+/**
+ * Existe SÓ no dublê — nenhum item do catálogo real declara o eixo `classe`, e
+ * sem ele esse ramo de `afinidadeCom` é INEXERCITÁVEL.
+ */
+export const ID_DO_ITEM_EXCLUSIVO_DE_CLASSE = 'i-de-classe';
+export const ITEM_EXCLUSIVO_DE_CLASSE = {
+  id: ID_DO_ITEM_EXCLUSIVO_DE_CLASSE, nome: 'Item de Classe',
+  slot: 'armadura' as const, duasMaos: false,
+  modificadores: { vida: 6 },
+  exclusivo: { eixo: 'classe' as const, donoId: 'c-outra', semAfinidade: { vida: 2 } },
+};
+
+/**
+ * Sem ele a dedup de `itensSemAfinidade`/`tirarDosSlots` é INEXERCITÁVEL —
+ * mesma lição do `ITEM_DUAS_MAOS`.
+ */
+export const ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS = 'i-exclusivo-duas-maos';
+export const ITEM_EXCLUSIVO_DUAS_MAOS = {
+  id: ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS, nome: 'Item Exclusivo de Duas Mãos',
+  slot: 'maoDireita' as const, duasMaos: true,
+  modificadores: { forca: 4 },
+  exclusivo: { eixo: 'raca' as const, donoId: ID_DA_RACA_DONA, semAfinidade: { forca: 1 } },
+};
+
+/**
+ * Exclusivo em `pes` — sem ele, `tirarDosSlots` varrendo um array escrito à mão
+ * sem esse slot ainda passava a suíte inteira: nenhum teste equipava um
+ * exclusivo ali. `capacete` (`ITEM_EXCLUSIVO`) e `maoDireita`/`maoEsquerda`
+ * (`ITEM_EXCLUSIVO_DUAS_MAOS`) já eram cobertos; `pes` era o slot mudo.
+ */
+export const ID_DO_ITEM_EXCLUSIVO_PES = 'i-exclusivo-pes';
+export const ITEM_EXCLUSIVO_PES = {
+  id: ID_DO_ITEM_EXCLUSIVO_PES, nome: 'Item Exclusivo de Pés',
+  slot: 'pes' as const, duasMaos: false,
+  modificadores: { agilidade: 2 },
+  exclusivo: { eixo: 'raca' as const, donoId: ID_DA_RACA_DONA, semAfinidade: { agilidade: 1 } },
 };
 
 export function catalogoDeTeste(
@@ -115,14 +185,20 @@ export function catalogoDeTeste(
       if (id === ID_DO_MONSTRO_FORTE) return MONSTRO_FORTE;
       return undefined;
     },
-    // Catálogo de teste conhece UMA classe e QUATRO itens, pelo mesmo princípio do
-    // monstro: um dublê que aprova qualquer id não é dublê, é a ausência de um.
+    // Só os ids listados, pelo mesmo princípio do monstro: um dublê que aprova
+    // qualquer id não é dublê, é a ausência de um.
     classe: (id) => (id === ID_DA_CLASSE_DE_TESTE ? CLASSE_DE_TESTE : undefined),
     item: (id) => {
       if (id === ID_DO_ITEM_DE_TESTE) return ITEM_DE_TESTE;
       if (id === ID_DO_ITEM_FORTE) return ITEM_FORTE;
       if (id === ID_DO_ITEM_FRACO) return ITEM_FRACO;
       if (id === ID_DO_ITEM_DUAS_MAOS) return ITEM_DUAS_MAOS;
+      if (id === ID_DO_ITEM_EXCLUSIVO) return ITEM_EXCLUSIVO;
+      if (id === ID_DO_ITEM_DE_CAPACETE) return ITEM_DE_CAPACETE;
+      if (id === ID_DO_ITEM_LASTRO) return ITEM_LASTRO;
+      if (id === ID_DO_ITEM_EXCLUSIVO_DE_CLASSE) return ITEM_EXCLUSIVO_DE_CLASSE;
+      if (id === ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS) return ITEM_EXCLUSIVO_DUAS_MAOS;
+      if (id === ID_DO_ITEM_EXCLUSIVO_PES) return ITEM_EXCLUSIVO_PES;
       return undefined;
     },
     ...parcial,

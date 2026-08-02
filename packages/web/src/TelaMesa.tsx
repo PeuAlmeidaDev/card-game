@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { api } from './api';
 import { PainelLog } from './PainelLog';
 import { descreverCarta } from './descreverCarta';
-import { acaoEhLegalNaFase, LIMITE_MOCHILA } from '@card-dungeon/shared';
-import type { AcaoDaMesa, AcaoNoFio, Catalogo, Escolhas, Fase, Slot, VistaDaPartida } from '@card-dungeon/shared';
+import { acaoEhLegalNaFase, afinidadeCom, LIMITE_MOCHILA } from '@card-dungeon/shared';
+import type { AcaoDaMesa, AcaoNoFio, Catalogo, Escolhas, Fase, ItemCarta, Slot, VistaDaPartida } from '@card-dungeon/shared';
+import { rotuloDeAfinidade } from './rotuloDeAfinidade';
 
 /**
  * Usado quando a tela roda sozinha; o `App` passa as escolhas reais do construtor.
@@ -120,6 +121,16 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
   // vista não carrega o máximo dele.
   const vidaMaxima = vista.jogadores.find((j) => j.id === vista.voce)?.combatente.vida ?? null;
   const eu = vista.jogadores.find((j) => j.id === vista.voce);
+  const infoDoItem = (itemId: string): ItemCarta | undefined => itens.find((i) => i.id === itemId);
+  const minhaZona = eu?.emJogo ?? null;
+  const rotuloDe = (itemId: string): string => {
+    const info = infoDoItem(itemId);
+    return info === undefined || minhaZona === null ? '' : rotuloDeAfinidade(info, minhaZona, nomeDaRaca);
+  };
+  const euNaoPossoVestir = (itemId: string): boolean => {
+    const info = infoDoItem(itemId);
+    return info !== undefined && minhaZona !== null && afinidadeCom(info, minhaZona) === 'proibida';
+  };
   // A SUA mochila, para o teto do "Guardar" e para o botão "Equipar" (que só faz
   // sentido no que é seu — a mochila alheia é visível, mas não sua para vestir).
   const minhaMochila = eu?.mochila ?? [];
@@ -341,10 +352,10 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
         <ul>
           {minhaMochila.map((carta) => (
             <li key={carta.id}>
-              {nomeDoItem(carta.itemId)}{' '}
+              {nomeDoItem(carta.itemId)}{rotuloDe(carta.itemId)}{' '}
               <button
                 type="button"
-                disabled={!legal('equiparCarta')}
+                disabled={!legal('equiparCarta') || euNaoPossoVestir(carta.itemId)}
                 onClick={() => void agir({ tipo: 'equiparCarta', cartaId: carta.id })}
               >
                 Equipar
@@ -386,7 +397,8 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
         <ul>
           {vista.suaMao.map((carta) => (
             <li key={carta.id}>
-              {descreverCarta(carta, nomeDaRaca, nomeDoMonstro, nomeDoItem)}{' '}
+              {descreverCarta(carta, nomeDaRaca, nomeDoMonstro, nomeDoItem)}
+              {carta.tipo === 'equipamento' && rotuloDe(carta.itemId)}{' '}
               {/* Só raça entra em jogo nesta fatia — o domínio recusa o resto, e um
                   botão que só serve para levar 400 ensina o jogador a errar. */}
               {carta.tipo === 'raca' && (
@@ -398,14 +410,15 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
                   Jogar
                 </button>
               )}
-              {/* Os DOIS pares finos de `procurarEncrenca` (ver a tabela no
-                  `aplicarAcao`, `mesa.ts`): a carta está na SUA mão, e ela é do
-                  TIPO `monstro`. `legal()` só aprova a fase inteira, não sabe de
-                  nenhum dos dois. O primeiro guard já tem gêmeo ESTRUTURAL — este
-                  botão só existe dentro de `vista.suaMao.map`, então "está na
-                  mão" é automático, nunca precisou de condição escrita. O
-                  segundo é o `carta.tipo === 'monstro'` abaixo: sem ele, clicar
-                  na raça na fase `encrenca` leva 400. */}
+              {/* O par fino de `procurarEncrenca`, mais o gêmeo ESTRUTURAL que a
+                  tabela do `aplicarAcao` (`mesa.ts`) não soma: a carta está na
+                  SUA mão, e ela é do TIPO `monstro`. `legal()` só aprova a fase
+                  inteira, não sabe de nenhum dos dois. O primeiro guard já tem
+                  gêmeo ESTRUTURAL — este botão só existe dentro de
+                  `vista.suaMao.map`, então "está na mão" é automático, nunca
+                  precisou de condição escrita. O segundo é o
+                  `carta.tipo === 'monstro'` abaixo: sem ele, clicar na raça na
+                  fase `encrenca` leva 400. */}
               {carta.tipo === 'monstro' && (
                 <button
                   type="button"
@@ -415,21 +428,17 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
                   Procurar encrenca
                 </button>
               )}
-              {/* O par fino que sobra de `equiparCarta` (ver a tabela no
-                  `aplicarAcao`), porque `legal()` é gate grosso e não conhece
-                  este:
-                  - `carta.tipo === 'equipamento'` → decide se o botão EXISTE.
-                  O gêmeo de espiada morreu junto com o guard do reducer: a
-                  espiada só existe na fase `vasculhar`, e nem `jogarCarta` nem
-                  `equiparCarta` são legais nela desde as Tasks 2 e 3 — a tabela
-                  já apaga os dois botões antes de qualquer pendência importar.
-                  O SLOT não vai na ação: quem decide onde encaixa é o item, pelo
-                  catálogo do servidor — deixar o cliente escolher seria deixá-lo
-                  pôr o capacete no pé. */}
+              {/* Os DOIS pares finos de `equiparCarta` que `legal()` (gate grosso)
+                  não conhece: `carta.tipo === 'equipamento'` decide se o botão
+                  EXISTE; `euNaoPossoVestir` (afinidade `proibida`), no
+                  `disabled` abaixo, é o outro. O SLOT não vai na ação: quem
+                  decide onde encaixa é o item, pelo catálogo do servidor —
+                  deixar o cliente escolher seria deixá-lo pôr o capacete no
+                  pé. */}
               {carta.tipo === 'equipamento' && (
                 <button
                   type="button"
-                  disabled={!legal('equiparCarta')}
+                  disabled={!legal('equiparCarta') || euNaoPossoVestir(carta.itemId)}
                   onClick={() => void agir({ tipo: 'equiparCarta', cartaId: carta.id })}
                 >
                   Equipar

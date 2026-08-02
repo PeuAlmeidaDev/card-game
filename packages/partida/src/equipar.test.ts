@@ -47,7 +47,7 @@ const comMochilaDe = (jogadorId: string, mochila: readonly CartaEquipamento[]): 
 // PRONTA, então o catálogo não entra no caminho — e é aqui, não lá, que o item de
 // duas mãos precisa existir.
 const info = (slot: InfoItem['slot'], duasMaos = false): InfoItem => ({
-  id: 'x', nome: 'X', slot, duasMaos, modificadores: {},
+  id: 'x', nome: 'X', slot, duasMaos, modificadores: {}, exclusivo: null,
 });
 
 describe('colocarNoSlot', () => {
@@ -124,14 +124,14 @@ describe('destinoDoDesequipado — o ramo da mochila', () => {
     // por troca de item.
     const estado = comMochilaDe('p1', []);
 
-    const r = destinoDoDesequipado(estado, [equipamento('t-velho')], 'p1');
+    const r = destinoDoDesequipado(estado, [equipamento('t-velho')], 'p1', 'trocaDeSlot');
 
     expect(jogadorDe(r.estado, 'p1').mochila.map((c) => c.id)).toEqual(['t-velho']);
     expect(r.estado.tesouros.cemiterio).toEqual([]);
     // O destino viaja no evento: as duas zonas são ABERTAS, e sem o campo o
     // jogador não distingue "guardado" de "queimado" — que é a regra nova.
     expect(r.eventos).toEqual([
-      { tipo: 'desequipou', jogadorId: 'p1', carta: equipamento('t-velho'), destino: 'mochila' },
+      { tipo: 'desequipou', jogadorId: 'p1', carta: equipamento('t-velho'), destino: 'mochila', motivo: 'trocaDeSlot' },
     ]);
   });
 
@@ -139,14 +139,14 @@ describe('destinoDoDesequipado — o ramo da mochila', () => {
     const cheia = Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-${String(i)}`));
     const estado = comMochilaDe('p1', cheia);
 
-    const r = destinoDoDesequipado(estado, [equipamento('t-velho')], 'p1');
+    const r = destinoDoDesequipado(estado, [equipamento('t-velho')], 'p1', 'trocaDeSlot');
 
     expect(jogadorDe(r.estado, 'p1').mochila).toHaveLength(LIMITE_MOCHILA);
     expect(r.estado.tesouros.cemiterio.map((c) => c.id)).toEqual(['t-velho']);
     // A carta foi DESTRUÍDA. É o único momento do jogo em que isso acontece sem
     // o jogador pedir, e era invisível antes deste evento existir.
     expect(r.eventos).toEqual([
-      { tipo: 'desequipou', jogadorId: 'p1', carta: equipamento('t-velho'), destino: 'cemiterio' },
+      { tipo: 'desequipou', jogadorId: 'p1', carta: equipamento('t-velho'), destino: 'cemiterio', motivo: 'trocaDeSlot' },
     ]);
   });
 
@@ -158,7 +158,7 @@ describe('destinoDoDesequipado — o ramo da mochila', () => {
     const quaseCheia = Array.from({ length: LIMITE_MOCHILA - 1 }, (_, i) => equipamento(`t-${String(i)}`));
     const estado = comMochilaDe('p1', quaseCheia);
 
-    const r = destinoDoDesequipado(estado, [equipamento('t-a'), equipamento('t-b')], 'p1');
+    const r = destinoDoDesequipado(estado, [equipamento('t-a'), equipamento('t-b')], 'p1', 'trocaDeSlot');
 
     expect(jogadorDe(r.estado, 'p1').mochila.map((c) => c.id)).toContain('t-a');
     expect(r.estado.tesouros.cemiterio.map((c) => c.id)).toEqual(['t-b']);
@@ -166,8 +166,8 @@ describe('destinoDoDesequipado — o ramo da mochila', () => {
     // que os dois destinos acontecem juntos, e um evento só para o lote não
     // conseguiria nomear os dois.
     expect(r.eventos).toEqual([
-      { tipo: 'desequipou', jogadorId: 'p1', carta: equipamento('t-a'), destino: 'mochila' },
-      { tipo: 'desequipou', jogadorId: 'p1', carta: equipamento('t-b'), destino: 'cemiterio' },
+      { tipo: 'desequipou', jogadorId: 'p1', carta: equipamento('t-a'), destino: 'mochila', motivo: 'trocaDeSlot' },
+      { tipo: 'desequipou', jogadorId: 'p1', carta: equipamento('t-b'), destino: 'cemiterio', motivo: 'trocaDeSlot' },
     ]);
   });
 
@@ -178,7 +178,7 @@ describe('destinoDoDesequipado — o ramo da mochila', () => {
     // `loot` não emitir com baralho esgotado.
     const estado = comMochilaDe('p1', []);
 
-    const r = destinoDoDesequipado(estado, [], 'p1');
+    const r = destinoDoDesequipado(estado, [], 'p1', 'trocaDeSlot');
 
     expect(r.estado).toBe(estado);
     expect(r.eventos).toEqual([]);

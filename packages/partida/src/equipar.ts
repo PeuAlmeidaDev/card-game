@@ -2,8 +2,8 @@ import type { CartaEquipamento, EstadoPartida, EventoDaMesa, InfoItem, Slot, Zon
 import { LIMITE_MOCHILA } from './mao';
 
 /**
- * As duas mãos, na ordem dos slots. Nomeado porque a regra de duas mãos o lê três
- * vezes aqui — e **exportado** desde 2026-07-31, porque havia um QUARTO leitor
+ * As duas mãos, na ordem dos slots. Nomeado porque a regra de duas mãos o lê duas
+ * vezes aqui — e **exportado** desde 2026-07-31, porque havia um TERCEIRO leitor
  * fora deste arquivo: `bot.ts` escrevia o par à mão para calcular o custo de
  * equipar uma arma grande. A cópia não era teórica: uma mutação nela deixou os
  * 240 testes verdes, porque o catálogo de teste não tinha arma de duas mãos.
@@ -77,11 +77,15 @@ export function colocarNoSlot(
  * mochila**. Reusar traria os quatro ramos de Porta como código morto, poria o
  * ramo da mochila na função errada, e fecharia um ciclo de import `mesa` ↔
  * `equipar`.
+ *
+ * @param motivo Sem default de propósito: o valor certo depende de quem chamou,
+ * e o compilador tem que cobrar cada call-site novo.
  */
 export function destinoDoDesequipado(
   estado: EstadoPartida,
   deslocados: readonly CartaEquipamento[],
   jogadorId: string,
+  motivo: Extract<EventoDaMesa, { readonly tipo: 'desequipou' }>['motivo'],
 ): { readonly estado: EstadoPartida; readonly eventos: readonly EventoDaMesa[] } {
   // Sem nada deslocado, devolve o MESMO estado: um spread aqui trocaria a
   // identidade do objeto por nada, e o caso comum (slot vazio) é este. Sem evento
@@ -106,7 +110,7 @@ export function destinoDoDesequipado(
     const paraMochila = mochila.length < LIMITE_MOCHILA;
     if (paraMochila) mochila.push(carta);
     else paraOCemiterio.push(carta);
-    eventos.push({ tipo: 'desequipou', jogadorId, carta, destino: paraMochila ? 'mochila' : 'cemiterio' });
+    eventos.push({ tipo: 'desequipou', jogadorId, carta, destino: paraMochila ? 'mochila' : 'cemiterio', motivo });
   }
 
   return {

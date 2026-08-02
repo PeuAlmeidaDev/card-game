@@ -56,8 +56,8 @@ const MONSTROS_PADRAO: Catalogo['monstros'] = [
 // Mesma ideia, para o baralho de Tesouros: sem o catálogo o nome do item cairia
 // no fallback `?? id` e o corpo mostraria `espada-curta` em vez de "Espada Curta".
 const ITENS_PADRAO: Catalogo['itens'] = [
-  { id: 'espada-curta', nome: 'Espada Curta', slot: 'maoDireita', duasMaos: false, modificadores: { forca: 2 } },
-  { id: 'elmo-de-couro', nome: 'Elmo de Couro', slot: 'capacete', duasMaos: false, modificadores: { vida: 2 } },
+  { id: 'espada-curta', nome: 'Espada Curta', slot: 'maoDireita', duasMaos: false, modificadores: { forca: 2 }, exclusivo: null },
+  { id: 'elmo-de-couro', nome: 'Elmo de Couro', slot: 'capacete', duasMaos: false, modificadores: { vida: 2 }, exclusivo: null },
 ];
 
 /** Uma carta de Tesouro na mão (ou já no corpo). */
@@ -668,7 +668,7 @@ describe('TelaMesa — o corpo', () => {
     await abrirMesa(
       comCorpo({ ...SLOTS_VAZIOS, maoDireita: montante, maoEsquerda: montante }),
       undefined, undefined,
-      [{ id: 'montante', nome: 'Montante', slot: 'maoDireita', duasMaos: true, modificadores: { forca: 4 } }],
+      [{ id: 'montante', nome: 'Montante', slot: 'maoDireita', duasMaos: true, modificadores: { forca: 4 }, exclusivo: null }],
     );
 
     expect(await screen.findAllByText(/Montante/)).toHaveLength(2);
@@ -1102,5 +1102,80 @@ describe('TelaMesa — a mochila', () => {
     await abrirMesa(emDescartar([tesouro('t-1')]));
 
     expect(await screen.findByRole('button', { name: /guardar/i })).toBeDisabled();
+  });
+});
+
+describe('TelaMesa — afinidade de itens', () => {
+  // Item exclusivo do Orc, junto do catálogo padrão — os testes daqui só
+  // acrescentam este ao invés de substituir, para continuarem cobrindo o item
+  // comum de sempre.
+  const ITENS_COM_EXCLUSIVO: Catalogo['itens'] = [
+    ...ITENS_PADRAO,
+    {
+      id: 'machado', nome: 'Machado', slot: 'maoDireita', duasMaos: false,
+      modificadores: { forca: 3, habilidade: 1 },
+      exclusivo: { eixo: 'raca', donoId: 'orc', semAfinidade: { forca: 2 } },
+    },
+  ];
+
+  it('"Equipar" fica VISÍVEL e apagado no exclusivo de outra raça', async () => {
+    // ⚠️ Contra-intuitivo e tem que ser procurado de propósito: o botão NÃO some.
+    // Decisão #26 do bible — verbo que some é verbo que o jogador nunca aprende
+    // que existe. É também o gêmeo do par fino novo: sem ele, clicar leva 400.
+    await abrirMesa(
+      {
+        ...vistaBase,
+        fase: 'recompor',
+        jogadores: vistaBase.jogadores.map((j) => (
+          j.id === 'p1'
+            ? { ...j, emJogo: { raca: { id: 'r1', tipo: 'raca', racaId: 'anao' }, slots: SLOTS_VAZIOS }, limiteDeMao: 7 }
+            : j
+        )),
+        suaMao: [tesouro('t-1', 'machado')],
+      },
+      undefined, undefined, ITENS_COM_EXCLUSIVO,
+    );
+
+    const botao = await screen.findByRole('button', { name: 'Equipar' });
+    expect(botao).toBeDisabled();
+  });
+
+  it('"Equipar" da MOCHILA também fica apagado no exclusivo de outra raça — o gêmeo do par da mão', async () => {
+    // Mutação medida pelo revisor: remover `|| euNaoPossoVestir(carta.itemId)`
+    // SÓ do botão da mochila deixava a suíte inteira verde — o teste acima cobre
+    // só a lista da mão. `cartaEquipavelDe` (packages/partida) procura o item na
+    // mão OU na mochila, e a tela precisa do MESMO `disabled` nas duas listas:
+    // sem ele, o Machado na mochila de um Anão fica aceso e o clique leva 400.
+    await abrirMesa(
+      {
+        ...vistaBase,
+        fase: 'recompor',
+        jogadores: vistaBase.jogadores.map((j) => (
+          j.id === 'p1'
+            ? {
+              ...j,
+              emJogo: { raca: { id: 'r1', tipo: 'raca', racaId: 'anao' }, slots: SLOTS_VAZIOS },
+              limiteDeMao: 7,
+              mochila: [tesouro('t-1', 'machado')],
+            }
+            : j
+        )),
+      },
+      undefined, undefined, ITENS_COM_EXCLUSIVO,
+    );
+
+    const botao = await screen.findByRole('button', { name: 'Equipar' });
+    expect(botao).toBeDisabled();
+  });
+
+  it('a carta exclusiva mostra o número que vale PARA VOCÊ', async () => {
+    // p1 SEM raça em jogo (o default de `vistaBase`): o Machado é exclusivo do
+    // Orc, então quem não tem raça veste pelo REDUZIDO — nunca o cheio.
+    await abrirMesa(
+      { ...vistaBase, fase: 'recompor', suaMao: [tesouro('t-1', 'machado')] },
+      undefined, undefined, ITENS_COM_EXCLUSIVO,
+    );
+
+    expect(await screen.findByText(/reduzido/)).toBeInTheDocument();
   });
 });

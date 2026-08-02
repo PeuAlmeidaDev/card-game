@@ -1,5 +1,5 @@
 import type { Combatente, EstadoCombate, EventoCombate, DecisaoPendente, PassivaCombate } from '@card-dungeon/motor';
-import type { Classe, Equipamento } from '@card-dungeon/personagem';
+import type { Classe, Equipamento, ModificadoresDeStat } from '@card-dungeon/personagem';
 
 /**
  * **Receita** de carta do baralho de PORTAS: o que compor, SEM identidade. É o
@@ -69,6 +69,24 @@ export type CartaEquipamento = Extract<CartaTesouro, { readonly tipo: 'equipamen
 export type Slot = 'capacete' | 'armadura' | 'maoDireita' | 'maoEsquerda' | 'pes';
 
 /**
+ * ⚠️ Gêmea da união em `cartas/src/itens.ts`, pelo mesmo motivo do `Slot`:
+ * `partida` é cego ao catálogo e a direção `cartas ← personagem ← partida` proíbe
+ * o import. Quem trava as duas é o `_CoberturaEixo` em `shared/src/index.ts`.
+ */
+export type EixoDeAfinidade = 'raca' | 'classe';
+
+/**
+ * A quem um item pertence, do ponto de vista da MESA. `ItemCarta` (pacote
+ * `cartas`) satisfaz este contrato estruturalmente — é o que dispensa qualquer
+ * import de `cartas` aqui.
+ */
+export interface Afinidade {
+  readonly eixo: EixoDeAfinidade;
+  readonly donoId: string;
+  readonly semAfinidade: ModificadoresDeStat;
+}
+
+/**
  * O que o catálogo sabe de um item: o `Equipamento` que o `montarCombatente` já
  * consome, mais os dois campos que só a MESA usa (onde encaixa, e se toma as duas
  * mãos). `ItemCarta` (pacote `cartas`) satisfaz este contrato estruturalmente —
@@ -77,6 +95,8 @@ export type Slot = 'capacete' | 'armadura' | 'maoDireita' | 'maoEsquerda' | 'pes
 export interface InfoItem extends Equipamento {
   readonly slot: Slot;
   readonly duasMaos: boolean;
+  /** `null` = item comum. */
+  readonly exclusivo: Afinidade | null;
 }
 
 /**
@@ -368,7 +388,8 @@ export type EventoDaMesa =
    * os dois destinos.
    */
   | { readonly tipo: 'desequipou'; readonly jogadorId: string;
-      readonly carta: CartaEquipamento; readonly destino: 'mochila' | 'cemiterio' }
+      readonly carta: CartaEquipamento; readonly destino: 'mochila' | 'cemiterio';
+      readonly motivo: 'trocaDeSlot' | 'perdeuAfinidade' }
   /**
    * O jogador declinou de agir numa fase parada. Emite evento — e não silêncio —
    * porque `versaoDe` é `log.length`: sem mover a versão, um duplo-clique em

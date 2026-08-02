@@ -12,13 +12,16 @@ import { projetarPara } from './projecao';
 import { AcaoInvalida } from './erros';
 import { filaDeDados, criarDadoCiclico } from './testes/dados';
 import { monstro, monstros, raca, equipamento } from './testes/cartas';
-import { catalogoDeTeste, ID_DA_CLASSE_DE_TESTE, MONSTRO_DE_TESTE } from './testes/catalogo';
+import {
+  catalogoDeTeste, ID_DA_CLASSE_DE_TESTE, MONSTRO_DE_TESTE, ID_DO_ITEM_EXCLUSIVO, ID_DA_RACA_OUTRA,
+  ID_DA_RACA_DONA, ID_DO_ITEM_DE_TESTE, ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS, ID_DO_ITEM_EXCLUSIVO_PES,
+} from './testes/catalogo';
 import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import { combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
 import type { DepsMesa } from './mesa';
 import type {
-  Carta, ConfigPartida, EntradaJogador, CartaPorta, EstadoPartida, InfoMonstro, JogadorNaMesa,
-  ZonaEmJogo,
+  Carta, ConfigPartida, EntradaJogador, CartaPorta, CartaEquipamento, EstadoPartida, InfoMonstro,
+  JogadorNaMesa, ZonaEmJogo,
 } from './tipos';
 import type { PassivaCombate } from '@card-dungeon/motor';
 
@@ -1426,6 +1429,171 @@ describe('aplicarAcao — jogarCarta', () => {
   });
 });
 
+describe('trocar de raça derruba o que perdeu afinidade', () => {
+  const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
+  const nascida = (): EstadoPartida => criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+
+  /**
+   * Mesa com o corpo, a mão e a mochila de p1 forjados de uma vez, na fase que a
+   * mão sustenta. Os cinco testes deste describe sempre precisam dos três juntos
+   * (o corpo que perde afinidade, a raça nova na mão, e a mochila que decide o
+   * destino do deslocado) — e a FASE, como em todo `comMao` deste arquivo, é
+   * DERIVADA (`faseDoTurnoDe`), nunca cravada: a mão sempre carrega a carta de
+   * raça, e é ela que sustenta `recompor`.
+   */
+  const comCorpo = (
+    estado: EstadoPartida,
+    slots: Partial<ZonaEmJogo['slots']>,
+    mao: readonly Carta[],
+    mochila: readonly CartaEquipamento[] = [],
+  ): EstadoPartida => {
+    const jogadores = estado.jogadores.map((j) => (
+      j.id === 'p1'
+        ? { ...j, mao, mochila, emJogo: { ...j.emJogo, slots: { ...SLOTS_VAZIOS, ...slots } } }
+        : j
+    ));
+    return { ...estado, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...estado, jogadores }, 'p1')) };
+  };
+
+  it('o exclusivo da raça VELHA cai quando a nova entra', () => {
+    // ⚠️ O PIN DA ORDEM (passo 2 do spec §6.2). Perguntado com a zona ANTIGA (sem
+    // raça), o grau seria `sem`, não `proibida`, e NADA cairia. É a pergunta feita
+    // depois da mutação que faz este teste passar — e é a inversão que o único
+    // bug de comportamento do Plano 4a cometeu.
+    const item = equipamento('t-1', ID_DO_ITEM_EXCLUSIVO);
+    const cartaDeRaca = raca('p-9', ID_DA_RACA_OUTRA);
+    const estado = comCorpo(nascida(), { capacete: item }, [cartaDeRaca]);
+    expect(estado.fase).toBe('recompor');
+
+    const { estado: depois } = aplicarAcao(
+      estado, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'p-9' }, deps([]),
+    );
+
+    expect(depois.jogadores[0]?.emJogo.slots.capacete).toBeNull();
+    expect(depois.jogadores[0]?.mochila.map((c) => c.id)).toContain('t-1');
+  });
+
+  it('o exclusivo da raça que você ACABOU DE VESTIR não cai', () => {
+    // O outro contrapositivo: sem ele, um guard escrito como `info.exclusivo !==
+    // null` (derruba todo exclusivo, sem checar QUAL raça) passaria os outros
+    // quatro testes deste describe e derrubaria o elmo de Orc de quem acabou de
+    // virar Orc — o oposto exato da feature.
+    const item = equipamento('t-1', ID_DO_ITEM_EXCLUSIVO);
+    const cartaDeRaca = raca('p-9', ID_DA_RACA_DONA);
+    const estado = comCorpo(nascida(), { capacete: item }, [cartaDeRaca]);
+
+    const { estado: depois } = aplicarAcao(
+      estado, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'p-9' }, deps([]),
+    );
+
+    expect(depois.jogadores[0]?.emJogo.slots.capacete?.id).toBe('t-1');
+  });
+
+  it('o item que CONTINUA válido não cai', () => {
+    // O contrapositivo. Sem ele, uma implementação que esvazia o corpo inteiro na
+    // troca de raça passaria o teste acima — e é literalmente o erro que o
+    // `jogarCarta` já quase cometeu ao remontar a zona em vez de espalhá-la.
+    const comum = equipamento('t-2', ID_DO_ITEM_DE_TESTE);
+    const cartaDeRaca = raca('p-9', ID_DA_RACA_OUTRA);
+    const estado = comCorpo(nascida(), { maoDireita: comum }, [cartaDeRaca]);
+
+    const { estado: depois } = aplicarAcao(
+      estado, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'p-9' }, deps([]),
+    );
+
+    expect(depois.jogadores[0]?.emJogo.slots.maoDireita?.id).toBe('t-2');
+  });
+
+  it('a arma de DUAS MÃOS cai UMA vez — o baralho não cresce', () => {
+    // Sem dedup, a mesma instância iria duas vezes para a mochila/cemitério e o
+    // baralho de Tesouros CRESCERIA a cada troca de raça. É o mesmo motivo do
+    // `Map` em `colocarNoSlot`, e a defesa aqui é reusar `itensEquipados` (que já
+    // deduplica) em vez de varrer `Object.values(slots)`.
+    const montante = equipamento('t-1', ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS);
+    const cartaDeRaca = raca('p-9', ID_DA_RACA_OUTRA);
+    const estado = comCorpo(nascida(), { maoDireita: montante, maoEsquerda: montante }, [cartaDeRaca]);
+
+    const { eventos, estado: depois } = aplicarAcao(
+      estado, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'p-9' }, deps([]),
+    );
+
+    expect(eventos.filter((e) => e.tipo === 'desequipou')).toHaveLength(1);
+    // O evento sozinho não prova que os DOIS slots esvaziaram — só que UMA carta
+    // caiu. Mutação medida: `tirarDosSlots` sem `maoEsquerda` no laço deixa este
+    // describe inteiro verde, porque nenhuma asserção lia o slot.
+    expect(depois.jogadores[0]?.emJogo.slots.maoDireita).toBeNull();
+    expect(depois.jogadores[0]?.emJogo.slots.maoEsquerda).toBeNull();
+  });
+
+  it('o exclusivo em `pes` cai igual ao de `capacete` — o slot que a suíte não tocava', () => {
+    // Mutação medida pelo revisor: trocar `Object.keys(SLOTS_VAZIOS)` por
+    // `['capacete', 'armadura', 'maoDireita']` em `tirarDosSlots` deixava
+    // 280/280 verdes — nem `pes` nem `maoEsquerda` tinham teste. O cenário não é
+    // hipotético: `botas-de-mare` (catálogo real) é exclusivo de `aquatico` e
+    // mora em `pes` — sem este teste, trocar de raça deixaria as botas presas no
+    // slot E `destinoDoDesequipado` as duplicaria na mochila, e a próxima
+    // consulta de `combatenteDe` lançaria `Error` cru (500) numa partida legítima.
+    const item = equipamento('t-1', ID_DO_ITEM_EXCLUSIVO_PES);
+    const cartaDeRaca = raca('p-9', ID_DA_RACA_OUTRA);
+    const estado = comCorpo(nascida(), { pes: item }, [cartaDeRaca]);
+
+    const { estado: depois } = aplicarAcao(
+      estado, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'p-9' }, deps([]),
+    );
+
+    expect(depois.jogadores[0]?.emJogo.slots.pes).toBeNull();
+    expect(depois.jogadores[0]?.mochila.map((c) => c.id)).toContain('t-1');
+  });
+
+  it('com UMA vaga na mochila e DOIS itens caindo, um vai para cada destino', () => {
+    // O teste que o spec §6.2 nomeia. Com a mochila VAZIA ou CHEIA as duas
+    // implementações (perguntar por item × perguntar uma vez para o lote) dão o
+    // mesmo resultado, e o teste ficaria verde por acidente.
+    //
+    // Os dois exclusivos de RACA_DONA são `ID_DO_ITEM_EXCLUSIVO` (capacete) e
+    // `ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS` (as duas mãos, MESMA instância — dedup por
+    // `itensEquipados` conta como UM item, não dois): a ordem de `itensEquipados`
+    // segue `SLOTS_VAZIOS` (capacete antes de maoDireita), então o capacete é o
+    // primeiro a pedir vaga na mochila e o montante é o segundo, que já não cabe.
+    const exclusivo = equipamento('t-1', ID_DO_ITEM_EXCLUSIVO);
+    const montante = equipamento('t-2', ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS);
+    const quaseCheia = Array.from({ length: LIMITE_MOCHILA - 1 }, (_, i) => equipamento(`t-cheia-${String(i)}`));
+    const cartaDeRaca = raca('p-9', ID_DA_RACA_OUTRA);
+    const estado = comCorpo(
+      nascida(),
+      { capacete: exclusivo, maoDireita: montante, maoEsquerda: montante },
+      [cartaDeRaca],
+      quaseCheia,
+    );
+
+    const { eventos } = aplicarAcao(
+      estado, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'p-9' }, deps([]),
+    );
+
+    const saidas = eventos.filter((e) => e.tipo === 'desequipou');
+    expect(saidas.map((e) => e.destino)).toEqual(['mochila', 'cemiterio']);
+    expect(saidas.every((e) => e.motivo === 'perdeuAfinidade')).toBe(true);
+  });
+
+  it('o item que caiu NA MOCHILA segura a fase — a fase não se auto-pula', () => {
+    // ⚠️ O gêmeo EXATO do único bug de comportamento do Plano 4a. `faseSeAutoPula`
+    // decide por `mochila.length > 0`; se `entrarOuPular` receber o jogador de
+    // ANTES de `destinoDoDesequipado`, a fase parada se pula com o jogador ainda
+    // tendo o que vestir. O fixture que pega é o de mão SEM equipamento e mochila
+    // que fica com EXATAMENTE a carta que acabou de cair.
+    const item = equipamento('t-1', ID_DO_ITEM_EXCLUSIVO);
+    const cartaDeRaca = raca('p-9', ID_DA_RACA_OUTRA);
+    const estado = comCorpo(nascida(), { capacete: item }, [cartaDeRaca]);
+    expect(estado.jogadores[0]?.mochila).toEqual([]);
+
+    const { estado: depois } = aplicarAcao(
+      estado, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'p-9' }, deps([]),
+    );
+
+    expect(depois.fase).toBe('recompor');
+  });
+});
+
 describe('aplicarAcao — equiparCarta', () => {
   // 🎚️ Era a composição de sala vazia; virou raça (não monstro) no corte dela
   // (decisão #42) para o default do `nascida` continuar sendo de um tipo
@@ -1527,7 +1695,7 @@ describe('aplicarAcao — equiparCarta', () => {
     const { eventos } = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
 
     expect(eventos).toContainEqual({
-      tipo: 'desequipou', jogadorId: 'p1', destino: 'cemiterio',
+      tipo: 'desequipou', jogadorId: 'p1', destino: 'cemiterio', motivo: 'trocaDeSlot',
       carta: { id: 't-0', tipo: 'equipamento', itemId: 'i-teste' },
     });
     // E na ordem: a ação pedida antes do que ela custou.
@@ -1731,6 +1899,83 @@ describe('aplicarAcao — equiparCarta', () => {
 
     expect(() => aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 'nao-existe' }, deps([])))
       .toThrow('aplicarAcao: a carta nao-existe não está na sua mão nem na mochila');
+  });
+
+  it('equipar item de OUTRA especialização é recusado — 400, não 500', () => {
+    // Pedido do cliente que a regra recusa => AcaoInvalida. É o par fino novo, e
+    // ele precisa de gêmeo na tela (Task 8): botão escrito só com `legal(tipo)`
+    // acenderia aqui e o jogador levaria 400 na cara.
+    const item = equipamento('t-1', ID_DO_ITEM_EXCLUSIVO);
+    const p0 = comMao(nascida(), [item]);
+    const jogadores = p0.jogadores.map((j) => (
+      j.id === 'p1' ? { ...j, emJogo: { ...j.emJogo, raca: raca('r1', ID_DA_RACA_OUTRA) } } : j
+    ));
+    const estado: EstadoPartida = {
+      ...p0, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...p0, jogadores }, 'p1')),
+    };
+    expect(estado.fase).toBe('recompor');
+
+    expect(() => aplicarAcao(estado, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([])))
+      .toThrowError(AcaoInvalida);
+  });
+
+  it('a recusa vale também na fase `jogar` — são DOIS pares, não um', () => {
+    // `equiparCarta` é legal nas duas fases paradas. A tabela de pares finos conta
+    // uma linha por (fase, ação, condição), e agrupar as duas numa célula é
+    // literalmente o mecanismo que fez a tabela mentir três vezes.
+    //
+    // `jogar` só nasce de verdade vencendo um combate (`entrarOuPular` no fim de
+    // `resolverCarta`) — por isso a raça em jogo é armada ANTES da luta e o
+    // combate é vencido pelo caminho real, em vez de cravar `fase: 'jogar'` num
+    // estado que o domínio nunca produziria dessa forma.
+    const item = equipamento('t-1', ID_DO_ITEM_EXCLUSIVO);
+    const p0 = comMao(nascida(soMonstro), [item]);
+    const jogadores = p0.jogadores.map((j) => (
+      j.id === 'p1' ? { ...j, emJogo: { ...j.emJogo, raca: raca('r1', ID_DA_RACA_OUTRA) } } : j
+    ));
+    const comRaca: EstadoPartida = {
+      ...p0, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...p0, jogadores }, 'p1')),
+    };
+    const naFase2 = aplicarAcao(comRaca, { tipo: 'passar', jogadorId: 'p1' }, deps([])).estado;
+    const emCombate = aplicarAcao(naFase2, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
+    const estado = venceOCombate(emCombate);
+    expect(estado.fase).toBe('jogar');
+
+    expect(() => aplicarAcao(estado, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([])))
+      .toThrowError(AcaoInvalida);
+  });
+
+  it('estando SEM raça, o exclusivo alheio É equipável (reduzido, não proibido)', () => {
+    // O contrapositivo do guard. Sem ele, um guard escrito como
+    // `exclusivo !== null` passaria os dois testes acima e quebraria a decisão #1
+    // do spec sem nada acusar. `nascida()` já entrega p1 sem raça em jogo
+    // (`emJogo.raca: null`), então nada precisa ser forjado além da mão.
+    const item = equipamento('t-1', ID_DO_ITEM_EXCLUSIVO);
+    const estado = comMao(nascida(), [item]);
+
+    const { estado: depois } = aplicarAcao(
+      estado, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]),
+    );
+
+    expect(depois.jogadores[0]?.emJogo.slots.capacete?.id).toBe('t-1');
+  });
+
+  it('equipar NÃO derruba a raça em jogo — a zona é espalhada, não remontada', () => {
+    // O erro que isto prende o compilador ACEITA: `{ raca: null, slots }` tem os
+    // campos certos com o valor errado. O gêmeo em `jogarCarta` já reprovava por
+    // 6 testes; aqui ninguém olhava a raça, e a mutação passava 279/279 verde.
+    const item = equipamento('t-1');
+    const p0 = comMao(nascida(), [item]);
+    const jogadores = p0.jogadores.map((j) => (
+      j.id === 'p1' ? { ...j, emJogo: { ...j.emJogo, raca: raca('r1', ID_DA_RACA_DONA) } } : j
+    ));
+    const estado: EstadoPartida = {
+      ...p0, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...p0, jogadores }, 'p1')),
+    };
+
+    const r = aplicarAcao(estado, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+
+    expect(jogadorDe(r.estado, 'p1').emJogo.raca?.racaId).toBe(ID_DA_RACA_DONA);
   });
 });
 

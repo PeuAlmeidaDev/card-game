@@ -1,13 +1,13 @@
 import type { Combatente, Passo, RolarD12, PassivaCombate } from '@card-dungeon/motor';
 import { AcaoIlegal, criarCombate, proximoPasso } from '@card-dungeon/motor';
 import type {
-  AcaoDaMesa, Carta, CartaPorta, CartaTesouro, CatalogoDaMesa, Embaralhar, EstadoPartida, EventoDaMesa,
-  Fase, FaseParada, InfoRaca, JogadorNaMesa,
+  AcaoDaMesa, Carta, CartaEquipamento, CartaPorta, CartaTesouro, CatalogoDaMesa, Embaralhar,
+  EstadoPartida, EventoDaMesa, Fase, FaseParada, InfoRaca, JogadorNaMesa, Slot, ZonaEmJogo,
 } from './tipos';
 import { tirarDoTopo } from './baralho';
 import { LIMITE_MOCHILA } from './mao';
 import { destinoDaCaridade } from './caridade';
-import { combatenteDe } from './corpo';
+import { afinidadeCom, combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
 import { colocarNoSlot, destinoDoDesequipado } from './equipar';
 import { classificar } from './classificacao';
 import { AcaoInvalida } from './erros';
@@ -130,14 +130,8 @@ function sairDaParada(
  * `fase.test.ts` afirma para as DUAS — parar em `recompor` sem raça nem
  * equipamento na mão, ou em `jogar` sem equipamento, é violação.
  *
- * O `jogador` vem por parâmetro porque quem chama é quem sabe QUAL versão dele já
- * é a final. Na maioria das ações é a que o chamador acabou de montar; em
- * `equiparCarta` NÃO é — lá o estado sofre uma segunda mutação
- * (`destinoDoDesequipado` devolvendo o item deslocado à mochila) depois que o
- * jogador atualizado foi fechado, e é a versão de `estado` que vale. Por isso o
- * parâmetro existe em vez de um `find` aqui dentro: nenhuma regra fixa serve para
- * os dois casos, e errar o lado faz a fase parada se pular com o jogador ainda
- * tendo o que vestir.
+ * ⚠️ O `jogador` vem por parâmetro porque só o chamador sabe qual versão dele já
+ * é a final; quem mexe no estado DEPOIS de fechá-la precisa reler de `estado`.
  */
 function entrarOuPular(
   estado: EstadoPartida,
@@ -211,10 +205,10 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // guards certos; agora ela precisa entrar na tabela, e o `Record<Fase, …>` cobra.
   //
   // ⚠️ O QUE A TABELA NÃO RESPONDE. Passar aqui não garante que a ação será
-  // aceita: a elegibilidade FINA continua em cada função, e hoje são CATORZE pares
-  // em DEZESSEIS linhas — cada par precisa de gêmeo na tela, porque o `legal()` da
-  // `TelaMesa` lê ESTA tabela e não sabe deles. As duas linhas que não são par
-  // estão marcadas na própria tabela e explicadas logo abaixo dela.
+  // aceita: a elegibilidade FINA continua em cada função, e hoje são DEZESSEIS
+  // pares em DEZOITO linhas — cada par precisa de gêmeo na tela, porque o
+  // `legal()` da `TelaMesa` lê ESTA tabela e não sabe deles. As duas linhas que
+  // não são par estão marcadas na própria tabela e explicadas logo abaixo dela.
   //
   // ⚠️ O 13º entrou em 2026-07-28, e não era par novo: existia desde o Plano 3b e
   // NUNCA esteve na tabela (o par "monte+cemitério vazios" de `empurrarCarta`).
@@ -236,6 +230,8 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   //   recompor             jogarCarta     carta.tipo === 'raca'        `jogarCarta`
   //   recompor             equiparCarta   carta.tipo === 'equipamento' `equiparCarta`
   //   jogar                equiparCarta   carta.tipo === 'equipamento' `equiparCarta`
+  //   recompor             equiparCarta   afinidade !== 'proibida'     `equiparCarta`
+  //   jogar                equiparCarta   afinidade !== 'proibida'     `equiparCarta`
   //   recompor             guardarCarta   carta.tipo === 'equipamento' `guardarCarta`
   //   recompor             guardarCarta   mochila cheia                `guardarCarta`
   //   jogar                guardarCarta   carta.tipo === 'equipamento' `guardarCarta`
@@ -243,7 +239,7 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   //   combate              atacar         `proximaDecisao`             o motor (`AcaoIlegal`)
   //   combate              esquivar       `proximaDecisao`             o motor (`AcaoIlegal`)
   //   encrenca             procurarEncrenca  a carta é do tipo monstro `procurarEncrenca`
-  //   ↑ CATORZE pares. As duas linhas abaixo NÃO são par — estão aqui para provar
+  //   ↑ DEZESSEIS pares. As duas linhas abaixo NÃO são par — estão aqui para provar
   //     que a recontagem chegou até estes dois verbos:
   //   encrenca             saquear        — (nenhum guard fino; #62)   — (ausência)
   //   encrenca             procurarEncrenca  a carta está na sua mão   (gêmeo ESTRUTURAL)
@@ -293,7 +289,7 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // jogador nunca aprende que existe.
   //
   // HISTÓRICO da contagem, que é a lição do parágrafo acima — os números abaixo
-  // são de planos passados, NÃO a contagem de hoje (que é catorze):
+  // são de planos passados, NÃO a contagem de hoje (que é dezesseis):
   // no Plano 3b a lista subiu de sete para oito, e ao conferir descobriu-se que a
   // contagem anterior também mentia — as linhas `vasculhar/descartar` escondiam
   // DOIS pares cada uma dentro de uma célula agrupada, então nunca foram nove
@@ -311,6 +307,10 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // contagem é menos perigoso que omitir um par — mas quebra a convenção que faz
   // a recontagem funcionar, porque o próximo a recontar acha "quinze" e procura
   // um gêmeo na tela que não tem o que ser escrito.
+  //
+  // A fatia da afinidade foi de catorze para DEZESSEIS: os dois pares de
+  // `afinidadeCom` são DUAS linhas e não uma, porque `equiparCarta` é legal nas
+  // duas fases paradas e a convenção é uma linha por par.
   if (!acaoEhLegalNaFase(estado.fase, acao.tipo)) {
     throw new AcaoInvalida(`aplicarAcao: ${acao.tipo} não é legal na fase ${estado.fase}`);
   }
@@ -324,7 +324,7 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   }
 
   if (acao.tipo === 'jogarCarta') {
-    return jogarCarta(estado, acao);
+    return jogarCarta(estado, acao, deps);
   }
 
   if (acao.tipo === 'entregarCarta') {
@@ -770,6 +770,37 @@ function entregarCarta(
   );
 }
 
+/** Os itens equipados que a zona já atualizada não aceita mais. */
+function itensSemAfinidade(
+  emJogoAtualizado: ZonaEmJogo,
+  catalogo: CatalogoDaMesa,
+): readonly CartaEquipamento[] {
+  return itensEquipados(emJogoAtualizado.slots).filter((carta) => {
+    const info = catalogo.item(carta.itemId);
+    if (info === undefined) {
+      throw new Error(`itensSemAfinidade: item ${carta.itemId} não está no catálogo`);
+    }
+    return afinidadeCom(info, emJogoAtualizado) === 'proibida';
+  });
+}
+
+/** Esvazia os slots ocupados por qualquer uma destas cartas. */
+function tirarDosSlots(
+  slots: ZonaEmJogo['slots'],
+  cartas: readonly CartaEquipamento[],
+): ZonaEmJogo['slots'] {
+  if (cartas.length === 0) return slots;
+  const ids = new Set(cartas.map((c) => c.id));
+  const novos: Record<Slot, CartaEquipamento | null> = { ...slots };
+  // As chaves saem de `SLOTS_VAZIOS` (um `Record<Slot, …>`) para não haver uma
+  // segunda lista de slots escrita à mão.
+  for (const slot of Object.keys(SLOTS_VAZIOS) as readonly Slot[]) {
+    const ocupante = novos[slot];
+    if (ocupante !== null && ids.has(ocupante.id)) novos[slot] = null;
+  }
+  return novos;
+}
+
 /**
  * Põe uma carta de raça da mão na zona em jogo. A anterior vai para o cemitério:
  * a zona é ABERTA, então trocar de raça é jogada pública.
@@ -793,10 +824,14 @@ function entregarCarta(
  *
  * Em `descartar` sobra só `entregarCarta`: `equiparCarta` saiu junto, para as duas
  * fases paradas que acontecem ANTES da cobrança do excedente.
+ *
+ * Trocar de raça DERRUBA o item que ficou proibido, por `destinoDoDesequipado`
+ * como ele já era — mochila se houver vaga, cemitério de Tesouros se não.
  */
 function jogarCarta(
   estado: EstadoPartida,
   acao: Extract<AcaoDaMesa, { readonly tipo: 'jogarCarta' }>,
+  deps: DepsMesa,
 ): ResultadoAcao {
   // O guard de espiada MORREU aqui: `jogarCarta` só é legal em `recompor`, que
   // acontece antes de qualquer compra, e a espiada só existe em `vasculhar`. A
@@ -808,32 +843,34 @@ function jogarCarta(
   }
 
   const anterior = jogador.emJogo.raca;
+  const comRacaNova: ZonaEmJogo = { ...jogador.emJogo, raca: carta };
+  const perdidos = itensSemAfinidade(comRacaNova, deps.catalogo);
   const atualizado: JogadorNaMesa = {
     ...jogador,
     mao: jogador.mao.filter((c) => c.id !== carta.id),
-    // ESPALHA a zona; não a remonta. Trocar de raça mexe num campo da zona, não
-    // na zona inteira — escrever `{ raca: carta, slots: { ...SLOTS_VAZIOS } }`
-    // aqui desequiparia o corpo a cada troca de raça, e o compilador aceitaria
-    // (o campo estaria lá, só com o valor errado). O spread é o que faz o campo
-    // que esta função não conhece sobreviver a ela.
-    emJogo: { ...jogador.emJogo, raca: carta },
+    emJogo: { ...comRacaNova, slots: tirarDosSlots(comRacaNova.slots, perdidos) },
   };
 
-  return entrarOuPular(
-    {
-      ...estado,
-      jogadores: estado.jogadores.map((j) => (j.id === atualizado.id ? atualizado : j)),
-      portas: {
-        ...estado.portas,
-        cemiterio: anterior === null ? estado.portas.cemiterio : [...estado.portas.cemiterio, anterior],
-      },
+  const comJogador: EstadoPartida = {
+    ...estado,
+    jogadores: estado.jogadores.map((j) => (j.id === atualizado.id ? atualizado : j)),
+    portas: {
+      ...estado.portas,
+      cemiterio: anterior === null ? estado.portas.cemiterio : [...estado.portas.cemiterio, anterior],
     },
-    atualizado,
+  };
+  const { estado: base, eventos: doDeslocado } =
+    destinoDoDesequipado(comJogador, perdidos, acao.jogadorId, 'perdeuAfinidade');
+
+  return entrarOuPular(
+    base,
+    // ⚠️ RELÊ de `base`: `destinoDoDesequipado` pode ter mexido na mochila dele.
+    base.jogadores.find((j) => j.id === acao.jogadorId) ?? atualizado,
     // `recompor` fixo, e não `estado.fase`: a tabela só declara `jogarCarta` legal
     // aqui. Um dia em que ela declarar noutra fase, este literal é a linha que
     // vai estar mentindo — e é por isso que ele fica visível em vez de derivado.
     'recompor',
-    [{ tipo: 'racaEmJogo', jogadorId: acao.jogadorId, carta }],
+    [{ tipo: 'racaEmJogo', jogadorId: acao.jogadorId, carta }, ...doDeslocado],
   );
 }
 
@@ -865,6 +902,9 @@ function equiparCarta(
   if (info === undefined) {
     throw new Error(`equiparCarta: item ${carta.itemId} não está no catálogo`);
   }
+  if (afinidadeCom(info, jogador.emJogo) === 'proibida') {
+    throw new AcaoInvalida(`aplicarAcao: ${info.nome} é exclusivo de outra especialização`);
+  }
 
   const { slots, deslocados } = colocarNoSlot(jogador.emJogo.slots, carta, info);
   const atualizado: JogadorNaMesa = {
@@ -879,15 +919,13 @@ function equiparCarta(
     // ver o pin de ordem em `mesa.test.ts` ("vindo de uma mochila CHEIA...").
     mao: origem === 'mao' ? jogador.mao.filter((c) => c.id !== carta.id) : jogador.mao,
     mochila: origem === 'mochila' ? jogador.mochila.filter((c) => c.id !== carta.id) : jogador.mochila,
-    // ESPALHA a zona; não a remonta — mesmo motivo de `jogarCarta`: a raça que
-    // esta função não conhece precisa sobreviver a ela.
     emJogo: { ...jogador.emJogo, slots },
   };
   const comJogador: EstadoPartida = {
     ...estado,
     jogadores: estado.jogadores.map((j) => (j.id === atualizado.id ? atualizado : j)),
   };
-  const { estado: base, eventos: doDeslocado } = destinoDoDesequipado(comJogador, deslocados, acao.jogadorId);
+  const { estado: base, eventos: doDeslocado } = destinoDoDesequipado(comJogador, deslocados, acao.jogadorId, 'trocaDeSlot');
   // `equipou` primeiro: o log conta a ação que o jogador pediu, e só então o que
   // ela custou. Invertido, a linha "Espada Curta foi para o cemitério" apareceria
   // antes de existir motivo para ela.
@@ -905,13 +943,7 @@ function equiparCarta(
 
   return entrarOuPular(
     base,
-    // ⚠️ RELÊ de `base`; não passa `atualizado`. Esta é a única ação do reducer em
-    // que o jogador sofre uma SEGUNDA mutação depois de `atualizado` ser fechado:
-    // `destinoDoDesequipado` (acima) pode ter posto o item que saiu do slot na
-    // mochila DESTE mesmo jogador. E `faseSeAutoPula` decide por
-    // `mochila.length > 0` — com a versão de antes, equipar a última carta da
-    // mochila pularia a fase parada tendo o deslocado dentro dela para vestir.
-    // Em `jogar`, isso passa o turno inteiro.
+    // ⚠️ RELÊ de `base`: `destinoDoDesequipado` pode ter mexido na mochila dele.
     base.jogadores.find((j) => j.id === acao.jogadorId) ?? atualizado,
     // A fase de ORIGEM, não um literal: equipar é legal em `recompor` e em
     // `jogar`, e o jogador tem que continuar onde estava. Fixar `recompor` aqui
