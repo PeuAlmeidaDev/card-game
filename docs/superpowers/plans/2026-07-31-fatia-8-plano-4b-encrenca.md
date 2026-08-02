@@ -1080,8 +1080,18 @@ Roteiro para o Pedro, em `localhost:5173`:
 4. ⚠️ **Contra-intuitivo, procurar de propósito:** com uma carta de **raça** na mão e nenhum
    monstro, confirmar que "Procurar encrenca" **não aparece** naquela carta — e que a fase continua
    saindo pelo "Saquear", sem travar.
-5. Ver um bot **recusar** a luta (log: ele saqueia com monstro na mão). Se isso nunca acontecer numa
-   partida inteira, a `MARGEM_DE_ENCRENCA` está errada.
+5. 🔴 **ITEM DEFEITUOSO — NÃO COPIE ESTE MODELO. Fechado por sonda em 2026-08-02, não pela tela.**
+   ~~Ver um bot **recusar** a luta (log: ele saqueia com monstro na mão). Se isso nunca acontecer
+   numa partida inteira, a `MARGEM_DE_ENCRENCA` está errada.~~
+   **Por que ele é defeituoso:** a recusa **acontece** — 53 vezes em 400 partidas — mas em apenas
+   **9,25% das partidas** (mediana por partida **zero** nas cinco rodadas). Assistir a **uma**
+   partida reprova o item em **~91% das vezes com o bot funcionando**; seriam necessárias ~31
+   partidas para 95% de chance de ver uma. ➡️ **Evento de cauda não vira item de gate ocular** — ou
+   se mede por sonda, ou o item nasce dando **falso negativo**, que é pior que item ausente porque
+   **acusa** um defeito que não existe. Ver a decisão **#70** do bible e a seção de 2026-08-02 do
+   `CLAUDE.md`. Relatório: `.superpowers/sdd/2026-07-31-fatia-8-plano-4b-encrenca/gate-item5-report.md`.
+   ⚠️ **E a causa dominante do `saquear` é a OUTRA** (478 "sem monstro na mão" contra 53 recusas):
+   ler o log sem separar as duas causas leva a conclusão errada **nos dois sentidos**.
 
 ---
 
