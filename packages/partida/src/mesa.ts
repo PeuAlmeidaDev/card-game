@@ -7,7 +7,7 @@ import type {
 import { tirarDoTopo } from './baralho';
 import { LIMITE_MOCHILA } from './mao';
 import { destinoDaCaridade } from './caridade';
-import { combatenteDe } from './corpo';
+import { afinidadeCom, combatenteDe } from './corpo';
 import { colocarNoSlot, destinoDoDesequipado } from './equipar';
 import { classificar } from './classificacao';
 import { AcaoInvalida } from './erros';
@@ -211,10 +211,10 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // guards certos; agora ela precisa entrar na tabela, e o `Record<Fase, …>` cobra.
   //
   // ⚠️ O QUE A TABELA NÃO RESPONDE. Passar aqui não garante que a ação será
-  // aceita: a elegibilidade FINA continua em cada função, e hoje são CATORZE pares
-  // em DEZESSEIS linhas — cada par precisa de gêmeo na tela, porque o `legal()` da
-  // `TelaMesa` lê ESTA tabela e não sabe deles. As duas linhas que não são par
-  // estão marcadas na própria tabela e explicadas logo abaixo dela.
+  // aceita: a elegibilidade FINA continua em cada função, e hoje são DEZESSEIS
+  // pares em DEZOITO linhas — cada par precisa de gêmeo na tela, porque o
+  // `legal()` da `TelaMesa` lê ESTA tabela e não sabe deles. As duas linhas que
+  // não são par estão marcadas na própria tabela e explicadas logo abaixo dela.
   //
   // ⚠️ O 13º entrou em 2026-07-28, e não era par novo: existia desde o Plano 3b e
   // NUNCA esteve na tabela (o par "monte+cemitério vazios" de `empurrarCarta`).
@@ -236,6 +236,8 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   //   recompor             jogarCarta     carta.tipo === 'raca'        `jogarCarta`
   //   recompor             equiparCarta   carta.tipo === 'equipamento' `equiparCarta`
   //   jogar                equiparCarta   carta.tipo === 'equipamento' `equiparCarta`
+  //   recompor             equiparCarta   afinidade !== 'proibida'     `equiparCarta`
+  //   jogar                equiparCarta   afinidade !== 'proibida'     `equiparCarta`
   //   recompor             guardarCarta   carta.tipo === 'equipamento' `guardarCarta`
   //   recompor             guardarCarta   mochila cheia                `guardarCarta`
   //   jogar                guardarCarta   carta.tipo === 'equipamento' `guardarCarta`
@@ -243,7 +245,7 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   //   combate              atacar         `proximaDecisao`             o motor (`AcaoIlegal`)
   //   combate              esquivar       `proximaDecisao`             o motor (`AcaoIlegal`)
   //   encrenca             procurarEncrenca  a carta é do tipo monstro `procurarEncrenca`
-  //   ↑ CATORZE pares. As duas linhas abaixo NÃO são par — estão aqui para provar
+  //   ↑ DEZESSEIS pares. As duas linhas abaixo NÃO são par — estão aqui para provar
   //     que a recontagem chegou até estes dois verbos:
   //   encrenca             saquear        — (nenhum guard fino; #62)   — (ausência)
   //   encrenca             procurarEncrenca  a carta está na sua mão   (gêmeo ESTRUTURAL)
@@ -293,7 +295,7 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // jogador nunca aprende que existe.
   //
   // HISTÓRICO da contagem, que é a lição do parágrafo acima — os números abaixo
-  // são de planos passados, NÃO a contagem de hoje (que é catorze):
+  // são de planos passados, NÃO a contagem de hoje (que é dezesseis):
   // no Plano 3b a lista subiu de sete para oito, e ao conferir descobriu-se que a
   // contagem anterior também mentia — as linhas `vasculhar/descartar` escondiam
   // DOIS pares cada uma dentro de uma célula agrupada, então nunca foram nove
@@ -311,6 +313,12 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // contagem é menos perigoso que omitir um par — mas quebra a convenção que faz
   // a recontagem funcionar, porque o próximo a recontar acha "quinze" e procura
   // um gêmeo na tela que não tem o que ser escrito.
+  //
+  // A fatia da afinidade foi de catorze para DEZESSEIS, com os dois pares de
+  // `afinidadeCom` — DUAS linhas e não uma, porque `equiparCarta` é legal nas duas
+  // fases paradas e a convenção é uma linha por par. O spec da afinidade dizia
+  // "uma linha"; agrupar as duas numa célula é o mecanismo exato das três primeiras
+  // mentiras desta tabela.
   if (!acaoEhLegalNaFase(estado.fase, acao.tipo)) {
     throw new AcaoInvalida(`aplicarAcao: ${acao.tipo} não é legal na fase ${estado.fase}`);
   }
@@ -864,6 +872,18 @@ function equiparCarta(
   const info = deps.catalogo.item(carta.itemId);
   if (info === undefined) {
     throw new Error(`equiparCarta: item ${carta.itemId} não está no catálogo`);
+  }
+  // Especialização ERRADA: você não veste. Não é o mesmo que "não tem
+  // especialização" — quem está sem raça veste reduzido (decisão #1 do spec), e é
+  // `afinidadeCom` quem separa os dois casos. Pedido do cliente que a regra
+  // recusa => AcaoInvalida (400), nunca Error cru.
+  //
+  // ⚠️ A zona conferida é a de ANTES de equipar (`jogador.emJogo`), que é a certa:
+  // equipar não muda raça nem classe, então a resposta é a mesma antes e depois.
+  // A ordem só importa no caminho inverso — a troca de raça —, e lá ela é a
+  // armadilha da Task 6.
+  if (afinidadeCom(info, jogador.emJogo) === 'proibida') {
+    throw new AcaoInvalida(`aplicarAcao: ${info.nome} é exclusivo de outra especialização`);
   }
 
   const { slots, deslocados } = colocarNoSlot(jogador.emJogo.slots, carta, info);

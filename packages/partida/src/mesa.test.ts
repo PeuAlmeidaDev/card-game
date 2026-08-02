@@ -12,7 +12,9 @@ import { projetarPara } from './projecao';
 import { AcaoInvalida } from './erros';
 import { filaDeDados, criarDadoCiclico } from './testes/dados';
 import { monstro, monstros, raca, equipamento } from './testes/cartas';
-import { catalogoDeTeste, ID_DA_CLASSE_DE_TESTE, MONSTRO_DE_TESTE } from './testes/catalogo';
+import {
+  catalogoDeTeste, ID_DA_CLASSE_DE_TESTE, MONSTRO_DE_TESTE, ID_DO_ITEM_EXCLUSIVO, ID_DA_RACA_OUTRA,
+} from './testes/catalogo';
 import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import { combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
 import type { DepsMesa } from './mesa';
@@ -1731,6 +1733,65 @@ describe('aplicarAcao — equiparCarta', () => {
 
     expect(() => aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 'nao-existe' }, deps([])))
       .toThrow('aplicarAcao: a carta nao-existe não está na sua mão nem na mochila');
+  });
+
+  it('equipar item de OUTRA especialização é recusado — 400, não 500', () => {
+    // Pedido do cliente que a regra recusa => AcaoInvalida. É o par fino novo, e
+    // ele precisa de gêmeo na tela (Task 8): botão escrito só com `legal(tipo)`
+    // acenderia aqui e o jogador levaria 400 na cara.
+    const item = equipamento('t-1', ID_DO_ITEM_EXCLUSIVO);
+    const p0 = comMao(nascida(), [item]);
+    const jogadores = p0.jogadores.map((j) => (
+      j.id === 'p1' ? { ...j, emJogo: { ...j.emJogo, raca: raca('r1', ID_DA_RACA_OUTRA) } } : j
+    ));
+    const estado: EstadoPartida = {
+      ...p0, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...p0, jogadores }, 'p1')),
+    };
+    expect(estado.fase).toBe('recompor');
+
+    expect(() => aplicarAcao(estado, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([])))
+      .toThrowError(AcaoInvalida);
+  });
+
+  it('a recusa vale também na fase `jogar` — são DOIS pares, não um', () => {
+    // `equiparCarta` é legal nas duas fases paradas. A tabela de pares finos conta
+    // uma linha por (fase, ação, condição), e agrupar as duas numa célula é
+    // literalmente o mecanismo que fez a tabela mentir três vezes.
+    //
+    // `jogar` só nasce de verdade vencendo um combate (`entrarOuPular` no fim de
+    // `resolverCarta`) — por isso a raça em jogo é armada ANTES da luta e o
+    // combate é vencido pelo caminho real, em vez de cravar `fase: 'jogar'` num
+    // estado que o domínio nunca produziria dessa forma.
+    const item = equipamento('t-1', ID_DO_ITEM_EXCLUSIVO);
+    const p0 = comMao(nascida(soMonstro), [item]);
+    const jogadores = p0.jogadores.map((j) => (
+      j.id === 'p1' ? { ...j, emJogo: { ...j.emJogo, raca: raca('r1', ID_DA_RACA_OUTRA) } } : j
+    ));
+    const comRaca: EstadoPartida = {
+      ...p0, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...p0, jogadores }, 'p1')),
+    };
+    const naFase2 = aplicarAcao(comRaca, { tipo: 'passar', jogadorId: 'p1' }, deps([])).estado;
+    const emCombate = aplicarAcao(naFase2, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
+    const estado = venceOCombate(emCombate);
+    expect(estado.fase).toBe('jogar');
+
+    expect(() => aplicarAcao(estado, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([])))
+      .toThrowError(AcaoInvalida);
+  });
+
+  it('estando SEM raça, o exclusivo alheio É equipável (reduzido, não proibido)', () => {
+    // O contrapositivo do guard. Sem ele, um guard escrito como
+    // `exclusivo !== null` passaria os dois testes acima e quebraria a decisão #1
+    // do spec sem nada acusar. `nascida()` já entrega p1 sem raça em jogo
+    // (`emJogo.raca: null`), então nada precisa ser forjado além da mão.
+    const item = equipamento('t-1', ID_DO_ITEM_EXCLUSIVO);
+    const estado = comMao(nascida(), [item]);
+
+    const { estado: depois } = aplicarAcao(
+      estado, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]),
+    );
+
+    expect(depois.jogadores[0]?.emJogo.slots.capacete?.id).toBe('t-1');
   });
 });
 
