@@ -2,8 +2,8 @@ import type { CartaEquipamento, EstadoPartida, EventoDaMesa, InfoItem, Slot, Zon
 import { LIMITE_MOCHILA } from './mao';
 
 /**
- * As duas mãos, na ordem dos slots. Nomeado porque a regra de duas mãos o lê três
- * vezes aqui — e **exportado** desde 2026-07-31, porque havia um QUARTO leitor
+ * As duas mãos, na ordem dos slots. Nomeado porque a regra de duas mãos o lê duas
+ * vezes aqui — e **exportado** desde 2026-07-31, porque havia um TERCEIRO leitor
  * fora deste arquivo: `bot.ts` escrevia o par à mão para calcular o custo de
  * equipar uma arma grande. A cópia não era teórica: uma mutação nela deixou os
  * 240 testes verdes, porque o catálogo de teste não tinha arma de duas mãos.

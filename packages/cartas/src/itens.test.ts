@@ -71,7 +71,8 @@ describe('exclusividade', () => {
     // um número que nunca acontece passa DESPERCEBIDA. Quando a fatia `classe
     // como carta` criar o primeiro, este teste reprova e obriga alguém a decidir
     // o que fazer com ele — em vez de um comentário prometendo futuro, que é a
-    // forma que este projeto já pagou treze vezes.
+    // forma que este projeto já pagou várias vezes (o padrão está catalogado no
+    // `CLAUDE.md`).
     //
     // `i.exclusivo?.eixo` é TIPADO: renomear `eixo` quebra a compilação em vez de
     // deixar o teste virar vácuo (o modo de falha de `teste-de-ausencia-vira-vacuo`).
