@@ -1,13 +1,13 @@
 import type { Combatente, Passo, RolarD12, PassivaCombate } from '@card-dungeon/motor';
 import { AcaoIlegal, criarCombate, proximoPasso } from '@card-dungeon/motor';
 import type {
-  AcaoDaMesa, Carta, CartaPorta, CartaTesouro, CatalogoDaMesa, Embaralhar, EstadoPartida, EventoDaMesa,
-  Fase, FaseParada, InfoRaca, JogadorNaMesa,
+  AcaoDaMesa, Carta, CartaEquipamento, CartaPorta, CartaTesouro, CatalogoDaMesa, Embaralhar,
+  EstadoPartida, EventoDaMesa, Fase, FaseParada, InfoRaca, JogadorNaMesa, Slot, ZonaEmJogo,
 } from './tipos';
 import { tirarDoTopo } from './baralho';
 import { LIMITE_MOCHILA } from './mao';
 import { destinoDaCaridade } from './caridade';
-import { afinidadeCom, combatenteDe } from './corpo';
+import { afinidadeCom, combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
 import { colocarNoSlot, destinoDoDesequipado } from './equipar';
 import { classificar } from './classificacao';
 import { AcaoInvalida } from './erros';
@@ -332,7 +332,7 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   }
 
   if (acao.tipo === 'jogarCarta') {
-    return jogarCarta(estado, acao);
+    return jogarCarta(estado, acao, deps);
   }
 
   if (acao.tipo === 'entregarCarta') {
@@ -779,6 +779,49 @@ function entregarCarta(
 }
 
 /**
+ * Os itens equipados que a zona ATUAL não aceita mais. Lê `itensEquipados` (que
+ * já deduplica por id) em vez de varrer `Object.values(slots)`: a arma de duas
+ * mãos ocupa os dois slots com a MESMA instância, e sem a dedup ela iria duas
+ * vezes para o cemitério — o baralho de Tesouros CRESCERIA a cada troca de raça.
+ *
+ * ⚠️ Recebe a zona JÁ atualizada. A pergunta é sobre a raça NOVA (spec §6.2,
+ * passo 2); com a zona antiga o grau seria `sem` e nada cairia.
+ */
+function itensSemAfinidade(
+  emJogo: ZonaEmJogo,
+  catalogo: CatalogoDaMesa,
+): readonly CartaEquipamento[] {
+  return itensEquipados(emJogo.slots).filter((carta) => {
+    const info = catalogo.item(carta.itemId);
+    if (info === undefined) {
+      // Invariante NOSSA: a carta veio da composição que a borda montou do próprio
+      // catálogo. Error cru => 500 sem vazar, mesma cadeia de `combatenteDe`.
+      throw new Error(`itensSemAfinidade: item ${carta.itemId} não está no catálogo`);
+    }
+    return afinidadeCom(info, emJogo) === 'proibida';
+  });
+}
+
+/** Esvazia os slots ocupados por qualquer uma destas cartas. */
+function tirarDosSlots(
+  slots: ZonaEmJogo['slots'],
+  cartas: readonly CartaEquipamento[],
+): ZonaEmJogo['slots'] {
+  if (cartas.length === 0) return slots;
+  const ids = new Set(cartas.map((c) => c.id));
+  const novos: Record<Slot, CartaEquipamento | null> = { ...slots };
+  // As chaves saem de `SLOTS_VAZIOS`, que é `Record<Slot, …>` — o cast é sobre um
+  // objeto cujo tipo garante exatamente estas chaves. Escrever a lista de slots à
+  // mão aqui seria a cópia que fica para trás quando o sexto nascer, que é o
+  // motivo de `SLOTS_VAZIOS` existir.
+  for (const slot of Object.keys(SLOTS_VAZIOS) as readonly Slot[]) {
+    const ocupante = novos[slot];
+    if (ocupante !== null && ids.has(ocupante.id)) novos[slot] = null;
+  }
+  return novos;
+}
+
+/**
  * Põe uma carta de raça da mão na zona em jogo. A anterior vai para o cemitério:
  * a zona é ABERTA, então trocar de raça é jogada pública.
  *
@@ -801,10 +844,21 @@ function entregarCarta(
  *
  * Em `descartar` sobra só `entregarCarta`: `equiparCarta` saiu junto, para as duas
  * fases paradas que acontecem ANTES da cobrança do excedente.
+ *
+ * Desde a fatia da afinidade, trocar de raça **derruba** o item que ficou
+ * proibido (decisão #4 do spec): ele vai para a mochila se houver vaga, para o
+ * cemitério de Tesouros se não — `destinoDoDesequipado` como ele já era, sem
+ * regra nova. Isso dá peso à troca de raça, que até aqui era quase gratuita.
+ *
+ * As alternativas foram recusadas com motivo: deixar o item valendo o reduzido
+ * exigiria uma TERCEIRA categoria de valor (quem tem a raça errada não é "quem
+ * não tem raça"), e bloquear a troca faria a carta de raça às vezes não poder ser
+ * jogada, espalhando a regra até o `faseSeAutoPula`.
  */
 function jogarCarta(
   estado: EstadoPartida,
   acao: Extract<AcaoDaMesa, { readonly tipo: 'jogarCarta' }>,
+  deps: DepsMesa,
 ): ResultadoAcao {
   // O guard de espiada MORREU aqui: `jogarCarta` só é legal em `recompor`, que
   // acontece antes de qualquer compra, e a espiada só existe em `vasculhar`. A
@@ -816,32 +870,46 @@ function jogarCarta(
   }
 
   const anterior = jogador.emJogo.raca;
+  // PASSO 1 do spec §6.2: a raça nova entra na zona ANTES de qualquer pergunta
+  // sobre afinidade.
+  const comRacaNova: ZonaEmJogo = { ...jogador.emJogo, raca: carta };
+  // PASSO 2: a pergunta, com a zona JÁ atualizada.
+  const perdidos = itensSemAfinidade(comRacaNova, deps.catalogo);
+  // PASSO 3: os proibidos saem dos slots (já deduplicados por `itensEquipados`).
   const atualizado: JogadorNaMesa = {
     ...jogador,
     mao: jogador.mao.filter((c) => c.id !== carta.id),
-    // ESPALHA a zona; não a remonta. Trocar de raça mexe num campo da zona, não
-    // na zona inteira — escrever `{ raca: carta, slots: { ...SLOTS_VAZIOS } }`
-    // aqui desequiparia o corpo a cada troca de raça, e o compilador aceitaria
-    // (o campo estaria lá, só com o valor errado). O spread é o que faz o campo
-    // que esta função não conhece sobreviver a ela.
-    emJogo: { ...jogador.emJogo, raca: carta },
+    emJogo: { ...comRacaNova, slots: tirarDosSlots(comRacaNova.slots, perdidos) },
   };
 
-  return entrarOuPular(
-    {
-      ...estado,
-      jogadores: estado.jogadores.map((j) => (j.id === atualizado.id ? atualizado : j)),
-      portas: {
-        ...estado.portas,
-        cemiterio: anterior === null ? estado.portas.cemiterio : [...estado.portas.cemiterio, anterior],
-      },
+  const comJogador: EstadoPartida = {
+    ...estado,
+    jogadores: estado.jogadores.map((j) => (j.id === atualizado.id ? atualizado : j)),
+    portas: {
+      ...estado.portas,
+      cemiterio: anterior === null ? estado.portas.cemiterio : [...estado.portas.cemiterio, anterior],
     },
-    atualizado,
+  };
+  // PASSO 4: só então o destino, que lê a mochila e emite os eventos — um por
+  // item e na ordem, porque a mochila pode caber só um de dois.
+  const { estado: base, eventos: doDeslocado } =
+    destinoDoDesequipado(comJogador, perdidos, acao.jogadorId, 'perdeuAfinidade');
+
+  return entrarOuPular(
+    base,
+    // ⚠️ RELÊ de `base`; não passa `atualizado`. Esta função virou a SEGUNDA do
+    // reducer em que o jogador sofre uma mutação depois de `atualizado` ser
+    // fechado — `destinoDoDesequipado` pode ter posto o item derrubado na mochila
+    // DELE, e `faseSeAutoPula` decide por `mochila.length > 0`. Com a versão de
+    // antes, derrubar um item por perda de afinidade pularia a fase parada tendo
+    // o item dentro da mochila para vestir. É o gêmeo exato do único bug de
+    // comportamento do Plano 4a.
+    base.jogadores.find((j) => j.id === acao.jogadorId) ?? atualizado,
     // `recompor` fixo, e não `estado.fase`: a tabela só declara `jogarCarta` legal
     // aqui. Um dia em que ela declarar noutra fase, este literal é a linha que
     // vai estar mentindo — e é por isso que ele fica visível em vez de derivado.
     'recompor',
-    [{ tipo: 'racaEmJogo', jogadorId: acao.jogadorId, carta }],
+    [{ tipo: 'racaEmJogo', jogadorId: acao.jogadorId, carta }, ...doDeslocado],
   );
 }
 

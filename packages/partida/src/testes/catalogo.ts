@@ -146,6 +146,22 @@ export const ITEM_EXCLUSIVO_DE_CLASSE = {
   exclusivo: { eixo: 'classe' as const, id: 'c-outra', semAfinidade: { vida: 2 } },
 };
 
+/**
+ * O exclusivo de duas mãos (Task 6 da afinidade). Sem ele a dedup de
+ * `itensSemAfinidade`/`tirarDosSlots` — que reusa `itensEquipados` para não
+ * derrubar a mesma instância duas vezes — é *inexercitável*, não só
+ * desprotegida: é literalmente a lição do `ITEM_DUAS_MAOS` (a ausência de arma
+ * de duas mãos no catálogo de teste deixou 240 testes verdes sobre a regra de
+ * duas mãos do bot quebrada), agora do lado da troca de raça.
+ */
+export const ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS = 'i-exclusivo-duas-maos';
+export const ITEM_EXCLUSIVO_DUAS_MAOS = {
+  id: ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS, nome: 'Item Exclusivo de Duas Mãos',
+  slot: 'maoDireita' as const, duasMaos: true,
+  modificadores: { forca: 5 },
+  exclusivo: { eixo: 'raca' as const, id: ID_DA_RACA_DONA, semAfinidade: { forca: 2 } },
+};
+
 export function catalogoDeTeste(
   parcial: Partial<CatalogoDaMesa> = {},
 ): CatalogoDaMesa {
@@ -156,7 +172,7 @@ export function catalogoDeTeste(
       if (id === ID_DO_MONSTRO_FORTE) return MONSTRO_FORTE;
       return undefined;
     },
-    // Catálogo de teste conhece UMA classe e SEIS itens, pelo mesmo princípio do
+    // Catálogo de teste conhece UMA classe e SETE itens, pelo mesmo princípio do
     // monstro: um dublê que aprova qualquer id não é dublê, é a ausência de um.
     classe: (id) => (id === ID_DA_CLASSE_DE_TESTE ? CLASSE_DE_TESTE : undefined),
     item: (id) => {
@@ -166,6 +182,7 @@ export function catalogoDeTeste(
       if (id === ID_DO_ITEM_DUAS_MAOS) return ITEM_DUAS_MAOS;
       if (id === ID_DO_ITEM_EXCLUSIVO) return ITEM_EXCLUSIVO;
       if (id === ID_DO_ITEM_EXCLUSIVO_DE_CLASSE) return ITEM_EXCLUSIVO_DE_CLASSE;
+      if (id === ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS) return ITEM_EXCLUSIVO_DUAS_MAOS;
       return undefined;
     },
     ...parcial,
