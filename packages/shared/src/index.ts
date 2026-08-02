@@ -19,10 +19,12 @@ import type {
   EspiadaPendente,
   EventoDaMesa,
   Fase,
+  GrauDeAfinidade,
   JogadorPublico,
   PosicaoFinal,
   Slot,
   VistaDaPartida,
+  ZonaEmJogo,
 } from '@card-dungeon/partida';
 import type { Slot as SlotDaCarta, ItemCarta, EixoDeAfinidade as EixoDaCarta } from '@card-dungeon/cartas';
 
@@ -192,6 +194,12 @@ export { LIMITE_MOCHILA } from '@card-dungeon/partida';
 // zero hoje (nenhuma classe do catálogo é tão negativa), bomba amanhã.
 export { montarCombatente } from '@card-dungeon/personagem';
 
+// Valor, pelo mesmo motivo de `acaoEhLegalNaFase`: a afinidade é regra, e um
+// `exclusivo.id === raca.racaId` escrito no cliente é a cópia que diverge. A tela
+// LÊ a regra; nunca a reimplementa. `contribuicaoDe` vem junto porque mostrar o
+// valor CHEIO na tela de quem veste reduzido é a tela mentindo.
+export { afinidadeCom, contribuicaoDe } from '@card-dungeon/partida';
+
 const c = initContract();
 
 /**
@@ -296,4 +304,9 @@ export type {
   // saem de `partida` (a regra) — o `_CoberturaEixo` acima trava as duas uniões.
   Afinidade,
   EixoDeAfinidade,
+  // `GrauDeAfinidade` é o retorno de `afinidadeCom`; `ZonaEmJogo` é o segundo
+  // parâmetro dela e de `contribuicaoDe` — as assinaturas do `web` precisam
+  // nomear as duas.
+  GrauDeAfinidade,
+  ZonaEmJogo,
 };

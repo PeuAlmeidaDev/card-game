@@ -1104,3 +1104,50 @@ describe('TelaMesa — a mochila', () => {
     expect(await screen.findByRole('button', { name: /guardar/i })).toBeDisabled();
   });
 });
+
+describe('TelaMesa — afinidade de itens', () => {
+  // Item exclusivo do Orc, junto do catálogo padrão — os testes daqui só
+  // acrescentam este ao invés de substituir, para continuarem cobrindo o item
+  // comum de sempre.
+  const ITENS_COM_EXCLUSIVO: Catalogo['itens'] = [
+    ...ITENS_PADRAO,
+    {
+      id: 'machado', nome: 'Machado', slot: 'maoDireita', duasMaos: false,
+      modificadores: { forca: 3, habilidade: 1 },
+      exclusivo: { eixo: 'raca', id: 'orc', semAfinidade: { forca: 2 } },
+    },
+  ];
+
+  it('"Equipar" fica VISÍVEL e apagado no exclusivo de outra raça', async () => {
+    // ⚠️ Contra-intuitivo e tem que ser procurado de propósito: o botão NÃO some.
+    // Decisão #26 do bible — verbo que some é verbo que o jogador nunca aprende
+    // que existe. É também o gêmeo do par fino novo: sem ele, clicar leva 400.
+    await abrirMesa(
+      {
+        ...vistaBase,
+        fase: 'recompor',
+        jogadores: vistaBase.jogadores.map((j) => (
+          j.id === 'p1'
+            ? { ...j, emJogo: { raca: { id: 'r1', tipo: 'raca', racaId: 'anao' }, slots: SLOTS_VAZIOS }, limiteDeMao: 7 }
+            : j
+        )),
+        suaMao: [tesouro('t-1', 'machado')],
+      },
+      undefined, undefined, ITENS_COM_EXCLUSIVO,
+    );
+
+    const botao = await screen.findByRole('button', { name: 'Equipar' });
+    expect(botao).toBeDisabled();
+  });
+
+  it('a carta exclusiva mostra o número que vale PARA VOCÊ', async () => {
+    // p1 SEM raça em jogo (o default de `vistaBase`): o Machado é exclusivo do
+    // Orc, então quem não tem raça veste pelo REDUZIDO — nunca o cheio.
+    await abrirMesa(
+      { ...vistaBase, fase: 'recompor', suaMao: [tesouro('t-1', 'machado')] },
+      undefined, undefined, ITENS_COM_EXCLUSIVO,
+    );
+
+    expect(await screen.findByText(/reduzido/)).toBeInTheDocument();
+  });
+});

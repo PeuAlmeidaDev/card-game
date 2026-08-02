@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { api } from './api';
 import { PainelLog } from './PainelLog';
 import { descreverCarta } from './descreverCarta';
-import { acaoEhLegalNaFase, LIMITE_MOCHILA } from '@card-dungeon/shared';
-import type { AcaoDaMesa, AcaoNoFio, Catalogo, Escolhas, Fase, Slot, VistaDaPartida } from '@card-dungeon/shared';
+import { acaoEhLegalNaFase, afinidadeCom, LIMITE_MOCHILA } from '@card-dungeon/shared';
+import type { AcaoDaMesa, AcaoNoFio, Catalogo, Escolhas, Fase, ItemCarta, Slot, VistaDaPartida } from '@card-dungeon/shared';
+import { rotuloDeAfinidade } from './rotuloDeAfinidade';
 
 /**
  * Usado quando a tela roda sozinha; o `App` passa as escolhas reais do construtor.
@@ -120,6 +121,16 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
   // vista não carrega o máximo dele.
   const vidaMaxima = vista.jogadores.find((j) => j.id === vista.voce)?.combatente.vida ?? null;
   const eu = vista.jogadores.find((j) => j.id === vista.voce);
+  const infoDoItem = (itemId: string): ItemCarta | undefined => itens.find((i) => i.id === itemId);
+  const minhaZona = eu?.emJogo ?? null;
+  const rotuloDe = (itemId: string): string => {
+    const info = infoDoItem(itemId);
+    return info === undefined || minhaZona === null ? '' : rotuloDeAfinidade(info, minhaZona, nomeDaRaca);
+  };
+  const euNaoPossoVestir = (itemId: string): boolean => {
+    const info = infoDoItem(itemId);
+    return info !== undefined && minhaZona !== null && afinidadeCom(info, minhaZona) === 'proibida';
+  };
   // A SUA mochila, para o teto do "Guardar" e para o botão "Equipar" (que só faz
   // sentido no que é seu — a mochila alheia é visível, mas não sua para vestir).
   const minhaMochila = eu?.mochila ?? [];
@@ -341,10 +352,10 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
         <ul>
           {minhaMochila.map((carta) => (
             <li key={carta.id}>
-              {nomeDoItem(carta.itemId)}{' '}
+              {nomeDoItem(carta.itemId)}{rotuloDe(carta.itemId)}{' '}
               <button
                 type="button"
-                disabled={!legal('equiparCarta')}
+                disabled={!legal('equiparCarta') || euNaoPossoVestir(carta.itemId)}
                 onClick={() => void agir({ tipo: 'equiparCarta', cartaId: carta.id })}
               >
                 Equipar
@@ -386,7 +397,8 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
         <ul>
           {vista.suaMao.map((carta) => (
             <li key={carta.id}>
-              {descreverCarta(carta, nomeDaRaca, nomeDoMonstro, nomeDoItem)}{' '}
+              {descreverCarta(carta, nomeDaRaca, nomeDoMonstro, nomeDoItem)}
+              {carta.tipo === 'equipamento' && rotuloDe(carta.itemId)}{' '}
               {/* Só raça entra em jogo nesta fatia — o domínio recusa o resto, e um
                   botão que só serve para levar 400 ensina o jogador a errar. */}
               {carta.tipo === 'raca' && (
@@ -429,7 +441,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
               {carta.tipo === 'equipamento' && (
                 <button
                   type="button"
-                  disabled={!legal('equiparCarta')}
+                  disabled={!legal('equiparCarta') || euNaoPossoVestir(carta.itemId)}
                   onClick={() => void agir({ tipo: 'equiparCarta', cartaId: carta.id })}
                 >
                   Equipar
