@@ -117,9 +117,9 @@ export const ID_DA_RACA_OUTRA = 'r-outra';
  * apagaria a diferença entre "rende menos" e "não rende", que é exatamente a
  * decisão #1 do spec (afinidade é ESCALONADA, não binária).
  *
- * Slot `capacete` para não colidir com os outros dublês, que moram todos em
- * `maoDireita` — assim um teste pode ter um exclusivo e um comum equipados ao
- * mesmo tempo sem um deslocar o outro.
+ * Slot `capacete`, longe dos outros dublês de força (`maoDireita`) — quem
+ * precisa de algo competindo pelo MESMO slot usa `ITEM_DE_CAPACETE`/`ITEM_LASTRO`,
+ * abaixo.
  */
 export const ID_DO_ITEM_EXCLUSIVO = 'i-exclusivo';
 export const ITEM_EXCLUSIVO = {
@@ -127,6 +127,29 @@ export const ITEM_EXCLUSIVO = {
   slot: 'capacete' as const, duasMaos: false,
   modificadores: { forca: 4 },
   exclusivo: { eixo: 'raca' as const, id: ID_DA_RACA_DONA, semAfinidade: { forca: 1 } },
+};
+
+/**
+ * Item comum de `capacete` — o MESMO slot do `ITEM_EXCLUSIVO`. Sem ele, testar
+ * "o exclusivo desloca algo já equipado" forçava um item de OUTRO slot
+ * (`maoDireita`) para dentro de `capacete`, um corpo que o reducer nunca produz.
+ */
+export const ID_DO_ITEM_DE_CAPACETE = 'i-capacete';
+export const ITEM_DE_CAPACETE = {
+  id: ID_DO_ITEM_DE_CAPACETE, nome: 'Item de Capacete',
+  slot: 'capacete' as const, duasMaos: false, modificadores: { forca: 3 }, exclusivo: null,
+};
+
+/**
+ * 🎚️ Soma líquida NEGATIVA (−2). Existe para o filtro de
+ * `candidatosQueEuPossoVestir` ser EXERCITÁVEL: com todo item somando ≥ 0,
+ * `ganho = 0 − custo` nunca passa de `melhorGanho = 0` e o guard de
+ * `valorEfetivoDe` já basta sozinho. Mesma lição do `ITEM_DUAS_MAOS`.
+ */
+export const ID_DO_ITEM_LASTRO = 'i-lastro';
+export const ITEM_LASTRO = {
+  id: ID_DO_ITEM_LASTRO, nome: 'Lastro',
+  slot: 'capacete' as const, duasMaos: false, modificadores: { agilidade: -2 }, exclusivo: null,
 };
 
 /**
@@ -168,7 +191,7 @@ export function catalogoDeTeste(
       if (id === ID_DO_MONSTRO_FORTE) return MONSTRO_FORTE;
       return undefined;
     },
-    // Catálogo de teste conhece UMA classe e SETE itens, pelo mesmo princípio do
+    // Catálogo de teste conhece UMA classe e NOVE itens, pelo mesmo princípio do
     // monstro: um dublê que aprova qualquer id não é dublê, é a ausência de um.
     classe: (id) => (id === ID_DA_CLASSE_DE_TESTE ? CLASSE_DE_TESTE : undefined),
     item: (id) => {
@@ -177,6 +200,8 @@ export function catalogoDeTeste(
       if (id === ID_DO_ITEM_FRACO) return ITEM_FRACO;
       if (id === ID_DO_ITEM_DUAS_MAOS) return ITEM_DUAS_MAOS;
       if (id === ID_DO_ITEM_EXCLUSIVO) return ITEM_EXCLUSIVO;
+      if (id === ID_DO_ITEM_DE_CAPACETE) return ITEM_DE_CAPACETE;
+      if (id === ID_DO_ITEM_LASTRO) return ITEM_LASTRO;
       if (id === ID_DO_ITEM_EXCLUSIVO_DE_CLASSE) return ITEM_EXCLUSIVO_DE_CLASSE;
       if (id === ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS) return ITEM_EXCLUSIVO_DUAS_MAOS;
       return undefined;

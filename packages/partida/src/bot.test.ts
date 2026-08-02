@@ -8,8 +8,9 @@ import { filaDeDados } from './testes/dados';
 import { equipamento, monstro as cartaMonstro, monstros, raca } from './testes/cartas';
 import { LIMITE_BASE_DE_MAO, LIMITE_MOCHILA } from './mao';
 import {
-  catalogoDeTeste, ID_DA_CLASSE_DE_TESTE, ID_DA_RACA_DONA, ID_DA_RACA_OUTRA, ID_DO_ITEM_DUAS_MAOS,
-  ID_DO_ITEM_EXCLUSIVO, ID_DO_ITEM_FORTE, ID_DO_ITEM_FRACO, ID_DO_MONSTRO_FORTE,
+  catalogoDeTeste, ID_DA_CLASSE_DE_TESTE, ID_DA_RACA_DONA, ID_DA_RACA_OUTRA, ID_DO_ITEM_DE_CAPACETE,
+  ID_DO_ITEM_DUAS_MAOS, ID_DO_ITEM_EXCLUSIVO, ID_DO_ITEM_FORTE, ID_DO_ITEM_FRACO, ID_DO_ITEM_LASTRO,
+  ID_DO_MONSTRO_FORTE,
 } from './testes/catalogo';
 import { COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import type {
@@ -493,14 +494,25 @@ describe('escolherAcao', () => {
     expect(escolherAcao(vista, 'p1', catalogoDeTeste()).tipo).not.toBe('equiparCarta');
   });
 
+  it('não pede o proibido nem quando ele deslocaria um item de valor líquido NEGATIVO', () => {
+    // O guard de `valorEfetivoDe` sozinho não distingue este caso de um slot
+    // vazio (as duas contas dão ganho ≤ 0). `ITEM_LASTRO` só existe para o
+    // filtro de `candidatosQueEuPossoVestir` ter algo próprio a proteger.
+    const vista = vistaEm('recompor', {
+      suaMao: [equipamento('t-exclusivo', ID_DO_ITEM_EXCLUSIVO)],
+      slots: { capacete: equipamento('t-lastro', ID_DO_ITEM_LASTRO) },
+      racaEmJogo: raca('r-outra', ID_DA_RACA_OUTRA),
+    });
+
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste()).tipo).not.toBe('equiparCarta');
+  });
+
   it('não superestima: com o exclusivo alheio ele NÃO troca um item melhor', () => {
-    // `valorDe` lendo o CHEIO faria o bot ver 4 onde ele vai receber 1, e trocar
-    // um item bom por um que rende menos.
+    // Ler o CHEIO faria o bot ver 4 onde ele vai receber 1, e trocar um item bom
+    // por um que rende menos.
     const vista = vistaEm('jogar', {
       suaMao: [equipamento('t-exclusivo', ID_DO_ITEM_EXCLUSIVO)],
-      // `capacete`, não `maoDireita`: é o slot do EXCLUSIVO (catalogo.ts), e só
-      // competindo pelo MESMO slot que o reduzido "não bate o que está no corpo".
-      slots: { capacete: equipamento('t-forte', ID_DO_ITEM_FORTE) },
+      slots: { capacete: equipamento('t-capacete', ID_DO_ITEM_DE_CAPACETE) },
       racaEmJogo: null,
     });
 
@@ -509,15 +521,14 @@ describe('escolherAcao', () => {
   });
 
   it('COM a raça dona em jogo, o mesmo item passa a valer a pena', () => {
-    // O contrapositivo do teste acima — sem ele, um `valorDe` que devolvesse
-    // sempre 0 para exclusivo passaria os dois primeiros e o bot nunca vestiria
-    // um exclusivo, nem o da própria raça. É o efeito colateral desejado do spec
-    // §8: o bot passa a preferir o item da própria raça sem nenhuma regra nova.
+    // O contrapositivo do teste acima — sem ele, um `valorEfetivoDe` que
+    // devolvesse sempre 0 para exclusivo passaria os dois primeiros e o bot
+    // nunca vestiria um exclusivo, nem o da própria raça. É o efeito colateral
+    // desejado do spec §8: o bot passa a preferir o item da própria raça sem
+    // nenhuma regra nova.
     const vista = vistaEm('jogar', {
       suaMao: [equipamento('t-exclusivo', ID_DO_ITEM_EXCLUSIVO)],
-      // `capacete`, não `maoDireita`: é o slot do EXCLUSIVO (catalogo.ts), e só
-      // competindo pelo MESMO slot que o reduzido "não bate o que está no corpo".
-      slots: { capacete: equipamento('t-forte', ID_DO_ITEM_FORTE) },
+      slots: { capacete: equipamento('t-capacete', ID_DO_ITEM_DE_CAPACETE) },
       racaEmJogo: raca('r-dona', ID_DA_RACA_DONA),
     });
 

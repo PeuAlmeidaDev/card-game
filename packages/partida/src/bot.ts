@@ -151,8 +151,7 @@ function melhorEncrenca(
   for (const carta of vista.suaMao) {
     if (carta.tipo !== 'monstro') continue;
     const info = catalogo.monstro(carta.monstroId);
-    // Id que o catálogo não conhece vale "não sei" — e não sei não vira luta. Mesma
-    // política do `valorDe`: o bot nunca lança, porque sempre há alternativa.
+    // Id que o catálogo não conhece vale "não sei" — e não sei não vira luta.
     if (info === undefined) continue;
 
     const adversario: Combatente = {
@@ -191,11 +190,7 @@ function valorEfetivoDe(itemId: string, catalogo: CatalogoDaMesa, emJogo: ZonaEm
   return (forca ?? 0) + (vida ?? 0) + (habilidade ?? 0) + (agilidade ?? 0);
 }
 
-/**
- * As duas origens de `equiparCarta` (mão e mochila), menos o que o reducer
- * recusaria — um candidato proibido virando ação sobe `AcaoInvalida` por
- * `avancarBots` e vira 400 na jogada do humano.
- */
+/** As duas origens de `equiparCarta` (mão e mochila), menos o que o reducer recusaria. */
 function candidatosQueEuPossoVestir(
   vista: VistaDaPartida,
   eu: JogadorPublico,
