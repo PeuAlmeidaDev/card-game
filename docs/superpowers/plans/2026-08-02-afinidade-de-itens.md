@@ -28,6 +28,13 @@ personagem 9 · partida 257 · shared 25 · server 30 · web 137), typecheck 7/7
 
 ---
 
+> 📌 **Nota de execução (2026-08-02, Task 12):** o campo `Afinidade.id` foi **renomeado para
+> `donoId`** durante a execução, porque `ItemCarta` já tem um `id` e a ambiguidade exigia dois
+> comentários gêmeos — um em `cartas`, um em `partida` — cujo conteúdo inteiro era *"este `id` não é
+> o `id` do item"*. O nome novo matou os dois. **Os blocos de código deste plano foram atualizados
+> para `donoId`**; o spec de 2026-07-31 traz o nome antigo marcado no lugar. Se você estiver lendo
+> este plano como registro histórico, saiba que ele foi escrito com `id` e corrigido depois.
+
 ## Global Constraints
 
 - **Node ≥ 22.13**, `pnpm@11.9.0`, TypeScript **strict** + `noUncheckedIndexedAccess`.
@@ -617,7 +624,7 @@ function idNoEixo(eixo: EixoDeAfinidade, emJogo: ZonaEmJogo): string | null {
  * por conta própria seria a quinta cópia de regra que este projeto pagou para
  * desfazer, e a que divergisse acenderia um botão que só serve para levar 400.
  *
- * ⚠️ `partida` continua CEGO ao catálogo: compara `info.exclusivo.id` com
+ * ⚠️ `partida` continua CEGO ao catálogo: compara `info.exclusivo.donoId` com
  * `emJogo.raca?.racaId`, nunca com `'orc'` escrito à mão. Nenhum id de conteúdo
  * entra no domínio.
  */
@@ -629,7 +636,7 @@ export function afinidadeCom(info: InfoItem, emJogo: ZonaEmJogo): GrauDeAfinidad
   const meu = idNoEixo(exclusivo.eixo, emJogo);
   // Sem nada no eixo = "quem não tem X" (decisão #2): veste, reduzido.
   if (meu === null) return 'sem';
-  return meu === exclusivo.id ? 'plena' : 'proibida';
+  return meu === exclusivo.donoId ? 'plena' : 'proibida';
 }
 ```
 
@@ -1645,7 +1652,7 @@ Em `packages/shared/src/index.ts`, ao lado dos outros três re-exports de valor:
 
 ```ts
 // Valor, pelo mesmo motivo de `acaoEhLegalNaFase`: a afinidade é regra, e um
-// `exclusivo.id === raca.racaId` escrito no cliente é a cópia que diverge. A tela
+// `exclusivo.donoId === raca.racaId` escrito no cliente é a cópia que diverge. A tela
 // LÊ a regra; nunca a reimplementa. `contribuicaoDe` vem junto porque mostrar o
 // valor CHEIO na tela de quem veste reduzido é a tela mentindo.
 export { afinidadeCom, contribuicaoDe } from '@card-dungeon/partida';
@@ -1746,7 +1753,7 @@ export function rotuloDeAfinidade(
 
   // Eixo `classe` mostra o id cru: nenhum item o declara hoje, e um `nomeDaClasse`
   // injetado seria parâmetro que nenhum call-site consegue exercitar.
-  const dono = exclusivo.eixo === 'raca' ? nomeDaRaca(exclusivo.id) : exclusivo.id;
+  const dono = exclusivo.eixo === 'raca' ? nomeDaRaca(exclusivo.donoId) : exclusivo.donoId;
   const grau = afinidadeCom(info, emJogo);
   // Antes de pedir o número: `contribuicaoDe` LANÇA no proibido.
   if (grau === 'proibida') {
@@ -1896,7 +1903,7 @@ Em `packages/cartas/src/itens.test.ts`, dentro do `describe('exclusividade')`:
     // são 4 sacáveis, não 5, e a #54 do bible existe porque três decisões erraram
     // exatamente isto. O Humano fica de fora porque ele É a ausência — um item
     // dele seria um item que só quem não tem raça veste cheio, invertendo a regra.
-    const donos = ITENS.flatMap((i) => (i.exclusivo?.eixo === 'raca' ? [i.exclusivo.id] : []));
+    const donos = ITENS.flatMap((i) => (i.exclusivo?.eixo === 'raca' ? [i.exclusivo.donoId] : []));
     expect([...donos].sort()).toEqual(RACAS_SACAVEIS.map((r) => r.id).sort());
   });
 
