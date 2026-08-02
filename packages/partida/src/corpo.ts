@@ -1,5 +1,6 @@
 import type { Combatente } from '@card-dungeon/motor';
 import { montarCombatente } from '@card-dungeon/personagem';
+import type { Equipamento } from '@card-dungeon/personagem';
 import type {
   CartaEquipamento, CatalogoDaMesa, EixoDeAfinidade, InfoItem, JogadorNaMesa, Slot, ZonaEmJogo,
 } from './tipos';
@@ -83,6 +84,41 @@ export function afinidadeCom(info: InfoItem, emJogo: ZonaEmJogo): GrauDeAfinidad
 }
 
 /**
+ * O que este item soma PARA ESTE CORPO — cheio ou reduzido. É por aqui que a
+ * afinidade vira número, e é o único ponto que traduz `GrauDeAfinidade` em
+ * modificadores.
+ *
+ * Devolve `Equipamento` (o contrato que `montarCombatente` consome), não um
+ * número: o cálculo dos 4 stats continua inteiro no `personagem`, com o `PISO`
+ * dele. Somar aqui seria a segunda cópia de `montarCombatente` — a mesma que a
+ * auditoria de 2026-07-31 achou no `calcularPreview` do cliente.
+ */
+export function contribuicaoDe(info: InfoItem, emJogo: ZonaEmJogo): Equipamento {
+  const grau = afinidadeCom(info, emJogo);
+  switch (grau) {
+    case 'plena':
+      return info;
+    case 'sem':
+      // `sem` só sai de item EXCLUSIVO — o comum responde `plena` na primeira
+      // linha de `afinidadeCom`. O teste de `null` aqui é o narrowing que o
+      // compilador exige, NÃO uma segunda leitura da regra: com
+      // `exclusivo === null` o grau nunca teria sido `sem`, e os dois lados do
+      // ternário devolveriam o mesmo `info`.
+      return info.exclusivo === null ? info : { ...info, modificadores: info.exclusivo.semAfinidade };
+    case 'proibida':
+      // Item proibido NO CORPO é invariante NOSSA quebrada: `equiparCarta` recusa
+      // e `jogarCarta` derruba na troca de raça. `Error` cru => 500 sem vazar,
+      // nunca `AcaoInvalida` — ninguém pediu isto agora, então não há pedido a
+      // recusar. Mesma cadeia do id que o catálogo não conhece.
+      throw new Error(`contribuicaoDe: item ${info.id} está no corpo e é proibido para esta zona`);
+    default: {
+      const naoTratado: never = grau;
+      throw new Error(`contribuicaoDe: grau não tratado: ${JSON.stringify(naoTratado)}`);
+    }
+  }
+}
+
+/**
  * Os stats do jogador AGORA. **Fonte única** — não existe campo paralelo para
  * sincronizar, que é exatamente o modo de falha que o `combatenteBase`
  * denormalizado trazia: mudar a zona e esquecer de recalcular deixava o
@@ -106,7 +142,11 @@ export function combatenteDe(jogador: JogadorNaMesa, catalogo: CatalogoDaMesa): 
     if (info === undefined) {
       throw new Error(`combatenteDe: item ${carta.itemId} não está no catálogo`);
     }
-    return info;
+    // A contribuição EFETIVA, não o item cru: o mesmo item rende diferente
+    // conforme quem o veste (spec §5). Entregar `info` aqui somaria o cheio para
+    // todo mundo, e a fatia inteira ficaria sem efeito no único lugar em que ela
+    // vira stat.
+    return contribuicaoDe(info, jogador.emJogo);
   });
   return { ...montarCombatente(classe, itens), level: jogador.patente };
 }

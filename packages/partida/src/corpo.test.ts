@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { afinidadeCom, combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
 import {
   catalogoDeTeste, CLASSE_DE_TESTE,
-  ID_DA_RACA_DONA, ID_DA_RACA_OUTRA,
+  ID_DA_RACA_DONA, ID_DA_RACA_OUTRA, ID_DO_ITEM_EXCLUSIVO,
   ITEM_DE_TESTE, ITEM_EXCLUSIVO, ITEM_EXCLUSIVO_DE_CLASSE,
 } from './testes/catalogo';
 import { equipamento, raca } from './testes/cartas';
@@ -76,6 +76,55 @@ describe('combatenteDe', () => {
       jogador({ emJogo: { raca: null, slots: { ...SLOTS_VAZIOS, pes: item } } }),
       catalogoDeTeste(),
     )).toThrowError(/item nao-existe/);
+  });
+
+  it('exclusivo da PRÓPRIA raça soma o valor CHEIO', () => {
+    const item = equipamento('t-1', ID_DO_ITEM_EXCLUSIVO);
+    const c = combatenteDe(
+      jogador({ emJogo: { raca: raca('p-1', ID_DA_RACA_DONA), slots: { ...SLOTS_VAZIOS, capacete: item } } }),
+      catalogoDeTeste(),
+    );
+    // BASE.forca (3) + CLASSE_DE_TESTE (0) + cheio (4) = 7.
+    expect(c.forca).toBe(7);
+  });
+
+  it('exclusivo alheio, estando SEM raça, soma o REDUZIDO', () => {
+    const item = equipamento('t-1', ID_DO_ITEM_EXCLUSIVO);
+    const c = combatenteDe(
+      jogador({ emJogo: { raca: null, slots: { ...SLOTS_VAZIOS, capacete: item } } }),
+      catalogoDeTeste(),
+    );
+    // BASE.forca (3) + reduzido (1) = 4. Se somasse o cheio daria 7; se somasse
+    // zero daria 3. Os três números são distintos DE PROPÓSITO — é o que separa
+    // "rende menos" de "não rende" e de "rende tudo".
+    expect(c.forca).toBe(4);
+  });
+
+  it('pôr a raça dona DEPOIS de equipar já rende o cheio — sem código nenhum', () => {
+    // O caso simétrico sai de graça: `combatenteDe` recalcula a cada consulta e
+    // não existe campo denormalizado para dessincronizar. Foi o que a morte do
+    // `combatenteBase` (Plano 3a) comprou. Vale um teste, não vale código — e o
+    // teste existe justamente para que ninguém "implemente" isto depois.
+    const item = equipamento('t-1', ID_DO_ITEM_EXCLUSIVO);
+    const slots = { ...SLOTS_VAZIOS, capacete: item };
+    const semRaca = combatenteDe(jogador({ emJogo: { raca: null, slots } }), catalogoDeTeste());
+    const comRaca = combatenteDe(
+      jogador({ emJogo: { raca: raca('p-1', ID_DA_RACA_DONA), slots } }),
+      catalogoDeTeste(),
+    );
+    expect(comRaca.forca).toBe(semRaca.forca + 3);
+  });
+
+  it('item PROIBIDO no corpo é invariante NOSSA: Error cru, não AcaoInvalida', () => {
+    // `equiparCarta` recusa (Task 4) e `jogarCarta` derruba na troca de raça
+    // (Task 6), então este estado não deveria existir. Se existir, alguém furou o
+    // reducer — 500 sem vazar, nunca "culpa sua". Mesma cadeia do id que o
+    // catálogo não conhece, logo acima.
+    const item = equipamento('t-1', ID_DO_ITEM_EXCLUSIVO);
+    expect(() => combatenteDe(
+      jogador({ emJogo: { raca: raca('p-1', ID_DA_RACA_OUTRA), slots: { ...SLOTS_VAZIOS, capacete: item } } }),
+      catalogoDeTeste(),
+    )).toThrowError(/proibido/);
   });
 });
 
