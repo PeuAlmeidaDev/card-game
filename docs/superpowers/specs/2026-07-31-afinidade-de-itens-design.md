@@ -252,6 +252,15 @@ na tela**. A regra é uma linha por par, e a recontagem sai **do reducer para a 
 contrário** — a tabela já mentiu quatro vezes, e a quarta foi por **omissão**, que só se acha
 recontando a partir do código.
 
+🔴 **CORREÇÃO DA EXECUÇÃO (Task 4, 2026-08-02): são DUAS linhas, não uma.** `equiparCarta` é legal
+nas **duas** fases paradas (`recompor` e `jogar`), e a convenção da tabela é **uma linha por par** —
+uma célula com duas fases é exatamente o mecanismo das **três primeiras** mentiras dela. A tabela
+foi de **catorze para DEZESSEIS pares, em DEZOITO linhas**, recontada **a partir do reducer** de
+forma independente pelo implementador e pelo revisor, sem omissão nem inflação. ➡️ **Esta frase fica
+marcada em vez de corrigida em silêncio**: quem lê o spec depois precisa saber que "uma linha" era a
+previsão, não o resultado — e que a diferença nasceu da própria convenção que o parágrafo acima
+invoca.
+
 🔴 **Não crave o número total aqui.** A primeira redação deste spec dizia *"a 14ª linha"*, contando
 a partir das 13 de hoje — e isso **já nasceu errado**, porque a decisão #61 do bible pôs o **Plano
 4b na frente desta fatia**, e ele acrescenta os pares dele antes. Número total em prosa é a mesma
@@ -349,6 +358,23 @@ mecânica** — por isso §10 exige medir os dois lados.
 
 ⚠️ **Escreva sempre "zero em N partidas", nunca "não acontece"** — é a checagem depois de cada ação,
 não prova de impossibilidade (decisão #53 do bible).
+
+✅ **AS TRÊS FORAM MEDIDAS (Task 10, 960 partidas). Resultado nas decisões #75, #77 e #76 do game
+bible** — o relatório é gitignored, então **o bible e o `CLAUDE.md` são a fonte**. Duas ressalvas que
+a tabela acima **não previa** e que ficam registradas aqui porque mudam como a linha se lê:
+
+- 🔴 **A terceira linha NÃO foi medida como pedida, e não dava para medir.** O que existe é um
+  **LIMITE SUPERIOR** — *"existia ≥1 candidato proibido na mão+mochila quando o bot foi decidir"*
+  (**75,4% / 73,0%**; olhando **só a mão**, **32,9% / 31,6%**) —, **não** a contagem de recusas: a
+  recusa acontece dentro de `vestirOuGuardar`, que é **privada** de `bot.ts`, e instrumentá-la
+  exigiria mexer em código de produção para facilitar a medição. **A palavra "recusa" não pode
+  aparecer sem essa qualificação ao lado.**
+- 🔴 **A segunda linha respondeu "não é regra morta" e trouxe um problema de PROCESSO junto:**
+  **40,6% das partidas** têm ≥1 queda, mas a **mediana por partida é ZERO** — é **evento de cauda**,
+  e por isso *"ver um item cair por perda de afinidade"* **não pode virar item de gate ocular**
+  (reprovaria em ~59% das observações com o código correto). É a **decisão #70** do bible se
+  repetindo na fatia seguinte à dela, e o gate do §12 abaixo foi escrito **sem** esse item, de
+  propósito.
 
 ---
 
