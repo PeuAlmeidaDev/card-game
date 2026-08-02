@@ -1934,6 +1934,24 @@ describe('aplicarAcao — equiparCarta', () => {
 
     expect(depois.jogadores[0]?.emJogo.slots.capacete?.id).toBe('t-1');
   });
+
+  it('equipar NÃO derruba a raça em jogo — a zona é espalhada, não remontada', () => {
+    // O erro que isto prende o compilador ACEITA: `{ raca: null, slots }` tem os
+    // campos certos com o valor errado. O gêmeo em `jogarCarta` já reprovava por
+    // 6 testes; aqui ninguém olhava a raça, e a mutação passava 279/279 verde.
+    const item = equipamento('t-1');
+    const p0 = comMao(nascida(), [item]);
+    const jogadores = p0.jogadores.map((j) => (
+      j.id === 'p1' ? { ...j, emJogo: { ...j.emJogo, raca: raca('r1', ID_DA_RACA_DONA) } } : j
+    ));
+    const estado: EstadoPartida = {
+      ...p0, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...p0, jogadores }, 'p1')),
+    };
+
+    const r = aplicarAcao(estado, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+
+    expect(jogadorDe(r.estado, 'p1').emJogo.raca?.racaId).toBe(ID_DA_RACA_DONA);
+  });
 });
 
 describe('aplicarAcao — guardarCarta', () => {

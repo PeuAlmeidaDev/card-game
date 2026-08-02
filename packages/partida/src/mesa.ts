@@ -919,8 +919,6 @@ function equiparCarta(
     // ver o pin de ordem em `mesa.test.ts` ("vindo de uma mochila CHEIA...").
     mao: origem === 'mao' ? jogador.mao.filter((c) => c.id !== carta.id) : jogador.mao,
     mochila: origem === 'mochila' ? jogador.mochila.filter((c) => c.id !== carta.id) : jogador.mochila,
-    // ESPALHA a zona; não a remonta — o que esta função não conhece precisa
-    // sobreviver a ela.
     emJogo: { ...jogador.emJogo, slots },
   };
   const comJogador: EstadoPartida = {

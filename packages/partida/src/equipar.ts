@@ -77,13 +77,14 @@ export function colocarNoSlot(
  * mochila**. Reusar traria os quatro ramos de Porta como código morto, poria o
  * ramo da mochila na função errada, e fecharia um ciclo de import `mesa` ↔
  * `equipar`.
+ *
+ * @param motivo Sem default de propósito: o valor certo depende de quem chamou,
+ * e o compilador tem que cobrar cada call-site novo.
  */
 export function destinoDoDesequipado(
   estado: EstadoPartida,
   deslocados: readonly CartaEquipamento[],
   jogadorId: string,
-  // Sem default de propósito: o valor certo depende de quem chamou, e o
-  // compilador tem que cobrar cada call-site novo.
   motivo: Extract<EventoDaMesa, { readonly tipo: 'desequipou' }>['motivo'],
 ): { readonly estado: EstadoPartida; readonly eventos: readonly EventoDaMesa[] } {
   // Sem nada deslocado, devolve o MESMO estado: um spread aqui trocaria a

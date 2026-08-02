@@ -11,8 +11,9 @@ errada não veste — com o item caindo do corpo quando a troca de raça o torna
 (`combatenteDe`, `equiparCarta`, o bot) e re-exportada como **valor** por `shared` para a tela ler
 em vez de copiar. O eixo (`raca` | `classe`) nasce completo no tipo desde o primeiro commit; o
 catálogo declara só `raca`, e a ausência do outro é travada por **teste vermelho**, nunca por
-comentário. `partida` continua cego ao catálogo: compara `info.exclusivo.id` com
-`emJogo.raca?.racaId`, nunca com `'orc'` escrito à mão.
+comentário. `partida` continua cego ao catálogo: compara `info.exclusivo.donoId` (⚠️ o campo se
+chamava `id` quando este plano foi escrito; renomeado na Task 12) com `emJogo.raca?.racaId`, nunca
+com `'orc'` escrito à mão.
 
 **Tech Stack:** TypeScript strict (+ `noUncheckedIndexedAccess`), pnpm workspaces, vitest, ESLint
 flat. Pacotes tocados: `cartas`, `partida`, `shared`, `web`. `motor`, `personagem` e `server` não

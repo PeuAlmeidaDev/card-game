@@ -170,8 +170,10 @@ Em `packages/cartas/src/itens.ts`:
 ```ts
 export interface Afinidade {
   readonly eixo: 'raca' | 'classe';
-  /** O id da raça/classe que veste este item por inteiro. */
-  readonly id: string;
+  // ⚠️ RENOMEADO NA EXECUÇÃO (Task 12, 2026-08-02): este spec foi aprovado em
+  // 2026-07-31 com o campo chamado `id`. O nome carregava um comentário só para
+  // dizer que ele NÃO é o `id` do item; o comentário virou o nome.
+  readonly donoId: string; // era: `id`
   /** O que o item rende para quem NÃO tem o eixo em jogo. Obrigatório: ver decisão #3. */
   readonly semAfinidade: ModificadoresDeItem;
 }
@@ -230,8 +232,9 @@ o que a morte do `combatenteBase` (Plano 3a) comprou. Vale um teste, não vale c
 cada um respondesse por conta própria seria a quinta cópia de regra que este projeto pagou para
 desfazer — e a que divergisse acenderia um botão que só serve para levar 400.
 
-⚠️ **`partida` continua cego ao catálogo:** ele compara `info.exclusivo.id` com
-`emJogo.raca?.racaId`, nunca com `'orc'` escrito à mão. Nenhum id de conteúdo entra no domínio.
+⚠️ **`partida` continua cego ao catálogo:** ele compara `info.exclusivo.donoId` (⚠️ chamado `id`
+neste spec até a Task 12 — ver §4) com `emJogo.raca?.racaId`, nunca com `'orc'` escrito à mão.
+Nenhum id de conteúdo entra no domínio.
 
 **`combatenteDe`** passa a somar a contribuição **efetiva** de cada item equipado (cheia ou
 reduzida), em vez de entregar `info` cru ao `montarCombatente`.
