@@ -1140,6 +1140,34 @@ describe('TelaMesa — afinidade de itens', () => {
     expect(botao).toBeDisabled();
   });
 
+  it('"Equipar" da MOCHILA também fica apagado no exclusivo de outra raça — o gêmeo do par da mão', async () => {
+    // Mutação medida pelo revisor: remover `|| euNaoPossoVestir(carta.itemId)`
+    // SÓ do botão da mochila deixava a suíte inteira verde — o teste acima cobre
+    // só a lista da mão. `cartaEquipavelDe` (packages/partida) procura o item na
+    // mão OU na mochila, e a tela precisa do MESMO `disabled` nas duas listas:
+    // sem ele, o Machado na mochila de um Anão fica aceso e o clique leva 400.
+    await abrirMesa(
+      {
+        ...vistaBase,
+        fase: 'recompor',
+        jogadores: vistaBase.jogadores.map((j) => (
+          j.id === 'p1'
+            ? {
+              ...j,
+              emJogo: { raca: { id: 'r1', tipo: 'raca', racaId: 'anao' }, slots: SLOTS_VAZIOS },
+              limiteDeMao: 7,
+              mochila: [tesouro('t-1', 'machado')],
+            }
+            : j
+        )),
+      },
+      undefined, undefined, ITENS_COM_EXCLUSIVO,
+    );
+
+    const botao = await screen.findByRole('button', { name: 'Equipar' });
+    expect(botao).toBeDisabled();
+  });
+
   it('a carta exclusiva mostra o número que vale PARA VOCÊ', async () => {
     // p1 SEM raça em jogo (o default de `vistaBase`): o Machado é exclusivo do
     // Orc, então quem não tem raça veste pelo REDUZIDO — nunca o cheio.

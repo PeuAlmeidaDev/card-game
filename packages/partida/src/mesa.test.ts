@@ -14,7 +14,7 @@ import { filaDeDados, criarDadoCiclico } from './testes/dados';
 import { monstro, monstros, raca, equipamento } from './testes/cartas';
 import {
   catalogoDeTeste, ID_DA_CLASSE_DE_TESTE, MONSTRO_DE_TESTE, ID_DO_ITEM_EXCLUSIVO, ID_DA_RACA_OUTRA,
-  ID_DA_RACA_DONA, ID_DO_ITEM_DE_TESTE, ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS,
+  ID_DA_RACA_DONA, ID_DO_ITEM_DE_TESTE, ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS, ID_DO_ITEM_EXCLUSIVO_PES,
 } from './testes/catalogo';
 import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import { combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
@@ -1513,11 +1513,36 @@ describe('trocar de raça derruba o que perdeu afinidade', () => {
     const cartaDeRaca = raca('p-9', ID_DA_RACA_OUTRA);
     const estado = comCorpo(nascida(), { maoDireita: montante, maoEsquerda: montante }, [cartaDeRaca]);
 
-    const { eventos } = aplicarAcao(
+    const { eventos, estado: depois } = aplicarAcao(
       estado, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'p-9' }, deps([]),
     );
 
     expect(eventos.filter((e) => e.tipo === 'desequipou')).toHaveLength(1);
+    // O evento sozinho não prova que os DOIS slots esvaziaram — só que UMA carta
+    // caiu. Mutação medida: `tirarDosSlots` sem `maoEsquerda` no laço deixa este
+    // describe inteiro verde, porque nenhuma asserção lia o slot.
+    expect(depois.jogadores[0]?.emJogo.slots.maoDireita).toBeNull();
+    expect(depois.jogadores[0]?.emJogo.slots.maoEsquerda).toBeNull();
+  });
+
+  it('o exclusivo em `pes` cai igual ao de `capacete` — o slot que a suíte não tocava', () => {
+    // Mutação medida pelo revisor: trocar `Object.keys(SLOTS_VAZIOS)` por
+    // `['capacete', 'armadura', 'maoDireita']` em `tirarDosSlots` deixava
+    // 280/280 verdes — nem `pes` nem `maoEsquerda` tinham teste. O cenário não é
+    // hipotético: `botas-de-mare` (catálogo real) é exclusivo de `aquatico` e
+    // mora em `pes` — sem este teste, trocar de raça deixaria as botas presas no
+    // slot E `destinoDoDesequipado` as duplicaria na mochila, e a próxima
+    // consulta de `combatenteDe` lançaria `Error` cru (500) numa partida legítima.
+    const item = equipamento('t-1', ID_DO_ITEM_EXCLUSIVO_PES);
+    const cartaDeRaca = raca('p-9', ID_DA_RACA_OUTRA);
+    const estado = comCorpo(nascida(), { pes: item }, [cartaDeRaca]);
+
+    const { estado: depois } = aplicarAcao(
+      estado, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'p-9' }, deps([]),
+    );
+
+    expect(depois.jogadores[0]?.emJogo.slots.pes).toBeNull();
+    expect(depois.jogadores[0]?.mochila.map((c) => c.id)).toContain('t-1');
   });
 
   it('com UMA vaga na mochila e DOIS itens caindo, um vai para cada destino', () => {

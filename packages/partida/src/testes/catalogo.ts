@@ -161,6 +161,20 @@ export const ITEM_EXCLUSIVO_DUAS_MAOS = {
   exclusivo: { eixo: 'raca' as const, donoId: ID_DA_RACA_DONA, semAfinidade: { forca: 1 } },
 };
 
+/**
+ * Exclusivo em `pes` — sem ele, `tirarDosSlots` varrendo um array escrito à mão
+ * sem esse slot ainda passava a suíte inteira: nenhum teste equipava um
+ * exclusivo ali. `capacete` (`ITEM_EXCLUSIVO`) e `maoDireita`/`maoEsquerda`
+ * (`ITEM_EXCLUSIVO_DUAS_MAOS`) já eram cobertos; `pes` era o slot mudo.
+ */
+export const ID_DO_ITEM_EXCLUSIVO_PES = 'i-exclusivo-pes';
+export const ITEM_EXCLUSIVO_PES = {
+  id: ID_DO_ITEM_EXCLUSIVO_PES, nome: 'Item Exclusivo de Pés',
+  slot: 'pes' as const, duasMaos: false,
+  modificadores: { agilidade: 2 },
+  exclusivo: { eixo: 'raca' as const, donoId: ID_DA_RACA_DONA, semAfinidade: { agilidade: 1 } },
+};
+
 export function catalogoDeTeste(
   parcial: Partial<CatalogoDaMesa> = {},
 ): CatalogoDaMesa {
@@ -184,6 +198,7 @@ export function catalogoDeTeste(
       if (id === ID_DO_ITEM_LASTRO) return ITEM_LASTRO;
       if (id === ID_DO_ITEM_EXCLUSIVO_DE_CLASSE) return ITEM_EXCLUSIVO_DE_CLASSE;
       if (id === ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS) return ITEM_EXCLUSIVO_DUAS_MAOS;
+      if (id === ID_DO_ITEM_EXCLUSIVO_PES) return ITEM_EXCLUSIVO_PES;
       return undefined;
     },
     ...parcial,
