@@ -76,6 +76,26 @@ type CartaNaMao = VistaDaPartida['suaMao'][number];
 const MAO_QUE_ESTOURA = 9;
 
 /**
+ * Vista com a mão de p1 preenchida **e `cartasNaMao` batendo com ela**. Os dois
+ * campos são projeções da MESMA zona (`suaMao` é o conteúdo, `cartasNaMao` é a
+ * contagem que os outros assentos enxergam), e o domínio nunca os emite
+ * divergentes — um fixture com duas cartas em `suaMao` e `cartasNaMao: 0` afirma
+ * sobre um jogo que não existe, mesmo quando nenhuma asserção olha o contador.
+ *
+ * ⚠️ **Não é varredura:** os fixtures anteriores ao Plano 4b ainda montam
+ * `{ ...vistaBase, suaMao: [...] }` na mão, com o contador em 0. Sincronizá-los
+ * é mexer em testes de outras fatias sem achado que o peça; o que esta função
+ * garante é que o próximo fixture nasça certo.
+ */
+const comMao = (vista: VistaDaPartida, suaMao: readonly CartaNaMao[]): VistaDaPartida => ({
+  ...vista,
+  suaMao,
+  jogadores: vista.jogadores.map((j) => (
+    j.id === 'p1' ? { ...j, cartasNaMao: suaMao.length } : j
+  )),
+});
+
+/**
  * Vista na fase `descartar` com a mão que o domínio precisaria ver para chegar
  * nela. O enchimento até `MAO_QUE_ESTOURA` mora aqui, num ponto só, para que o
  * próximo giro do dial quebre um lugar em vez de cinco fixtures.
@@ -101,14 +121,7 @@ const emDescartar = (cartas: readonly CartaNaMao[] = []): VistaDaPartida => {
       (_, i): CartaNaMao => ({ id: `m-${i}`, tipo: 'monstro', monstroId: 'm-teste' }),
     ),
   ];
-  return {
-    ...vistaBase,
-    fase: 'descartar',
-    suaMao,
-    jogadores: vistaBase.jogadores.map((j) => (
-      j.id === 'p1' ? { ...j, cartasNaMao: suaMao.length } : j
-    )),
-  };
+  return comMao({ ...vistaBase, fase: 'descartar' }, suaMao);
 };
 
 const abrirMesa = async (
@@ -961,14 +974,10 @@ describe('TelaMesa — a fase `encrenca`', () => {
   it('"Procurar encrenca" só acende na carta de MONSTRO', async () => {
     // Par fino: a tabela de fases aprova `procurarEncrenca` na fase inteira e não
     // sabe do tipo da carta. Sem este gêmeo, clicar na raça leva 400.
-    await abrirMesa({
-      ...vistaBase,
-      fase: 'encrenca',
-      suaMao: [
-        { id: 'p-m', tipo: 'monstro', monstroId: 'goblin' },
-        { id: 'p-r', tipo: 'raca', racaId: 'orc' },
-      ],
-    });
+    await abrirMesa(comMao({ ...vistaBase, fase: 'encrenca' }, [
+      { id: 'p-m', tipo: 'monstro', monstroId: 'goblin' },
+      { id: 'p-r', tipo: 'raca', racaId: 'orc' },
+    ]));
 
     const botoes = await screen.findAllByRole('button', { name: /procurar encrenca/i });
     expect(botoes).toHaveLength(1);
@@ -995,14 +1004,10 @@ describe('TelaMesa — a fase `encrenca`', () => {
     // o `cartaId` por qualquer outro id continuaria passando — a mão tem DOIS
     // monstros distintos e o clique é no segundo, para o teste ter dentes.
     const agir = vi.spyOn(api, 'agir').mockResolvedValue({ status: 200, body: vistaBase } as never);
-    await abrirMesa({
-      ...vistaBase,
-      fase: 'encrenca',
-      suaMao: [
-        { id: 'p-m1', tipo: 'monstro', monstroId: 'goblin' },
-        { id: 'p-m2', tipo: 'monstro', monstroId: 'orc-guerreiro' },
-      ],
-    });
+    await abrirMesa(comMao({ ...vistaBase, fase: 'encrenca' }, [
+      { id: 'p-m1', tipo: 'monstro', monstroId: 'goblin' },
+      { id: 'p-m2', tipo: 'monstro', monstroId: 'orc-guerreiro' },
+    ]));
 
     // `orc-guerreiro` não está no catálogo de teste — cai no fallback `?? id`, que
     // é exatamente o que torna a linha inconfundível com a do Goblin.
