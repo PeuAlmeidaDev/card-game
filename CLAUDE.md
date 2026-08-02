@@ -73,8 +73,8 @@ Visão do jogo **fechada** em 2 sessões de `grilling` (9 + 13 decisões) — ve
 **sete** pacotes. ⚠️ Até 2026-07-31 esta lista trazia um oitavo, `progressao`, em três lugares
 (aqui, na Stack e no diagrama). **Ele não existe desde o commit `ca52c7a`**, que o renomeou para
 `partida` ao trocar a run solo pela mesa. Fatias 1–7 completas. **Fatia 8 "TESOUROS": Planos 1, 2, 3a ("Tesouros e o
-corpo"), 3b ("As fases do corpo") e 4a ("Mochila e o bot que veste") mergeados; o Plano 4b
-("A encrenca") construído em 2026-08-01 e PENDENTE DE MERGE.** Com o 4b a fatia 8 fecha a parte
+corpo"), 3b ("As fases do corpo"), 4a ("Mochila e o bot que veste") e **4b ("A encrenca")
+mergeados.** Com o 4b a fatia 8 fecha a parte
 ESTRUTURAL: o §6 do bible e o `Fase` do código passam a ter as mesmas **seis** fases. Detalhe do
 4b na sessão de 2026-08-01, no fim deste arquivo.
 
@@ -408,8 +408,9 @@ fato** subiu). Registrado como decisão **#55**; a alavanca real sobre a economi
   ✅ **Refeito no 4b: zero em 604 partidas**, agora com `saquear` em jogo (598 usos só nas rodadas
   de N=80) e com a condição virada **predicado** em `fase.test.ts` (#62). O `Error` cru **fica**.
 
-✅ **O que era "Próximo" aqui — o Plano 4b, a fase `encrenca` — ESTÁ CONSTRUÍDO** (2026-08-01,
-pendente de merge). Os três baselines abaixo **foram remedidos**; os resultados estão na sessão de
+✅ **O que era "Próximo" aqui — o Plano 4b, a fase `encrenca` — ESTÁ CONSTRUÍDO E MERGEADO**
+(2026-08-01; gate ocular fechado em 2026-08-02). Os três baselines abaixo **foram remedidos**; os
+resultados estão na sessão de
 2026-08-01, no fim deste arquivo. O parágrafo segue como registro do que se esperava dele.
 
 Os verbos `procurarEncrenca`/`saquear` (§6 do
@@ -485,12 +486,14 @@ receita-alvo **não é construível** com o catálogo de hoje.
 
 ## ⚠️ SESSÃO DE 2026-08-01 — a `encrenca` está CONSTRUÍDA, e pela primeira vez nesta fatia a promessa se cumpriu
 
-**O Plano 4b está construído e PENDENTE DE MERGE** (branch `feat/fatia-8-plano-4b-encrenca`).
+**O Plano 4b está MERGEADO** (branch `feat/fatia-8-plano-4b-encrenca`).
 Sete tasks de código + esta de documentação; **527 testes verdes**, typecheck 7/7 e lint limpos.
-🔴 **O gate ocular (Step 4 da Task 9) é do Pedro e NÃO foi feito** — nada aqui o substitui.
-⏸️ **Atualizado em 2026-08-02:** os **itens 1–3 foram conferidos pelo Pedro** e o **item 5 foi
-fechado por SONDA** (ele não é observável na tela — ver a sessão de 2026-08-02 e a decisão #70 do
-bible). **O item 4 segue pendente com ele**, agora com o critério corrigido.
+✅ **GATE OCULAR FECHADO PELO PEDRO em 2026-08-02.** Os itens **1–3** e o **4** (a ausência do botão
+"Procurar encrenca" na carta de raça) foram conferidos por ele na tela; o **item 5** foi fechado por
+**SONDA**, porque **não é observável numa partida** — ver a sessão de 2026-08-02 e a decisão **#70**
+do bible. ⚠️ **Metade do que este gate "pegou" era defeito do próprio roteiro, não do código:** o
+item 5 pedia um evento de cauda (falso negativo em ~91% das partidas) e o item 4 estava escrito de
+formas **opostas** no plano e no spec. Nenhum dos dois era sobre o código.
 
 **O que entrou em produção:** a fase **`encrenca`** com os dois verbos —
 **`procurarEncrenca`** (joga um monstro **da mão**, reusando `resolverCarta`, e por isso o combate
