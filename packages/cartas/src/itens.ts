@@ -90,7 +90,8 @@ export interface ItemCarta {
 }
 
 /**
- * 🎚️ Oito itens cobrindo os 5 slots. A calibragem é deliberadamente TÍMIDA: o
+ * 🎚️ Doze itens cobrindo os 5 slots: 8 comuns + 4 exclusivos, um por raça
+ * sacável (`RACAS_SACAVEIS`). A calibragem é deliberadamente TÍMIDA: o
  * balanceamento medido na fatia 5 (5 derrotas para 9 vitórias) já era duro, e
  * agora o jogador acumula itens ao longo da partida — o efeito composto é a
  * variável nova. Subir números aqui é o dial mais barato de girar depois do
@@ -99,6 +100,9 @@ export interface ItemCarta {
  * O **Montante** é a única arma de duas mãos: ele dá mais força que a Espada
  * Curta, e o preço é a mão que sobraria para o Escudo. É o primeiro trade-off
  * real de composição do corpo — sem ele, equipar seria só somar.
+ *
+ * `ITENS_SACAVEIS` deriva deste array, então os 4 exclusivos entram no
+ * baralho de Tesouros: 32 → 48 cartas na mesa de 4.
  */
 export const ITENS: readonly ItemCarta[] = [
   { id: 'elmo-de-couro', nome: 'Elmo de Couro', slot: 'capacete', duasMaos: false, modificadores: { vida: 2 }, exclusivo: null },
@@ -109,6 +113,34 @@ export const ITENS: readonly ItemCarta[] = [
   { id: 'montante', nome: 'Montante', slot: 'maoDireita', duasMaos: true, modificadores: { forca: 4, agilidade: -1 }, exclusivo: null },
   { id: 'escudo-redondo', nome: 'Escudo Redondo', slot: 'maoEsquerda', duasMaos: false, modificadores: { vida: 3 }, exclusivo: null },
   { id: 'botas-leves', nome: 'Botas Leves', slot: 'pes', duasMaos: false, modificadores: { agilidade: 2 }, exclusivo: null },
+  // 🎚️ Os QUATRO exclusivos, um por raça sacável. A calibragem segue TÍMIDA, como
+  // o resto do catálogo: cheio soma ~4 (o teto dos itens de hoje, que vai de 1 a 4)
+  // e reduzido soma 1 ou 2 — na faixa de um item comum, nunca zero. Esse par é o
+  // que faz o exclusivo alheio ser "jogável, só que menos", que é a decisão #1 do
+  // spec da afinidade.
+  //
+  // O que se perde no reduzido é sempre a parte TÉCNICA, nunca a bruta: o machado
+  // corta igual na mão de qualquer um, e o que falta é saber usá-lo. É por isso que
+  // os dois conjuntos são DECLARADOS e não derivados (decisão #3) — nenhuma fórmula
+  // global produz "mantém a força, perde a habilidade".
+  //
+  // ⚠️ `maoEsquerda` continua com UM item só (o Escudo Redondo). É lacuna de
+  // conteúdo conhecida e é dial, não bug — nenhuma regra desta fatia depende da
+  // cobertura de slot.
+  //
+  // Nomes provisórios: nomenclatura autoral é sessão à parte (bible §16).
+  { id: 'machado-do-orc', nome: 'Machado do Orc', slot: 'maoDireita', duasMaos: false,
+    modificadores: { forca: 3, habilidade: 1 },
+    exclusivo: { eixo: 'raca', id: 'orc', semAfinidade: { forca: 2 } } },
+  { id: 'placa-do-cla', nome: 'Placa do Clã', slot: 'armadura', duasMaos: false,
+    modificadores: { vida: 5, agilidade: -1 },
+    exclusivo: { eixo: 'raca', id: 'anao', semAfinidade: { vida: 3, agilidade: -1 } } },
+  { id: 'diadema-elfico', nome: 'Diadema Élfico', slot: 'capacete', duasMaos: false,
+    modificadores: { habilidade: 3, agilidade: 1 },
+    exclusivo: { eixo: 'raca', id: 'elfo', semAfinidade: { habilidade: 1 } } },
+  { id: 'botas-de-mare', nome: 'Botas de Maré', slot: 'pes', duasMaos: false,
+    modificadores: { agilidade: 3, vida: 1 },
+    exclusivo: { eixo: 'raca', id: 'aquatico', semAfinidade: { agilidade: 1 } } },
 ];
 
 export function obterItem(id: string): ItemCarta | undefined {

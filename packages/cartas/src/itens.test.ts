@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { ITENS, ITENS_SACAVEIS, obterItem, type Slot } from './itens';
+import { ITENS, ITENS_SACAVEIS, obterItem, type Slot, type ModificadoresDeItem } from './itens';
+import { RACAS_SACAVEIS } from './racas';
 
 const SLOTS: readonly Slot[] = ['capacete', 'armadura', 'maoDireita', 'maoEsquerda', 'pes'];
 
@@ -76,5 +77,40 @@ describe('exclusividade', () => {
     // deixar o teste virar vácuo (o modo de falha de `teste-de-ausencia-vira-vacuo`).
     const deClasse = ITENS.filter((i) => i.exclusivo?.eixo === 'classe');
     expect(deClasse.map((i) => i.id)).toEqual([]);
+  });
+
+  it('há exatamente UM exclusivo por raça sacável, e nenhum para o Humano', () => {
+    // A conta sai de `RACAS_SACAVEIS`, nunca de "quantas raças o roster lista":
+    // são 4 sacáveis, não 5, e a #54 do bible existe porque três decisões erraram
+    // exatamente isto. O Humano fica de fora porque ele É a ausência — um item
+    // dele seria um item que só quem não tem raça veste cheio, invertendo a regra.
+    const donos = ITENS.flatMap((i) => (i.exclusivo?.eixo === 'raca' ? [i.exclusivo.id] : []));
+    expect([...donos].sort()).toEqual(RACAS_SACAVEIS.map((r) => r.id).sort());
+  });
+
+  it('todo item exclusivo declara um `semAfinidade` que rende ALGUMA coisa', () => {
+    // Reduzido não é zero: a decisão #1 do spec é que a afinidade é ESCALONADA. Um
+    // `semAfinidade: {}` faria o item ser binário na prática, com a regra
+    // escalonada rodando por cima de um dado que a nega.
+    for (const item of ITENS) {
+      if (item.exclusivo === null) continue;
+      const soma = Object.values(item.exclusivo.semAfinidade as Record<string, number>)
+        .reduce((a, b) => a + b, 0);
+      expect(soma, item.id).toBeGreaterThan(0);
+    }
+  });
+
+  it('o reduzido nunca é MAIOR que o cheio', () => {
+    // Se fosse, a especialização viraria uma punição e o balanceamento estaria
+    // dizendo o contrário do que a mecânica promete. É a checagem que a decisão #3
+    // do spec compra ao declarar os dois conjuntos em vez de derivar um do outro:
+    // com dois números escritos à mão, inverter é um typo.
+    for (const item of ITENS) {
+      if (item.exclusivo === null) continue;
+      const total = (m: ModificadoresDeItem): number =>
+        Object.values(m as Record<string, number>).reduce((a, b) => a + b, 0);
+      expect(total(item.exclusivo.semAfinidade), item.id)
+        .toBeLessThanOrEqual(total(item.modificadores));
+    }
   });
 });
