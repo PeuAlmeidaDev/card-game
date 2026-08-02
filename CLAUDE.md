@@ -244,8 +244,16 @@ revisão de diff a pega, porque não há diff.
 Corrigido: evento **`tesouroEsgotado`** (com `naoPagas`, convivendo com o `loot` no pagamento
 parcial) e a tela mostrando o estoque dos **dois** baralhos — `tesourosNoMonte` viajava na vista
 desde o 3a e **nunca fora renderizado**, a 3ª ocorrência de "publicado mas não renderizado" nesta
-fatia. ⚠️ Isto conserta a **visibilidade**; a **economia continua aberta** (pergunta 11 do §18) e
-é dial do Pedro.
+fatia. ⚠️ Isto conserta a **visibilidade**. A **economia não** — mas a **pergunta 11 do §18 está
+FECHADA desde 2026-07-29**: a resposta é **estrutural** (decisão **#40 do game bible**,
+consumíveis ≥ ~50% da receita de Itens, mais a evacuação do §10 que a **#46** vai construir), e a
+**#55** confirmou **por medição** que *"aumentar a pressão de mão"* **não** é alavanca sobre a
+economia. 🔴 **O que segue aberto é a CONSTRUÇÃO da resposta:** nenhum consumível existe em
+código, e eles só nascem no **bloco 2** (Maldições/Bad Stuff). ⚠️ **Não é dial** — a #40 recusa
+esse enquadramento por escrito (*"regra ESTRUTURAL, não dial… a resposta da pergunta 11 NÃO é
+'aumentar o baralho'"*), e chamar de dial ressuscita a saída que ela matou. Até 2026-08-01 esta
+linha dizia *"a economia continua aberta (pergunta 11) e é dial do Pedro"*: a citação estava
+certa, a afirmação errada nos dois pontos.
 
 💡 **Hipótese não medida, plausível:** isto pode explicar os DOIS números que a Task 9 registrou
 sem causa fechada — a caridade zerada (não há tesouro para doar na segunda metade) e a taxa de
@@ -266,18 +274,32 @@ apareceu nesta fatia.
 
 ⚠️ **A tabela é um gate de fase, não a resposta inteira de "posso?".** A elegibilidade fina
 (espiada pendente, tipo da carta, `proximaDecisao` do combate) continua em cada função do
-reducer, e **cada uma dessas condições precisa de gêmeo na tela**. Hoje são **15 pares, em 16
+reducer, e **cada uma dessas condições precisa de gêmeo na tela**. Hoje são **14 pares, em 16
 linhas** (o Plano 4a acrescentou os 4 de `guardarCarta`: tipo da carta e mochila cheia, em
-`recompor` e em `jogar`; o **4b** acrescentou os 2 de `procurarEncrenca`: a carta está na sua mão
-e a carta é do tipo monstro), tabelados no comentário do `aplicarAcao` — botão novo escrito só com
-`legal(tipo)` acende onde o domínio recusa e leva 400.
+`recompor` e em `jogar`; o **4b** acrescentou **1**, o tipo monstro de `procurarEncrenca`),
+tabelados no comentário do `aplicarAcao` — botão novo escrito só com `legal(tipo)` acende onde o
+domínio recusa e leva 400.
 
-⚠️ **A 16ª linha NÃO é um par, e ela está lá de propósito:** `saquear` não tem guard fino
-nenhum — pela decisão #62 do bible o baralho de Portas nunca acaba, então não há `if` de baralho
-vazio e não há recusa de domínio para a tela imitar. A linha existe para provar que **a
-recontagem CHEGOU até `saquear`**, que é o cuidado que faltava quando o par órfão de
-`empurrarCarta` passou batido. "Uma linha por par" continua valendo; declarar a ausência **em
-linha** é o que impede a próxima recontagem de achar que alguém esqueceu de olhar.
+⚠️ **Duas das 16 linhas NÃO são par, e estão lá de propósito** — as duas da `encrenca`, cada uma
+por um motivo diferente:
+
+1. **`saquear` não tem guard fino nenhum.** Pela decisão #62 do game bible o baralho de Portas
+   nunca acaba, então não há `if` de baralho vazio e não há recusa de domínio para a tela imitar.
+   A linha existe para provar que **a recontagem CHEGOU até `saquear`**, que é o cuidado que
+   faltava quando o par órfão de `empurrarCarta` passou batido.
+2. **`procurarEncrenca` / "a carta está na sua mão" tem gêmeo ESTRUTURAL, não escrito.** O botão
+   só existe dentro do `map` da mão, então o estado que o guard recusa é um estado que a tela não
+   consegue produzir. 🔑 **Isso é a convenção da tabela, e a prova está no que ela NUNCA listou:**
+   o mesmo guard vive em `cartaDaMao` (`jogarCarta`, `entregarCarta`, `guardarCarta`) e em
+   `cartaEquipavelDe` (`equiparCarta`) — e **`entregarCarta` não tem uma única linha na tabela**,
+   sendo esse o seu único guard fino.
+
+⚠️ **Este número já foi escrito como 15** (na leva de docs do 4b), contando o item 2 como par. É
+erro de inflação, não de omissão — menos perigoso, mas quebra a convenção que faz a recontagem
+funcionar: quem recontar depois procura um gêmeo na tela que não tem o que ser escrito. Corrigido
+em 2026-08-01 recontando **a partir do reducer**, `AcaoInvalida` por `AcaoInvalida`. "Uma linha
+por par" continua valendo; declarar a ausência **em linha, marcada**, é o que impede a próxima
+recontagem de achar que alguém esqueceu de olhar.
 
 ⚠️ Essa tabela já mentiu **quatro vezes**. As três primeiras pelo mesmo mecanismo — **agrupar
 duas fases numa célula** —, com a regra "uma linha por par" escrita no próprio comentário e
@@ -547,9 +569,14 @@ Com os **quatro assentos rodando exatamente a mesma política**: **#0 vence 40,6
   gradiente. Essa conclusão foi escrita e **derrubada na revisão** — o baseline *"antes era ~25%"*
   era **cherry-pick** (o relatório do 4a tem uma rodada com 48,39% que a faixa publicada excluía) e
   **não existe medição de gradiente anterior a esta**. É **hipótese**, não achado causal.
-- ⚠️ **A escada não está estabelecida, só a ponta:** os degraus adjacentes não são individualmente
-  significativos (z ≈ 1,73 / 2,26 / 3,12) e uma das 4 rodadas inverteu #1 e #2. Escreva *"o
-  primeiro vence muito mais que o último"*, **não** "41/27/20/13".
+- ⚠️ **A escada não está estabelecida, só a ponta:** os degraus do **meio** não são individualmente
+  significativos (**#1−#2** z = 1,73; **#2−#3** z = 2,26, marginal); só o **#0−#1** é
+  (z = 3,12). Some-se a isso que uma das 4 rodadas inverteu #1 e #2. Escreva *"o primeiro vence
+  muito mais que o último"*, **não** "41/27/20/13". ⚠️ **Rótulo colado no valor, de propósito:** a
+  versão anterior desta linha dizia *"os degraus **adjacentes**"* e listava `1,73 / 2,26 / 3,12`
+  **sem rótulo e em ordem crescente** — a leitura posicional natural atribuía 1,73 ao #0−#1 e
+  negava justamente o único degrau significativo. É a família *rótulo × valor* que os dois fix
+  rounds da Task 8 corrigiram, reincidindo na **cópia para os docs**.
 - ➡️ **Onde ele vive:** é **pergunta 17 do §18** do bible (medição, não decisão) e a decisão **#68**
   registra o número. **O Pedro ainda não decidiu nada sobre isso.** O que fecharia: rodar o mesmo
   script contra o commit pré-fatia num `git worktree`, comparando **distribuições por assento**,
