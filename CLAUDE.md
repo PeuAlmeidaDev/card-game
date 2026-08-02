@@ -740,14 +740,28 @@ Isso não foi medido, e é o que a pergunta 18 do §18 pede para fechar o dial.
 
 ## ⚠️ SESSÃO DE 2026-08-02/03 — a `afinidade` está construída, e o baralho maior moveu o QUANDO, não o SE
 
-**A fatia `afinidade` está construída na branch `feat/fatia-8-afinidade-de-itens`** — a primeira das
-três que nasceram em 2026-07-31 (decisão **#61** do bible). **13 tasks**, **564 testes verdes**,
-typecheck 7/7, lint limpo. Decisões **#71–#79** do bible; pergunta **19** nova no §18.
+**A fatia `afinidade` está MERGEADA** — a primeira das três que nasceram em 2026-07-31 (decisão
+**#61** do bible). Branch `feat/fatia-8-afinidade-de-itens`, **13 tasks + uma leva final de
+correção**, **566 testes verdes**, typecheck 7/7, lint limpo. Decisões **#71–#79** do bible;
+pergunta **19** nova no §18.
 
-🔴 **O GATE OCULAR DO PEDRO NÃO FOI FEITO** no momento em que estes docs foram escritos, e a revisão
-ampla do branch e o PR também não. ⚠️ **Precedente conhecido:** o `CLAUDE.md` diz "mergeado" **no
-commit que precede o merge** — mas *"o Pedro conferiu"* **não** se escreve antes de ele conferir. O
-roteiro do gate está na Task 11 do plano.
+🔴 **O GATE OCULAR DO PEDRO NÃO FOI FEITO, E A FATIA FOI MERGEADA ASSIM MESMO.** Ele autorizou o
+merge explicitamente em 2026-08-02 (*"pode fazer o push + pr + merge"*), com o roteiro do gate na
+mesa e o dev server no ar. ⚠️ **Isto NÃO é o gate tendo passado** — é o gate tendo sido **dispensado
+para este merge**, e a diferença importa: o gate pegou, **duas vezes seguidas**, o que dezenas de
+revisões e 500 testes não pegaram.
+
+➡️ **O roteiro continua válido e agora roda contra a `main`** (Task 11 do plano, 5 itens). O que ele
+achar vira **fix em cima da `main`**, não revert. ⚠️ **Se alguém for rodá-lo, a ordem eficiente NÃO
+é a do plano:** três dos cinco itens exigem uma raça já em jogo. Ordem prática — (5) o contador de
+Tesouros no monte em **32**, antes de clicar em nada; (2) sem raça, equipar um exclusivo alheio e ver
+o **reduzido**; então jogar uma carta de raça; (4) ler no log **por que** e **para onde** o item
+caiu; (3) o contra-intuitivo — "Equipar" **visível e APAGADO** no exclusivo de outra raça, **nas duas
+listas** (mão e mochila); (1) o exclusivo da própria raça somando o **cheio**.
+
+⚠️ **Precedente preservado:** o `CLAUDE.md` diz "mergeado" **no commit que precede o merge** — mas
+*"o Pedro conferiu"* **não** se escreve antes de ele conferir, e por isso esta seção diz o que
+aconteceu de verdade em vez de carimbar um gate que não houve.
 
 **O que entrou em produção:** um item pode ser **exclusivo** de uma raça (ou, **no tipo**, de uma
 classe). Quem tem a especialização veste pelo valor **cheio**; quem **não tem nenhuma** veste pelo
@@ -941,7 +955,11 @@ contando a evolução da contagem desde o Plano 3b) **é** candidato — o `git 
 
 ### O que fica ABERTO ao sair desta fatia
 
-- 🔴 **O gate ocular do Pedro** (roteiro na Task 11 do plano) e a **revisão ampla + PR**.
+- 🔴 **O gate ocular do Pedro** — **DISPENSADO para o merge**, não cumprido. Roteiro na Task 11 do
+  plano e a ordem prática logo acima; roda contra a `main` e o que achar vira fix, não revert.
+  ✅ A **revisão ampla do branch** foi feita (veredicto *"pronto com ressalvas"*, zero Critical) e as
+  ressalvas viraram a leva final: dois testes que fecharam pares finos que **280/280 e 145/145
+  verdes escondiam**, mais um comentário que já nascia mentindo.
 - 🔴 **A carta proibida presa na mochila** — pergunta **19** do §18, decisão dele.
 - ⬜ **A escolha do que queimar com a mochila cheia** (#59) — **é a próxima fatia**.
 - ⬜ **A decisão de UI da Task 8:** os números de afinidade aparecem **só** nas cartas exclusivas
