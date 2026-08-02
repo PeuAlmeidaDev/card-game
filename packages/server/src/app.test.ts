@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import type { RolarD12 } from '@card-dungeon/motor';
 import type { ResultadoDuelo, Catalogo, VistaDaPartida } from '@card-dungeon/shared';
 import type { Embaralhar } from '@card-dungeon/partida';
-import { obterMonstro } from '@card-dungeon/cartas';
+import { MAO_INICIAL_TESOUROS } from '@card-dungeon/partida';
+import { obterMonstro, ITENS_SACAVEIS } from '@card-dungeon/cartas';
 import { buildApp } from './app';
 
 function filaDeDados(rolagens: readonly number[]): RolarD12 {
@@ -311,6 +312,25 @@ describe('mesa', () => {
     // assentos, menos as 4 da mão inicial de cada um.
     expect(vista.cartasNoMonte).toBe(14 * 4 - 4 * 4);
     expect(vista.suaMao.some((c) => c.tipo === 'raca')).toBe(true);
+    await app.close();
+  });
+
+  it('a mesa de 4 nasce com 32 Tesouros no monte — 48 no baralho menos as 16 da mão inicial', async () => {
+    // O baralho de produção é DERIVADO do catálogo (`app.ts`, via `ITENS_SACAVEIS`), então ele
+    // muda de tamanho toda vez que um item entra. Sem esta asserção, a mudança acontece calada.
+    //   12 itens × 4 jogadores = 48 no baralho
+    //   MAO_INICIAL_TESOUROS (4) × 4 jogadores = 16 distribuídas
+    //   48 − 16 = 32 no monte
+    // ⚠️ Números DERIVADOS das constantes, não cravados: o dia em que o dial girar, este teste
+    // acompanha em vez de mentir.
+    const app = buildApp({ embaralhar: semEmbaralhar });
+    const vista = await criar(app);
+
+    const esperado = ITENS_SACAVEIS.length * 4 - MAO_INICIAL_TESOUROS * 4;
+    expect(vista.tesourosNoMonte).toBe(esperado);
+    // E o valor de HOJE, cravado de propósito ao lado: se alguém mexer nas constantes sem querer,
+    // a linha acima acompanha em silêncio e esta acusa.
+    expect(esperado).toBe(32);
     await app.close();
   });
 
