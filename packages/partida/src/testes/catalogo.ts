@@ -105,6 +105,47 @@ export const ITEM_DUAS_MAOS = {
   slot: 'maoDireita' as const, duasMaos: true, modificadores: { forca: 4 }, exclusivo: null,
 };
 
+/**
+ * Os dois ids de raça dos testes de afinidade. NEUTROS de propósito: `partida` é
+ * cego ao catálogo, e escrever `'orc'` aqui insinuaria um acoplamento que não
+ * existe — é a mesma nota que `testes/cartas.ts` já carrega sobre o `'m-teste'`.
+ */
+export const ID_DA_RACA_DONA = 'r-dona';
+export const ID_DA_RACA_OUTRA = 'r-outra';
+
+/**
+ * O item exclusivo do dublê. 🎚️ Os números não são decorativos e separam TRÊS
+ * respostas, não duas: cheio (4) ≠ reduzido (1) ≠ nada (0). Um reduzido de 0
+ * apagaria a diferença entre "rende menos" e "não rende", que é exatamente a
+ * decisão #1 do spec (afinidade é ESCALONADA, não binária).
+ *
+ * Slot `capacete` para não colidir com os outros dublês, que moram todos em
+ * `maoDireita` — assim um teste pode ter um exclusivo e um comum equipados ao
+ * mesmo tempo sem um deslocar o outro.
+ */
+export const ID_DO_ITEM_EXCLUSIVO = 'i-exclusivo';
+export const ITEM_EXCLUSIVO = {
+  id: ID_DO_ITEM_EXCLUSIVO, nome: 'Item Exclusivo',
+  slot: 'capacete' as const, duasMaos: false,
+  modificadores: { forca: 4 },
+  exclusivo: { eixo: 'raca' as const, id: ID_DA_RACA_DONA, semAfinidade: { forca: 1 } },
+};
+
+/**
+ * O exclusivo do eixo `classe`. Existe SÓ no dublê: nenhum item do catálogo real
+ * o declara (decisão #5 do spec), e sem ele o ramo `classe` de `afinidadeCom`
+ * seria inexercitável — a regra estaria escrita e nenhum teste a tocaria. É
+ * literalmente a lição do `ITEM_DUAS_MAOS`, cuja ausência deixou 240 testes
+ * verdes sobre uma regra quebrada.
+ */
+export const ID_DO_ITEM_EXCLUSIVO_DE_CLASSE = 'i-de-classe';
+export const ITEM_EXCLUSIVO_DE_CLASSE = {
+  id: ID_DO_ITEM_EXCLUSIVO_DE_CLASSE, nome: 'Item de Classe',
+  slot: 'armadura' as const, duasMaos: false,
+  modificadores: { vida: 6 },
+  exclusivo: { eixo: 'classe' as const, id: 'c-outra', semAfinidade: { vida: 2 } },
+};
+
 export function catalogoDeTeste(
   parcial: Partial<CatalogoDaMesa> = {},
 ): CatalogoDaMesa {
@@ -115,7 +156,7 @@ export function catalogoDeTeste(
       if (id === ID_DO_MONSTRO_FORTE) return MONSTRO_FORTE;
       return undefined;
     },
-    // Catálogo de teste conhece UMA classe e QUATRO itens, pelo mesmo princípio do
+    // Catálogo de teste conhece UMA classe e SEIS itens, pelo mesmo princípio do
     // monstro: um dublê que aprova qualquer id não é dublê, é a ausência de um.
     classe: (id) => (id === ID_DA_CLASSE_DE_TESTE ? CLASSE_DE_TESTE : undefined),
     item: (id) => {
@@ -123,6 +164,8 @@ export function catalogoDeTeste(
       if (id === ID_DO_ITEM_FORTE) return ITEM_FORTE;
       if (id === ID_DO_ITEM_FRACO) return ITEM_FRACO;
       if (id === ID_DO_ITEM_DUAS_MAOS) return ITEM_DUAS_MAOS;
+      if (id === ID_DO_ITEM_EXCLUSIVO) return ITEM_EXCLUSIVO;
+      if (id === ID_DO_ITEM_EXCLUSIVO_DE_CLASSE) return ITEM_EXCLUSIVO_DE_CLASSE;
       return undefined;
     },
     ...parcial,

@@ -1,6 +1,8 @@
 import type { Combatente } from '@card-dungeon/motor';
 import { montarCombatente } from '@card-dungeon/personagem';
-import type { CartaEquipamento, CatalogoDaMesa, JogadorNaMesa, Slot, ZonaEmJogo } from './tipos';
+import type {
+  CartaEquipamento, CatalogoDaMesa, EixoDeAfinidade, InfoItem, JogadorNaMesa, Slot, ZonaEmJogo,
+} from './tipos';
 
 /**
  * O corpo vazio. Constante e não função porque o objeto é sempre espalhado por
@@ -23,6 +25,61 @@ export function itensEquipados(slots: ZonaEmJogo['slots']): readonly CartaEquipa
     if (carta !== null) porId.set(carta.id, carta);
   }
   return [...porId.values()];
+}
+
+/**
+ * Quanto deste item é seu. TRÊS respostas, não duas (decisão #1 do spec da
+ * afinidade): `plena` (o valor cheio), `sem` (o valor reduzido que a carta
+ * declara) e `proibida` (você tem a especialização ERRADA e não veste).
+ */
+export type GrauDeAfinidade = 'plena' | 'sem' | 'proibida';
+
+/**
+ * O que a zona tem NO EIXO perguntado, ou `null` se nada.
+ *
+ * O ramo `classe` devolve `null` e isso NÃO é um buraco: `ZonaEmJogo` não tem
+ * campo `classe` nesta fatia, então ninguém tem classe em jogo, e pelo princípio
+ * da decisão #2 do spec ("quem não tem X usa os exclusivos de X") todos são "quem
+ * não tem X". A regra está funcionando contra a zona que existe. Quando
+ * `emJogo.classe` nascer na fatia da classe, este ramo passa a ler de verdade e
+ * NENHUM consumidor muda — quem afirma isso hoje é o teste do `corpo.test.ts`.
+ *
+ * `switch` fechado por `never`: eixo novo na união quebra a compilação DESTE
+ * arquivo, que é o único lugar que traduz eixo em campo da zona.
+ */
+function idNoEixo(eixo: EixoDeAfinidade, emJogo: ZonaEmJogo): string | null {
+  switch (eixo) {
+    case 'raca':
+      return emJogo.raca?.racaId ?? null;
+    case 'classe':
+      return null;
+    default: {
+      const naoTratado: never = eixo;
+      throw new Error(`idNoEixo: eixo não tratado: ${JSON.stringify(naoTratado)}`);
+    }
+  }
+}
+
+/**
+ * **A pergunta, num ponto único.** TRÊS leitores dependem dela — `combatenteDe`
+ * (quanto soma), `equiparCarta` (pode?) e o `bot` (vale a pena? é legal?) — e a
+ * tela a lê pelo re-export de `shared`, nunca por cópia. Se cada um respondesse
+ * por conta própria seria a quinta cópia de regra que este projeto pagou para
+ * desfazer, e a que divergisse acenderia um botão que só serve para levar 400.
+ *
+ * ⚠️ `partida` continua CEGO ao catálogo: compara `info.exclusivo.id` com
+ * `emJogo.raca?.racaId`, nunca com `'orc'` escrito à mão. Nenhum id de conteúdo
+ * entra no domínio.
+ */
+export function afinidadeCom(info: InfoItem, emJogo: ZonaEmJogo): GrauDeAfinidade {
+  const exclusivo = info.exclusivo;
+  // Item comum: todo mundo veste cheio. É a primeira linha da tabela do spec §5.
+  if (exclusivo === null) return 'plena';
+
+  const meu = idNoEixo(exclusivo.eixo, emJogo);
+  // Sem nada no eixo = "quem não tem X" (decisão #2): veste, reduzido.
+  if (meu === null) return 'sem';
+  return meu === exclusivo.id ? 'plena' : 'proibida';
 }
 
 /**
