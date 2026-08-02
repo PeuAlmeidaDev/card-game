@@ -111,7 +111,7 @@ testável só por render.
 10. **A medição** — precisa do conteúdo da Task 9.
 11. **Gate ocular + docs** — humano, não delegável.
 
-⏱️ **Ordem de execução real: 1…9 → 12 → 10 → 11.** O "12" é rótulo (as Tasks 1–11 já estavam
+⏱️ **Ordem de execução real: 1…9 → 13 → 12 → 10 → 11.** O "12" é rótulo (as Tasks 1–11 já estavam
 numeradas quando a regra nova chegou), não posição.
 
 ---
@@ -2184,6 +2184,87 @@ git commit -F /tmp/msg.txt
 - ⚠️ Com PRs empilhados, mergeie **sem** `--delete-branch` e faça `gh pr edit <n> --base main`
   antes de cada merge seguinte: `gh pr merge --delete-branch` **fecha** os PRs que apontavam para
   aquela branch, e o GitHub não retargeta.
+
+---
+
+### Task 13: Prender o tamanho do baralho de Tesouros de produção
+
+> ⏱️ **Executa logo depois da Task 9**, antes da 12. Nasceu de um achado **Important** da revisão
+> da Task 9, fora do escopo daquela task (ela só podia tocar `packages/cartas`).
+
+**Files:**
+- Modify: `packages/server/src/app.test.ts`
+
+**O achado, medido:** `grep -rn "ITENS_SACAVEIS|composicaoTesouros|tesourosNoMonte" packages/`
+mostra que o **único** ponto que deriva a composição de produção do catálogo real é
+`packages/server/src/app.ts:95` — e **nenhum teste, em pacote nenhum**, afirma o tamanho
+resultante. Todos usam composições sintéticas (`i-teste`, `['i-1','i-2','i-3']`).
+
+🔴 **Por que isso importa mais do que parece.** A mudança de economia mais significativa desta
+fatia — o baralho de Tesouros indo de **32 para 48** cartas na mesa de 4 — está **sem uma única
+asserção que a prenda**. E o **item 5 do gate ocular** (Task 11) depende exatamente desse número.
+A decisão **#70 do game bible**, tomada em 2026-08-02, catalogou que **item de gate ocular não é
+guarda confiável** — foi escrita depois de um item de gate reprovar em ~91% das observações com o
+código funcionando. Deixar o número defendido só pelo olho do dono é repetir isso de propósito.
+
+- [ ] **Step 1: Escrever o teste que falha**
+
+Em `packages/server/src/app.test.ts`, no describe que já cria uma partida de produção:
+
+```ts
+  it('a mesa de 4 nasce com 32 Tesouros no monte — 48 no baralho menos as 16 da mão inicial', () => {
+    // O baralho de produção é DERIVADO do catálogo (`app.ts`, via `ITENS_SACAVEIS`), então ele
+    // muda de tamanho toda vez que um item entra. Sem esta asserção, a mudança acontece calada.
+    //   12 itens × 4 jogadores = 48 no baralho
+    //   MAO_INICIAL_TESOUROS (4) × 4 jogadores = 16 distribuídas
+    //   48 − 16 = 32 no monte
+    // ⚠️ Números DERIVADOS das constantes, não cravados: o dia em que o dial girar, este teste
+    // acompanha em vez de mentir.
+    const esperado = ITENS_SACAVEIS.length * ASSENTOS - MAO_INICIAL_TESOUROS * ASSENTOS;
+    expect(vista.tesourosNoMonte).toBe(esperado);
+    // E o valor de HOJE, cravado de propósito ao lado: se alguém mexer nas constantes sem querer,
+    // a linha acima acompanha em silêncio e esta acusa.
+    expect(esperado).toBe(32);
+  });
+```
+
+⚠️ **As duas asserções são deliberadas e fazem trabalhos opostos.** A derivada sobrevive ao giro
+de dial; a cravada acusa o giro. Uma só delas deixa um dos dois modos de falha sem guarda.
+Ajuste os nomes (`ASSENTOS` pode não existir — use o que o arquivo já usa para o número de
+jogadores; `MAO_INICIAL_TESOUROS` vem de `@card-dungeon/partida`).
+
+- [ ] **Step 2: Rodar e ver passar** (o código já está certo — este teste documenta e prende)
+
+Run: `pnpm -F @card-dungeon/server test`
+
+⚠️ Se ele **falhar**, pare: o número real diverge do esperado e isso é achado, não ajuste. Reporte.
+
+- [ ] **Step 3: Sonda — o teste prende mesmo?**
+
+Comente **um** dos 12 itens de `ITENS` em `packages/cartas/src/itens.ts`. O teste tem que reprovar
+(esperado 28, recebido 32 — ou o inverso). **Reverta.**
+
+- [ ] **Step 4: Verificação e commit**
+
+Run: `pnpm test && pnpm typecheck && pnpm lint`
+
+```bash
+git add packages/server
+cat > /tmp/msg.txt <<'EOF'
+test(server): prende o tamanho do baralho de Tesouros de produção
+
+O baralho é derivado do catálogo, então ele muda toda vez que um item entra —
+e nenhuma asserção, em pacote nenhum, prendia o tamanho resultante. Esta fatia
+o levou de 32 para 48 cartas na mesa de 4 sem nada acusar.
+
+Duas asserções de propósito: a derivada sobrevive ao giro de dial, a cravada
+acusa o giro. Uma só deixaria um dos dois modos de falha sem guarda.
+
+O item 5 do gate ocular dependia sozinho desse número, e a decisão #70 do bible
+acabou de catalogar que item de gate não é guarda confiável.
+EOF
+git commit -F /tmp/msg.txt
+```
 
 ---
 
