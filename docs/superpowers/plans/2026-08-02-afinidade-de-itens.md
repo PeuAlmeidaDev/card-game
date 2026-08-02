@@ -39,9 +39,21 @@ personagem 9 · partida 257 · shared 25 · server 30 · web 137), typecheck 7/7
   a suíte e vê-la verde **não** é evidência de nada naquele passo.
 - **Nunca escreva "não acontece"** sobre um número medido — escreva **"zero em N partidas"**
   (decisão #53 do bible). E **cada medida carrega o SEU N**; não empreste N entre linhas.
+- 🔴 **COMENTÁRIO ENXUTO — regra nova, decidida em 2026-08-02, no meio da Task 6.** O `nome` da
+  função diz o que ela faz; comentário só onde o código não consegue falar (truque de tipo
+  não-óbvio, restrição de ordem que ainda não virou teste). **Restrição load-bearing vira TESTE ou
+  NOME.** Narração histórica — por que a decisão foi tomada, o que aconteceu em qual plano — **sai
+  do arquivo**: ela já vive no game bible, no spec e no git.
+  **O motivo é medido, não estético:** `partida/src/tipos.ts` tem 600+ linhas e cai para menos de
+  200 sem comentário. E as **treze** ocorrências catalogadas de "comentário que afirma um presente
+  errado" são o argumento — mais comentário é mais superfície para apodrecer.
+  ⚠️ **As Tasks 1–6 foram escritas sob a regra antiga.** O bloco de código de cada task deste
+  plano ainda traz os comentários longos: **trate-os como conteúdo a ENXUGAR, não a copiar
+  verbatim.** O que o plano fixa verbatim são **nomes, assinaturas, valores e casos de teste** —
+  nunca o volume de prosa. A **Task 12** enxuga o diff das Tasks 1–6.
 - **Comentário afirma o PRESENTE.** Intenção futura vai para o spec ou para um teste que fica
-  vermelho quando a hora chegar. Este projeto pagou **treze vezes** por comentário que afirma um
-  presente errado, e a variante mais cara justificava uma *ausência* de código.
+  vermelho quando a hora chegar. A variante mais cara das treze justificava uma *ausência* de
+  código — não há linha para conferir, só a falta dela.
 - **A tabela de pares finos** (comentário do `aplicarAcao`, `mesa.ts`) recontá-se **do REDUCER
   para a tabela, nunca ao contrário**, `AcaoInvalida` por `AcaoInvalida`. Hoje são **14 pares em
   16 linhas**. Ela já mentiu quatro vezes: 3× por agrupamento, 1× por omissão, e a contagem já
@@ -93,8 +105,14 @@ testável só por render.
 9. **Os 4 itens exclusivos** — o CONTEÚDO, deliberadamente por último: ele é o que muda o
    tamanho do baralho de Tesouros (32 → 48 na mesa de 4), e mudar a economia antes de a mecânica
    estar de pé misturaria as duas na medição. É a decisão #51 do bible com outra roupa.
+12. **Enxugar os comentários desta fatia** — a regra nova chegou no meio da Task 6, e sem esta
+    task a branch fica com dois estilos. Roda **aqui**, antes da medição: o gate e os números
+    valem contra o código final.
 10. **A medição** — precisa do conteúdo da Task 9.
 11. **Gate ocular + docs** — humano, não delegável.
+
+⏱️ **Ordem de execução real: 1…9 → 12 → 10 → 11.** O "12" é rótulo (as Tasks 1–11 já estavam
+numeradas quando a regra nova chegou), não posição.
 
 ---
 
@@ -1503,56 +1521,59 @@ import { afinidadeCom, contribuicaoDe } from './corpo';
 
 e troque `valorDe`:
 
+🔴 **Comentário ENXUTO (regra nova — ver Global Constraints).** Os blocos abaixo já vêm no estilo
+novo: o nome carrega o sentido, e sobra **uma** linha só onde o código não consegue falar. O nome
+`valorDe` vira **`valorEfetivoDe`** — "efetivo" é a coisa toda que o docstring antigo explicava em
+oito linhas.
+
 ```ts
-/**
- * Soma dos modificadores EFETIVOS de um item para ESTE corpo. Métrica gulosa por
- * escolha (a decisão #9 do spec da fatia 8 segue valendo para equipamento): trata
- * +2 de força e +2 de agilidade como equivalentes.
- *
- * ⚠️ Lê a contribuição EFETIVA, não a cheia. Sem isto o bot vê 4 onde vai receber
- * 1 e troca um item bom por um exclusivo alheio que rende menos.
- *
- * Item que o catálogo não conhece vale 0, e item PROIBIDO também — em vez de
- * deixar `contribuicaoDe` lançar. O bot é uma POLÍTICA, não o reducer: uma exceção
- * aqui derrubaria a mesa por uma decisão que sempre tem a alternativa `passar`. E
- * o zero é a resposta certa de qualquer forma: um item que ele não pode vestir não
- * lhe soma nada. Quem impede o bot de PEDIR o proibido é o filtro em
- * `vestirOuGuardar`, não este zero.
- */
-function valorDe(itemId: string, catalogo: CatalogoDaMesa, emJogo: ZonaEmJogo): number {
+function valorEfetivoDe(itemId: string, catalogo: CatalogoDaMesa, emJogo: ZonaEmJogo): number {
   const info = catalogo.item(itemId);
   if (info === undefined) return 0;
+  // Zero, e não `contribuicaoDe` (que lança): o bot é política, e política não derruba a mesa.
   if (afinidadeCom(info, emJogo) === 'proibida') return 0;
   const { forca, vida, habilidade, agilidade } = contribuicaoDe(info, emJogo).modificadores;
   return (forca ?? 0) + (vida ?? 0) + (habilidade ?? 0) + (agilidade ?? 0);
 }
 ```
 
-Em `vestirOuGuardar`, filtre os candidatos e passe a zona nas duas chamadas de `valorDe`:
+Em `vestirOuGuardar`, filtre os candidatos e passe a zona nas duas chamadas:
 
 ```ts
-  // As duas origens de `equiparCarta`, MENOS o que o reducer vai recusar. Filtrar
-  // aqui não é otimização: um candidato proibido virando ação sobe `AcaoInvalida`
-  // por `avancarBots` e vira 400 na jogada do HUMANO, com a mesa morrendo em retry
-  // determinístico — o Critical que matou 28 de 30 mesas no Plano 3b.
-  const candidatos = [
+  const candidatos = candidatosQueEuPossoVestir(vista, eu, catalogo);
+```
+
+com a extração — o **nome** é o que carrega a regra que antes era um comentário de quatro linhas:
+
+```ts
+/** As duas origens de `equiparCarta` (mão e mochila), menos o que o reducer recusaria. */
+function candidatosQueEuPossoVestir(
+  vista: VistaDaPartida,
+  eu: JogadorPublico,
+  catalogo: CatalogoDaMesa,
+): readonly CartaEquipamento[] {
+  return [
     ...vista.suaMao.filter((c): c is CartaEquipamento => c.tipo === 'equipamento'),
     ...eu.mochila,
   ].filter((carta) => {
     const info = catalogo.item(carta.itemId);
-    // Id desconhecido continua passando: `valorDe` já o trata como 0 e ele nunca
-    // ganha do `melhorGanho`. Recusá-lo aqui poria uma segunda política sobre a
-    // mesma pergunta, em dois lugares.
+    // Id desconhecido passa: `valorEfetivoDe` já o zera, e recusar aqui seria a segunda política.
     return info === undefined || afinidadeCom(info, eu.emJogo) !== 'proibida';
   });
+}
 ```
 
 e dentro do laço:
 
 ```ts
-    const custo = [...ocupantes.values()].reduce((s, itemId) => s + valorDe(itemId, catalogo, eu.emJogo), 0);
-    const ganho = valorDe(carta.itemId, catalogo, eu.emJogo) - custo;
+    const custo = [...ocupantes.values()].reduce((s, itemId) => s + valorEfetivoDe(itemId, catalogo, eu.emJogo), 0);
+    const ganho = valorEfetivoDe(carta.itemId, catalogo, eu.emJogo) - custo;
 ```
+
+⚠️ **O filtro não é otimização — é o que impede a mesa de morrer.** Candidato proibido virando ação
+sobe `AcaoInvalida` por `avancarBots`, vira **400 na jogada do humano**, e a retentativa repete
+porque a decisão do bot é determinística sobre o estado persistido. Foi o Critical que matou **28
+de 30 mesas** no Plano 3b. Isso fica **no plano e no teste**, não em comentário.
 
 ⚠️ **`guardarCarta` NÃO ganha filtro de afinidade.** Guardar um item proibido é legal e faz
 sentido — ele fica na mochila esperando a raça certa, e o reducer não recusa. Acrescentar o filtro
@@ -1713,23 +1734,7 @@ function formatar(mods: ModificadoresDeStat): string {
     .join(', ');
 }
 
-/**
- * De quem o item é e quanto ele rende **para você**. `''` para item comum — a
- * grande maioria das cartas, e escrever "não é exclusivo" em todas seria ruído.
- *
- * O NÚMERO é o efetivo, nunca o cheio: mostrar o cheio na tela de quem veste
- * reduzido é a tela mentindo, e a fatia inteira deixaria de ser visível
- * exatamente para quem ela penaliza (spec §7).
- *
- * ⚠️ Ramifica no `proibida` ANTES de perguntar o número: `contribuicaoDe` LANÇA
- * nesse grau, porque item proibido NO CORPO é invariante nossa quebrada. Aqui a
- * carta está na mão, não no corpo — o grau é legítimo e o que falta é a frase.
- *
- * O eixo `classe` cai no `else` do nome e mostra o id cru. Nenhum item o declara
- * hoje (travado por teste em `cartas`), e um `nomeDaClasse` injetado só para esse
- * caminho seria um parâmetro que nenhum call-site consegue exercitar. Degradação
- * feia e honesta, a mesma de `nomeDoItem` no skew de versão.
- */
+/** `''` para item comum. O número é o EFETIVO — o cheio na tela de quem veste reduzido mente. */
 export function rotuloDeAfinidade(
   info: ItemCarta,
   emJogo: ZonaEmJogo,
@@ -1738,8 +1743,11 @@ export function rotuloDeAfinidade(
   const exclusivo = info.exclusivo;
   if (exclusivo === null) return '';
 
+  // Eixo `classe` mostra o id cru: nenhum item o declara hoje, e um `nomeDaClasse`
+  // injetado seria parâmetro que nenhum call-site consegue exercitar.
   const dono = exclusivo.eixo === 'raca' ? nomeDaRaca(exclusivo.id) : exclusivo.id;
   const grau = afinidadeCom(info, emJogo);
+  // Antes de pedir o número: `contribuicaoDe` LANÇA no proibido.
   if (grau === 'proibida') {
     return ` — exclusivo de ${dono}: você não pode vestir`;
   }
@@ -1761,28 +1769,27 @@ Em `packages/web/src/TelaMesa.tsx`, ao lado dos outros helpers (perto de `nomeDo
 
 ```tsx
   const infoDoItem = (itemId: string): ItemCarta | undefined => itens.find((i) => i.id === itemId);
-  // A SUA zona. Sem ela (vista sem você — não acontece em partida real, mas o
-  // `find` é opcional) o rótulo some e o botão não é apagado por afinidade: a
-  // tela degrada para o comportamento de antes desta fatia, nunca para uma
-  // exceção que apaga a mesa.
   const minhaZona = eu?.emJogo ?? null;
   const rotuloDe = (itemId: string): string => {
     const info = infoDoItem(itemId);
     return info === undefined || minhaZona === null ? '' : rotuloDeAfinidade(info, minhaZona, nomeDaRaca);
   };
-  /* O gêmeo dos DOIS pares finos de afinidade (ver a tabela no `aplicarAcao`,
-     pacote `partida`): o reducer recusa `equiparCarta` quando o grau é `proibida`,
-     em `recompor` e em `jogar`. São dois pares e UM `disabled`, porque a condição
-     não depende da fase — a tabela conta o que o reducer recusa; a tela responde
-     com o mínimo que cobre as recusas.
-     `disabled`, não ausência: decisão #26 do bible — a tela tem UM vocabulário
-     para "você não pode agora", e verbo que some é verbo que o jogador nunca
-     aprende que existe. */
-  const proibido = (itemId: string): boolean => {
+  const euNaoPossoVestir = (itemId: string): boolean => {
     const info = infoDoItem(itemId);
     return info !== undefined && minhaZona !== null && afinidadeCom(info, minhaZona) === 'proibida';
   };
 ```
+
+🔴 **Comentário ENXUTO.** O nome `euNaoPossoVestir` diz o que dois parágrafos diziam antes. O
+**porquê** fica aqui no plano e nos testes, não no arquivo:
+
+- É o gêmeo dos **dois** pares finos que a Task 4 acrescentou. **Dois pares, UM `disabled`** — a
+  condição não depende da fase. A tabela conta o que o REDUCER recusa; a tela responde com o
+  mínimo que cobre as recusas.
+- `disabled`, **não ausência** (decisão #26 do bible): a tela tem um vocabulário só para "você não
+  pode agora", e verbo que some é verbo que o jogador nunca aprende que existe. **O teste do
+  Step 7 é quem prende isso.**
+- `minhaZona === null` (vista sem você) degrada para o comportamento pré-fatia, nunca para exceção.
 
 Na lista da **mochila**:
 
@@ -1791,7 +1798,7 @@ Na lista da **mochila**:
               {nomeDoItem(carta.itemId)}{rotuloDe(carta.itemId)}{' '}
               <button
                 type="button"
-                disabled={!legal('equiparCarta') || proibido(carta.itemId)}
+                disabled={!legal('equiparCarta') || euNaoPossoVestir(carta.itemId)}
                 onClick={() => void agir({ tipo: 'equiparCarta', cartaId: carta.id })}
               >
                 Equipar
@@ -1809,7 +1816,7 @@ Na lista da **mão**, no `<li>`, logo depois do `descreverCarta(...)`:
 e no botão "Equipar" da mão:
 
 ```tsx
-                  disabled={!legal('equiparCarta') || proibido(carta.itemId)}
+                  disabled={!legal('equiparCarta') || euNaoPossoVestir(carta.itemId)}
 ```
 
 Acrescente os imports: `rotuloDeAfinidade` de `./rotuloDeAfinidade` e `afinidadeCom` +
@@ -2177,6 +2184,85 @@ git commit -F /tmp/msg.txt
 - ⚠️ Com PRs empilhados, mergeie **sem** `--delete-branch` e faça `gh pr edit <n> --base main`
   antes de cada merge seguinte: `gh pr merge --delete-branch` **fecha** os PRs que apontavam para
   aquela branch, e o GitHub não retargeta.
+
+---
+
+### Task 12: Enxugar os comentários do diff DESTA fatia
+
+> ⏱️ **Executa entre a Task 9 e a Task 10.** A ordem de execução real do plano é
+> **1…9 → 12 → 10 → 11**: a medição e o gate rodam contra o código final, e a Task 11 precisa
+> reportar contagens que não vão mudar depois. O número 12 é rótulo, não posição.
+
+**Files:** todo arquivo de produção tocado pelas Tasks 1–9 desta branch. Nada fora dela.
+
+**Por que existe:** a regra de comentário enxuto foi decidida em **2026-08-02, no meio da Task 6**
+(ver Global Constraints). As Tasks 1–6 já estavam escritas sob a regra antiga. Sem esta task a
+branch fica com **dois estilos**, e a revisão final acusa — com razão.
+
+🔴 **Escopo ESTRITO: só o que esta branch escreveu.** A limpeza retroativa do repositório inteiro
+(`partida/src/tipos.ts` e companhia) é **fatia própria**, e misturá-la aqui tornaria o diff da
+afinidade irrevisável. É a lição da decisão #51 do bible — não mude duas coisas ao mesmo tempo.
+
+- [ ] **Step 1: Levantar a superfície**
+
+Run: `git diff --stat $(git merge-base main HEAD) HEAD -- packages/`
+Liste os arquivos de **produção** (não `.test.ts`) e, para cada um, os blocos de comentário que
+esta branch introduziu — `git diff` do range, não o arquivo inteiro.
+
+- [ ] **Step 2: Classificar cada bloco em três baldes, por escrito**
+
+| Balde | O que fazer |
+|---|---|
+| **Narração histórica** — "no Plano 4a aconteceu…", "a decisão #N do bible diz…", "este projeto pagou N vezes…" | **DELETAR.** Já vive no bible, no spec e no git. |
+| **Explicação que o NOME pode carregar** — "as duas origens de equipar, menos o que o reducer recusa" | **Renomear** e deletar o comentário. |
+| **Restrição que o código não consegue falar** — truque de tipo, ordem de chamada ainda não coberta por teste | **Manter, em UMA linha.** |
+
+⚠️ **Antes de deletar uma restrição load-bearing, pergunte se ela já tem teste.** Se tiver, delete.
+Se **não** tiver, o certo é **escrever o teste** e então deletar — não manter o comentário. É a
+regra que o projeto já tinha (*"intenção futura vai para um teste que fica vermelho"*), aplicada
+ao presente.
+
+- [ ] **Step 3: Aplicar, um arquivo por vez, rodando a suíte entre eles**
+
+Nenhuma mudança de comportamento. Renomear é a única alteração de código permitida, e ela tem que
+ser mecânica (o compilador acha todos os call-sites).
+
+🔴 **NÃO toque na tabela de pares finos do `aplicarAcao`.** Ela é uma **checklist executável por
+humano** — a lista dos gêmeos que a tela precisa ter —, não narração. Já mentiu quatro vezes por
+ser mal mantida; enxugá-la é o oposto do que ela precisa. O **bloco HISTÓRICO** dela, sim, pode
+encolher: ele conta a evolução da contagem, que é o que o git já guarda.
+
+- [ ] **Step 4: Verificação**
+
+Run: `pnpm test && pnpm typecheck && pnpm lint`
+Expected: **a mesma contagem de testes da Task 9** — nem um a mais, nem um a menos, salvo os
+testes que o Step 2 mandou escrever para substituir um comentário (esses você lista no relatório).
+
+- [ ] **Step 5: Medir o que a task entregou**
+
+Antes e depois, por arquivo tocado: linhas totais e linhas não-comentário. É o número que motivou
+a regra (`tipos.ts`: 600+ → menos de 200), e ele vai para o `CLAUDE.md` na Task 11.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add packages/
+cat > /tmp/msg.txt <<'EOF'
+refactor: os comentários desta fatia passam a caber no nome
+
+A regra nova: o nome da função diz o que ela faz; comentário só onde o código
+não consegue falar. Narração histórica sai do arquivo — ela já vive no game
+bible, no spec e no git.
+
+O argumento é o próprio histórico: as treze ocorrências de "comentário que
+afirma um presente errado" são superfície que apodreceu. Menos superfície,
+menos apodrecimento.
+
+Escopo estrito ao diff desta branch. A limpeza do repositório inteiro é fatia
+própria — misturá-la aqui tornaria o diff da afinidade irrevisável.
+EOF
+git commit -F /tmp/msg.txt
+```
 
 ---
 
