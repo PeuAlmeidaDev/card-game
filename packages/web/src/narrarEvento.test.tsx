@@ -83,6 +83,29 @@ describe('narrarEvento — linhas de texto puro', () => {
     )).toBe('Bot 1 descartou Espada Curta.');
   });
 
+  it('o desequipou por TROCA DE SLOT conta o preço de equipar', () => {
+    const linha = render(<>{narrarEvento(
+      { tipo: 'desequipou', jogadorId: 'p1', carta: { id: 't-1', tipo: 'equipamento', itemId: 'espada-curta' },
+        destino: 'mochila', motivo: 'trocaDeSlot' },
+      ctx,
+    )}</>);
+    expect(linha.container.textContent).toContain('vai para a mochila');
+  });
+
+  it('o desequipou por PERDA DE AFINIDADE liga o item à raça que acabou de entrar', () => {
+    // Sem o motivo, o log diz "o Machado foi para a mochila" e o jogador não liga
+    // o fato à carta de raça que acabou de jogar. Um item sai do corpo dele por
+    // uma razão que a tela não conta — é literalmente o padrão que o gate ocular
+    // pegou DUAS vezes seguidas: o código faz certo e não conta a ninguém.
+    const linha = render(<>{narrarEvento(
+      { tipo: 'desequipou', jogadorId: 'p1', carta: { id: 't-1', tipo: 'equipamento', itemId: 'espada-curta' },
+        destino: 'cemiterio', motivo: 'perdeuAfinidade' },
+      ctx,
+    )}</>);
+    expect(linha.container.textContent).toContain('nova especialização');
+    expect(linha.container.textContent).toContain('descartada');
+  });
+
   it('equipou MOSTRA a carta e a NOMEIA — o slot é zona aberta', () => {
     // Assimetria deliberada em relação ao `loot`: o que decide se o evento pode
     // ser narrado é a zona de DESTINO, e o corpo está à vista da mesa inteira.

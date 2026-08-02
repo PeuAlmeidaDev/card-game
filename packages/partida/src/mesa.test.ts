@@ -1529,7 +1529,7 @@ describe('aplicarAcao — equiparCarta', () => {
     const { eventos } = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
 
     expect(eventos).toContainEqual({
-      tipo: 'desequipou', jogadorId: 'p1', destino: 'cemiterio',
+      tipo: 'desequipou', jogadorId: 'p1', destino: 'cemiterio', motivo: 'trocaDeSlot',
       carta: { id: 't-0', tipo: 'equipamento', itemId: 'i-teste' },
     });
     // E na ordem: a ação pedida antes do que ela custou.

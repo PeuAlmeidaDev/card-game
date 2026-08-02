@@ -392,13 +392,20 @@ export type EventoDaMesa =
    * sem ninguém pedir, e é justamente o que ensina "esvazie a mochila antes de
    * trocar de equipamento".
    *
+   * `motivo` existe porque desde a fatia da afinidade um item sai do corpo por
+   * DUAS razões diferentes — a troca de equipamento, que o jogador pediu, e a
+   * perda de afinidade, que ele causou sem pedir ao jogar outra raça. Sem o campo
+   * as duas ficam indistinguíveis no log, e a segunda é justamente a que o jogador
+   * não liga à própria jogada.
+   *
    * UM evento por item deslocado, na ordem em que `destinoDoDesequipado` os
    * resolve: um montante por cima de duas armas de uma mão desloca DOIS itens e a
    * mochila pode caber só um, então um evento para o lote não conseguiria nomear
    * os dois destinos.
    */
   | { readonly tipo: 'desequipou'; readonly jogadorId: string;
-      readonly carta: CartaEquipamento; readonly destino: 'mochila' | 'cemiterio' }
+      readonly carta: CartaEquipamento; readonly destino: 'mochila' | 'cemiterio';
+      readonly motivo: 'trocaDeSlot' | 'perdeuAfinidade' }
   /**
    * O jogador declinou de agir numa fase parada. Emite evento — e não silêncio —
    * porque `versaoDe` é `log.length`: sem mover a versão, um duplo-clique em

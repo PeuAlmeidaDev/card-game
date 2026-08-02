@@ -82,6 +82,14 @@ export function destinoDoDesequipado(
   estado: EstadoPartida,
   deslocados: readonly CartaEquipamento[],
   jogadorId: string,
+  /**
+   * POR QUE o item saiu. Parâmetro obrigatório e não default `'trocaDeSlot'`: com
+   * default, o chamador novo (a troca de raça) herdaria calado o motivo errado, e
+   * o log mentiria sem nenhum erro de compilação. Obrigatório, o compilador cobra
+   * cada call-site — que é o que se quer de um campo cujo valor certo depende de
+   * quem chamou.
+   */
+  motivo: Extract<EventoDaMesa, { readonly tipo: 'desequipou' }>['motivo'],
 ): { readonly estado: EstadoPartida; readonly eventos: readonly EventoDaMesa[] } {
   // Sem nada deslocado, devolve o MESMO estado: um spread aqui trocaria a
   // identidade do objeto por nada, e o caso comum (slot vazio) é este. Sem evento
@@ -106,7 +114,7 @@ export function destinoDoDesequipado(
     const paraMochila = mochila.length < LIMITE_MOCHILA;
     if (paraMochila) mochila.push(carta);
     else paraOCemiterio.push(carta);
-    eventos.push({ tipo: 'desequipou', jogadorId, carta, destino: paraMochila ? 'mochila' : 'cemiterio' });
+    eventos.push({ tipo: 'desequipou', jogadorId, carta, destino: paraMochila ? 'mochila' : 'cemiterio', motivo });
   }
 
   return {
