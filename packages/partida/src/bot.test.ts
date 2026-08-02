@@ -8,8 +8,8 @@ import { filaDeDados } from './testes/dados';
 import { equipamento, monstro as cartaMonstro, monstros, raca } from './testes/cartas';
 import { LIMITE_BASE_DE_MAO, LIMITE_MOCHILA } from './mao';
 import {
-  catalogoDeTeste, ID_DA_CLASSE_DE_TESTE, ID_DO_ITEM_DUAS_MAOS, ID_DO_ITEM_FORTE, ID_DO_ITEM_FRACO,
-  ID_DO_MONSTRO_FORTE,
+  catalogoDeTeste, ID_DA_CLASSE_DE_TESTE, ID_DA_RACA_DONA, ID_DA_RACA_OUTRA, ID_DO_ITEM_DUAS_MAOS,
+  ID_DO_ITEM_EXCLUSIVO, ID_DO_ITEM_FORTE, ID_DO_ITEM_FRACO, ID_DO_MONSTRO_FORTE,
 } from './testes/catalogo';
 import { COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import type {
@@ -480,6 +480,49 @@ describe('escolherAcao', () => {
 
     expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
       .toEqual({ tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-2m' });
+  });
+
+  it('NUNCA propõe equipar um item proibido, mesmo sendo o de maior valor cheio', () => {
+    // Não é otimização: `AcaoInvalida` sobe por `avancarBots` e vira 400 na jogada
+    // do HUMANO, com retry determinístico. 28 de 30 mesas mortas no Plano 3b.
+    const vista = vistaEm('recompor', {
+      suaMao: [equipamento('t-exclusivo', ID_DO_ITEM_EXCLUSIVO)],
+      racaEmJogo: raca('r-outra', ID_DA_RACA_OUTRA),
+    });
+
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste()).tipo).not.toBe('equiparCarta');
+  });
+
+  it('não superestima: com o exclusivo alheio ele NÃO troca um item melhor', () => {
+    // `valorDe` lendo o CHEIO faria o bot ver 4 onde ele vai receber 1, e trocar
+    // um item bom por um que rende menos.
+    const vista = vistaEm('jogar', {
+      suaMao: [equipamento('t-exclusivo', ID_DO_ITEM_EXCLUSIVO)],
+      // `capacete`, não `maoDireita`: é o slot do EXCLUSIVO (catalogo.ts), e só
+      // competindo pelo MESMO slot que o reduzido "não bate o que está no corpo".
+      slots: { capacete: equipamento('t-forte', ID_DO_ITEM_FORTE) },
+      racaEmJogo: null,
+    });
+
+    // Reduzido (1) não bate o que está no corpo; o bot guarda ou passa, não veste.
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste()).tipo).not.toBe('equiparCarta');
+  });
+
+  it('COM a raça dona em jogo, o mesmo item passa a valer a pena', () => {
+    // O contrapositivo do teste acima — sem ele, um `valorDe` que devolvesse
+    // sempre 0 para exclusivo passaria os dois primeiros e o bot nunca vestiria
+    // um exclusivo, nem o da própria raça. É o efeito colateral desejado do spec
+    // §8: o bot passa a preferir o item da própria raça sem nenhuma regra nova.
+    const vista = vistaEm('jogar', {
+      suaMao: [equipamento('t-exclusivo', ID_DO_ITEM_EXCLUSIVO)],
+      // `capacete`, não `maoDireita`: é o slot do EXCLUSIVO (catalogo.ts), e só
+      // competindo pelo MESMO slot que o reduzido "não bate o que está no corpo".
+      slots: { capacete: equipamento('t-forte', ID_DO_ITEM_FORTE) },
+      racaEmJogo: raca('r-dona', ID_DA_RACA_DONA),
+    });
+
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
+      .toEqual({ tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-exclusivo' });
   });
 
   it('guarda o que não melhora, se a mochila tem vaga', () => {

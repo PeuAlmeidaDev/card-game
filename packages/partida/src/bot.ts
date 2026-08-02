@@ -1,10 +1,13 @@
 import type { Combatente } from '@card-dungeon/motor';
-import type { AcaoDaMesa, CartaEquipamento, CatalogoDaMesa, JogadorPublico, Slot, VistaDaPartida } from './tipos';
+import type {
+  AcaoDaMesa, CartaEquipamento, CatalogoDaMesa, JogadorPublico, Slot, VistaDaPartida, ZonaEmJogo,
+} from './tipos';
 import { LIMITE_MOCHILA } from './mao';
 // O par de mãos vem do MESMO lugar que `colocarNoSlot` usa: o custo que o bot
 // calcula tem que ser o custo que o reducer vai cobrar, e duas listas escritas à
 // mão divergem em silêncio (o slot que nascer não entra na cópia).
 import { MAOS } from './equipar';
+import { afinidadeCom, contribuicaoDe } from './corpo';
 
 /**
  * Política do bot desta fatia: burro por definição na maior parte — executa a
@@ -172,25 +175,41 @@ function melhorEncrenca(
 }
 
 /**
- * Soma dos modificadores de um item. Métrica GULOSA, não inteligente para
- * EQUIPAR (decisão #9 do spec da fatia 8, que segue valendo aqui): trata +2 de
- * força e +2 de agilidade como equivalentes, o que é falso para quem joga bem e
- * proposital nesta função. ⚠️ O que a #9 dizia sobre o bot NUNCA avaliar risco —
- * "isso é da fatia da interferência" — está REVOGADO desde 2026-07-31 (decisão
- * #63 do bible): a avaliação de risco já chegou nesta fatia, só que para a
- * decisão de ENTRAR em combate (`melhorEncrenca`/`rodadasParaMatar` acima), não
- * para escolher equipamento. Esta função continua gulosa por escolha, não por
- * o bot ainda não saber avaliar risco.
+ * Soma dos modificadores EFETIVOS de um item para esta zona — cheio, reduzido ou
+ * zero, conforme `afinidadeCom`. Métrica GULOSA, não inteligente para EQUIPAR
+ * (decisão #9 do spec da fatia 8): trata +2 de força e +2 de agilidade como
+ * equivalentes.
  *
- * Item que o catálogo não conhece vale 0 em vez de lançar: o bot é uma POLÍTICA,
- * não o reducer. Uma exceção aqui derrubaria a mesa por uma decisão que sempre tem
- * a alternativa `passar`.
+ * Item que o catálogo não conhece, ou proibido nesta zona, vale 0 em vez de
+ * lançar: o bot é uma POLÍTICA, não o reducer.
  */
-function valorDe(itemId: string, catalogo: CatalogoDaMesa): number {
+function valorEfetivoDe(itemId: string, catalogo: CatalogoDaMesa, emJogo: ZonaEmJogo): number {
   const info = catalogo.item(itemId);
   if (info === undefined) return 0;
-  const { forca, vida, habilidade, agilidade } = info.modificadores;
+  if (afinidadeCom(info, emJogo) === 'proibida') return 0;
+  const { forca, vida, habilidade, agilidade } = contribuicaoDe(info, emJogo).modificadores;
   return (forca ?? 0) + (vida ?? 0) + (habilidade ?? 0) + (agilidade ?? 0);
+}
+
+/**
+ * As duas origens de `equiparCarta` (mão e mochila), menos o que o reducer
+ * recusaria — um candidato proibido virando ação sobe `AcaoInvalida` por
+ * `avancarBots` e vira 400 na jogada do humano.
+ */
+function candidatosQueEuPossoVestir(
+  vista: VistaDaPartida,
+  eu: JogadorPublico,
+  catalogo: CatalogoDaMesa,
+): readonly CartaEquipamento[] {
+  return [
+    ...vista.suaMao.filter((c): c is CartaEquipamento => c.tipo === 'equipamento'),
+    ...eu.mochila,
+  ].filter((carta) => {
+    const info = catalogo.item(carta.itemId);
+    // Id desconhecido passa: `valorEfetivoDe` já o zera, e recusar aqui seria a
+    // segunda política.
+    return info === undefined || afinidadeCom(info, eu.emJogo) !== 'proibida';
+  });
 }
 
 /**
@@ -205,12 +224,7 @@ function vestirOuGuardar(
   eu: JogadorPublico,
   catalogo: CatalogoDaMesa,
 ): AcaoDaMesa {
-  // As duas origens de `equiparCarta`. A mão é filtrada por tipo (é heterogênea);
-  // a mochila não precisa (é `CartaTesouro[]` inteira).
-  const candidatos = [
-    ...vista.suaMao.filter((c): c is CartaEquipamento => c.tipo === 'equipamento'),
-    ...eu.mochila,
-  ];
+  const candidatos = candidatosQueEuPossoVestir(vista, eu, catalogo);
 
   let melhor: CartaEquipamento | undefined;
   let melhorGanho = 0;
@@ -226,8 +240,8 @@ function vestirOuGuardar(
     }
     // Dedup por id pelo mesmo motivo de `colocarNoSlot`: um montante ocupando as
     // duas mãos seria contado duas vezes e pareceria melhor do que é.
-    const custo = [...ocupantes.values()].reduce((s, itemId) => s + valorDe(itemId, catalogo), 0);
-    const ganho = valorDe(carta.itemId, catalogo) - custo;
+    const custo = [...ocupantes.values()].reduce((s, itemId) => s + valorEfetivoDe(itemId, catalogo, eu.emJogo), 0);
+    const ganho = valorEfetivoDe(carta.itemId, catalogo, eu.emJogo) - custo;
     if (ganho > melhorGanho) {
       melhor = carta;
       melhorGanho = ganho;
