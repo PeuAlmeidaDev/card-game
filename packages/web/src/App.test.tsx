@@ -19,7 +19,7 @@ const catalogo: Catalogo = {
   classes: [{ id: 'guerreiro', nome: 'Guerreiro', modificadores: { forca: 1, vida: 5 } }],
   // Os itens do catálogo são as cartas de Tesouro (com `slot` e `duasMaos`): o
   // construtor não os oferece mais, mas a mesa precisa deles para desenhar o corpo.
-  itens: [{ id: 'espada-curta', nome: 'Espada Curta', slot: 'maoDireita', duasMaos: false, modificadores: { forca: 2 } }],
+  itens: [{ id: 'espada-curta', nome: 'Espada Curta', slot: 'maoDireita', duasMaos: false, modificadores: { forca: 2 }, exclusivo: null }],
 };
 
 const resultado: ResultadoDuelo = { tipo: 'vitoria', vencedor: 'a', turnos: 3, log: [] };

@@ -10,10 +10,12 @@ import type {
 } from '@card-dungeon/personagem';
 import type {
   AcaoDaMesa,
+  Afinidade,
   Carta,
   CartaEquipamento,
   CartaPorta,
   CartaTesouro,
+  EixoDeAfinidade,
   EspiadaPendente,
   EventoDaMesa,
   Fase,
@@ -22,7 +24,7 @@ import type {
   Slot,
   VistaDaPartida,
 } from '@card-dungeon/partida';
-import type { Slot as SlotDaCarta, ItemCarta } from '@card-dungeon/cartas';
+import type { Slot as SlotDaCarta, ItemCarta, EixoDeAfinidade as EixoDaCarta } from '@card-dungeon/cartas';
 
 /**
  * Corpo do POST /api/duelo e /api/partida: as escolhas do jogador (ids).
@@ -134,6 +136,28 @@ type _CoberturaSlot =
   [Slot] extends [SlotDaCarta] ? ([SlotDaCarta] extends [Slot] ? true : never) : never;
 const _coberturaSlot: _CoberturaSlot = true;
 void _coberturaSlot;
+
+/**
+ * Trava as duas uniões `EixoDeAfinidade` — a de `partida` (a REGRA: contra qual
+ * campo da zona a afinidade é conferida) e a de `cartas` (o DADO: o que o item
+ * declara). Mesma duplicação e mesmo preço do `Slot`, logo acima.
+ *
+ * ⚠️ Uma das direções o compilador JÁ pegaria de graça: se `cartas` ganhar um
+ * eixo a mais, `ItemCarta` deixa de ser atribuível a `InfoItem` e o
+ * `item: obterItem` do `server/src/app.ts` quebra. A direção que **só este guard
+ * pega** é a inversa: `partida` ganhar um eixo que nenhuma carta consegue
+ * declarar — uma regra que roda para um valor que o jogo nunca produz, e que
+ * portanto nenhum teste natural exercita.
+ *
+ * A tupla é obrigatória pelo mesmo motivo dos outros dois guards: `A | B extends X`
+ * DISTRIBUI sobre a união e a checagem se auto-satisfaz.
+ *
+ * ⚠️ Guard de COMPILAÇÃO. Quem acusa é o `pnpm typecheck`, nunca a suíte.
+ */
+type _CoberturaEixo =
+  [EixoDeAfinidade] extends [EixoDaCarta] ? ([EixoDaCarta] extends [EixoDeAfinidade] ? true : never) : never;
+const _coberturaEixo: _CoberturaEixo = true;
+void _coberturaEixo;
 
 /**
  * Corpo do POST /api/partida/:id/acao: a ação MAIS a versão do estado que o
@@ -268,4 +292,8 @@ export type {
   // então o que não passar por aqui simplesmente não existe para o cliente.
   Slot,
   ItemCarta,
+  // Mesma jogada, para o eixo de especialização: `Afinidade` e `EixoDeAfinidade`
+  // saem de `partida` (a regra) — o `_CoberturaEixo` acima trava as duas uniões.
+  Afinidade,
+  EixoDeAfinidade,
 };

@@ -56,8 +56,8 @@ const MONSTROS_PADRAO: Catalogo['monstros'] = [
 // Mesma ideia, para o baralho de Tesouros: sem o catálogo o nome do item cairia
 // no fallback `?? id` e o corpo mostraria `espada-curta` em vez de "Espada Curta".
 const ITENS_PADRAO: Catalogo['itens'] = [
-  { id: 'espada-curta', nome: 'Espada Curta', slot: 'maoDireita', duasMaos: false, modificadores: { forca: 2 } },
-  { id: 'elmo-de-couro', nome: 'Elmo de Couro', slot: 'capacete', duasMaos: false, modificadores: { vida: 2 } },
+  { id: 'espada-curta', nome: 'Espada Curta', slot: 'maoDireita', duasMaos: false, modificadores: { forca: 2 }, exclusivo: null },
+  { id: 'elmo-de-couro', nome: 'Elmo de Couro', slot: 'capacete', duasMaos: false, modificadores: { vida: 2 }, exclusivo: null },
 ];
 
 /** Uma carta de Tesouro na mão (ou já no corpo). */
@@ -668,7 +668,7 @@ describe('TelaMesa — o corpo', () => {
     await abrirMesa(
       comCorpo({ ...SLOTS_VAZIOS, maoDireita: montante, maoEsquerda: montante }),
       undefined, undefined,
-      [{ id: 'montante', nome: 'Montante', slot: 'maoDireita', duasMaos: true, modificadores: { forca: 4 } }],
+      [{ id: 'montante', nome: 'Montante', slot: 'maoDireita', duasMaos: true, modificadores: { forca: 4 }, exclusivo: null }],
     );
 
     expect(await screen.findAllByText(/Montante/)).toHaveLength(2);

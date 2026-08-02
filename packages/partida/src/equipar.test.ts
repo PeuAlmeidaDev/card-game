@@ -47,7 +47,7 @@ const comMochilaDe = (jogadorId: string, mochila: readonly CartaEquipamento[]): 
 // PRONTA, então o catálogo não entra no caminho — e é aqui, não lá, que o item de
 // duas mãos precisa existir.
 const info = (slot: InfoItem['slot'], duasMaos = false): InfoItem => ({
-  id: 'x', nome: 'X', slot, duasMaos, modificadores: {},
+  id: 'x', nome: 'X', slot, duasMaos, modificadores: {}, exclusivo: null,
 });
 
 describe('colocarNoSlot', () => {

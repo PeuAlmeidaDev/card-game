@@ -1,5 +1,5 @@
 import type { Combatente, EstadoCombate, EventoCombate, DecisaoPendente, PassivaCombate } from '@card-dungeon/motor';
-import type { Classe, Equipamento } from '@card-dungeon/personagem';
+import type { Classe, Equipamento, ModificadoresDeStat } from '@card-dungeon/personagem';
 
 /**
  * **Receita** de carta do baralho de PORTAS: o que compor, SEM identidade. É o
@@ -69,6 +69,30 @@ export type CartaEquipamento = Extract<CartaTesouro, { readonly tipo: 'equipamen
 export type Slot = 'capacete' | 'armadura' | 'maoDireita' | 'maoEsquerda' | 'pes';
 
 /**
+ * ⚠️ Gêmea da união em `cartas/src/itens.ts`, pelo mesmo motivo do `Slot`:
+ * `partida` é cego ao catálogo e a direção `cartas ← personagem ← partida` proíbe
+ * o import. Quem trava as duas é o `_CoberturaEixo` em `shared/src/index.ts`.
+ */
+export type EixoDeAfinidade = 'raca' | 'classe';
+
+/**
+ * A quem um item pertence, do ponto de vista da MESA. `ItemCarta` (pacote
+ * `cartas`) satisfaz este contrato estruturalmente — é o que dispensa qualquer
+ * import de `cartas` aqui.
+ *
+ * ⚠️ `id` é o id de uma RAÇA ou de uma CLASSE do catálogo, e `partida` nunca o
+ * compara com um literal: quem responde a pergunta é `afinidadeCom` (em
+ * `./corpo`), confrontando este campo com `emJogo.raca?.racaId`. Nenhum id de
+ * conteúdo entra no domínio.
+ */
+export interface Afinidade {
+  readonly eixo: EixoDeAfinidade;
+  readonly id: string;
+  /** O que o item rende para quem NÃO tem o eixo em jogo (spec §4, decisão #3). */
+  readonly semAfinidade: ModificadoresDeStat;
+}
+
+/**
  * O que o catálogo sabe de um item: o `Equipamento` que o `montarCombatente` já
  * consome, mais os dois campos que só a MESA usa (onde encaixa, e se toma as duas
  * mãos). `ItemCarta` (pacote `cartas`) satisfaz este contrato estruturalmente —
@@ -77,6 +101,12 @@ export type Slot = 'capacete' | 'armadura' | 'maoDireita' | 'maoEsquerda' | 'pes
 export interface InfoItem extends Equipamento {
   readonly slot: Slot;
   readonly duasMaos: boolean;
+  /**
+   * `null` = item comum. Viaja até aqui porque `partida` recebe o item por
+   * `CatalogoDaMesa.item()` e é ELE quem tem que responder a afinidade — sem o
+   * campo, a regra teria que morar na borda, que é onde ela não pode morar.
+   */
+  readonly exclusivo: Afinidade | null;
 }
 
 /**

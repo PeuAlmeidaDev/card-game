@@ -67,7 +67,7 @@ export const CLASSE_DE_TESTE = {
 export const ID_DO_ITEM_DE_TESTE = 'i-teste';
 export const ITEM_DE_TESTE = {
   id: ID_DO_ITEM_DE_TESTE, nome: 'Item de Teste',
-  slot: 'maoDireita' as const, duasMaos: false, modificadores: { forca: 1 },
+  slot: 'maoDireita' as const, duasMaos: false, modificadores: { forca: 1 }, exclusivo: null,
 };
 
 /**
@@ -79,12 +79,12 @@ export const ITEM_DE_TESTE = {
 export const ID_DO_ITEM_FORTE = 'i-forte';
 export const ITEM_FORTE = {
   id: ID_DO_ITEM_FORTE, nome: 'Item Forte',
-  slot: 'maoDireita' as const, duasMaos: false, modificadores: { forca: 3 },
+  slot: 'maoDireita' as const, duasMaos: false, modificadores: { forca: 3 }, exclusivo: null,
 };
 export const ID_DO_ITEM_FRACO = 'i-fraco';
 export const ITEM_FRACO = {
   id: ID_DO_ITEM_FRACO, nome: 'Item Fraco',
-  slot: 'maoDireita' as const, duasMaos: false, modificadores: { forca: 1 },
+  slot: 'maoDireita' as const, duasMaos: false, modificadores: { forca: 1 }, exclusivo: null,
 };
 
 /**
@@ -102,7 +102,7 @@ export const ITEM_FRACO = {
 export const ID_DO_ITEM_DUAS_MAOS = 'i-duas-maos';
 export const ITEM_DUAS_MAOS = {
   id: ID_DO_ITEM_DUAS_MAOS, nome: 'Item de Duas Mãos',
-  slot: 'maoDireita' as const, duasMaos: true, modificadores: { forca: 4 },
+  slot: 'maoDireita' as const, duasMaos: true, modificadores: { forca: 4 }, exclusivo: null,
 };
 
 export function catalogoDeTeste(

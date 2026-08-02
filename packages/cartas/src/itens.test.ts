@@ -46,3 +46,35 @@ describe('catálogo de itens', () => {
     }
   });
 });
+
+describe('exclusividade', () => {
+  it('todo item do catálogo declara `exclusivo` explicitamente', () => {
+    // O campo é obrigatório e NULÁVEL, não opcional (spec §4). Quem cobra isso de
+    // verdade é o compilador; este teste é a rede de runtime — `ITENS` é um
+    // literal, e um item novo escrito sem o campo em JS puro passaria calado.
+    // Mesmo motivo pelo qual `ZonaEmJogo.slots` não é `slots?`: campo ausente
+    // deixa "não é exclusivo" e "esqueci de decidir" indistinguíveis.
+    for (const item of ITENS) {
+      expect(item, item.id).toHaveProperty('exclusivo');
+    }
+  });
+
+  it('nenhum item do catálogo declara exclusividade de CLASSE', () => {
+    // ⚠️ Este teste existe para FICAR VERMELHO. O eixo `classe` existe no tipo
+    // desde o primeiro commit desta fatia (decisão #5 do spec), mas nenhum item o
+    // declara até a classe virar carta — porque um exclusivo de Guerreiro teria o
+    // valor CHEIO inalcançável hoje (ninguém tem classe em jogo, então todos
+    // vestem reduzido), e metade do balanceamento dele seria ficção.
+    //
+    // Uma carta que ninguém pode usar some numa medição; uma carta calibrada por
+    // um número que nunca acontece passa DESPERCEBIDA. Quando a fatia `classe
+    // como carta` criar o primeiro, este teste reprova e obriga alguém a decidir
+    // o que fazer com ele — em vez de um comentário prometendo futuro, que é a
+    // forma que este projeto já pagou treze vezes.
+    //
+    // `i.exclusivo?.eixo` é TIPADO: renomear `eixo` quebra a compilação em vez de
+    // deixar o teste virar vácuo (o modo de falha de `teste-de-ausencia-vira-vacuo`).
+    const deClasse = ITENS.filter((i) => i.exclusivo?.eixo === 'classe');
+    expect(deClasse.map((i) => i.id)).toEqual([]);
+  });
+});

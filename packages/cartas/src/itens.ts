@@ -27,6 +27,40 @@ export interface ModificadoresDeItem {
 }
 
 /**
+ * Os dois eixos de especialização do jogo. `classe` já existe aqui e **nenhum
+ * item o declara** — ver a decisão #5 do spec da afinidade e o teste que trava
+ * isso em `itens.test.ts`. A união nasce completa porque a fatia da classe herda
+ * a mecânica pronta em vez de escrever a segunda cópia da regra.
+ *
+ * ⚠️ Gêmea da união em `partida/src/tipos.ts` — `partida` é cego ao catálogo e a
+ * direção de dependência (`cartas ← personagem ← partida`) proíbe o import. Quem
+ * impede as duas de divergirem é o guard `_CoberturaEixo` em `shared/src/index.ts`,
+ * exatamente como o `_CoberturaSlot` faz com `Slot`. Eixo novo => os dois arquivos.
+ */
+export type EixoDeAfinidade = 'raca' | 'classe';
+
+/**
+ * A quem este item pertence, e o que ele rende para quem NÃO se especializou.
+ *
+ * `semAfinidade` é **declarado, nunca derivado** (decisão #3 do spec): não existe
+ * "reduzido = metade". O exemplo que originou a regra não é aritmético — a arma
+ * corta igual na mão de qualquer um, o que se perde é a técnica —, e uma fórmula
+ * global esconde a decisão de balanceamento atrás de uma conta. É a decisão #36 do
+ * game bible valendo de novo.
+ *
+ * ⚠️ Custo aceito e escrito: cada item exclusivo passa a ter DOIS conjuntos de
+ * números para balancear — o dobro de superfície para o balanceamento errar em
+ * silêncio.
+ */
+export interface Afinidade {
+  readonly eixo: EixoDeAfinidade;
+  /** O id da raça/classe que veste este item por inteiro. */
+  readonly id: string;
+  /** O que o item rende para quem NÃO tem o eixo em jogo. */
+  readonly semAfinidade: ModificadoresDeItem;
+}
+
+/**
  * Uma carta do baralho de Tesouros. Dado puro — como `MonstroCarta` e diferente
  * de `RacaCarta`, não há código aqui, então a carta atravessa o JSON do
  * `/catalogo` inteira e dispensa projeção `Resumo`.
@@ -44,7 +78,15 @@ export interface ItemCarta {
   readonly nome: string;
   readonly slot: Slot;
   readonly duasMaos: boolean;
+  /** Os modificadores CHEIOS — o que o item rende para quem tem afinidade plena. */
   readonly modificadores: ModificadoresDeItem;
+  /**
+   * `null` = item comum: todo mundo veste cheio. Obrigatório e NULÁVEL, não
+   * opcional — mesmo motivo de `ZonaEmJogo.slots` não ser `slots?`: campo ausente
+   * deixa "não é exclusivo" e "esqueci de decidir" indistinguíveis, e cada leitor
+   * futuro decide de novo o que o `undefined` significa.
+   */
+  readonly exclusivo: Afinidade | null;
 }
 
 /**
@@ -59,14 +101,14 @@ export interface ItemCarta {
  * real de composição do corpo — sem ele, equipar seria só somar.
  */
 export const ITENS: readonly ItemCarta[] = [
-  { id: 'elmo-de-couro', nome: 'Elmo de Couro', slot: 'capacete', duasMaos: false, modificadores: { vida: 2 } },
-  { id: 'capuz-do-vigia', nome: 'Capuz do Vigia', slot: 'capacete', duasMaos: false, modificadores: { habilidade: 1 } },
-  { id: 'cota-de-malha', nome: 'Cota de Malha', slot: 'armadura', duasMaos: false, modificadores: { vida: 4, agilidade: -1 } },
-  { id: 'gibao-de-couro', nome: 'Gibão de Couro', slot: 'armadura', duasMaos: false, modificadores: { vida: 2 } },
-  { id: 'espada-curta', nome: 'Espada Curta', slot: 'maoDireita', duasMaos: false, modificadores: { forca: 2 } },
-  { id: 'montante', nome: 'Montante', slot: 'maoDireita', duasMaos: true, modificadores: { forca: 4, agilidade: -1 } },
-  { id: 'escudo-redondo', nome: 'Escudo Redondo', slot: 'maoEsquerda', duasMaos: false, modificadores: { vida: 3 } },
-  { id: 'botas-leves', nome: 'Botas Leves', slot: 'pes', duasMaos: false, modificadores: { agilidade: 2 } },
+  { id: 'elmo-de-couro', nome: 'Elmo de Couro', slot: 'capacete', duasMaos: false, modificadores: { vida: 2 }, exclusivo: null },
+  { id: 'capuz-do-vigia', nome: 'Capuz do Vigia', slot: 'capacete', duasMaos: false, modificadores: { habilidade: 1 }, exclusivo: null },
+  { id: 'cota-de-malha', nome: 'Cota de Malha', slot: 'armadura', duasMaos: false, modificadores: { vida: 4, agilidade: -1 }, exclusivo: null },
+  { id: 'gibao-de-couro', nome: 'Gibão de Couro', slot: 'armadura', duasMaos: false, modificadores: { vida: 2 }, exclusivo: null },
+  { id: 'espada-curta', nome: 'Espada Curta', slot: 'maoDireita', duasMaos: false, modificadores: { forca: 2 }, exclusivo: null },
+  { id: 'montante', nome: 'Montante', slot: 'maoDireita', duasMaos: true, modificadores: { forca: 4, agilidade: -1 }, exclusivo: null },
+  { id: 'escudo-redondo', nome: 'Escudo Redondo', slot: 'maoEsquerda', duasMaos: false, modificadores: { vida: 3 }, exclusivo: null },
+  { id: 'botas-leves', nome: 'Botas Leves', slot: 'pes', duasMaos: false, modificadores: { agilidade: 2 }, exclusivo: null },
 ];
 
 export function obterItem(id: string): ItemCarta | undefined {
