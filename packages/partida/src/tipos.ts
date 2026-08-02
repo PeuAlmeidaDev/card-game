@@ -462,12 +462,15 @@ export interface EspiadaPendente {
  * `combate !== null`, `espiada !== null` e `mao.length > limite` que estava
  * repetida em cinco funções do reducer.
  *
- * **Seis valores.** `encrenca` (spec §6) entrou no vocabulário no Plano 4b
- * (Task 1) junto com os dois verbos dela (`procurarEncrenca`/`saquear`) e a
- * linha em `LEGAL` (`fase.ts`) — mas ninguém ainda ENTRA nela: nenhuma
- * transição do reducer produz `fase: 'encrenca'` até a Task 4 escrever a saída
- * de `vasculhar`. Até lá, quem sai de `vasculhar` sem combate continua indo
- * direto para `jogar`, como antes desta task.
+ * **Seis valores.** `encrenca` (spec §6 da fatia 8) é a fase da porta que NÃO é
+ * monstro: quem revela uma carta de raça não lutou, então escolhe entre jogar um
+ * monstro da própria mão (`procurarEncrenca`) ou comprar às cegas (`saquear`).
+ * A ÚNICA entrada é o ramo `raca` de `resolverCarta` (`mesa.ts`) — que serve
+ * tanto ao vasculhar atômico quanto à resolução da espiada —, e ela usa
+ * `registrar`, **não** `entrarOuPular`: a `encrenca` não é fase parada, não
+ * aceita `passar` e **nunca se auto-pula** (decisão #62 do game bible: o baralho
+ * de Portas nunca acaba, então as duas opções existem sempre). Por isso ela está
+ * fora de `FaseParada` — passá-la por `entrarOuPular` é erro de tipo.
  *
  * O `Record<Fase, …>` do `fase.ts` é o que obriga o valor novo a chegar com o
  * conjunto de ações dele — acrescentar uma fase sem legalidade é erro de

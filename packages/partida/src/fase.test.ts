@@ -380,13 +380,27 @@ describe('a fase nunca mente sobre o estado', () => {
     // nada) e a mão estourada sobrevive até `jogar` se auto-pular — é isso que
     // finalmente alcança `encerrarTurno` com o excedente intacto.
     //
-    // ⚠️ **Acoplado à política PROVISÓRIA do bot** (`bot.ts`, `case 'encrenca'`,
-    // que se autodeclara "política PROVISÓRIA desta task" e cita a Task 5 como
-    // quem a substitui pela avaliação da decisão #63 do bible): a razão de
-    // `descartar` sumir com densidade de produção é "o bot prefere lutar sempre
-    // que há monstro na mão", uma regra que pode não sobreviver à Task 5. Quando
-    // ela mudar, reconferir se este comentário (e a proporção invertida abaixo)
-    // ainda descrevem a causa certa.
+    // ⚠️ **Acoplado à política do bot em `encrenca`** (`bot.ts`, `case 'encrenca'`),
+    // que hoje é a AVALIAÇÃO da decisão #63 do game bible: o bot só topa a luta
+    // quando `rodadasParaMatar` lhe dá margem (`MARGEM_DE_ENCRENCA`), e cai em
+    // `saquear` quando nenhum monstro da mão passa.
+    //
+    // ✅ **Reconferido sob essa política nova** — a versão anterior deste
+    // comentário citava uma política PROVISÓRIA que não existe mais, e a
+    // instrução "reconferir quando ela mudar" tinha vencido sem ninguém cumprir.
+    // A causa descrita CONTINUA certa, e a conta é esta: contra o
+    // `MONSTRO_DE_TESTE` (`testes/catalogo.ts` — força 2, vida 10, habilidade 6,
+    // agilidade 1, level 1), o combatente do dublê (força 3, vida 20, habilidade
+    // 8, agilidade 5, level = patente) leva `ceil(10/4) / (8/12)` = **4,5**
+    // rodadas para matar, e o monstro leva `ceil(20/3) / (6/12)` = **14** para
+    // matá-lo; com agilidade 5 contra 1 o jogador ataca primeiro, então o exigido
+    // é 1,2 e `4,5 × 1,2 = 5,4 < 14` — o bot aceita, com folga de quase 3×. E a
+    // folga só CRESCE durante a partida (a patente sobe, e os itens do dublê só
+    // somam modificador positivo). Ou seja: com o baralho de produção, o bot
+    // continua descarregando o excesso de mão lutando, e `descartar` continua
+    // fora de alcance por essa via. ⚠️ A conferência depende dos números do
+    // `MONSTRO_DE_TESTE` e do `CLASSE_DE_TESTE`, que são load-bearing por outros
+    // motivos — mexer neles é refazer esta conta.
     //
     // ⚠️ **O achado NÃO é só sobre o teste — é sinal sobre o JOGO real:** com a
     // densidade de produção, `descartar` (a fase que cobra o excedente de mão)
