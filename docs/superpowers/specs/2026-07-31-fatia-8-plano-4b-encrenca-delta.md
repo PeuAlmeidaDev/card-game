@@ -151,10 +151,25 @@ Os pares que a `encrenca` acrescenta:
 3. `saquear` → a carta entra na mão **sem ser revelada** no log (é zona oculta: o evento diz que
    aconteceu, nunca o quê) e o turno segue para `jogar`.
 4. ⚠️ **Contra-intuitivo, procurar de propósito:** com uma carta de **raça** na mão e nenhum monstro,
-   confirmar que "Procurar encrenca" está **visível e apagado** (decisão #26 do bible) — e que
-   clicar nele não leva 400.
-5. Ver um bot **recusar** a luta: com o monstro forte na mão dele, ele deve saquear. Isso só é
-   visível pelo log; se nunca acontecer em uma partida inteira, a `MARGEM` está errada.
+   confirmar que "Procurar encrenca" **não aparece naquela carta** — e que a fase continua saindo
+   pelo "Saquear", sem travar.
+   🔴 **CRITÉRIO CORRIGIDO em 2026-08-02, e ele contradizia o código.** ~~Este item dizia
+   *"confirmar que 'Procurar encrenca' está **visível e apagado** (decisão #26 do bible)"*~~ — o que
+   está construído é o contrário: `TelaMesa.tsx:409` renderiza o botão dentro de
+   `{carta.tipo === 'monstro' && (…)}`, então numa carta de **raça** ele **não existe no DOM**
+   (o teste *"'Procurar encrenca' só acende na carta de MONSTRO"* afirma exatamente isso), e a
+   Task 9 do **plano** do 4b já enunciava o item assim. **Quem rodasse o gate por este texto
+   reprovaria código que funciona** — é a mesma família do item 5 abaixo (decisão #70 do bible).
+   ⬜ **O que fica em aberto, e é do Pedro:** se a convenção da **decisão #26** (*"botão apaga, não
+   some"*) deve ou não valer também aqui. Isto é decisão de UI **não tomada** — está sendo
+   **registrada**, não resolvida.
+5. 🔴 **ITEM DEFEITUOSO — NÃO COPIE ESTE MODELO. Fechado por SONDA em 2026-08-02, não pela tela.**
+   ~~Ver um bot **recusar** a luta: com o monstro forte na mão dele, ele deve saquear. Isso só é
+   visível pelo log; se nunca acontecer em uma partida inteira, a `MARGEM` está errada.~~
+   A recusa **acontece** (53 vezes em 400 partidas), mas em **9,25% das partidas** — assistir a uma
+   partida reprova o item em **~91% das vezes com o bot funcionando**. ➡️ **Evento de cauda não vira
+   item de gate ocular:** ou se mede por sonda, ou o item nasce dando **falso negativo**. Decisão
+   **#70** do bible; desenvolvimento no `CLAUDE.md` (sessão de 2026-08-02).
 
 ## 7. Fora de escopo, declarado
 

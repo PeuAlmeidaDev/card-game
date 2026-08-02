@@ -268,6 +268,17 @@ export type EventoDaMesa =
    * se o evento carrega a carta é a zona de DESTINO, não a ação.
    */
   | { readonly tipo: 'achado'; readonly jogadorId: string }
+  /**
+   * Saque: a carta comprada foi para a mão, então este evento diz que aconteceu e
+   * **nunca o quê** — mesma regra do `achado`, mesma razão (a zona de destino é
+   * oculta).
+   *
+   * É evento PRÓPRIO, e não um `achado` reusado, porque o log conta o que a mesa
+   * viu: `achado` é *"vasculhou e encontrou"*, `saqueou` é *"escolheu não lutar e
+   * levou uma carta"*. São escolhas diferentes do jogador, e um log que as
+   * confunde descreve um turno que não aconteceu.
+   */
+  | { readonly tipo: 'saqueou'; readonly jogadorId: string }
   | { readonly tipo: 'combate'; readonly jogadorId: string; readonly eventos: readonly EventoCombate[] }
   | { readonly tipo: 'patente'; readonly jogadorId: string; readonly patente: number }
   | { readonly tipo: 'derrota'; readonly jogadorId: string; readonly derrotas: number }
@@ -391,6 +402,25 @@ export type AcaoDaMesa =
    */
   | { readonly tipo: 'guardarCarta'; readonly jogadorId: string; readonly cartaId: string }
   /**
+   * Joga um MONSTRO da própria mão para lutar (spec §6). A carta sai da mão e vai
+   * para o cemitério de Portas — é o mesmo caminho que a porta revelada percorre,
+   * e por isso este verbo reusa `resolverCarta`.
+   *
+   * `cartaId` porque a escolha é do jogador: qual monstro encarar é a decisão que
+   * a fase existe para cobrar. Mesmo teto de 64 dos outros `cartaId`.
+   */
+  | { readonly tipo: 'procurarEncrenca'; readonly jogadorId: string; readonly cartaId: string }
+  /**
+   * Compra 1 carta de Portas **virada**, direto para a mão, sem revelar (spec §6).
+   *
+   * Sem campo nenhum além do tipo: não há o que escolher — a carta vem do topo, e
+   * o topo é segredo. ⚠️ Ele NÃO tem guard de baralho vazio, e isso é deliberado:
+   * a decisão #62 do bible diz que o baralho de Portas nunca acaba, então faltar
+   * carta é invariante NOSSA quebrada (500), não pedido inválido (400). Quem
+   * confere a promessa é o predicado em `fase.test.ts`.
+   */
+  | { readonly tipo: 'saquear'; readonly jogadorId: string }
+  /**
    * Encerra uma fase PARADA (`recompor`/`jogar`) sem fazer mais nada nela. É o
    * verbo que dá SAÍDA às duas — sem ele, `recompor` seria uma fase da qual não
    * se sai (o jogador com uma raça na mão travaria antes de vasculhar), que é
@@ -432,17 +462,21 @@ export interface EspiadaPendente {
  * `combate !== null`, `espiada !== null` e `mao.length > limite` que estava
  * repetida em cinco funções do reducer.
  *
- * **Cinco valores.** `encrenca` é a única do spec §6 que ainda falta — ela chega
- * no Plano 4 com os verbos dela (`procurarEncrenca`/`saquear`), pela mesma regra
- * que segurou `recompor` e `jogar` até aqui: fase entra JUNTO com o verbo que a
- * esvazia. Enquanto ela não existe, quem sai de `vasculhar` sem combate vai
- * direto para `jogar`.
+ * **Seis valores.** `encrenca` (spec §6 da fatia 8) é a fase da porta que NÃO é
+ * monstro: quem revela uma carta de raça não lutou, então escolhe entre jogar um
+ * monstro da própria mão (`procurarEncrenca`) ou comprar às cegas (`saquear`).
+ * A ÚNICA entrada é o ramo `raca` de `resolverCarta` (`mesa.ts`) — que serve
+ * tanto ao vasculhar atômico quanto à resolução da espiada —, e ela usa
+ * `registrar`, **não** `entrarOuPular`: a `encrenca` não é fase parada, não
+ * aceita `passar` e **nunca se auto-pula** (decisão #62 do game bible: o baralho
+ * de Portas nunca acaba, então as duas opções existem sempre). Por isso ela está
+ * fora de `FaseParada` — passá-la por `entrarOuPular` é erro de tipo.
  *
  * O `Record<Fase, …>` do `fase.ts` é o que obriga o valor novo a chegar com o
  * conjunto de ações dele — acrescentar uma fase sem legalidade é erro de
  * compilação, não uma fase silenciosamente sem saída.
  */
-export type Fase = 'recompor' | 'vasculhar' | 'combate' | 'jogar' | 'descartar';
+export type Fase = 'recompor' | 'vasculhar' | 'encrenca' | 'combate' | 'jogar' | 'descartar';
 
 /**
  * As fases de turno PARADO: nelas nada é comprado, e a única saída garantida é

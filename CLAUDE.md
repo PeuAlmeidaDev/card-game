@@ -54,7 +54,8 @@ a premissa **não**. O bible sempre desenhou **dois** caminhos para maldição (
 imediato é regra do **passo 2 do §6** (revelada no vasculhar), mas o `saquear` do passo 3 *"compra
 1 Portal virado pra mão"* — e o passo 5 já listava *"usar maldições"* entre as ações da mão. A
 frase colapsou dois caminhos num só e escreveu o resultado entre parênteses, como se fosse
-dedução óbvia. ⚠️ **Ia custar caro:** `saquear` é o verbo do **Plano 4b**, o próximo — ele nasceria
+dedução óbvia. ⚠️ **Ia custar caro:** `saquear` era o verbo do **Plano 4b**, então o próximo (hoje
+construído) — ele nasceria
 como "compra uma carta", sem perguntar o que acontece quando a carta é maldição. Lição: a regra
 "ler o bible antes de escrever" vale **também para o texto que ensina a regra**, e parêntese que
 começa com *"logo"* é dedução — o lugar onde a derivação se disfarça de fato.
@@ -72,10 +73,14 @@ Visão do jogo **fechada** em 2 sessões de `grilling` (9 + 13 decisões) — ve
 **sete** pacotes. ⚠️ Até 2026-07-31 esta lista trazia um oitavo, `progressao`, em três lugares
 (aqui, na Stack e no diagrama). **Ele não existe desde o commit `ca52c7a`**, que o renomeou para
 `partida` ao trocar a run solo pela mesa. Fatias 1–7 completas. **Fatia 8 "TESOUROS": Planos 1, 2, 3a ("Tesouros e o
-corpo"), 3b ("As fases do corpo") e 4a ("Mochila e o bot que veste") mergeados.**
+corpo"), 3b ("As fases do corpo"), 4a ("Mochila e o bot que veste") e **4b ("A encrenca")
+mergeados.** Com o 4b a fatia 8 fecha a parte
+ESTRUTURAL: o §6 do bible e o `Fase` do código passam a ter as mesmas **seis** fases. Detalhe do
+4b na sessão de 2026-08-01, no fim deste arquivo.
 
 O Plano 2 trocou os guards espalhados do reducer por uma **máquina de fases**:
-`EstadoPartida.fase` (então `vasculhar | combate | descartar`; o 3b levou a cinco) mais a tabela
+`EstadoPartida.fase` (então `vasculhar | combate | descartar`; o 3b levou a cinco, o 4b a **seis**)
+mais a tabela
 `Record<Fase, ReadonlySet<AcaoDaMesa['tipo']>>` em `packages/partida/src/fase.ts`, lida num
 ponto só — no topo do `aplicarAcao` — e **também pela `TelaMesa`** (os botões acendem pela
 fase que vem na vista, o cliente não mantém cópia da regra de fase).
@@ -181,9 +186,11 @@ as duas hipóteses candidatas). **Tesouros doados por bots via caridade: ~0** (n
 **994**, com **145** para o humano) — o bot guloso resolve equipamento ANTES de chegar em
 `descartar`, e o que sobra para doar são cartas de Porta (`monstro`; a `salaVazia` foi removida em
 2026-07-30) que a mão inicial recebeu CRUAS (nunca resolvidas — `criarPartida` distribui direto do
-topo do baralho) e que **nenhum verbo do jogo hoje sabe jogar** — é o buraco que a fase `encrenca`
-do Plano 4b fecha. ⚠️ **Remedido em 2026-07-30 e CONFIRMADO em zero** (decisão #55 do bible): o
-corte da `salaVazia` devolveu pressão de mão e **não** ressuscitou a caridade de tesouro.
+topo do baralho) e que, **até 2026-08-01, nenhum verbo do jogo sabia jogar** — era o buraco que a
+fase `encrenca` do Plano 4b **fechou** (72,1%–74,7% dos monstros iniciais passaram a virar combate,
+N=480; ver a sessão de 2026-08-01). ⚠️ **Remedido em 2026-07-30 e CONFIRMADO em zero** (decisão #55
+do bible): o corte da `salaVazia` devolveu pressão de mão e **não** ressuscitou a caridade de
+tesouro — e o 4b **remediu de novo**: continua **zero em 480 partidas**.
 
 **Dívida "a mesa nasce exatamente no teto" (4+4 = 8 = limite de quem está sem raça) — segue
 verdadeira estruturalmente**, sem mudança: nasce em `recompor`, e qualquer carta que entre no
@@ -237,13 +244,27 @@ revisão de diff a pega, porque não há diff.
 Corrigido: evento **`tesouroEsgotado`** (com `naoPagas`, convivendo com o `loot` no pagamento
 parcial) e a tela mostrando o estoque dos **dois** baralhos — `tesourosNoMonte` viajava na vista
 desde o 3a e **nunca fora renderizado**, a 3ª ocorrência de "publicado mas não renderizado" nesta
-fatia. ⚠️ Isto conserta a **visibilidade**; a **economia continua aberta** (pergunta 11 do §18) e
-é dial do Pedro.
+fatia. ⚠️ Isto conserta a **visibilidade**. A **economia não** — mas a **pergunta 11 do §18 está
+FECHADA desde 2026-07-29**: a resposta é **estrutural** (decisão **#40 do game bible**,
+consumíveis ≥ ~50% da receita de Itens, mais a evacuação do §10 que a **#46** vai construir), e a
+**#55** confirmou **por medição** que *"aumentar a pressão de mão"* **não** é alavanca sobre a
+economia. 🔴 **O que segue aberto é a CONSTRUÇÃO da resposta:** nenhum consumível existe em
+código, e eles só nascem no **bloco 2** (Maldições/Bad Stuff). ⚠️ **Não é dial** — a #40 recusa
+esse enquadramento por escrito (*"regra ESTRUTURAL, não dial… a resposta da pergunta 11 NÃO é
+'aumentar o baralho'"*), e chamar de dial ressuscita a saída que ela matou. Até 2026-08-01 esta
+linha dizia *"a economia continua aberta (pergunta 11) e é dial do Pedro"*: a citação estava
+certa, a afirmação errada nos dois pontos.
 
 💡 **Hipótese não medida, plausível:** isto pode explicar os DOIS números que a Task 9 registrou
 sem causa fechada — a caridade zerada (não há tesouro para doar na segunda metade) e a taxa de
 vitória do humano abaixo da projeção (com o baralho seco, quem acumulou cedo trava a vantagem).
 Medir no 4b antes de tratar como fato.
+🔴 **O 4b NÃO a mediu — ela segue NÃO MEDIDA.** A Task 8 declarou o esgotamento do baralho de
+Tesouros **fora do escopo** e não instrumentou o estoque. ⚠️ Os dois números que a hipótese
+explicaria continuam de pé e foram remedidos: a caridade de Tesouro deu **zero em 480 partidas**,
+e a taxa de vitória virou um achado maior — o **gradiente de ordem de assento** da sessão de
+2026-08-01. **Nada disso a confirma nem a derruba**; ela continua candidata, e quem for medi-la
+precisa instrumentar o estoque, que é justamente o que não foi feito.
 
 ⚠️ **Vale mais que os achados: os dois vícios que este projeto mais teme deram LIMPO**, e não por
 leitura otimista — o revisor adversarial quebrou o código de produção em **7 pontos** e conferiu
@@ -253,10 +274,32 @@ apareceu nesta fatia.
 
 ⚠️ **A tabela é um gate de fase, não a resposta inteira de "posso?".** A elegibilidade fina
 (espiada pendente, tipo da carta, `proximaDecisao` do combate) continua em cada função do
-reducer, e **cada uma dessas condições precisa de gêmeo na tela**. Hoje são **13 pares, em 13
+reducer, e **cada uma dessas condições precisa de gêmeo na tela**. Hoje são **14 pares, em 16
 linhas** (o Plano 4a acrescentou os 4 de `guardarCarta`: tipo da carta e mochila cheia, em
-`recompor` e em `jogar`), tabelados no comentário do `aplicarAcao` — botão novo escrito só com
-`legal(tipo)` acende onde o domínio recusa e leva 400.
+`recompor` e em `jogar`; o **4b** acrescentou **1**, o tipo monstro de `procurarEncrenca`),
+tabelados no comentário do `aplicarAcao` — botão novo escrito só com `legal(tipo)` acende onde o
+domínio recusa e leva 400.
+
+⚠️ **Duas das 16 linhas NÃO são par, e estão lá de propósito** — as duas da `encrenca`, cada uma
+por um motivo diferente:
+
+1. **`saquear` não tem guard fino nenhum.** Pela decisão #62 do game bible o baralho de Portas
+   nunca acaba, então não há `if` de baralho vazio e não há recusa de domínio para a tela imitar.
+   A linha existe para provar que **a recontagem CHEGOU até `saquear`**, que é o cuidado que
+   faltava quando o par órfão de `empurrarCarta` passou batido.
+2. **`procurarEncrenca` / "a carta está na sua mão" tem gêmeo ESTRUTURAL, não escrito.** O botão
+   só existe dentro do `map` da mão, então o estado que o guard recusa é um estado que a tela não
+   consegue produzir. 🔑 **Isso é a convenção da tabela, e a prova está no que ela NUNCA listou:**
+   o mesmo guard vive em `cartaDaMao` (`jogarCarta`, `entregarCarta`, `guardarCarta`) e em
+   `cartaEquipavelDe` (`equiparCarta`) — e **`entregarCarta` não tem uma única linha na tabela**,
+   sendo esse o seu único guard fino.
+
+⚠️ **Este número já foi escrito como 15** (na leva de docs do 4b), contando o item 2 como par. É
+erro de inflação, não de omissão — menos perigoso, mas quebra a convenção que faz a recontagem
+funcionar: quem recontar depois procura um gêmeo na tela que não tem o que ser escrito. Corrigido
+em 2026-08-01 recontando **a partir do reducer**, `AcaoInvalida` por `AcaoInvalida`. "Uma linha
+por par" continua valendo; declarar a ausência **em linha, marcada**, é o que impede a próxima
+recontagem de achar que alguém esqueceu de olhar.
 
 ⚠️ Essa tabela já mentiu **quatro vezes**. As três primeiras pelo mesmo mecanismo — **agrupar
 duas fases numa célula** —, com a regra "uma linha por par" escrita no próprio comentário e
@@ -280,8 +323,10 @@ Uma sessão de `grilling` produziu **22 decisões (#29–#50)** e mudou coisas q
 afirmava. **O `game-bible.md` é a fonte de verdade; o que está escrito acima pode estar velho.**
 
 - ✅ **O MVP finalmente TEM definição:** **`game-bible.md` §3.1**. Seis blocos.
-- ✅ **Ordem vigente (§17, decisões #45 e #51):** **`corte da salaVazia` (bloco 0, acrescentado em
-  2026-07-30)** → `4b encrenca` → **`Maldições/Bad Stuff`** →
+- ⚠️ **Ordem desta sessão (§17, decisões #45 e #51) — SUPERADA pela #61**, que meteu três fatias
+  entre a `encrenca` e as Maldições; a ordem que vale está na sessão de 2026-07-31, abaixo:
+  ~~**`corte da salaVazia` (bloco 0, acrescentado em 2026-07-30)** → `4b encrenca`~~ (as duas
+  **construídas**, em 2026-07-30 e 2026-08-01) → **`Maldições/Bad Stuff`** →
   **`Frontend animado`** → **`Online`** → `Interferência` → `Habilidades` (fora do MVP) →
   `Contas/ranking/crônica`.
   🔴 **A ordem que este arquivo trazia OMITIA O ONLINE, e isso era DERIVA** — o §17 tinha
@@ -350,6 +395,9 @@ fato** subiu). Registrado como decisão **#55**; a alavanca real sobre a economi
   #42 temia que sem a `salaVazia` *"o descarte virasse tirania"*; o ritmo **não subiu**, então a
   preocupação **não se confirmou nesta amostra** — o que não é o mesmo que descartada, porque
   ninguém mediu *quantos turnos terminam em `descartar`*.
+  ✅ **O 4b mediu:** **10 de 8.364 turnos (0,12%, N=240)** passam por `descartar`, mediana **0** por
+  partida. ⚠️ É o número da mesa **do 4b** (com a `encrenca` e o bot da #63), não um retrato do
+  bloco 0 — mas fecha a lacuna que este parágrafo apontava: tirania de descarte **não** aparece.
 - **O que a fatia MEDIU e não consertou (#53):** `tirarDoTopo` (`baralho.ts:61-64`) lança `Error`
   cru = **500** com monte e cemitério vazios, e **`vasculhar` (`mesa.ts:414-435`) não tem guard
   nenhum** — só `empurrarCarta` tem (`mesa.ts:461`). Exposição **pré-existente**, e com 56 cartas
@@ -357,12 +405,19 @@ fato** subiu). Registrado como decisão **#55**; a alavanca real sobre a economi
   "não acontece"**; é a checagem depois de CADA ação, não prova de impossibilidade. Como não deu
   maior que zero, não virou task aqui: **o número vai para o 4b**, que precisa refazê-lo — `saquear` compra
   Porta **para a mão**, e mão é a zona que esvazia baralho sem devolver nada ao cemitério.
+  ✅ **Refeito no 4b: zero em 604 partidas**, agora com `saquear` em jogo (598 usos só nas rodadas
+  de N=80) e com a condição virada **predicado** em `fase.test.ts` (#62). O `Error` cru **fica**.
 
-**Próximo: Plano 4b — a fase `encrenca`.** Os verbos `procurarEncrenca`/`saquear` (§6 do
+✅ **O que era "Próximo" aqui — o Plano 4b, a fase `encrenca` — ESTÁ CONSTRUÍDO E MERGEADO**
+(2026-08-01; gate ocular fechado em 2026-08-02). Os três baselines abaixo **foram remedidos**; os
+resultados estão na sessão de
+2026-08-01, no fim deste arquivo. O parágrafo segue como registro do que se esperava dele.
+
+Os verbos `procurarEncrenca`/`saquear` (§6 do
 bible) — a Task 9 do Plano 4a mediu por que ela importa: cartas de Porta dadas na mão inicial
-ficam mortas até existir um verbo que as jogue de dentro da mão. 📌 **O 4b herda três números
+ficam mortas até existir um verbo que as jogue de dentro da mão. 📌 **O 4b herdou três números
 como baseline a remedir:** caridade de Tesouro **0** / de Porta **49**, ritmo **101/104**, beco
-sem saída **0/80**. ⚠️ E herda uma expectativa **rebaixada**: a `encrenca` dá verbo à Porta morta
+sem saída **0/80**. ⚠️ E herdou uma expectativa **rebaixada**: a `encrenca` dá verbo à Porta morta
 na mão, mas **não** há evidência de que pressão de mão ressuscite caridade de Tesouro (#55) —
 não repita a promessa da #42 com outro nome.
 ⚠️ **Duas coisas novas que o 4b tem que encarar e que o plano ainda não sabia:** (1) `saquear`
@@ -383,16 +438,18 @@ construtor da fatia 2 — seletor de classe, preview, botão "Duelar"). A remoç
 destino — **classe vira carta** (#60) —, o que exigiu o **Aprendiz** como ausência, que exigiu uma
 compensação, que revelou que **itens exclusivos não existem**. Daí saíram três fatias.
 
-**▶️ ORDEM VIGENTE (decisão #61), e o 4b continua na frente:**
-`4b encrenca` → **`afinidade`** → **`escolha do descarte`** → **`classe como carta`** → Maldições.
-⚠️ **Por que o 4b primeiro:** a `afinidade` leva o baralho de Tesouros de **32 para 48 cartas**, e o
-4b tem **três baselines herdados a remedir**. Rodar antes contamina — é a #51 com outra roupa.
-⚠️ **Custo aceito:** o topo da tela fica no ar por mais quatro fatias.
+**▶️ ORDEM VIGENTE (decisão #61):** ✅ ~~`4b encrenca`~~ (**construído em 2026-08-01**) →
+**`afinidade`** (a próxima) → **`escolha do descarte`** → **`classe como carta`** → Maldições.
+⚠️ **Por que o 4b veio primeiro:** a `afinidade` leva o baralho de Tesouros de **32 para 48
+cartas**, e o 4b tinha **três baselines herdados a remedir**. Rodar antes contaminaria — é a #51
+com outra roupa. ✅ **A precaução se pagou:** os três baselines foram remedidos com o baralho de
+Tesouros ainda em 32 (sessão de 2026-08-01).
+⚠️ **Custo aceito:** o topo da tela fica no ar por mais três fatias (era quatro).
 
-**Specs prontos, sem plano ainda:**
-`docs/superpowers/specs/2026-07-31-afinidade-de-itens-design.md` ·
-`docs/superpowers/specs/2026-07-31-fatia-8-plano-4b-encrenca-delta.md` (DELTA — o §6/§6.1 do spec
-da fatia 8 continua sendo a fonte).
+**Specs prontos:** `docs/superpowers/specs/2026-07-31-afinidade-de-itens-design.md` (sem plano
+ainda) · `docs/superpowers/specs/2026-07-31-fatia-8-plano-4b-encrenca-delta.md` (DELTA — o §6/§6.1
+do spec da fatia 8 continua sendo a fonte; **executado**, plano em
+`docs/superpowers/plans/2026-07-31-fatia-8-plano-4b-encrenca.md`).
 
 **As duas decisões que o 4b fechou:**
 - **#62 — o baralho de PORTAS nunca acaba.** É REGRA, não consequência do reshuffle (que recicla o
@@ -426,6 +483,228 @@ procurando esse erro nos outros.
 📌 **Sobra disso, para a fatia `classe como carta`:** a receita-alvo pede **3 cartas de classe por
 jogador** e o catálogo tem **2 classes** — com "1 cópia por classe sacável" (#60) dá **2**. A
 receita-alvo **não é construível** com o catálogo de hoje.
+
+## ⚠️ SESSÃO DE 2026-08-01 — a `encrenca` está CONSTRUÍDA, e pela primeira vez nesta fatia a promessa se cumpriu
+
+**O Plano 4b está MERGEADO** (branch `feat/fatia-8-plano-4b-encrenca`).
+Sete tasks de código + esta de documentação; **527 testes verdes**, typecheck 7/7 e lint limpos.
+✅ **GATE OCULAR FECHADO PELO PEDRO em 2026-08-02.** Os itens **1–3** e o **4** (a ausência do botão
+"Procurar encrenca" na carta de raça) foram conferidos por ele na tela; o **item 5** foi fechado por
+**SONDA**, porque **não é observável numa partida** — ver a sessão de 2026-08-02 e a decisão **#70**
+do bible. ⚠️ **Metade do que este gate "pegou" era defeito do próprio roteiro, não do código:** o
+item 5 pedia um evento de cauda (falso negativo em ~91% das partidas) e o item 4 estava escrito de
+formas **opostas** no plano e no spec. Nenhum dos dois era sobre o código.
+
+**O que entrou em produção:** a fase **`encrenca`** com os dois verbos —
+**`procurarEncrenca`** (joga um monstro **da mão**, reusando `resolverCarta`, e por isso o combate
+que abre é indistinguível do que a porta traz) e **`saquear`** (compra 1 Porta virada **para a
+mão**, evento `saqueou`, que **não diz o quê** — a mão é zona oculta). A entrada na fase é o ramo
+`raca` de `resolverCarta`; ela usa `registrar` e **não** `entrarOuPular`, porque **não é fase
+parada e nunca se auto-pula** (#62). O bot passou a **avaliar o combate** antes de procurar
+encrenca (`rodadasParaMatar` + `MARGEM_DE_ENCRENCA` = 1,2, com 1,5× extra quando o monstro ataca
+primeiro — #63, que revoga a decisão #9 do **spec da fatia 8**). A invariante *"monte e cemitério
+de Portas nunca ambos vazios"* virou **predicado** em `fase.test.ts` (#62). Na tela: os dois
+botões, o `NOME_DA_FASE`, a narração do `saqueou` e o `participantesDe`.
+
+### 📊 Os números medidos (Task 8) — e o N é POR MEDIDA, nunca global
+
+🔴 **O relatório mora em `.superpowers/sdd/2026-07-31-fatia-8-plano-4b-encrenca/task-8-report.md`,
+que é GITIGNORED. Estes números só existem aqui e no §19 do bible (#65–#68).** Foram **728
+partidas** no total, dials de produção, dado e embaralho reais, sem semente — mas a instrumentação
+entrou em **três levas**, e cada medida vale só das rodadas em que ela existia. **Escrever um N
+global reivindicaria evidência que não foi produzida.**
+
+| Medida | Resultado | **N** |
+|---|---|---|
+| **Monstros da mão inicial** que viram combate via `procurarEncrenca` | **72,1%–74,7%** (antes: **estruturalmente zero**) | 480 |
+| **Usos de `procurarEncrenca`** que consomem carta da mão inicial | **95,2%–96,7%** (empoçado 95,97%) | 480 |
+| **Beco sem saída** (monte **e** cemitério de Portas vazios) | **zero em 604 partidas** | 604 |
+| Abortos por `Error` cru (500, invariante nossa) | **zero** | 728 |
+| Abortos por `AcaoInvalida` (400, bug de política do bot) | **zero** | 364 |
+| `encrenca` → `procurarEncrenca` × `saquear` | **86,1%–89,2% `procurarEncrenca`** | 728 |
+| Caridade de **Tesouro** (baseline 0) | **zero** | 480 |
+| Caridade de **Porta** (baseline **49** em 80) | **6, 3, 0, 1, 3, 2** por rodada de 80 | 480 |
+| Ritmo — mediana de ações do humano (baseline 101 / 104) | **95·101·104·103** (bot) / **110·103·109·98** (equipando) | 248 |
+| **Raça** da mão inicial que morre na mão | **30,8%–36,1%** | 480 |
+| **Gradiente de vitória por ordem de assento** | **40,6% · 26,6% · 20,0% · 12,8%** | 320 |
+| Episódios da #64 (acima do teto **e** sem monstro) | **7 episódios**, 0,00%–0,26% das entradas | 480 |
+| Turnos que passam por `descartar` (global) | **10 de 8.364 = 0,12%** | 240 |
+
+🔴 **DUAS ARMADILHAS DE RÓTULO, as duas já cometidas dentro do próprio relatório e corrigidas em
+fix round.** ⚠️ **"~72%" e "~96%" são medidas DIFERENTES, com denominadores diferentes:** a
+primeira é *"dos monstros que nasceram na mão, quantos foram jogados?"*; a segunda é *"das vezes
+que o verbo foi usado, quantas gastaram carta da mão inicial?"*. **Nunca as troque nem as colapse
+num número só.** ⚠️ E **cada linha da tabela carrega o SEU N** — não os empreste entre linhas.
+
+⏱️ **O ritmo é "SEM MUDANÇA DETECTÁVEL"** — as duas faixas **contêm** o baseline e as rodadas
+discordam em direção; não escreva "melhorou" nem "piorou". ⚠️ **Mas "sem mudança" não é "nada
+mudou": a COMPOSIÇÃO da métrica mudou.** A `encrenca` acrescenta uma ação obrigatória por porta
+não-monstro, e o humano gasta **2,31–2,74 ações por partida** nela. O total não subiu, e mesmo
+assim **não** se escreve *"foi exatamente absorvido"*: ~2,5 em ~100 é menor que a dispersão que
+N=31 já produz entre rodadas da mesma política.
+
+⚠️ **RESSALVA-MÃE, válida para TODOS os números acima:** esta fatia mudou **duas coisas ao mesmo
+tempo** — a `encrenca` **e** a política do bot (#63) — e os 3 bots rodam a **mesma**
+`escolherAcao` da política "bot" do humano. **Nenhum número isola uma da outra**, e toda comparação
+contra medições antigas move **os quatro assentos juntos**. É a #51 com outra roupa, que era a
+#24/#25 com outra roupa.
+
+### ✅ Os dois resultados bons
+
+1. **A justificativa da fatia se cumpriu — e é o PRIMEIRO número desta fatia 8 que se cumpre como
+   prometido**, depois de a #42 e a #55 terem prometido e não entregado. O monstro na mão inicial
+   era carta morta por construção (nenhum verbo sabia jogá-la); agora **72,1%–74,7%** deles viram
+   combate, e **95,2%–96,7%** dos usos do verbo gastam exatamente essa carta. 🔻 **O espelho disso é
+   uma queda:** a caridade de **Porta** desabou de **49** para **0–6 por 80** — os 49 eram carta
+   morta sendo doada por falta do que fazer com ela. ⚠️ A caridade de **Tesouro** segue em **zero**;
+   **não repita a promessa da #42 com outro nome**, a alavanca continua sendo a #40.
+2. **A decisão #62 sobreviveu ao teste que importava.** `saquear` compra Porta **para a mão**, e a
+   mão é a única zona que esvazia o baralho **sem devolver nada ao cemitério** — era exatamente o
+   risco. **Zero beco em 604 partidas**, com o verbo exercitado 598 vezes só nas 6 rodadas de N=80.
+   🔴 **"Zero em 604 partidas", NUNCA "não acontece"**: é checagem depois de CADA ação nas condições
+   medidas (patente-alvo 10, mesa de 4, 56 Portas), não prova de impossibilidade.
+
+### 🔴 O achado delicado: a ordem do assento decide a partida
+
+Com os **quatro assentos rodando exatamente a mesma política**: **#0 vence 40,6% · #1 26,6% ·
+#2 20,0% · #3 12,8%** (n=320; χ² = 53,78, df=3, p < 10⁻¹⁰; tendência z = −7,20; #0 × #3 z = 7,36).
+
+- ✅ **O que está afirmado:** existe **HOJE** um gradiente forte. Num jogo competitivo ranqueado,
+  quem joga primeiro vence ~41% e quem joga por último ~13%.
+- 🔴 **O que NÃO está afirmado, e não pode ser escrito:** que **esta fatia** causou ou aumentou o
+  gradiente. Essa conclusão foi escrita e **derrubada na revisão** — o baseline *"antes era ~25%"*
+  era **cherry-pick** (o relatório do 4a tem uma rodada com 48,39% que a faixa publicada excluía) e
+  **não existe medição de gradiente anterior a esta**. É **hipótese**, não achado causal.
+- ⚠️ **A escada não está estabelecida, só a ponta:** os degraus do **meio** não são individualmente
+  significativos (**#1−#2** z = 1,73; **#2−#3** z = 2,26, marginal); só o **#0−#1** é
+  (z = 3,12). Some-se a isso que uma das 4 rodadas inverteu #1 e #2. Escreva *"o primeiro vence
+  muito mais que o último"*, **não** "41/27/20/13". ⚠️ **Rótulo colado no valor, de propósito:** a
+  versão anterior desta linha dizia *"os degraus **adjacentes**"* e listava `1,73 / 2,26 / 3,12`
+  **sem rótulo e em ordem crescente** — a leitura posicional natural atribuía 1,73 ao #0−#1 e
+  negava justamente o único degrau significativo. É a família *rótulo × valor* que os dois fix
+  rounds da Task 8 corrigiram, reincidindo na **cópia para os docs**.
+- ➡️ **Onde ele vive:** é **pergunta 17 do §18** do bible (medição, não decisão) e a decisão **#68**
+  registra o número. **O Pedro ainda não decidiu nada sobre isso.** O que fecharia: rodar o mesmo
+  script contra o commit pré-fatia num `git worktree`, comparando **distribuições por assento**,
+  não taxas agregadas — e nem isso separa `encrenca` de #63.
+
+### ⚖️ A decisão #64 foi medida — e a medição desmentiu a narrativa inicial
+
+A sequência real do episódio forçado, **instrumentada**, é
+`["saquear", "passar", "entregarCarta", "entregarCarta"]` — o jogador **doa duas cartas**. A
+primeira versão do relatório afirmava *"duas ações de `equiparCarta`/`guardarCarta` o devolvem ao
+teto"*: **inventado a partir de uma contagem, e falso**. A #64 **se confirma no micro** (2 de 2
+episódios instrumentados passam por `descartar`) e **fica vazia no agregado** (7 episódios em 480
+partidas; `descartar` reclama 0,12% dos turnos). ⚠️ A justificativa escrita da #64 (*"vai doar
+muita carta"*) fica **tensionada** pela caridade de Porta em 0–6 por 80 — **a punição existe e
+quase nunca é cobrada**. 🔴 **A #64 não foi revogada nem revisitada: isso é decisão do Pedro**, e a
+tensão está registrada na #67 do bible em vez de o texto ser consertado em silêncio.
+
+### O que fica ABERTO ao sair desta fatia
+
+- 🔴 **O gate ocular do Pedro** (roteiro na Task 9 do plano do 4b). ⚠️ **O item 5 dele — *"ver um bot
+  recusar a luta; se isso nunca acontecer numa partida inteira, a `MARGEM_DE_ENCRENCA` está
+  errada"* — É DEFEITUOSO como escrito**, e foi fechado por sonda em 2026-08-02: ver a seção da
+  sessão de 2026-08-02, abaixo, e a decisão **#70** do bible. **Não copie esse item.**
+- 🔴 **O gradiente de assento** (pergunta 17 do §18) — medido, sem causa e sem decisão.
+- ⬜ **A raça inicial morrendo na mão em 30,8%–36,1%** — resíduo de carta morta que a `encrenca` não
+  toca. **Não reabre a pergunta 10**, fechada pelas #36/#37; fica como registro.
+- ⬜ **O esgotamento do baralho de Tesouros NÃO foi medido** — declarado fora do escopo da Task 8.
+- 🎚️ **A `MARGEM_DE_ENCRENCA` (1,2) continua "a calibrar"** pela própria #63. ✅ **Medida em
+  2026-08-02 e o Pedro decidiu NÃO girá-la** (decisão **#69**, pergunta **18** do §18) — ver abaixo.
+- **Próxima fatia: `afinidade`** (#61), que leva o baralho de Tesouros de 32 para 48 cartas.
+
+## 🔴 SESSÃO DE 2026-08-02 — o gate ocular pediu o teste ERRADO, e o bot estava certo
+
+**Nenhuma linha de código mudou.** Saíram desta sessão duas decisões do bible (**#69** e **#70**),
+uma pergunta nova no §18 (a **18**) e a marcação de um item de gate como defeituoso nos três
+documentos que o escrevem. O Plano 4b segue como estava: **527 testes verdes**, HEAD `90eb490`.
+
+**Fonte única de todo número abaixo:**
+`.superpowers/sdd/2026-07-31-fatia-8-plano-4b-encrenca/gate-item5-report.md` — **gitignored**, então
+os números só sobrevivem aqui e no §19/§18 do bible. **5 rodadas de 80 partidas**, dials de
+produção, dado e embaralho reais, sem semente. 🔴 **N por medida, nunca global:** recusas · saques
+"sem opção" · candidatos reprovados · ex-post dos **escolhidos** = **400**; grupo de controle
+(combates **forçados** pelo `vasculhar`) = **320** (R2–R5); curva de sensibilidade = **160**
+(R4–R5).
+
+### 🔴 A lição de processo, que é o mais transferível da sessão: **evento de cauda não vira item de gate ocular**
+
+O **item 5 do gate ocular** do 4b dizia: *"ver um bot **recusar** a luta (log: ele saqueia tendo
+monstro na mão). Se isso nunca acontecer numa partida inteira, a `MARGEM_DE_ENCRENCA` está
+errada."*
+
+**A recusa acontece — 53 vezes em 400 partidas — mas em apenas 9,25% das partidas** (37 de 400;
+**mediana por partida ZERO nas cinco rodadas**). ➡️ **Assistir a uma partida inteira reprova o item
+em ~91% das vezes COM O BOT FUNCIONANDO CORRETAMENTE.** Para 95% de chance de ver **uma** recusa
+seriam necessárias **~31 partidas** (`1 − 0,9075³¹ ≈ 0,95`) — o que não é gate ocular, é sonda.
+
+🔴 **Falso negativo num gate é PIOR que item ausente:** um item ausente não diz nada; este
+**acusava** um defeito que não existe. E o defeito acusado era **num dial** — a "correção" natural
+que ele induz é girar a `MARGEM`, que é exatamente o que a decisão #69 recusa. O item quase
+comprou uma mudança de balanceamento com evidência invertida.
+
+⚠️ **O mecanismo irmão, e ele engana nos DOIS sentidos:** a causa dominante do `saquear` é **a
+outra** — **478 saques por não haver monstro na mão contra 53 recusas**, 9 em cada 10. Quem olhasse
+o log **sem separar as causas** veria `saquear` frequente e concluiria *"o bot recusa demais"*, ou
+veria a recusa sumir no ruído e concluiria *"o bot nunca recusa"*. O sinal do item 5 é
+`saquear` **havendo monstro na mão**; o resto é a fase saindo pela única jogada legal.
+
+➡️ **A regra, para todo roteiro de gate futuro:** antes de escrever *"se isso nunca acontecer…"*,
+pergunte **qual é a frequência esperada do evento**. Se ela não for quase certa numa sessão de
+observação, o item é de **sonda**, não de olho — e o roteiro deve dizer isso na própria linha.
+🔑 É a mesma família das lições que este arquivo já cataloga (comentário que afirma um presente
+errado; a tabela de pares finos que mentiu por agrupamento, por omissão e por inflação):
+**texto que afirma o que se vai observar, sem ninguém ter medido se dá para observar.**
+
+⚠️ **Os três lugares que escrevem o item 5 foram marcados como defeituosos**, para a próxima fatia
+não copiar o item quebrado: `docs/superpowers/plans/2026-07-31-fatia-8-plano-4b-encrenca.md`
+(Task 9, Step 4), `docs/superpowers/specs/2026-07-31-fatia-8-plano-4b-encrenca-delta.md` (§6) e
+este arquivo (a lista "O que fica ABERTO" da sessão de 2026-08-01).
+
+🐛 **Achado adjacente, da MESMA família, e ele ainda está com o Pedro: o item 4 do gate estava
+escrito de DUAS formas opostas.** O **spec-delta** mandava confirmar que "Procurar encrenca" fica
+*"visível e apagado (decisão #26)"* numa carta de **raça**; o **plano** mandava confirmar que ele
+**não aparece**. O código faz o do plano — `TelaMesa.tsx:409` renderiza o botão dentro de
+`{carta.tipo === 'monstro' && (…)}`, e o teste *"'Procurar encrenca' só acende na carta de
+MONSTRO"* afirma isso. ➡️ **Quem rodasse o item 4 pelo spec reprovaria código que funciona** — de
+novo um gate acusando defeito inexistente, agora por **critério divergente entre dois documentos**
+em vez de por frequência. O spec foi corrigido. ⬜ **O que NÃO foi resolvido, porque é do Pedro:**
+se a convenção da **decisão #26** (*"botão apaga, não some"*) deve valer também aqui — registrado
+como pergunta de UI, não consertado em silêncio.
+
+### 🎚️ A decisão do Pedro: a `MARGEM_DE_ENCRENCA` fica em **1,2** e vai assim para o merge
+
+**Decisão #69 do bible.** A frouxidão está **registrada como dial a revisitar** (pergunta **18** do
+§18), **não** corrigida agora. **O argumento é de método, não de balanceamento:** a fatia **já mudou
+duas coisas ao mesmo tempo** (a `encrenca` **e** a política do bot da #63) e a Task 8 registrou por
+escrito que **nenhum número isola uma da outra**. Girar a margem agora seria a **TERCEIRA** variável
+e invalidaria as medições de **força final dos bots** (5,98–6,34, 14 amostras) e de **taxa de
+vitória** feitas em **728 partidas**. ➡️ **É literalmente o erro que as decisões #24 e #25 do bible
+já catalogaram.** 💰 **Custo aceito: o bot fica sub-ótimo por mais uma fatia.**
+
+🔴 **O que NÃO está quebrado — leia junto, senão isto vira "o bot está com defeito":** **ex-ante deu
+ZERO em 3.421 aceites** com desvantagem (N=400). O bot **nunca** aceita luta que a própria fórmula
+diz que perde; a menor razão observada num aceite foi **1,33**, acima do limiar de 1,20. O que a
+margem paga é a fórmula ser **otimista de propósito** — a #63 declara que ela ignora esquiva e
+passivas de raça e que a margem existe para pagar isso —, e **1,2 paga pouco**, que é coisa
+diferente de estar errada.
+
+**Os três números que sustentam "frouxa"** (detalhe e método na pergunta 18 do §18):
+
+| Evidência | Número |
+|---|---|
+| Candidatos individuais reprovados pela margem | **5,5%–7,4%** (~**1,1%** das entradas com monstro na mão: 7/707 e 8/672) |
+| Ganho **ex-post** — derrota em luta **ESCOLHIDA** × **FORÇADA** (`vasculhar`) | **8,69%** (236/2717) × **11,46%** (919/8019) — z = 4,03, mas só **1,32×**; N=320 |
+| Curva do dial (% das entradas que virariam recusa, R4/R5) | **1,2 → 0,99% / 1,19%** · **1,5 → 4,81% / 4,46%** · **2,0 → 15,42% / 14,58%** · **3,0 → 36,92% / 35,42%**; N=160 |
+
+📌 **Nota de método, que a próxima medição precisa herdar:** as **recusas** saem da `escolherAcao`
+real; a linha (b) **não usa fórmula nenhuma** (sai dos eventos `patente`/`derrota`); as linhas (a) e
+(c) usam uma **cópia** da fórmula — `rodadasParaMatar`, `melhorEncrenca` e `MARGEM_DE_ENCRENCA` são
+**privados** de `bot.ts` e não dá para importá-los —, e essa cópia foi **verificada**: a curva
+previu **7** e **8** recusas em duas rodadas e a política real produziu **7** e **8**.
+⚠️ **O que a curva NÃO diz:** o efeito de cada valor sobre **força de bot** ou **taxa de vitória**.
+Isso não foi medido, e é o que a pergunta 18 do §18 pede para fechar o dial.
 
 ## Stack (alvo)
 

@@ -29,6 +29,11 @@ const LEGAL: Record<Fase, ReadonlySet<AcaoDaMesa['tipo']>> = {
   // própria (spec §6): `vasculhar` e `manterCarta`/`empurrarCarta` são legais na
   // mesma fase e se excluem pelo campo `espiada`, que o reducer ainda consulta.
   vasculhar: new Set<AcaoDaMesa['tipo']>(['vasculhar', 'manterCarta', 'empurrarCarta']),
+  // A fase COBRA uma escolha: `procurarEncrenca` ou `saquear`, e nada mais. Sem
+  // `passar` — decisão #62 do bible. Quem sustenta a ausência é a regra de que o
+  // baralho de Portas nunca acaba, o que mantém `saquear` sempre disponível; a
+  // promessa é conferida pelo predicado da invariante, não por um comentário.
+  encrenca: new Set<AcaoDaMesa['tipo']>(['procurarEncrenca', 'saquear']),
   // `equiparCarta` fica de FORA: o motor recebe um snapshot imutável dos stats na
   // abertura do combate, então remontar o corpo no meio da luta ou não teria
   // efeito nenhum (mentindo para quem clicou) ou furaria o snapshot.
@@ -58,8 +63,9 @@ export function acaoEhLegalNaFase(fase: Fase, tipo: AcaoDaMesa['tipo']): boolean
  *
  * É a mitigação de RITMO da fatia: sem ela, `recompor` e `jogar` custariam dois
  * cliques por turno a quem não tem nada para jogar nem equipar. `vasculhar`,
- * `combate` e `descartar` nunca se pulam — pular a primeira seria pular o turno,
- * e pular a última seria perdoar o excedente.
+ * `encrenca`, `combate` e `descartar` nunca se pulam — pular a primeira seria
+ * pular o turno, `encrenca` sempre tem as duas opções (o baralho de Portas nunca
+ * acaba, decisão #62), e pular a última seria perdoar o excedente.
  *
  * A pergunta é a MESMA na entrada da fase e depois de cada ação dentro dela (ver
  * `entrarOuPular`, em `./mesa`): equipar o último item sai da fase sozinho, sem
@@ -87,6 +93,7 @@ export function faseSeAutoPula(fase: Fase, jogador: JogadorNaMesa): boolean {
       // não dá o que fazer aqui, então não segura a fase.
       return !temEquipamento;
     case 'vasculhar':
+    case 'encrenca':
     case 'combate':
     case 'descartar':
       return false;

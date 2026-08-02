@@ -111,6 +111,16 @@ describe('narrarEvento — linhas de texto puro', () => {
     expect(narrarEvento({ tipo: 'loot', jogadorId: 'p2', quantidade: 1 }, ctx))
       .toBe('Bot 1 saqueia o cadáver e leva 1 tesouro.');
   });
+
+  it('saqueou NÃO diz o que foi comprado — a mão é zona oculta', () => {
+    // Mesmo princípio do `achado` e do `loot`: o evento não carrega a carta, e a
+    // narração não pode inventar o que ele não diz. Vale também para quem
+    // saqueou — ele descobre o quê pela própria mão.
+    expect(narrarEvento({ tipo: 'saqueou', jogadorId: 'p1' }, ctx))
+      .toBe('Você saqueia a porta fechada e leva uma carta.');
+    expect(narrarEvento({ tipo: 'saqueou', jogadorId: 'p2' }, ctx))
+      .toBe('Bot 1 saqueia a porta fechada e leva uma carta.');
+  });
 });
 
 describe('narrarEvento — linhas com marcação', () => {

@@ -76,14 +76,42 @@ type CartaNaMao = VistaDaPartida['suaMao'][number];
 const MAO_QUE_ESTOURA = 9;
 
 /**
+ * Vista com a mão de p1 preenchida **e `cartasNaMao` batendo com ela**. Os dois
+ * campos são projeções da MESMA zona (`suaMao` é o conteúdo, `cartasNaMao` é a
+ * contagem que os outros assentos enxergam), e o domínio nunca os emite
+ * divergentes — um fixture com duas cartas em `suaMao` e `cartasNaMao: 0` afirma
+ * sobre um jogo que não existe, mesmo quando nenhuma asserção olha o contador.
+ *
+ * ⚠️ **Não é varredura:** os fixtures anteriores ao Plano 4b ainda montam
+ * `{ ...vistaBase, suaMao: [...] }` na mão, com o contador em 0. Sincronizá-los
+ * é mexer em testes de outras fatias sem achado que o peça; o que esta função
+ * garante é que o próximo fixture nasça certo.
+ */
+const comMao = (vista: VistaDaPartida, suaMao: readonly CartaNaMao[]): VistaDaPartida => ({
+  ...vista,
+  suaMao,
+  jogadores: vista.jogadores.map((j) => (
+    j.id === 'p1' ? { ...j, cartasNaMao: suaMao.length } : j
+  )),
+});
+
+/**
  * Vista na fase `descartar` com a mão que o domínio precisaria ver para chegar
  * nela. O enchimento até `MAO_QUE_ESTOURA` mora aqui, num ponto só, para que o
  * próximo giro do dial quebre um lugar em vez de cinco fixtures.
  *
  * Enche com MONSTRO (decisão #42 tirou a sala vazia do jogo) porque não acende
- * nem "Jogar" nem "Equipar" — só `raca` e `equipamento` desenham botão na linha
- * da carta — e a carta que o teste passa continua sendo a única do tipo dela na
- * tela quando esse tipo é diferente do filler.
+ * nem "Jogar" nem "Equipar" — só `raca` e `equipamento` desenham esses dois.
+ *
+ * ⚠️ Desde a Task 7 do Plano 4b isto NÃO significa "o filler não desenha botão
+ * nenhum": `monstro` também desenha "Procurar encrenca" (apagado fora da fase
+ * `encrenca`, mas PRESENTE no DOM) — um `emDescartar()` sem cartas extras é NOVE
+ * desses botões, calados. A garantia que sobrevive é mais estreita: a carta que o
+ * teste passa continua sendo a única do SEU tipo na tela quando esse tipo não é
+ * `monstro`. Um teste que use `emDescartar` e consulte "Procurar encrenca" por
+ * texto genérico (sem escopar pela linha da carta) conta o filler junto — a
+ * mesma classe de erro que `entregar uma carta manda a ação com o id DELA`
+ * evita escopando por `within(linhaDaCartaAlvo)`.
  */
 const emDescartar = (cartas: readonly CartaNaMao[] = []): VistaDaPartida => {
   const suaMao: readonly CartaNaMao[] = [
@@ -93,14 +121,7 @@ const emDescartar = (cartas: readonly CartaNaMao[] = []): VistaDaPartida => {
       (_, i): CartaNaMao => ({ id: `m-${i}`, tipo: 'monstro', monstroId: 'm-teste' }),
     ),
   ];
-  return {
-    ...vistaBase,
-    fase: 'descartar',
-    suaMao,
-    jogadores: vistaBase.jogadores.map((j) => (
-      j.id === 'p1' ? { ...j, cartasNaMao: suaMao.length } : j
-    )),
-  };
+  return comMao({ ...vistaBase, fase: 'descartar' }, suaMao);
 };
 
 const abrirMesa = async (
@@ -934,6 +955,70 @@ describe('TelaMesa — a fase e o botão Passar', () => {
     // `<strong>Combate</strong>` com o mesmo texto, e sem escopo o
     // `findByText` reprova por achar os dois.
     expect(await screen.findByText('Combate', { selector: 'p' })).toBeInTheDocument();
+  });
+});
+
+describe('TelaMesa — a fase `encrenca`', () => {
+  it('na fase `encrenca`, Saquear acende e Vasculhar/Passar apagam', async () => {
+    // Passar é a ausência que DEFINE a fase (decisão #62 do bible): `encrenca`
+    // não tem `passar` e nunca se auto-pula, ela cobra uma das duas ações. Sem
+    // esta linha, nenhum teste do `web` afirmava que "Passar" some aqui — só
+    // que "Saquear" aparece, o que não é a mesma promessa.
+    await abrirMesa({ ...vistaBase, fase: 'encrenca' });
+
+    expect(await screen.findByRole('button', { name: /saquear/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /vasculhar local/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Passar' })).toBeDisabled();
+  });
+
+  it('"Procurar encrenca" só acende na carta de MONSTRO', async () => {
+    // Par fino: a tabela de fases aprova `procurarEncrenca` na fase inteira e não
+    // sabe do tipo da carta. Sem este gêmeo, clicar na raça leva 400.
+    await abrirMesa(comMao({ ...vistaBase, fase: 'encrenca' }, [
+      { id: 'p-m', tipo: 'monstro', monstroId: 'goblin' },
+      { id: 'p-r', tipo: 'raca', racaId: 'orc' },
+    ]));
+
+    const botoes = await screen.findAllByRole('button', { name: /procurar encrenca/i });
+    expect(botoes).toHaveLength(1);
+    expect(botoes[0]).toBeEnabled();
+  });
+
+  it('saquear manda a ação `saquear`', async () => {
+    // Achado do review: os dois testes acima afirmam ACENDIMENTO, não AÇÃO — o
+    // payload é protegido pelo `pnpm typecheck` (o contrato tipa `agir`), mas
+    // nada garantia que o clique realmente disparasse `saquear`.
+    const agir = vi.spyOn(api, 'agir').mockResolvedValue({ status: 200, body: vistaBase } as never);
+    await abrirMesa({ ...vistaBase, fase: 'encrenca' });
+
+    await userEvent.click(await screen.findByRole('button', { name: /saquear/i }));
+
+    expect(agir).toHaveBeenCalledWith({
+      params: { id: 'm1' },
+      body: { acao: { tipo: 'saquear' }, versao: 1 },
+    });
+  });
+
+  it('procurar encrenca manda a ação com o id DAQUELE monstro', async () => {
+    // Simétrico ao teste de "Entregar" da suíte da mão: com UM monstro só, trocar
+    // o `cartaId` por qualquer outro id continuaria passando — a mão tem DOIS
+    // monstros distintos e o clique é no segundo, para o teste ter dentes.
+    const agir = vi.spyOn(api, 'agir').mockResolvedValue({ status: 200, body: vistaBase } as never);
+    await abrirMesa(comMao({ ...vistaBase, fase: 'encrenca' }, [
+      { id: 'p-m1', tipo: 'monstro', monstroId: 'goblin' },
+      { id: 'p-m2', tipo: 'monstro', monstroId: 'orc-guerreiro' },
+    ]));
+
+    // `orc-guerreiro` não está no catálogo de teste — cai no fallback `?? id`, que
+    // é exatamente o que torna a linha inconfundível com a do Goblin.
+    const linhaDoSegundoMonstro = (await screen.findByText(/orc-guerreiro/)).closest('li');
+    if (linhaDoSegundoMonstro === null) throw new Error('linha do segundo monstro não encontrada no DOM');
+    await userEvent.click(within(linhaDoSegundoMonstro).getByRole('button', { name: /procurar encrenca/i }));
+
+    expect(agir).toHaveBeenCalledWith({
+      params: { id: 'm1' },
+      body: { acao: { tipo: 'procurarEncrenca', cartaId: 'p-m2' }, versao: 1 },
+    });
   });
 });
 

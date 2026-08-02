@@ -44,6 +44,7 @@ const NOME_DO_SLOT: Record<Slot, string> = {
 const NOME_DA_FASE: Record<Fase, string> = {
   recompor: 'Recompor — vista o corpo antes de abrir a porta',
   vasculhar: 'Vasculhar — abra a próxima porta',
+  encrenca: 'Encrenca — lute com um monstro da mão ou saqueie a porta fechada',
   combate: 'Combate',
   jogar: 'Jogar — vista o que encontrou',
   descartar: 'Descartar — sua mão está acima do limite',
@@ -241,6 +242,17 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
             >
               Vasculhar local
             </button>
+            {/* A fase `encrenca` (decisão #62 do bible) NÃO tem `passar` e nunca se
+                auto-pula — ela cobra uma das duas ações. `legal('saquear')` já é a
+                resposta inteira: o verbo não tem guard fino no reducer (o baralho
+                de Portas nunca acaba), só o gate de fase. */}
+            <button
+              type="button"
+              disabled={!legal('saquear')}
+              onClick={() => void agir({ tipo: 'saquear' })}
+            >
+              Saquear
+            </button>
             {/* Uma etiqueta só para as duas fases paradas: o que "Passar" significa
                 em cada uma já está dito na linha de fase acima, e dois rótulos
                 dariam ao jogador dois botões para aprender em vez de um. */}
@@ -384,6 +396,23 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
                   onClick={() => void agir({ tipo: 'jogarCarta', cartaId: carta.id })}
                 >
                   Jogar
+                </button>
+              )}
+              {/* Os DOIS pares finos de `procurarEncrenca` (ver a tabela no
+                  `aplicarAcao`, `mesa.ts`): a carta está na SUA mão, e ela é do
+                  TIPO `monstro`. `legal()` só aprova a fase inteira, não sabe de
+                  nenhum dos dois. O primeiro guard já tem gêmeo ESTRUTURAL — este
+                  botão só existe dentro de `vista.suaMao.map`, então "está na
+                  mão" é automático, nunca precisou de condição escrita. O
+                  segundo é o `carta.tipo === 'monstro'` abaixo: sem ele, clicar
+                  na raça na fase `encrenca` leva 400. */}
+              {carta.tipo === 'monstro' && (
+                <button
+                  type="button"
+                  disabled={!legal('procurarEncrenca')}
+                  onClick={() => void agir({ tipo: 'procurarEncrenca', cartaId: carta.id })}
+                >
+                  Procurar encrenca
                 </button>
               )}
               {/* O par fino que sobra de `equiparCarta` (ver a tabela no

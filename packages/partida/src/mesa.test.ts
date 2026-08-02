@@ -43,6 +43,18 @@ const config = {
   composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE,
 };
 
+/**
+ * Uma mesa cujo baralho de Portas só tem carta de RAÇA — o único jeito de o
+ * primeiro `vasculhar` cair direto no ramo que esta task muda. `config` (acima)
+ * mistura monstro e raça; aqui a composição é só `orc` para o teste da entrada
+ * na `encrenca` não depender de sorte de embaralhamento.
+ */
+const configSoRaca = {
+  patenteAlvo: 5,
+  composicaoPorJogador: [{ tipo: 'raca' as const, racaId: 'orc' }],
+  composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE,
+};
+
 const deps = (dados: readonly number[]) => ({
   rolar: filaDeDados(dados),
   embaralhar: semEmbaralhar,
@@ -128,38 +140,56 @@ describe('aplicarAcao — vasculhar', () => {
       .toThrow('aplicarAcao: não é a vez de p2');
   });
 
-  it('porta que não luta registra o evento e passa a vez', () => {
+  it('porta que não luta registra o evento — e abre a `encrenca`, sem passar a vez', () => {
     // 🎚️ Era a sala vazia que ocupava este papel; com o corte dela (decisão #42
     // do game bible) a única porta que não abre combate é a carta de RAÇA, e ela
     // muda o evento: vai para a MÃO, zona oculta, então sai `achado` (sem a
-    // carta) no lugar de `porta` (com ela). A vez ainda passa porque a mão deste
-    // fixture está vazia — a raça sacada não estoura nada e `jogar` se auto-pula.
+    // carta) no lugar de `porta` (com ela).
+    //
+    // 🎚️ Mudança de comportamento (Task 4 do Plano 4b): a raça já não entrega o
+    // turno a `jogar` (que se auto-pulava e encerrava o turno) — ela abre a
+    // `encrenca` (spec §6), e a `encrenca` NUNCA se auto-pula (decisão #62 do
+    // bible). A vez fica com quem vasculhou até a escolha (`saquear` ou
+    // `procurarEncrenca`) ser feita.
     const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'raca', racaId: 'r-teste' }] },
       { embaralhar: semEmbaralhar });
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
 
-    expect(r.estado.vezDe).toBe('p2');
+    expect(r.estado.fase).toBe('encrenca');
+    expect(r.estado.vezDe).toBe('p1');
     expect(r.estado.combate).toBeNull();
-    expect(r.eventos).toHaveLength(2);
-    expect(r.eventos[0]).toEqual({ tipo: 'achado', jogadorId: 'p1' });
-    expect(r.eventos[1]).toEqual({ tipo: 'vez', jogadorId: 'p2' });
+    expect(r.eventos).toEqual([{ tipo: 'achado', jogadorId: 'p1' }]);
   });
 
   it('o log acumula os eventos de cada ação, na ordem', () => {
     // `eventos` é o delta da ação; `log` é a crônica inteira. Sem esta asserção,
     // esquecer de gravar no log passaria despercebido — todo o resto do estado
     // continuaria certo e nenhum outro teste falharia.
-    // Raça, e não monstro: as duas ações precisam ser de jogadores DIFERENTES, e
-    // só a porta que não abre combate passa a vez dentro da própria ação.
-    const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'raca', racaId: 'r-teste' }] },
-      { embaralhar: semEmbaralhar });
+    //
+    // 🎚️ Caminho novo (Task 4 do Plano 4b): a raça não passa mais a vez sozinha —
+    // ela abre a `encrenca`, e é `saquear` (a mão nova não tem equipamento, então
+    // `jogar` se auto-pula) quem devolve a vez ao segundo jogador. Três ações, não
+    // duas, mas o que a asserção prova continua o mesmo: o log acumula em ordem,
+    // inclusive através da troca de jogador.
+    //
+    // Baralho com folga (3 raças por jogador): a mesma composição de 1 por jogador
+    // não sobreviveria às DUAS compras de p1 (vasculhar + saquear) mais o
+    // `vasculhar` de p2 — o monte ficaria vazio e `tirarDoTopo` reembaralharia um
+    // cemitério igualmente vazio (Error cru).
+    const soRaca = {
+      ...config,
+      composicaoPorJogador: Array.from({ length: 3 }, () => ({ tipo: 'raca' as const, racaId: 'r-teste' })),
+    };
+    const p = criarPartida('m1', entradas, soRaca, { embaralhar: semEmbaralhar });
     const r1 = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
-    const r2 = aplicarAcao(r1.estado, { tipo: 'vasculhar', jogadorId: 'p2' }, deps([]));
+    const r2 = aplicarAcao(r1.estado, { tipo: 'saquear', jogadorId: 'p1' }, deps([]));
+    const r3 = aplicarAcao(r2.estado, { tipo: 'vasculhar', jogadorId: 'p2' }, deps([]));
 
-    expect(r2.estado.log).toEqual([
+    expect(r3.estado.log).toEqual([
       { tipo: 'vez', jogadorId: 'p1' },
       ...r1.eventos,
       ...r2.eventos,
+      ...r3.eventos,
     ]);
   });
 
@@ -968,14 +998,20 @@ describe('aplicarAcao — espiada (Presciência)', () => {
   });
 
   it('SEM Presciência, vasculhar continua atômico (nenhuma espiada)', () => {
-    // Raça, e não monstro: a segunda asserção é "resolveu na hora", provada pela
-    // vez tendo passado — e monstro abriria combate, prendendo a vez em p1.
+    // Raça, e não monstro: monstro abriria combate, e o `combate` também não deixa
+    // espiada pendente — não provaria nada de específico sobre a Presciência.
+    //
+    // 🎚️ A prova de "resolveu na hora" MUDOU (Task 4 do Plano 4b): antes era a vez
+    // tendo passado (a raça entregava a `jogar`, que se auto-pulava e encerrava o
+    // turno). Agora a raça abre a `encrenca` sem passar a vez — o que prova a
+    // resolução atômica é a fase ter avançado para `encrenca` (e não ter ficado
+    // presa em `vasculhar` com uma espiada pendente).
     const p = criarPartida('m1', entradas,
       { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'raca' as const, racaId: 'r-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
       { embaralhar: semEmbaralhar });
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])); // deps() sem catálogo de raça
     expect(r.estado.espiada).toBeNull();
-    expect(r.estado.vezDe).toBe('p2'); // resolveu na hora
+    expect(r.estado.fase).toBe('encrenca'); // resolveu na hora
   });
 
   it('lê a passiva da raça pelo catálogo injetado, não por um resolvedor solto', () => {
@@ -1059,12 +1095,23 @@ describe('avancarBots — teto de ações automáticas', () => {
   });
 
   it('não dispara numa rodada normal de bots', () => {
-    // Raça: é a porta que passa a vez dentro da própria ação, e é isso que leva o
-    // turno ao bot sem abrir combate no meio.
-    const p = criarPartida('m1', entradas, { ...config, composicaoPorJogador: [{ tipo: 'raca', racaId: 'r-teste' }] },
-      { embaralhar: semEmbaralhar });
+    // 🎚️ Caminho novo (Task 4 do Plano 4b): a raça não passa mais a vez sozinha —
+    // ela abre a `encrenca`, e é quem vasculhou (aqui, o humano p1) quem escolhe
+    // `saquear` (a mão sem equipamento não segura `jogar`) para devolver a vez ao
+    // bot. O bot então percorre o MESMO caminho sozinho (`vasculhar` → `encrenca`
+    // → `saquear`, sem monstro na mão) antes de devolver a vez a p1 — e é isso
+    // que prova que uma rodada normal de bots não dispara o teto anti-loop.
+    //
+    // Baralho com folga (3 raças por jogador): humano e bot juntos consomem até 4
+    // cartas, e sobra o suficiente para não reembaralhar um cemitério vazio.
+    const soRaca = {
+      ...config,
+      composicaoPorJogador: Array.from({ length: 3 }, () => ({ tipo: 'raca' as const, racaId: 'r-teste' })),
+    };
+    const p = criarPartida('m1', entradas, soRaca, { embaralhar: semEmbaralhar });
+    const abriuEncrenca = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
     // passa a vez para o bot p2; avancarBots roda o turno dele e devolve a vez a p1
-    const vezDoBot = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
+    const vezDoBot = aplicarAcao(abriuEncrenca, { tipo: 'saquear', jogadorId: 'p1' }, deps([])).estado;
     const r = avancarBots(vezDoBot, deps([]));
 
     expect(r.estado.vezDe).toBe('p1');
@@ -1073,11 +1120,16 @@ describe('avancarBots — teto de ações automáticas', () => {
 });
 
 describe('vasculhar — carta de raça', () => {
-  it('a carta de raça vai para a mão de quem vasculhou, e o turno encerra', () => {
+  it('a carta de raça vai para a mão de quem vasculhou, e abre a `encrenca`', () => {
     // O monte é forjado para ter UMA carta e id conhecido — a composição da mesa
     // só existe para a partida nascer. A carta vai para uma zona OCULTA, então o
     // evento é `achado` (porta fechada): diz que aconteceu, nunca o quê. Quem
     // sacou descobre pela própria mão.
+    //
+    // 🎚️ Mudança de comportamento (Task 4 do Plano 4b): antes a raça entregava a
+    // `jogar` — que se auto-pulava (mão sem equipamento) e encerrava o turno.
+    // Agora ela abre a `encrenca` (spec §6), e a `encrenca` nunca se auto-pula
+    // (decisão #62) — a vez fica com quem vasculhou.
     const p0 = criarPartida('m1', entradas,
       { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
       { embaralhar: semEmbaralhar });
@@ -1090,7 +1142,8 @@ describe('vasculhar — carta de raça', () => {
     expect(r.estado.portas.cemiterio.some((c) => c.id === 'r1')).toBe(false); // está na mão, não no lixo
     expect(r.estado.portas.cemiterio).toHaveLength(0);                        // raça não passa pelo descarte
     expect(r.estado.combate).toBeNull();                               // raça não abre combate
-    expect(r.estado.vezDe).toBe('p2');
+    expect(r.estado.fase).toBe('encrenca');
+    expect(r.estado.vezDe).toBe('p1');
     expect(r.eventos[0]).toMatchObject({ tipo: 'achado', jogadorId: 'p1' });
   });
 
@@ -1113,6 +1166,44 @@ describe('vasculhar — carta de raça', () => {
     expect(vistaDoAdversario).not.toContain('raca-secreta');
     // Não é perda de informação: quem sacou descobre o quê pela própria mão.
     expect(projetarPara('p1', r.estado, catalogoPadrao).suaMao.map((c) => c.id)).toEqual(['carta-secreta']);
+  });
+});
+
+describe('vasculhar — a porta de raça abre a `encrenca`', () => {
+  it('a porta de raça entrega o turno à `encrenca`, não a `jogar`', () => {
+    // É o único caminho de entrada da fase desde que a `salaVazia` saiu do jogo
+    // (decisão #42 do bible): porta que não é monstro vai para a mão, e é isso que
+    // abre a escolha entre lutar com o que se tem ou saquear.
+    const p = criarPartida('m1', entradas, configSoRaca, { embaralhar: semEmbaralhar });
+
+    const r = aplicarAcao({ ...p, fase: 'vasculhar' }, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
+
+    expect(r.estado.fase).toBe('encrenca');
+    expect(r.eventos.some((e) => e.tipo === 'achado')).toBe(true);
+  });
+
+  it('a `encrenca` NÃO se auto-pula, mesmo com a mão sem NENHUM monstro para procurar', () => {
+    // `saquear` está sempre disponível (decisão #62), então não existe "nada a
+    // fazer" aqui — nem quando a mão tem carta, mas nenhuma delas serve ao OUTRO
+    // verbo da fase (`procurarEncrenca`, que só aceita monstro). Uma fase que se
+    // pulasse esconderia a escolha.
+    //
+    // 🔴 FIX (revisão, round 1 — MINOR 7): a versão anterior deste teste forjava
+    // `mao: []`, mas `configSoRaca` já não dá mão inicial nenhuma — era um
+    // no-op, e o teste ficava idêntico em substância ao de cima (a mesma mão
+    // vazia, a mesma ação). Trocado por um equipamento na mão: ele PROVA a
+    // mesma coisa por um caminho diferente — mão não-vazia, mas sem monstro,
+    // ainda assim sem auto-pulo.
+    const p = criarPartida('m1', entradas, configSoRaca, { embaralhar: semEmbaralhar });
+    const maoSemMonstro: EstadoPartida = {
+      ...p,
+      fase: 'vasculhar',
+      jogadores: p.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao: [equipamento('t-1')] } : j)),
+    };
+
+    const r = aplicarAcao(maoSemMonstro, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
+
+    expect(r.estado.fase).toBe('encrenca');
   });
 });
 
@@ -1938,8 +2029,12 @@ describe('aplicarAcao — entregarCarta (a caridade)', () => {
 describe('encerrarTurno — o limite de mão segura a vez', () => {
   const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
   // A porta que NÃO abre combate, desde o corte da sala vazia (decisão #42): ela
-  // é a única que encerra o turno dentro da própria compra — e cresce a mão em 1,
-  // o que aqui é a feature, não o efeito colateral.
+  // cresce a mão em 1, o que aqui é a feature, não o efeito colateral.
+  //
+  // 🎚️ Mudança de comportamento (Task 4 do Plano 4b): a raça deixou de ser "a
+  // única que encerra o turno dentro da própria compra" — ela abre a `encrenca`
+  // (que nunca se auto-pula, decisão #62) e a vez só passa depois de `saquear` ou
+  // do fim de um combate por `procurarEncrenca`.
   const soRaca = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'raca' as const, racaId: 'r-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
   // 🎚️ As duas derivadas do dial (cravadas em 5 e 4, pararam de valer quando
   // `LIMITE_BASE_DE_MAO` subiu para 7): `base + 1` cartas com raça em jogo
@@ -1969,36 +2064,78 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
     )),
   });
 
-  it('com a mão acima do limite, a vez NÃO passa', () => {
+  it('com a mão acima do limite, a vez NÃO passa — e o excedente é cobrado quando `saquear` fecha o encontro', () => {
     // A carta de raça sacada vai para a MÃO (não para a zona) — é ela que estoura
     // o limite como CONSEQUÊNCIA da compra, não como precondição do vasculhar.
+    //
+    // 🔴 FIX (revisão, round 1): a versão anterior deste teste parava logo depois
+    // do `vasculhar` com só três asserções (mão cresceu, vez ficou, sem evento
+    // `vez`) — e essas três valem IGUAL para uma mão estourada e para uma mão
+    // VAZIA (é exatamente o que "a porta que não luta abre a `encrenca`..." prova
+    // com `mao: []`). O teste tinha VIRADO VAZIO: passaria mesmo se
+    // `limiteDeMao` devolvesse `Infinity`, porque a raça agora nunca passa a vez,
+    // estourada ou não (ela abre a `encrenca` incondicionalmente — ver
+    // `fase.test.ts`, "a fase nunca mente sobre o estado"). Documentar isso não
+    // bastava; o teste tinha que continuar até um estado que ainda discrimina.
+    //
+    // A extensão: `saquear` fecha o encontro (mão sem equipamento, `jogar` se
+    // auto-pula) e é aí que `encerrarTurno` volta a perguntar pelo limite — o
+    // ÚNICO lugar que liga "a raça estourou a mão" a "o excedente é cobrado" no
+    // MESMO teste. Antes essa garantia só existia composta, em dois testes que
+    // não se conheciam (este e "a compra que estoura a mão abre a `encrenca`…").
     const p0 = comMaoNoLimiteEZona(criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar }));
-    const p: EstadoPartida = { ...p0, portas: { ...p0.portas, monte: [raca('r9', 'elfo')] } };
+    // Duas cartas no monte, não uma: a primeira é a raça que este teste testa: a
+    // segunda sustenta o `saquear` do segundo passo — sem ela o monte ficaria
+    // vazio (cemitério também vazio) e `tirarDoTopo` lançaria "baralho vazio" em
+    // vez de deixar o teste chegar a `descartar`. `saquear` não resolve a carta
+    // (vai crua para a mão), então o TIPO da segunda carta é irrelevante aqui.
+    const p: EstadoPartida = { ...p0, portas: { ...p0.portas, monte: [raca('r9', 'elfo'), monstro('m9')] } };
 
-    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
+    const abriuEncrenca = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
 
-    expect(r.estado.jogadores[0]?.mao).toHaveLength(maoNoLimite.length + 1); // a compra estourou a mão
+    expect(abriuEncrenca.estado.jogadores[0]?.mao).toHaveLength(maoNoLimite.length + 1); // a compra estourou a mão
+    expect(abriuEncrenca.estado.fase).toBe('encrenca');
+    expect(abriuEncrenca.estado.vezDe).toBe('p1');
+    expect(abriuEncrenca.eventos.some((e) => e.tipo === 'vez')).toBe(false);
+
+    const r = aplicarAcao(abriuEncrenca.estado, { tipo: 'saquear', jogadorId: 'p1' }, deps([]));
+
+    // O excedente finalmente aparece — em `descartar`, sem a vez ter passado.
+    expect(r.estado.fase).toBe('descartar');
     expect(r.estado.vezDe).toBe('p1');
     expect(r.eventos.some((e) => e.tipo === 'vez')).toBe(false);
   });
 
-  it('mesmo sem passar a vez, o log anda — a versão precisa se mover', () => {
-    // Se a ação não movesse a versão, um retry de rede escaparia do guard de 409
-    // no server e morreria como 400 no reducer. Foi exatamente o achado A3 da
-    // espiada; aqui não se repete porque o evento `porta` já foi emitido.
+  it('mesmo sem passar a vez, o log anda em CADA etapa — a versão precisa se mover', () => {
+    // Se uma ação não movesse a versão, um retry de rede escaparia do guard de
+    // 409 no server e morreria como 400 no reducer. Foi exatamente o achado A3
+    // da espiada.
+    //
+    // 🔴 FIX (revisão, round 1): pelo mesmo motivo do teste acima, checar só o
+    // `log` depois do `vasculhar` não provava nada específico sobre a mão
+    // estourada — QUALQUER raça sacada segura a vez e cresce o log, cheia ou
+    // vazia a mão. A garantia que importa é mais ampla: TODA vez que a vez fica
+    // parada (aqui, duas vezes seguidas — `vasculhar`→`encrenca` e
+    // `saquear`→`descartar`), o log tem que andar mesmo assim, ou as DUAS
+    // paradas escapariam do guard de 409 no retry.
     const p0 = comMaoNoLimiteEZona(criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar }));
-    const p: EstadoPartida = { ...p0, portas: { ...p0.portas, monte: [raca('r9', 'elfo')] } };
+    const p: EstadoPartida = { ...p0, portas: { ...p0.portas, monte: [raca('r9', 'elfo'), monstro('m9')] } };
 
-    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
+    const abriuEncrenca = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
+    expect(abriuEncrenca.estado.log.length).toBeGreaterThan(p.log.length);
 
-    expect(r.estado.log.length).toBeGreaterThan(p.log.length);
+    const r = aplicarAcao(abriuEncrenca.estado, { tipo: 'saquear', jogadorId: 'p1' }, deps([]));
+    expect(r.estado.log.length).toBeGreaterThan(abriuEncrenca.estado.log.length);
   });
 
   it('com a mão dentro do limite, a vez passa como sempre', () => {
-    // Raça, e não monstro: é a compra que encerra o turno dentro da própria ação.
+    // 🎚️ Caminho novo (Task 4 do Plano 4b): a raça não encerra mais o turno dentro
+    // do próprio `vasculhar` — ela abre a `encrenca`. É `saquear` quem chega a
+    // `jogar` (que se auto-pula sem equipamento na mão) e devolve a vez.
     const p = criarPartida('m1', entradas, soRaca, { embaralhar: semEmbaralhar });
+    const abriuEncrenca = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
 
-    const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
+    const r = aplicarAcao(abriuEncrenca, { tipo: 'saquear', jogadorId: 'p1' }, deps([]));
 
     expect(r.estado.vezDe).toBe('p2');
     expect(r.eventos.some((e) => e.tipo === 'vez')).toBe(true);
@@ -2237,16 +2374,19 @@ describe('a fase acompanha o que o turno fez', () => {
     expect(r.estado.fase).toBe('combate');
   });
 
-  it('a porta que não luta passa a vez e devolve a mesa a `vasculhar`', () => {
+  it('a porta que não luta abre a `encrenca` — a vez fica com quem vasculhou', () => {
     // 🎚️ Era a sala vazia; com o corte dela (decisão #42) quem ocupa este ramo do
-    // `switch` de `resolverCarta` é a raça. A vez passa porque a mão nasce vazia
-    // neste fixture — a carta sacada não estoura nada, e `jogar` se auto-pula.
+    // `switch` de `resolverCarta` é a raça.
+    //
+    // 🎚️ Mudança de comportamento (Task 4 do Plano 4b): a raça deixou de passar a
+    // vez sozinha. Ela abre a `encrenca` (spec §6), que nunca se auto-pula
+    // (decisão #62) — independente de a mão estourar ou não.
     const p = criarPartida('m1', entradas, soRaca, { embaralhar: semEmbaralhar });
 
     const r = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
 
-    expect(r.estado.vezDe).toBe('p2');
-    expect(r.estado.fase).toBe('vasculhar');
+    expect(r.estado.vezDe).toBe('p1');
+    expect(r.estado.fase).toBe('encrenca');
   });
 
   it('a espiada pendente NÃO é fase própria — o turno segue em `vasculhar`', () => {
@@ -2260,11 +2400,25 @@ describe('a fase acompanha o que o turno fez', () => {
     expect(r.estado.fase).toBe('vasculhar');
   });
 
-  it('a compra que estoura a mão prende o turno em `descartar`', () => {
-    // A mesma situação de "com a mão acima do limite, a vez NÃO passa", agora
-    // dita pela fase: `LIMITE_BASE_DE_MAO` cartas com raça em jogo = NO limite; a
-    // raça sacada é a que passa dele. 🎚️ Derivado do dial pelo mesmo motivo dos
-    // outros: cravado em 4, virava folga quando o teto subiu.
+  it('a compra que estoura a mão abre a `encrenca` — o excedente só é cobrado depois', () => {
+    // 🎚️ MUDANÇA DE COMPORTAMENTO (Task 4 do Plano 4b), não só de asserção: antes
+    // este fixture provava "prende o turno em `descartar`" porque a raça passava
+    // por `entrarOuPular`/`encerrarTurno`, e era `encerrarTurno` quem perguntava
+    // `faseDoTurnoDe(daVez)` e trocava a fase por `descartar` sem passar a vez.
+    // A raça não chama mais nenhum dos dois — ela vai direto para `registrar` com
+    // `fase: 'encrenca'`, SEM checar o limite de mão. Por isso a mesma mão
+    // estourada agora abre `encrenca` em vez de `descartar`: o excedente só volta
+    // a ser cobrado quando `saquear`/`procurarEncrenca` devolverem o turno a
+    // `jogar`, via `encerrarTurno`.
+    //
+    // ⚠️ Isto é uma mudança de REGRA real, não um detalhe de teste: enquanto
+    // estiver na `encrenca`, um jogador acima do limite ainda pode `saquear` (que
+    // SOMA carta) ou `procurarEncrenca` antes de o excedente ser cobrado — ver o
+    // relatório desta task para a discussão.
+    //
+    // `LIMITE_BASE_DE_MAO` cartas com raça em jogo = NO limite; a raça sacada é a
+    // que passa dele. 🎚️ Derivado do dial pelo mesmo motivo dos outros: cravado
+    // em 4, virava folga quando o teto subiu.
     const p0 = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const noLimite: EstadoPartida = {
       ...p0,
@@ -2280,7 +2434,7 @@ describe('a fase acompanha o que o turno fez', () => {
     const r = aplicarAcao(noLimite, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([]));
 
     expect(r.estado.vezDe).toBe('p1');
-    expect(r.estado.fase).toBe('descartar');
+    expect(r.estado.fase).toBe('encrenca');
   });
 
   it('quem RECEBE a vez estourado a recebe já em `descartar`', () => {
@@ -2473,5 +2627,100 @@ describe('o guard de fase é ponto único', () => {
     expect(estourado.fase).toBe('descartar');
     expect(() => aplicarAcao(estourado, { tipo: 'passar', jogadorId: 'p1' }, deps([])))
       .toThrow('aplicarAcao: passar não é legal na fase descartar');
+  });
+});
+
+describe('saquear', () => {
+  it('tira a carta do topo do monte e a põe NA MÃO, sem revelar', () => {
+    const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
+    const antes = { ...p, fase: 'encrenca' as const };
+    const maoAntes = antes.jogadores[0]!.mao.length;
+    const monteAntes = antes.portas.monte.length;
+
+    const r = aplicarAcao(antes, { tipo: 'saquear', jogadorId: 'p1' }, deps([]));
+
+    expect(r.estado.jogadores[0]!.mao).toHaveLength(maoAntes + 1);
+    expect(r.estado.portas.monte).toHaveLength(monteAntes - 1);
+    // A carta NÃO passa pelo cemitério: ela foi do monte direto para a mão.
+    expect(r.estado.portas.cemiterio).toHaveLength(antes.portas.cemiterio.length);
+  });
+
+  it('o evento `saqueou` NÃO carrega a carta — a mão é zona oculta', () => {
+    const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
+    const r = aplicarAcao({ ...p, fase: 'encrenca' as const }, { tipo: 'saquear', jogadorId: 'p1' }, deps([]));
+
+    const saqueou = r.eventos.find((e) => e.tipo === 'saqueou');
+    expect(saqueou).toEqual({ tipo: 'saqueou', jogadorId: 'p1' });
+    // O log inteiro viaja para todos na projeção: um campo `carta` aqui anunciaria
+    // à mesa o conteúdo de uma mão que `JogadorPublico` existe para esconder.
+    expect(JSON.stringify(saqueou)).not.toContain('monstroId');
+  });
+
+  it('depois de saquear, o turno vai para `jogar`', () => {
+    // `saquear` é o fim do encontro deste turno: a janela seguinte é a de vestir o
+    // que se tem. Com um equipamento na mão, `jogar` PARA (não se auto-pula).
+    const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
+    const comEquip: EstadoPartida = {
+      ...p,
+      fase: 'encrenca',
+      jogadores: p.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao: [equipamento('t-1')] } : j)),
+    };
+
+    const r = aplicarAcao(comEquip, { tipo: 'saquear', jogadorId: 'p1' }, deps([]));
+
+    expect(r.estado.fase).toBe('jogar');
+  });
+});
+
+describe('procurarEncrenca', () => {
+  it('joga o monstro da mão, abre combate e manda a carta ao cemitério', () => {
+    const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
+    const comMonstro: EstadoPartida = {
+      ...p,
+      fase: 'encrenca',
+      jogadores: p.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao: [monstro('m-mao')] } : j)),
+    };
+    const cemiterioAntes = comMonstro.portas.cemiterio.length;
+
+    // ⚠️ Este verbo ABRE COMBATE, então consome dado. `[4, 12, 12]` é o orçamento de
+    // um lance que o arquivo já usa (ver o comentário do helper `venceOCombate`,
+    // no topo do arquivo): acerto, esquiva falha, contra-ataque errado. Se sobrar
+    // ou faltar dado, ajuste pelo helper — não invente números.
+    const r = aplicarAcao(comMonstro, { tipo: 'procurarEncrenca', jogadorId: 'p1', cartaId: 'm-mao' }, deps([4, 12, 12]));
+
+    expect(r.estado.fase).toBe('combate');
+    expect(r.estado.combate).not.toBeNull();
+    expect(r.estado.jogadores[0]!.mao).toHaveLength(0);
+    // A carta jogada é DESCARTADA, não devolvida ao monte: ela foi usada.
+    expect(r.estado.portas.cemiterio).toHaveLength(cemiterioAntes + 1);
+    expect(r.estado.portas.cemiterio.some((c) => c.id === 'm-mao')).toBe(true);
+  });
+
+  it('recusa carta que não está na mão', () => {
+    const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
+
+    expect(() => aplicarAcao(
+      { ...p, fase: 'encrenca' },
+      { tipo: 'procurarEncrenca', jogadorId: 'p1', cartaId: 'nao-existe' },
+      deps([]),
+    )).toThrow(AcaoInvalida);
+  });
+
+  it('recusa carta que não é monstro — raça não procura encrenca', () => {
+    // É par fino: a tabela de fases aprova `procurarEncrenca` em `encrenca` e não
+    // sabe do TIPO da carta. Sem este guard, jogar uma raça aqui cairia no ramo
+    // `raca` de `resolverCarta` e a carta voltaria para a mão de onde saiu.
+    const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
+    const comRaca: EstadoPartida = {
+      ...p,
+      fase: 'encrenca',
+      jogadores: p.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao: [raca('r-1', 'orc')] } : j)),
+    };
+
+    expect(() => aplicarAcao(
+      comRaca,
+      { tipo: 'procurarEncrenca', jogadorId: 'p1', cartaId: 'r-1' },
+      deps([]),
+    )).toThrow(AcaoInvalida);
   });
 });

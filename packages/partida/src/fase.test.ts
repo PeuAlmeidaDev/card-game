@@ -88,6 +88,27 @@ describe('acaoEhLegalNaFase', () => {
     expect(acaoEhLegalNaFase('descartar', 'guardarCarta')).toBe(false);
   });
 
+  it('em `encrenca` valem SÓ procurar encrenca e saquear', () => {
+    expect(acaoEhLegalNaFase('encrenca', 'procurarEncrenca')).toBe(true);
+    expect(acaoEhLegalNaFase('encrenca', 'saquear')).toBe(true);
+    // Sem `passar`: a fase COBRA uma escolha (decisão #62 do bible). Quem sustenta
+    // isso é a regra de que o baralho de Portas nunca acaba, então `saquear` está
+    // sempre disponível.
+    expect(acaoEhLegalNaFase('encrenca', 'passar')).toBe(false);
+    expect(acaoEhLegalNaFase('encrenca', 'vasculhar')).toBe(false);
+    expect(acaoEhLegalNaFase('encrenca', 'equiparCarta')).toBe(false);
+    expect(acaoEhLegalNaFase('encrenca', 'jogarCarta')).toBe(false);
+    expect(acaoEhLegalNaFase('encrenca', 'entregarCarta')).toBe(false);
+  });
+
+  it('os verbos da `encrenca` não valem em NENHUMA outra fase', () => {
+    // O gêmeo do teste acima: sem ele, pôr os dois verbos em toda fase passaria.
+    for (const fase of ['recompor', 'vasculhar', 'combate', 'jogar', 'descartar'] as const) {
+      expect(acaoEhLegalNaFase(fase, 'procurarEncrenca')).toBe(false);
+      expect(acaoEhLegalNaFase(fase, 'saquear')).toBe(false);
+    }
+  });
+
   it('em `descartar` sobra SÓ a caridade', () => {
     // 🎚️ Mudança de REGRA (decisão #7), não de estrutura: a raça só entra em jogo
     // na fase 1 e o tesouro vira corpo nas duas janelas paradas (`recompor` e
@@ -170,6 +191,10 @@ describe('faseSeAutoPula (spec §6.1)', () => {
     // o turno; pular `descartar` seria perdoar o excedente.
     const vazio = comMao([]);
     expect(faseSeAutoPula('vasculhar', vazio)).toBe(false);
+    // `encrenca` nunca se pula: ela sempre tem as duas opções, porque o baralho de
+    // Portas nunca acaba (decisão #62 do bible). Uma fase que se pulasse aqui
+    // esconderia a escolha que ela existe para cobrar.
+    expect(faseSeAutoPula('encrenca', vazio)).toBe(false);
     expect(faseSeAutoPula('combate', vazio)).toBe(false);
     expect(faseSeAutoPula('descartar', vazio)).toBe(false);
   });
@@ -196,10 +221,13 @@ describe('faseDoTurnoDe abre o turno em `recompor`', () => {
 describe('a fase nunca mente sobre o estado', () => {
   /**
    * Guardar a fase (em vez de derivá-la a cada leitura) é decisão do spec §6 — no
-   * destino, `recompor`, `encrenca` e `jogar` são todas "turno parado" e nenhuma
-   * é derivável. O preço é a dessincronização silenciosa: uma transição esquecida
-   * não quebra teste nenhum, só deixa a mesa numa fase de onde não se sai. Esta é
-   * a conta que paga o campo guardado.
+   * destino, nenhuma fase é derivável do resto do estado. `recompor` e `jogar`
+   * são "turno parado" (saem por `passar`); `encrenca` NÃO é — ela cobra uma
+   * escolha entre `procurarEncrenca`/`saquear` e nunca se pula (decisão #62 do
+   * bible, ver `faseSeAutoPula`). O preço de guardar em vez de derivar é a
+   * dessincronização silenciosa: uma transição esquecida não quebra teste
+   * nenhum, só deixa a mesa numa fase de onde não se sai. Esta é a conta que
+   * paga o campo guardado.
    *
    * Só vale com `desfecho === 'emAndamento'`: a partida terminada não tem turno,
    * e `fecharCombate` a deixa com uma fase neutra de propósito.
@@ -209,23 +237,68 @@ describe('a fase nunca mente sobre o estado', () => {
     const erros: string[] = [];
     const daVez = e.jogadores.find((j) => j.id === e.vezDe);
     const estourado = daVez !== undefined && daVez.mao.length > limiteDeMao(daVez);
+    // Só para `encrenca` (ver o `case` abaixo): o overflow que ela pode conviver
+    // é ESTREITO, +1 no máximo, por construção — não "qualquer excesso". A
+    // ÚNICA entrada nesta fase é o ramo `raca` de `resolverCarta`, alcançável só
+    // a partir de `vasculhar` (que este mesmo predicado, no `case 'vasculhar'`,
+    // já prova NÃO estourado), e o que `vasculhar` faz é somar EXATAMENTE 1
+    // carta à mão antes de abrir `encrenca`. Um predicado que aceitasse
+    // QUALQUER estouro aqui (`estourado`, sem teto) não pegaria uma regressão
+    // futura que tornasse a fase reentrante ou lhe desse uma segunda porta de
+    // entrada — só o teto fino pega isso.
+    const estouradoAlemDeUm = daVez !== undefined && daVez.mao.length > limiteDeMao(daVez) + 1;
 
     if ((e.fase === 'combate') !== (e.combate !== null)) {
       erros.push(`fase=${e.fase} com combate ${e.combate === null ? 'fechado' : 'aberto'}`);
     }
+    // 🔑 Decisão #62 do bible: o baralho de Portas NUNCA acaba. É a regra que
+    // sustenta a `encrenca` não ter `passar` — `saquear` está sempre disponível.
+    //
+    // ⚠️ O reshuffle NÃO garante isso sozinho: ele recicla o cemitério, e o
+    // cemitério fica vazio se as cartas estiverem todas em mãos. A caridade não
+    // ajuda — `entregarCarta` move a carta de uma mão para outra. A margem de hoje
+    // depende de TRÊS dials ao mesmo tempo (tamanho do baralho, limite de mão,
+    // número de assentos), e girar qualquer um pode comê-la em silêncio.
+    //
+    // Por isso a promessa é conferida AQUI, depois de cada ação de uma partida
+    // inteira, em vez de escrita num comentário. Se este alarme tocar, a alternativa
+    // era um `Error` cru de `tirarDoTopo` — 500 na cara do jogador.
+    if (e.portas.monte.length === 0 && e.portas.cemiterio.length === 0) {
+      erros.push('monte E cemitério de Portas vazios — a decisão #62 diz que o baralho nunca acaba');
+    }
     // `switch` exaustivo, não uma lista de `if (e.fase === '…')`: os `if`s eram uma
     // permissão POR NOME de fase, e uma fase nova (`recompor`, `encrenca`, `jogar`
-    // — todas "turno parado", todas fases em que a mão muda) cai fora de todos
+    // — todas fases em que a mão muda, "turno parado" ou não) cai fora de todos
     // eles em silêncio — a `Record<Fase, …>` da tabela de ações cobra a fase nova,
     // mas nada cobrava a COERÊNCIA dela com o estado. O `default` com `never` move
-    // esse esquecimento de "passa quieto" para erro de compilação: quem escrever o
-    // Plano 3 é obrigado a decidir o que a fase nova significa para o excedente.
+    // esse esquecimento de "passa quieto" para erro de compilação: quem escrever a
+    // fase nova é obrigado a decidir o que ela significa para o excedente.
     switch (e.fase) {
       case 'descartar':
         if (!estourado) erros.push('fase=descartar sem excedente na mão de quem tem a vez');
         break;
       case 'vasculhar':
         if (estourado) erros.push('fase=vasculhar com a mão de quem tem a vez estourada');
+        break;
+      case 'encrenca':
+        // 🎚️ Até a Task 4 do Plano 4b, esta fase nunca convivia com mão estourada
+        // pelo MESMO motivo de `vasculhar`: a raça passava por
+        // `entrarOuPular`/`encerrarTurno`, que perguntava `faseDoTurnoDe` e trocava
+        // a fase por `descartar` antes de a `encrenca` existir. A Task 4 tirou a
+        // raça desse caminho — ela vai direto para `registrar` com
+        // `fase: 'encrenca'`, sem checar o limite. `encrenca` PODE conviver com mão
+        // estourada agora, de propósito (decisão #62: `saquear` sempre disponível,
+        // e o excedente só volta a ser cobrado quando `jogar`/`encerrarTurno`
+        // fecharem o encontro).
+        //
+        // 🔴 FIX (revisão, round 1): a primeira versão deste `case` não checava
+        // NADA — afrouxamento mais largo que o necessário. O overflow que
+        // `encrenca` pode ter é ESTREITO (+1, ver `estouradoAlemDeUm` acima); um
+        // predicado que aceitasse qualquer estouro não dispararia se uma task
+        // futura desse à fase uma segunda entrada, ou a tornasse reentrante
+        // (`saquear` empilhando estouro sobre estouro sem nunca passar por
+        // `vasculhar` de novo). A Task 6 acrescenta o predicado do baralho.
+        if (estouradoAlemDeUm) erros.push('fase=encrenca com a mão de quem tem a vez estourada por MAIS de 1');
         break;
       case 'combate':
         // Hoje inalcançável — nenhuma ação mexe na mão durante o combate, e só se
@@ -268,7 +341,7 @@ describe('a fase nunca mente sobre o estado', () => {
     return erros;
   };
 
-  it('vale em todo estado de uma partida inteira, e as cinco fases aparecem', () => {
+  it('vale em todo estado de uma partida inteira, e as seis fases aparecem', () => {
     const quatro: readonly EntradaJogador[] = [
       { id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE },
       { id: 'p2', nome: 'Bot 1', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
@@ -287,9 +360,61 @@ describe('a fase nunca mente sobre o estado', () => {
 
     // Baralho COM carta de raça e mão inicial de verdade: é o que faz a mão
     // estourar durante o jogo e a fase `descartar` ser realmente visitada.
+    //
+    // 🎚️ Proporção regirada na Task 4 do Plano 4b (1 monstro + 9 raça, mesmo
+    // TAMANHO de 10 por jogador — o OPOSTO da densidade de produção, 71,4%
+    // monstro / 28,6% raça, decisão #52 do bible): antes (8 monstro + 2 raça,
+    // mais perto da produção) a raça sacada em `vasculhar` entregava direto a
+    // `jogar`/`descartar` via `entrarOuPular`/`encerrarTurno`. Agora ela abre a
+    // `encrenca`, e o bot (`escolherAcao`) prefere `procurarEncrenca` sempre que
+    // houver monstro na mão — o que DESCARTA o excesso lutando, sem nunca sobrar
+    // para `saquear`. Com baralho majoritariamente monstro (a proporção antiga,
+    // mais perto da de produção), a mão de um jogador quase sempre tem monstro
+    // disponível, e a fase `descartar` deixa de ser alcançada por essa via —
+    // qualitativo, não recravar número aqui: não há script versionado que
+    // reproduza uma contagem exata, e o relatório da Task 4 já publicou um número
+    // (~934 ações) que não bate com uma tentativa anterior deste comentário
+    // (20000) por um fator de 20 — nenhum dos dois é reproduzível. Invertendo a
+    // proporção (monstro ESCASSO), o jogador eventualmente esgota os monstros da
+    // mão, `encrenca` cai em `saquear` (que só ADICIONA carta, sem descartar
+    // nada) e a mão estourada sobrevive até `jogar` se auto-pular — é isso que
+    // finalmente alcança `encerrarTurno` com o excedente intacto.
+    //
+    // ⚠️ **Acoplado à política do bot em `encrenca`** (`bot.ts`, `case 'encrenca'`),
+    // que hoje é a AVALIAÇÃO da decisão #63 do game bible: o bot só topa a luta
+    // quando `rodadasParaMatar` lhe dá margem (`MARGEM_DE_ENCRENCA`), e cai em
+    // `saquear` quando nenhum monstro da mão passa.
+    //
+    // ✅ **Reconferido sob essa política nova** — a versão anterior deste
+    // comentário citava uma política PROVISÓRIA que não existe mais, e a
+    // instrução "reconferir quando ela mudar" tinha vencido sem ninguém cumprir.
+    // A causa descrita CONTINUA certa, e a conta é esta: contra o
+    // `MONSTRO_DE_TESTE` (`testes/catalogo.ts` — força 2, vida 10, habilidade 6,
+    // agilidade 1, level 1), o combatente do dublê (força 3, vida 20, habilidade
+    // 8, agilidade 5, level = patente) leva `ceil(10/4) / (8/12)` = **4,5**
+    // rodadas para matar, e o monstro leva `ceil(20/3) / (6/12)` = **14** para
+    // matá-lo; com agilidade 5 contra 1 o jogador ataca primeiro, então o exigido
+    // é 1,2 e `4,5 × 1,2 = 5,4 < 14` — o bot aceita, com folga de quase 3×. E a
+    // folga só CRESCE durante a partida (a patente sobe, e os itens do dublê só
+    // somam modificador positivo). Ou seja: com o baralho de produção, o bot
+    // continua descarregando o excesso de mão lutando, e `descartar` continua
+    // fora de alcance por essa via. ⚠️ A conferência depende dos números do
+    // `MONSTRO_DE_TESTE` e do `CLASSE_DE_TESTE`, que são load-bearing por outros
+    // motivos — mexer neles é refazer esta conta.
+    //
+    // ⚠️ **O achado NÃO é só sobre o teste — é sinal sobre o JOGO real:** com a
+    // densidade de produção, `descartar` (a fase que cobra o excedente de mão)
+    // pode estar praticamente inalcançável via raça, porque o bot guloso sempre
+    // descarrega o excesso lutando antes de a cobrança chegar. Girar o fixture
+    // para monstro escasso RESTAURA a cobertura de teste, mas ENTERRA esse sinal
+    // se ninguém o persegue fora daqui. Registrado com destaque no relatório da
+    // Task 4 (seção "Fix round 1") para a Task 8 (medição) investigar se isso
+    // também vale com dials de produção e bots reais.
     const composicao = montarComposicao({
-      monstroIds: Array.from({ length: 8 }, () => 'm-teste'),
-      copiasPorMonstro: 1, racaIds: ['elfo', 'anao'], copiasPorRaca: 1,
+      monstroIds: Array.from({ length: 1 }, () => 'm-teste'),
+      copiasPorMonstro: 1,
+      racaIds: Array.from({ length: 9 }, (_, i) => (i % 2 === 0 ? 'elfo' : 'anao')),
+      copiasPorRaca: 1,
     });
     // 🎚️ Dial LOCAL girado de novo nesta fatia: `LIMITE_BASE_DE_MAO` subiu de 4
     // para 7, e com 5 cartas a mão parou de estourar — `descartar` deixou de ser
@@ -299,14 +424,13 @@ describe('a fase nunca mente sobre o estado', () => {
     // `LIMITE_BASE_DE_MAO + 1` = o teto exato de quem está sem raça em jogo: a
     // mesa nasce cheia mas não estourada (`vasculhar`), e é a primeira carta que
     // entra na mão — carta de raça comprada ou tesouro lootado — que empurra o
-    // turno para `descartar`. Nascer já estourado também visitaria a fase, mas
-    // provaria menos: o caminho que interessa é a TRANSIÇÃO durante o jogo.
+    // turno para `encrenca`/`descartar`. Nascer já estourado também visitaria a
+    // fase, mas provaria menos: o caminho que interessa é a TRANSIÇÃO durante o
+    // jogo.
     //
     // 🎚️ O tamanho da composição (10 por jogador) é preservado do fixture
-    // anterior, que era 5 monstro + 3 sala vazia + 2 raça: o corte da sala vazia
-    // (decisão #42) virou as 3 em monstro, e não em raça, porque raça vai para a
-    // MÃO — três a mais por bloco mudariam o ritmo de estouro que este fixture
-    // calibra.
+    // anterior — a proporção monstro/raça mudou (ver o comentário acima), o
+    // TOTAL não.
     let estado = criarPartida('m1', quatro,
       {
         patenteAlvo: 4,
@@ -400,6 +524,13 @@ describe('a fase nunca mente sobre o estado', () => {
     // de raça que a composição deste fixture distribui; `'jogar'` vem do primeiro
     // combate VENCIDO, porque é o loot que põe equipamento na mão (sem
     // equipamento a fase se auto-pula e nunca aparece).
-    expect([...fasesVistas].sort()).toEqual(['combate', 'descartar', 'jogar', 'recompor', 'vasculhar']);
+    //
+    // 🎚️ `'encrenca'` é NOVA nesta lista (Task 4 do Plano 4b: antes a fase
+    // existia no tipo `Fase`, mas nada no reducer entrava nela de verdade nesta
+    // simulação). `'descartar'` só volta a aparecer com o baralho pobre em
+    // monstro (ver o comentário da composição, acima): é a mão que esgota o
+    // monstro e cai em `saquear` — que só ADICIONA carta — quem finalmente deixa
+    // o excedente sobreviver até `encerrarTurno`.
+    expect([...fasesVistas].sort()).toEqual(['combate', 'descartar', 'encrenca', 'jogar', 'recompor', 'vasculhar']);
   });
 });

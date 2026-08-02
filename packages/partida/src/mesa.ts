@@ -163,16 +163,22 @@ function entrarOuPular(
  * LIMPO, e `passar` na fase esquecida saía como `Error` cru — **500 numa partida
  * legítima**, não o 400 de `AcaoInvalida`.
  *
- * ⚠️ A `encrenca` do Plano 4b **não** é candidata — mas com ressalva, não certeza:
- * o spec §6 dá a ela `procurarEncrenca` e `saquear`, e nenhum `passar`. `saquear`
- * é o **candidato** a impedir o beco sem saída, e isso **não foi medido** — só o
- * corte da `salaVazia` foi: *"monte e cemitério de Portas ambos vazios"* deu
- * **zero em 80 partidas** (decisão #53/#55 do game bible). 🔴 **Zero em 80 não é
- * prova de impossibilidade.** `tirarDoTopo` (`baralho.ts`) ainda lança `Error`
- * cru com os dois vazios — que é **500**, não o 400 de `AcaoInvalida` — e
- * `vasculhar` chama `tirarDoTopo` sem guard nenhum. O risco aqui não é só uma
- * fase específica do roteiro; é também `FaseParada` ser uma união mantida à mão,
- * que qualquer um alarga sem passar por esta função.
+ * ⚠️ A `encrenca` **não** é fase parada: o spec §6 da fatia 8 dá a ela
+ * `procurarEncrenca` e `saquear`, e nenhum `passar`. Isso deixou de ser ressalva
+ * e virou REGRA — a decisão **#62 do game bible** diz que o baralho de Portas
+ * nunca acaba, então `saquear` é sempre uma saída e a fase nunca fica sem opção.
+ * A promessa é **predicado da invariante de partida** (`fase.test.ts`), não
+ * comentário, e foi medida nesta fatia: *"monte e cemitério de Portas ambos
+ * vazios"* deu **zero em 604 partidas** (o corte da `salaVazia` já dera zero em
+ * 80 — decisão #53/#55). 🔴 **Zero medido não é prova de impossibilidade.**
+ *
+ * ⚠️ E o `Error` cru de `tirarDoTopo` (`baralho.ts`) com os dois vazios — que é
+ * **500**, não o 400 de `AcaoInvalida` — FICA de propósito: pela #62, faltar
+ * Porta é invariante nossa quebrada, não pedido inválido. Hoje são **dois** os
+ * chamadores sem guard nenhum, `vasculhar` e `saquear` (só `empurrarCarta` tem);
+ * a lista tem que crescer junto quando um terceiro nascer. O risco aqui não é só
+ * uma fase específica do roteiro; é também `FaseParada` ser uma união mantida à
+ * mão, que qualquer um alarga sem passar por esta função.
  *
  * Os dois `throw` que dependem deste predicado (no `aplicarAcao` e no
  * `equiparCarta`) se descrevem como "inalcançável pela tabela". Continuam sendo —
@@ -205,9 +211,10 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // guards certos; agora ela precisa entrar na tabela, e o `Record<Fase, …>` cobra.
   //
   // ⚠️ O QUE A TABELA NÃO RESPONDE. Passar aqui não garante que a ação será
-  // aceita: a elegibilidade FINA continua em cada função, e hoje são TREZE pares —
-  // cada um precisa de gêmeo na tela, porque o `legal()` da `TelaMesa` lê ESTA
-  // tabela e não sabe deles.
+  // aceita: a elegibilidade FINA continua em cada função, e hoje são CATORZE pares
+  // em DEZESSEIS linhas — cada par precisa de gêmeo na tela, porque o `legal()` da
+  // `TelaMesa` lê ESTA tabela e não sabe deles. As duas linhas que não são par
+  // estão marcadas na própria tabela e explicadas logo abaixo dela.
   //
   // ⚠️ O 13º entrou em 2026-07-28, e não era par novo: existia desde o Plano 3b e
   // NUNCA esteve na tabela (o par "monte+cemitério vazios" de `empurrarCarta`).
@@ -235,6 +242,35 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   //   jogar                guardarCarta   mochila cheia                `guardarCarta`
   //   combate              atacar         `proximaDecisao`             o motor (`AcaoIlegal`)
   //   combate              esquivar       `proximaDecisao`             o motor (`AcaoIlegal`)
+  //   encrenca             procurarEncrenca  a carta é do tipo monstro `procurarEncrenca`
+  //   ↑ CATORZE pares. As duas linhas abaixo NÃO são par — estão aqui para provar
+  //     que a recontagem chegou até estes dois verbos:
+  //   encrenca             saquear        — (nenhum guard fino; #62)   — (ausência)
+  //   encrenca             procurarEncrenca  a carta está na sua mão   (gêmeo ESTRUTURAL)
+  //
+  // `saquear` NÃO soma ao total: a recontagem partiu do `switch`, e a função não
+  // tem NENHUM guard fino — a decisão #62 do game bible (o baralho de Portas
+  // nunca acaba) é o que dispensa um `if` de baralho vazio, e sem guard não há
+  // recusa de domínio para a tela imitar. A linha existe para provar que a
+  // recontagem CHEGOU até `saquear`, não para declarar um par novo — é o mesmo
+  // cuidado que achou o par órfão de `empurrarCarta` em 2026-07-28.
+  //
+  // "a carta está na sua mão" de `procurarEncrenca` também NÃO soma, e o motivo é
+  // outro: o gêmeo dele é ESTRUTURAL, não um `disabled` que alguém precisa
+  // lembrar de escrever — o botão só existe dentro do `map` da mão, então apontar
+  // uma carta que não está lá não é um estado que a tela consiga produzir. É a
+  // convenção que esta tabela sempre seguiu, e a prova está no que ela NUNCA
+  // listou: o mesmo guard vive em `cartaDaMao` (usado por `jogarCarta`,
+  // `entregarCarta` e `guardarCarta`) e em `cartaEquipavelDe` (usado por
+  // `equiparCarta`), e `entregarCarta` não tem UMA linha nesta tabela — o guard
+  // de `cartaDaMao` é o único fino que ela tem. Listar aqui e não lá inflaria a
+  // contagem sem acrescentar gêmeo nenhum a escrever.
+  //
+  // `procurarEncrenca` soma, então, UM par: a carta apontada tem que SER um
+  // monstro — sem esse guard, uma carta de raça cairia no ramo `raca` de
+  // `resolverCarta` e voltaria para a mão de onde saiu, num turno que a mesa
+  // registraria como encontro sem ter sido. (A função não reusa `cartaDaMao`
+  // porque quer `Carta` heterogênea, e já sabe que quer um monstro.)
   //
   // Um botão novo escrito só com `legal(tipo)` acende nesses estados e leva 400.
   // Os dois pares `espiada !== null` de `jogarCarta` e `equiparCarta` MORRERAM:
@@ -257,15 +293,24 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // jogador nunca aprende que existe.
   //
   // HISTÓRICO da contagem, que é a lição do parágrafo acima — os números abaixo
-  // são de planos passados, NÃO a contagem de hoje (que é a lista de doze):
+  // são de planos passados, NÃO a contagem de hoje (que é catorze):
   // no Plano 3b a lista subiu de sete para oito, e ao conferir descobriu-se que a
   // contagem anterior também mentia — as linhas `vasculhar/descartar` escondiam
   // DOIS pares cada uma dentro de uma célula agrupada, então nunca foram nove
   // pares: eram nove LINHAS sobre onze pares. `equiparCarta` deixou `descartar`
   // e ficou com as DUAS fases paradas — duas linhas, nunca uma célula com duas
-  // fases. O Plano 4a levou de oito para doze, com os quatro de `guardarCarta`.
+  // fases. O Plano 4a levou de oito para doze, com os quatro de `guardarCarta`;
+  // em 2026-07-28 a recontagem achou o par órfão de `empurrarCarta` e foi para
+  // treze. O Plano 4b foi de treze para CATORZE, com o par de tipo de
+  // `procurarEncrenca` — a PRIMEIRA vez que a `encrenca` contribui algum par à
+  // lista (`saquear` continua sem guard fino).
   //
-  // A `encrenca` do Plano 4 não muda esta lista: os verbos dela são novos.
+  // ⚠️ Esse "catorze" já foi escrito como QUINZE, e o erro é instrutivo: contou-se
+  // o guard "a carta está na sua mão" como par, sem notar que a tabela nunca
+  // contou os guards iguais de `cartaDaMao` e `cartaEquipavelDe`. Inflar a
+  // contagem é menos perigoso que omitir um par — mas quebra a convenção que faz
+  // a recontagem funcionar, porque o próximo a recontar acha "quinze" e procura
+  // um gêmeo na tela que não tem o que ser escrito.
   if (!acaoEhLegalNaFase(estado.fase, acao.tipo)) {
     throw new AcaoInvalida(`aplicarAcao: ${acao.tipo} não é legal na fase ${estado.fase}`);
   }
@@ -305,15 +350,36 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
     ]);
   }
 
-  return agirNoCombate(estado, acao, deps);
+  if (acao.tipo === 'atacar' || acao.tipo === 'esquivar') {
+    return agirNoCombate(estado, acao, deps);
+  }
+
+  if (acao.tipo === 'saquear') {
+    return saquear(estado, acao.jogadorId, deps);
+  }
+
+  if (acao.tipo === 'procurarEncrenca') {
+    return procurarEncrenca(estado, acao.jogadorId, acao.cartaId, deps);
+  }
+
+  // Exaustividade: a cadeia de `if` acima cobre TODO `AcaoDaMesa['tipo']` de hoje
+  // (`procurarEncrenca`, Task 3, foi o último a ganhar ramo). Mesma proteção dos
+  // `naoTratada: never` dos `switch` deste arquivo (`resolverCarta`,
+  // `descartarNoBaralhoCerto`): um tipo novo em `AcaoDaMesa` sem `if` próprio
+  // quebra a COMPILAÇÃO aqui, não em produção — é a lição do Plano 4b Task 1,
+  // que precisou deste guard explícito porque o fallthrough implícito para
+  // `agirNoCombate` já tinha quebrado uma vez com `AcaoDaMesa` alargado.
+  const naoTratada: never = acao;
+  throw new Error(`aplicarAcao: ação sem ramo no reducer: ${JSON.stringify(naoTratada)}`);
 }
 
 /**
  * Resolve uma carta JÁ comprada (o baralho em `base` já reflete a compra) e é
  * dona do seu DESTINO: `monstro` abre combate; `raca` (indo para a mão de quem
- * vasculhou) entrega o turno à fase `jogar`, que se auto-pula e encerra o turno
- * quando não há equipamento na mão. É o núcleo compartilhado do vasculhar
- * atômico e da resolução da espiada.
+ * a revelou) entrega o turno à fase `encrenca`, que cobra `procurarEncrenca` ou
+ * `saquear` — ela não se auto-pula e não aceita `passar` (decisão #62 do game
+ * bible). É o núcleo compartilhado dos TRÊS chamadores: o vasculhar atômico, a
+ * resolução da espiada e `procurarEncrenca`.
  *
  * O EVENTO sai por ramo, não antes do `switch`, porque quem decide se a carta
  * pode ser anunciada é o DESTINO dela — e é este `switch` que o conhece. Um
@@ -348,11 +414,16 @@ function resolverCarta(
       if (comACarta === undefined) {
         throw new Error(`resolverCarta: jogador ${jogadorId} não está na mesa`);
       }
-      // O jogador ATUALIZADO (com a carta já na mão): a raça sacada não dá o que
-      // fazer em `jogar` — ela espera a fase 1 do próximo turno —, mas um
-      // equipamento que já estivesse na mão dá, e é por isso que a pergunta é
-      // feita sobre a mão de agora e não sobre a de antes do saque.
-      return entrarOuPular({ ...base, jogadores }, comACarta, 'jogar', [{ tipo: 'achado', jogadorId }]);
+      // A porta que não é monstro abre a `encrenca` (spec §6): você não lutou, então
+      // escolhe entre jogar um monstro da mão ou saquear. `registrar` e NÃO
+      // `entrarOuPular`: a `encrenca` não é fase parada e nunca se auto-pula
+      // (decisão #62 do bible) — passar por `entrarOuPular` pediria uma `FaseParada`,
+      // que ela não é, e o tipo recusa.
+      //
+      // ⚠️ A janela de vestir NÃO se perdeu: os dois verbos da `encrenca` terminam
+      // em `jogar` (o `saquear` diretamente, o `procurarEncrenca` pelo fim do
+      // combate), então o loot continua tendo onde virar corpo.
+      return registrar({ ...base, jogadores, fase: 'encrenca' }, [{ tipo: 'achado', jogadorId }]);
     }
     case 'monstro':
       break;
@@ -426,6 +497,86 @@ function vasculhar(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): Re
   const t = tirarDoTopo(estado.portas, deps.embaralhar);
   const base: EstadoPartida = { ...estado, portas: t.baralho };
   return resolverCarta(base, jogadorId, t.carta, deps);
+}
+
+/**
+ * Compra 1 carta de Portas **virada**, direto para a mão (spec §6). É a alternativa
+ * a lutar, e é o que impede a `encrenca` de ser um beco sem saída. Irmã de
+ * `vasculhar`, logo acima: as duas compram do mesmo baralho de Portas.
+ *
+ * ⚠️ **Sem guard de baralho vazio, de propósito.** A decisão #62 do bible diz que o
+ * baralho de Portas nunca acaba; se acabar, é invariante NOSSA quebrada — o `Error`
+ * cru de `tirarDoTopo` (500) é a resposta certa, não o 400 de `AcaoInvalida`. Quem
+ * confere a promessa é o predicado da invariante em `fase.test.ts`, não um `if`
+ * aqui: um guard silencioso transformaria a violação da regra em jogo normal.
+ *
+ * A carta vai para a MÃO sem passar pelo cemitério — daí o evento ser `saqueou`
+ * (que não carrega a carta) e não `porta` (que carrega).
+ */
+function saquear(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): ResultadoAcao {
+  const t = tirarDoTopo(estado.portas, deps.embaralhar);
+  const jogadores = estado.jogadores.map((j) => (
+    j.id === jogadorId ? { ...j, mao: [...j.mao, t.carta] } : j
+  ));
+  const comACarta = jogadores.find((j) => j.id === jogadorId);
+  if (comACarta === undefined) {
+    throw new Error(`saquear: jogador ${jogadorId} não está na mesa`);
+  }
+  // O jogador ATUALIZADO, com a carta já na mão: a pergunta do auto-pulo de `jogar`
+  // é sobre a mão de AGORA. Mesmo motivo, e mesma armadilha de ordem, do ramo
+  // `raca` de `resolverCarta`.
+  return entrarOuPular(
+    { ...estado, portas: t.baralho, jogadores },
+    comACarta,
+    'jogar',
+    [{ tipo: 'saqueou', jogadorId }],
+  );
+}
+
+/**
+ * Joga um monstro da própria mão para lutar (spec §6). É o verbo que dá saída às
+ * cartas de Porta que hoje morrem na mão — medido no Plano 4a: a mão inicial
+ * recebe monstros CRUS (`criarPartida` distribui do topo sem resolver) e nenhum
+ * verbo do jogo sabia jogá-los.
+ *
+ * Reusa `resolverCarta`, que é a mesma função do `vasculhar`: ela põe a carta no
+ * cemitério de Portas, emite o evento `porta` (público — a mesa inteira vê o
+ * monstro) e abre o combate contra os stats do catálogo. Reimplementar isso aqui
+ * seria a segunda cópia do caminho de combate.
+ *
+ * DOIS guards finos, os dois com gêmeo obrigatório na `TelaMesa`: a carta tem que
+ * estar na mão e tem que ser monstro. O segundo não é cerimônia — sem ele, uma
+ * carta de raça cairia no ramo `raca` de `resolverCarta` e voltaria para a mão de
+ * onde saiu, num turno que a mesa registraria como encontro.
+ */
+function procurarEncrenca(
+  estado: EstadoPartida,
+  jogadorId: string,
+  cartaId: string,
+  deps: DepsMesa,
+): ResultadoAcao {
+  const jogador = estado.jogadores.find((j) => j.id === jogadorId);
+  if (jogador === undefined) {
+    throw new Error(`procurarEncrenca: jogador ${jogadorId} não está na mesa`);
+  }
+  const carta = jogador.mao.find((c) => c.id === cartaId);
+  if (carta === undefined) {
+    throw new AcaoInvalida(`procurarEncrenca: a carta ${cartaId} não está na sua mão`);
+  }
+  if (carta.tipo !== 'monstro') {
+    throw new AcaoInvalida('procurarEncrenca: só carta de monstro procura encrenca');
+  }
+
+  // A carta sai da mão ANTES de `resolverCarta` — que é quem a põe no cemitério.
+  // Invertida a ordem, a carta existiria nos dois lugares ao mesmo tempo e o censo
+  // de conservação acusaria uma duplicata.
+  const semACarta: EstadoPartida = {
+    ...estado,
+    jogadores: estado.jogadores.map((j) => (
+      j.id === jogadorId ? { ...j, mao: j.mao.filter((c) => c.id !== cartaId) } : j
+    )),
+  };
+  return resolverCarta(semACarta, jogadorId, carta, deps);
 }
 
 /** As ações que só fazem sentido com uma espiada pendente. */

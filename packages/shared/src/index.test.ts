@@ -137,6 +137,21 @@ describe('acaoDaMesaSchema', () => {
     expect(acaoDaMesaSchema.safeParse({ tipo: 'entregarCarta', cartaId: '' }).success).toBe(false);
     expect(acaoDaMesaSchema.safeParse({ tipo: 'entregarCarta', cartaId: 'x'.repeat(65) }).success).toBe(false);
   });
+
+  it('aceita saquear, só com o tipo', () => {
+    // Sem `cartaId`: a carta comprada é o TOPO do baralho de Portas, decidido pelo
+    // estado autoritativo — o cliente não escolhe qual carta vem.
+    expect(acaoDaMesaSchema.parse({ tipo: 'saquear' })).toEqual({ tipo: 'saquear' });
+  });
+
+  it('procurarEncrenca viaja no fio com o mesmo teto de 64 do cartaId', () => {
+    // Mesmo padrão de `jogarCarta`/`equiparCarta`/`guardarCarta`: o `cartaId` é o
+    // único campo livre do fio, refletido verbatim no 400 e no log do server.
+    expect(acaoDaMesaSchema.safeParse({ tipo: 'procurarEncrenca', cartaId: 'p-3' }).success).toBe(true);
+    expect(acaoDaMesaSchema.safeParse({ tipo: 'procurarEncrenca', cartaId: '' }).success).toBe(false);
+    expect(acaoDaMesaSchema.safeParse({ tipo: 'procurarEncrenca', cartaId: 'x'.repeat(65) }).success).toBe(false);
+    expect(acaoDaMesaSchema.safeParse({ tipo: 'procurarEncrenca' }).success).toBe(false);
+  });
 });
 
 describe('acaoRequisicaoSchema', () => {
