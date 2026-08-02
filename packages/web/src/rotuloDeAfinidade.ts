@@ -24,7 +24,7 @@ export function rotuloDeAfinidade(
 
   // Eixo `classe` mostra o id cru: nenhum item o declara hoje, e um `nomeDaClasse`
   // injetado seria parâmetro que nenhum call-site consegue exercitar.
-  const dono = exclusivo.eixo === 'raca' ? nomeDaRaca(exclusivo.id) : exclusivo.id;
+  const dono = exclusivo.eixo === 'raca' ? nomeDaRaca(exclusivo.donoId) : exclusivo.donoId;
   const grau = afinidadeCom(info, emJogo);
   // Antes de pedir o número: `contribuicaoDe` LANÇA no proibido.
   if (grau === 'proibida') {

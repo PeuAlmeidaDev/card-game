@@ -174,13 +174,10 @@ function melhorEncrenca(
 }
 
 /**
- * Soma dos modificadores EFETIVOS de um item para esta zona — cheio, reduzido ou
- * zero, conforme `afinidadeCom`. Métrica GULOSA, não inteligente para EQUIPAR
- * (decisão #9 do spec da fatia 8): trata +2 de força e +2 de agilidade como
- * equivalentes.
- *
- * Item que o catálogo não conhece, ou proibido nesta zona, vale 0 em vez de
- * lançar: o bot é uma POLÍTICA, não o reducer.
+ * Soma dos modificadores EFETIVOS de um item para esta zona. Métrica GULOSA:
+ * trata +2 de força e +2 de agilidade como equivalentes. Item que o catálogo não
+ * conhece, ou proibido nesta zona, vale 0 em vez de lançar — o bot é uma
+ * POLÍTICA, não o reducer.
  */
 function valorEfetivoDe(itemId: string, catalogo: CatalogoDaMesa, emJogo: ZonaEmJogo): number {
   const info = catalogo.item(itemId);

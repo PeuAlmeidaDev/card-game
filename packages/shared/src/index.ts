@@ -140,19 +140,8 @@ const _coberturaSlot: _CoberturaSlot = true;
 void _coberturaSlot;
 
 /**
- * Trava as duas uniões `EixoDeAfinidade` — a de `partida` (a REGRA: contra qual
- * campo da zona a afinidade é conferida) e a de `cartas` (o DADO: o que o item
- * declara). Mesma duplicação e mesmo preço do `Slot`, logo acima.
- *
- * ⚠️ Uma das direções o compilador JÁ pegaria de graça: se `cartas` ganhar um
- * eixo a mais, `ItemCarta` deixa de ser atribuível a `InfoItem` e o
- * `item: obterItem` do `server/src/app.ts` quebra. A direção que **só este guard
- * pega** é a inversa: `partida` ganhar um eixo que nenhuma carta consegue
- * declarar — uma regra que roda para um valor que o jogo nunca produz, e que
- * portanto nenhum teste natural exercita.
- *
- * A tupla é obrigatória pelo mesmo motivo dos outros dois guards: `A | B extends X`
- * DISTRIBUI sobre a união e a checagem se auto-satisfaz.
+ * Trava as duas uniões `EixoDeAfinidade` — a de `partida` (a regra) e a de
+ * `cartas` (o dado). Mesma duplicação, mesma tupla e mesmo preço do `Slot`, acima.
  *
  * ⚠️ Guard de COMPILAÇÃO. Quem acusa é o `pnpm typecheck`, nunca a suíte.
  */
@@ -194,10 +183,8 @@ export { LIMITE_MOCHILA } from '@card-dungeon/partida';
 // zero hoje (nenhuma classe do catálogo é tão negativa), bomba amanhã.
 export { montarCombatente } from '@card-dungeon/personagem';
 
-// Valor, pelo mesmo motivo de `acaoEhLegalNaFase`: a afinidade é regra, e um
-// `exclusivo.id === raca.racaId` escrito no cliente é a cópia que diverge. A tela
-// LÊ a regra; nunca a reimplementa. `contribuicaoDe` vem junto porque mostrar o
-// valor CHEIO na tela de quem veste reduzido é a tela mentindo.
+// Valor, pelo mesmo motivo: a afinidade é regra, e mostrar o valor CHEIO na tela
+// de quem veste reduzido é a tela mentindo.
 export { afinidadeCom, contribuicaoDe } from '@card-dungeon/partida';
 
 const c = initContract();
@@ -300,13 +287,9 @@ export type {
   // então o que não passar por aqui simplesmente não existe para o cliente.
   Slot,
   ItemCarta,
-  // Mesma jogada, para o eixo de especialização: `Afinidade` e `EixoDeAfinidade`
-  // saem de `partida` (a regra) — o `_CoberturaEixo` acima trava as duas uniões.
+  // Mesma jogada, para o eixo de especialização.
   Afinidade,
   EixoDeAfinidade,
-  // `GrauDeAfinidade` é o retorno de `afinidadeCom`; `ZonaEmJogo` é o segundo
-  // parâmetro dela e de `contribuicaoDe` — as assinaturas do `web` precisam
-  // nomear as duas.
   GrauDeAfinidade,
   ZonaEmJogo,
 };

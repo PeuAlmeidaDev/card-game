@@ -82,13 +82,8 @@ export function destinoDoDesequipado(
   estado: EstadoPartida,
   deslocados: readonly CartaEquipamento[],
   jogadorId: string,
-  /**
-   * POR QUE o item saiu. Parâmetro obrigatório e não default `'trocaDeSlot'`: com
-   * default, o chamador novo (a troca de raça) herdaria calado o motivo errado, e
-   * o log mentiria sem nenhum erro de compilação. Obrigatório, o compilador cobra
-   * cada call-site — que é o que se quer de um campo cujo valor certo depende de
-   * quem chamou.
-   */
+  // Sem default de propósito: o valor certo depende de quem chamou, e o
+  // compilador tem que cobrar cada call-site novo.
   motivo: Extract<EventoDaMesa, { readonly tipo: 'desequipou' }>['motivo'],
 ): { readonly estado: EstadoPartida; readonly eventos: readonly EventoDaMesa[] } {
   // Sem nada deslocado, devolve o MESMO estado: um spread aqui trocaria a

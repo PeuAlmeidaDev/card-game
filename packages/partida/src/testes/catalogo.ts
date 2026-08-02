@@ -103,37 +103,23 @@ export const ITEM_DUAS_MAOS = {
   slot: 'maoDireita' as const, duasMaos: true, modificadores: { forca: 4 }, exclusivo: null,
 };
 
-/**
- * Os dois ids de raça dos testes de afinidade. NEUTROS de propósito: `partida` é
- * cego ao catálogo, e escrever `'orc'` aqui insinuaria um acoplamento que não
- * existe — é a mesma nota que `testes/cartas.ts` já carrega sobre o `'m-teste'`.
- */
+/** Ids NEUTROS de propósito: `partida` é cego ao catálogo. */
 export const ID_DA_RACA_DONA = 'r-dona';
 export const ID_DA_RACA_OUTRA = 'r-outra';
 
 /**
- * O item exclusivo do dublê. 🎚️ Os números não são decorativos e separam TRÊS
- * respostas, não duas: cheio (4) ≠ reduzido (1) ≠ nada (0). Um reduzido de 0
- * apagaria a diferença entre "rende menos" e "não rende", que é exatamente a
- * decisão #1 do spec (afinidade é ESCALONADA, não binária).
- *
- * Slot `capacete`, longe dos outros dublês de força (`maoDireita`) — quem
- * precisa de algo competindo pelo MESMO slot usa `ITEM_DE_CAPACETE`/`ITEM_LASTRO`,
- * abaixo.
+ * 🎚️ Cheio (4) ≠ reduzido (1) ≠ nada (0): os três valores separam as TRÊS
+ * respostas de `afinidadeCom`. Um reduzido de 0 apagaria a do meio.
  */
 export const ID_DO_ITEM_EXCLUSIVO = 'i-exclusivo';
 export const ITEM_EXCLUSIVO = {
   id: ID_DO_ITEM_EXCLUSIVO, nome: 'Item Exclusivo',
   slot: 'capacete' as const, duasMaos: false,
   modificadores: { forca: 4 },
-  exclusivo: { eixo: 'raca' as const, id: ID_DA_RACA_DONA, semAfinidade: { forca: 1 } },
+  exclusivo: { eixo: 'raca' as const, donoId: ID_DA_RACA_DONA, semAfinidade: { forca: 1 } },
 };
 
-/**
- * Item comum de `capacete` — o MESMO slot do `ITEM_EXCLUSIVO`. Sem ele, testar
- * "o exclusivo desloca algo já equipado" forçava um item de OUTRO slot
- * (`maoDireita`) para dentro de `capacete`, um corpo que o reducer nunca produz.
- */
+/** Comum, no MESMO slot do `ITEM_EXCLUSIVO` — para testar quem desloca quem. */
 export const ID_DO_ITEM_DE_CAPACETE = 'i-capacete';
 export const ITEM_DE_CAPACETE = {
   id: ID_DO_ITEM_DE_CAPACETE, nome: 'Item de Capacete',
@@ -141,10 +127,9 @@ export const ITEM_DE_CAPACETE = {
 };
 
 /**
- * 🎚️ Soma líquida NEGATIVA (−2). Existe para o filtro de
- * `candidatosQueEuPossoVestir` ser EXERCITÁVEL: com todo item somando ≥ 0,
- * `ganho = 0 − custo` nunca passa de `melhorGanho = 0` e o guard de
- * `valorEfetivoDe` já basta sozinho. Mesma lição do `ITEM_DUAS_MAOS`.
+ * 🎚️ Soma líquida NEGATIVA (−2), sem a qual o filtro de
+ * `candidatosQueEuPossoVestir` é INEXERCITÁVEL: com todo item somando ≥ 0,
+ * `ganho = 0 − custo` nunca passa de `melhorGanho = 0`.
  */
 export const ID_DO_ITEM_LASTRO = 'i-lastro';
 export const ITEM_LASTRO = {
@@ -153,32 +138,27 @@ export const ITEM_LASTRO = {
 };
 
 /**
- * O exclusivo do eixo `classe`. Existe SÓ no dublê: nenhum item do catálogo real
- * o declara (decisão #5 do spec), e sem ele o ramo `classe` de `afinidadeCom`
- * seria inexercitável — a regra estaria escrita e nenhum teste a tocaria. É
- * literalmente a lição do `ITEM_DUAS_MAOS`, cuja ausência deixou 240 testes
- * verdes sobre uma regra quebrada.
+ * Existe SÓ no dublê — nenhum item do catálogo real declara o eixo `classe`, e
+ * sem ele esse ramo de `afinidadeCom` é INEXERCITÁVEL.
  */
 export const ID_DO_ITEM_EXCLUSIVO_DE_CLASSE = 'i-de-classe';
 export const ITEM_EXCLUSIVO_DE_CLASSE = {
   id: ID_DO_ITEM_EXCLUSIVO_DE_CLASSE, nome: 'Item de Classe',
   slot: 'armadura' as const, duasMaos: false,
   modificadores: { vida: 6 },
-  exclusivo: { eixo: 'classe' as const, id: 'c-outra', semAfinidade: { vida: 2 } },
+  exclusivo: { eixo: 'classe' as const, donoId: 'c-outra', semAfinidade: { vida: 2 } },
 };
 
 /**
- * O exclusivo de duas mãos. Sem ele a dedup de `itensSemAfinidade`/
- * `tirarDosSlots` (via `itensEquipados`) seria *inexercitável*, mesma lição do
- * `ITEM_DUAS_MAOS`. Números alinhados com `ITEM_EXCLUSIVO`: nenhum teste os lê
- * isoladamente, e divergir sem motivo só convidaria a pergunta errada depois.
+ * Sem ele a dedup de `itensSemAfinidade`/`tirarDosSlots` é INEXERCITÁVEL —
+ * mesma lição do `ITEM_DUAS_MAOS`.
  */
 export const ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS = 'i-exclusivo-duas-maos';
 export const ITEM_EXCLUSIVO_DUAS_MAOS = {
   id: ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS, nome: 'Item Exclusivo de Duas Mãos',
   slot: 'maoDireita' as const, duasMaos: true,
   modificadores: { forca: 4 },
-  exclusivo: { eixo: 'raca' as const, id: ID_DA_RACA_DONA, semAfinidade: { forca: 1 } },
+  exclusivo: { eixo: 'raca' as const, donoId: ID_DA_RACA_DONA, semAfinidade: { forca: 1 } },
 };
 
 export function catalogoDeTeste(
@@ -191,8 +171,8 @@ export function catalogoDeTeste(
       if (id === ID_DO_MONSTRO_FORTE) return MONSTRO_FORTE;
       return undefined;
     },
-    // Catálogo de teste conhece UMA classe e NOVE itens, pelo mesmo princípio do
-    // monstro: um dublê que aprova qualquer id não é dublê, é a ausência de um.
+    // Só os ids listados, pelo mesmo princípio do monstro: um dublê que aprova
+    // qualquer id não é dublê, é a ausência de um.
     classe: (id) => (id === ID_DA_CLASSE_DE_TESTE ? CLASSE_DE_TESTE : undefined),
     item: (id) => {
       if (id === ID_DO_ITEM_DE_TESTE) return ITEM_DE_TESTE;

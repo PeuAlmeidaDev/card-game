@@ -110,21 +110,16 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
           {evento.de === 'recompor' ? ' segue sem se recompor.' : ' encerra o turno.'}
         </small>
       );
-    // O preço de tirar um item do corpo, que antes acontecia calado. Duas
-    // dimensões, escritas como PREFIXO × SUFIXO em vez de quatro frases: o motivo
-    // diz por que saiu, o destino diz para onde foi, e as duas variam
-    // independentes. Quatro frases escritas à mão seriam quatro lugares para a
-    // regra do destino divergir.
+    // Motivo × destino como PREFIXO × SUFIXO: as duas dimensões variam
+    // independentes, e quatro frases à mão seriam quatro lugares para divergir.
     case 'desequipou': {
       const quem = evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId);
       const item = descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem);
       const porque = evento.motivo === 'trocaDeSlot'
         ? `${quem} tira ${item} do corpo`
         : `${item} não serve à nova especialização de ${quem === 'Você' ? 'você' : quem} e sai do corpo`;
-      // NOMEIA o destino porque a regra é condicional (a mochila se há vaga, o
-      // cemitério se não) — sem dizer qual dos dois foi, o jogador não descobre
-      // que trocar de equipamento com a mochila cheia DESTRÓI uma carta, que é
-      // justamente o que ensina a esvaziá-la antes.
+      // NOMEIA o destino: sem saber qual dos dois foi, o jogador não descobre que
+      // trocar de item com a mochila cheia DESTRÓI uma carta.
       return evento.destino === 'mochila'
         ? `${porque} — vai para a mochila.`
         : `${porque} — a mochila está cheia, e a carta é descartada.`;

@@ -1114,7 +1114,7 @@ describe('TelaMesa — afinidade de itens', () => {
     {
       id: 'machado', nome: 'Machado', slot: 'maoDireita', duasMaos: false,
       modificadores: { forca: 3, habilidade: 1 },
-      exclusivo: { eixo: 'raca', id: 'orc', semAfinidade: { forca: 2 } },
+      exclusivo: { eixo: 'raca', donoId: 'orc', semAfinidade: { forca: 2 } },
     },
   ];
 

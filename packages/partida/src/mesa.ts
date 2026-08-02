@@ -130,11 +130,8 @@ function sairDaParada(
  * `fase.test.ts` afirma para as DUAS — parar em `recompor` sem raça nem
  * equipamento na mão, ou em `jogar` sem equipamento, é violação.
  *
- * O `jogador` vem por parâmetro, não de um `find` aqui dentro: nenhuma regra fixa
- * decide qual versão é a final, e um chamador cujo estado sofre uma mutação
- * DEPOIS de fechar o jogador (`destinoDoDesequipado` movendo um item deslocado
- * para a mochila) precisa reler de `estado`, não passar a versão de antes — senão
- * a fase parada se pula com o jogador ainda tendo o que vestir.
+ * ⚠️ O `jogador` vem por parâmetro porque só o chamador sabe qual versão dele já
+ * é a final; quem mexe no estado DEPOIS de fechá-la precisa reler de `estado`.
  */
 function entrarOuPular(
   estado: EstadoPartida,
@@ -311,11 +308,9 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // a recontagem funcionar, porque o próximo a recontar acha "quinze" e procura
   // um gêmeo na tela que não tem o que ser escrito.
   //
-  // A fatia da afinidade foi de catorze para DEZESSEIS, com os dois pares de
-  // `afinidadeCom` — DUAS linhas e não uma, porque `equiparCarta` é legal nas duas
-  // fases paradas e a convenção é uma linha por par. O spec da afinidade dizia
-  // "uma linha"; agrupar as duas numa célula é o mecanismo exato das três primeiras
-  // mentiras desta tabela.
+  // A fatia da afinidade foi de catorze para DEZESSEIS: os dois pares de
+  // `afinidadeCom` são DUAS linhas e não uma, porque `equiparCarta` é legal nas
+  // duas fases paradas e a convenção é uma linha por par.
   if (!acaoEhLegalNaFase(estado.fase, acao.tipo)) {
     throw new AcaoInvalida(`aplicarAcao: ${acao.tipo} não é legal na fase ${estado.fase}`);
   }
@@ -775,27 +770,17 @@ function entregarCarta(
   );
 }
 
-/**
- * Os itens equipados que a zona ATUAL não aceita mais. Lê `itensEquipados` (que
- * já deduplica por id) em vez de varrer `Object.values(slots)`: a arma de duas
- * mãos ocupa os dois slots com a MESMA instância, e sem a dedup ela iria duas
- * vezes para o cemitério — o baralho de Tesouros CRESCERIA a cada troca de raça.
- *
- * ⚠️ Recebe a zona JÁ atualizada. A pergunta é sobre a raça NOVA (spec §6.2,
- * passo 2); com a zona antiga o grau seria `sem` e nada cairia.
- */
+/** Os itens equipados que a zona já atualizada não aceita mais. */
 function itensSemAfinidade(
-  emJogo: ZonaEmJogo,
+  emJogoAtualizado: ZonaEmJogo,
   catalogo: CatalogoDaMesa,
 ): readonly CartaEquipamento[] {
-  return itensEquipados(emJogo.slots).filter((carta) => {
+  return itensEquipados(emJogoAtualizado.slots).filter((carta) => {
     const info = catalogo.item(carta.itemId);
     if (info === undefined) {
-      // Invariante NOSSA: a carta veio da composição que a borda montou do próprio
-      // catálogo. Error cru => 500 sem vazar, mesma cadeia de `combatenteDe`.
       throw new Error(`itensSemAfinidade: item ${carta.itemId} não está no catálogo`);
     }
-    return afinidadeCom(info, emJogo) === 'proibida';
+    return afinidadeCom(info, emJogoAtualizado) === 'proibida';
   });
 }
 
@@ -807,10 +792,8 @@ function tirarDosSlots(
   if (cartas.length === 0) return slots;
   const ids = new Set(cartas.map((c) => c.id));
   const novos: Record<Slot, CartaEquipamento | null> = { ...slots };
-  // As chaves saem de `SLOTS_VAZIOS`, que é `Record<Slot, …>` — o cast é sobre um
-  // objeto cujo tipo garante exatamente estas chaves. Escrever a lista de slots à
-  // mão aqui seria a cópia que fica para trás quando o sexto nascer, que é o
-  // motivo de `SLOTS_VAZIOS` existir.
+  // As chaves saem de `SLOTS_VAZIOS` (um `Record<Slot, …>`) para não haver uma
+  // segunda lista de slots escrita à mão.
   for (const slot of Object.keys(SLOTS_VAZIOS) as readonly Slot[]) {
     const ocupante = novos[slot];
     if (ocupante !== null && ids.has(ocupante.id)) novos[slot] = null;
@@ -842,15 +825,8 @@ function tirarDosSlots(
  * Em `descartar` sobra só `entregarCarta`: `equiparCarta` saiu junto, para as duas
  * fases paradas que acontecem ANTES da cobrança do excedente.
  *
- * Desde a fatia da afinidade, trocar de raça **derruba** o item que ficou
- * proibido (decisão #4 do spec): ele vai para a mochila se houver vaga, para o
- * cemitério de Tesouros se não — `destinoDoDesequipado` como ele já era, sem
- * regra nova. Isso dá peso à troca de raça, que até aqui era quase gratuita.
- *
- * As alternativas foram recusadas com motivo: deixar o item valendo o reduzido
- * exigiria uma TERCEIRA categoria de valor (quem tem a raça errada não é "quem
- * não tem raça"), e bloquear a troca faria a carta de raça às vezes não poder ser
- * jogada, espalhando a regra até o `faseSeAutoPula`.
+ * Trocar de raça DERRUBA o item que ficou proibido, por `destinoDoDesequipado`
+ * como ele já era — mochila se houver vaga, cemitério de Tesouros se não.
  */
 function jogarCarta(
   estado: EstadoPartida,
@@ -867,12 +843,8 @@ function jogarCarta(
   }
 
   const anterior = jogador.emJogo.raca;
-  // PASSO 1 do spec §6.2: a raça nova entra na zona ANTES de qualquer pergunta
-  // sobre afinidade.
   const comRacaNova: ZonaEmJogo = { ...jogador.emJogo, raca: carta };
-  // PASSO 2: a pergunta, com a zona JÁ atualizada.
   const perdidos = itensSemAfinidade(comRacaNova, deps.catalogo);
-  // PASSO 3: os proibidos saem dos slots (já deduplicados por `itensEquipados`).
   const atualizado: JogadorNaMesa = {
     ...jogador,
     mao: jogador.mao.filter((c) => c.id !== carta.id),
@@ -887,17 +859,12 @@ function jogarCarta(
       cemiterio: anterior === null ? estado.portas.cemiterio : [...estado.portas.cemiterio, anterior],
     },
   };
-  // PASSO 4: só então o destino, que lê a mochila e emite os eventos — um por
-  // item e na ordem, porque a mochila pode caber só um de dois.
   const { estado: base, eventos: doDeslocado } =
     destinoDoDesequipado(comJogador, perdidos, acao.jogadorId, 'perdeuAfinidade');
 
   return entrarOuPular(
     base,
-    // ⚠️ RELÊ de `base`; não passa `atualizado`. `destinoDoDesequipado` (acima)
-    // pode ter posto o item derrubado na mochila DELE depois que `atualizado` foi
-    // fechado — passar `atualizado` pularia a fase parada com o item ainda
-    // dentro da mochila para vestir.
+    // ⚠️ RELÊ de `base`: `destinoDoDesequipado` pode ter mexido na mochila dele.
     base.jogadores.find((j) => j.id === acao.jogadorId) ?? atualizado,
     // `recompor` fixo, e não `estado.fase`: a tabela só declara `jogarCarta` legal
     // aqui. Um dia em que ela declarar noutra fase, este literal é a linha que
@@ -935,15 +902,6 @@ function equiparCarta(
   if (info === undefined) {
     throw new Error(`equiparCarta: item ${carta.itemId} não está no catálogo`);
   }
-  // Especialização ERRADA: você não veste. Não é o mesmo que "não tem
-  // especialização" — quem está sem raça veste reduzido (decisão #1 do spec), e é
-  // `afinidadeCom` quem separa os dois casos. Pedido do cliente que a regra
-  // recusa => AcaoInvalida (400), nunca Error cru.
-  //
-  // ⚠️ A zona conferida é a de ANTES de equipar (`jogador.emJogo`), que é a certa:
-  // equipar não muda raça nem classe, então a resposta é a mesma antes e depois.
-  // A ordem só importa no caminho inverso — a troca de raça —, e lá ela é a
-  // armadilha da Task 6.
   if (afinidadeCom(info, jogador.emJogo) === 'proibida') {
     throw new AcaoInvalida(`aplicarAcao: ${info.nome} é exclusivo de outra especialização`);
   }
@@ -987,10 +945,7 @@ function equiparCarta(
 
   return entrarOuPular(
     base,
-    // ⚠️ RELÊ de `base`; não passa `atualizado`. `destinoDoDesequipado` (acima)
-    // pode ter posto o item na mochila DESTE jogador depois que `atualizado` foi
-    // fechado — passar `atualizado` pularia a fase parada com o deslocado ainda
-    // dentro dela para vestir.
+    // ⚠️ RELÊ de `base`: `destinoDoDesequipado` pode ter mexido na mochila dele.
     base.jogadores.find((j) => j.id === acao.jogadorId) ?? atualizado,
     // A fase de ORIGEM, não um literal: equipar é legal em `recompor` e em
     // `jogar`, e o jogador tem que continuar onde estava. Fixar `recompor` aqui

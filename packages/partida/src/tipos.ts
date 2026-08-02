@@ -79,16 +79,10 @@ export type EixoDeAfinidade = 'raca' | 'classe';
  * A quem um item pertence, do ponto de vista da MESA. `ItemCarta` (pacote
  * `cartas`) satisfaz este contrato estruturalmente — é o que dispensa qualquer
  * import de `cartas` aqui.
- *
- * ⚠️ `id` é o id de uma RAÇA ou de uma CLASSE do catálogo, e `partida` nunca o
- * compara com um literal: quem responde a pergunta é `afinidadeCom` (em
- * `./corpo`), confrontando este campo com `emJogo.raca?.racaId`. Nenhum id de
- * conteúdo entra no domínio.
  */
 export interface Afinidade {
   readonly eixo: EixoDeAfinidade;
-  readonly id: string;
-  /** O que o item rende para quem NÃO tem o eixo em jogo (spec §4, decisão #3). */
+  readonly donoId: string;
   readonly semAfinidade: ModificadoresDeStat;
 }
 
@@ -101,11 +95,7 @@ export interface Afinidade {
 export interface InfoItem extends Equipamento {
   readonly slot: Slot;
   readonly duasMaos: boolean;
-  /**
-   * `null` = item comum. Viaja até aqui porque `partida` recebe o item por
-   * `CatalogoDaMesa.item()` e é ELE quem tem que responder a afinidade — sem o
-   * campo, a regra teria que morar na borda, que é onde ela não pode morar.
-   */
+  /** `null` = item comum. */
   readonly exclusivo: Afinidade | null;
 }
 
@@ -391,12 +381,6 @@ export type EventoDaMesa =
    * ser DESTRUÍDA — acontece calada. É o único ponto do jogo em que uma carta some
    * sem ninguém pedir, e é justamente o que ensina "esvazie a mochila antes de
    * trocar de equipamento".
-   *
-   * `motivo` existe porque desde a fatia da afinidade um item sai do corpo por
-   * DUAS razões diferentes — a troca de equipamento, que o jogador pediu, e a
-   * perda de afinidade, que ele causou sem pedir ao jogar outra raça. Sem o campo
-   * as duas ficam indistinguíveis no log, e a segunda é justamente a que o jogador
-   * não liga à própria jogada.
    *
    * UM evento por item deslocado, na ordem em que `destinoDoDesequipado` os
    * resolve: um montante por cima de duas armas de uma mão desloca DOIS itens e a

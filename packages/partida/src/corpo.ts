@@ -29,25 +29,12 @@ export function itensEquipados(slots: ZonaEmJogo['slots']): readonly CartaEquipa
 }
 
 /**
- * Quanto deste item é seu. TRÊS respostas, não duas (decisão #1 do spec da
- * afinidade): `plena` (o valor cheio), `sem` (o valor reduzido que a carta
- * declara) e `proibida` (você tem a especialização ERRADA e não veste).
+ * `plena` = o valor cheio; `sem` = o valor reduzido que a carta declara;
+ * `proibida` = você tem a especialização ERRADA e não veste.
  */
 export type GrauDeAfinidade = 'plena' | 'sem' | 'proibida';
 
-/**
- * O que a zona tem NO EIXO perguntado, ou `null` se nada.
- *
- * O ramo `classe` devolve `null` e isso NÃO é um buraco: `ZonaEmJogo` não tem
- * campo `classe` nesta fatia, então ninguém tem classe em jogo, e pelo princípio
- * da decisão #2 do spec ("quem não tem X usa os exclusivos de X") todos são "quem
- * não tem X". A regra está funcionando contra a zona que existe. Quando
- * `emJogo.classe` nascer na fatia da classe, este ramo passa a ler de verdade e
- * NENHUM consumidor muda — quem afirma isso hoje é o teste do `corpo.test.ts`.
- *
- * `switch` fechado por `never`: eixo novo na união quebra a compilação DESTE
- * arquivo, que é o único lugar que traduz eixo em campo da zona.
- */
+/** O que a zona tem NO EIXO perguntado, ou `null` se nada. */
 function idNoEixo(eixo: EixoDeAfinidade, emJogo: ZonaEmJogo): string | null {
   switch (eixo) {
     case 'raca':
@@ -61,55 +48,27 @@ function idNoEixo(eixo: EixoDeAfinidade, emJogo: ZonaEmJogo): string | null {
   }
 }
 
-/**
- * **A pergunta, num ponto único.** TRÊS leitores dependem dela — `combatenteDe`
- * (quanto soma), `equiparCarta` (pode?) e o `bot` (vale a pena? é legal?) — e a
- * tela a lê pelo re-export de `shared`, nunca por cópia. Se cada um respondesse
- * por conta própria seria a quinta cópia de regra que este projeto pagou para
- * desfazer, e a que divergisse acenderia um botão que só serve para levar 400.
- *
- * ⚠️ `partida` continua CEGO ao catálogo: compara `info.exclusivo.id` com
- * `emJogo.raca?.racaId`, nunca com `'orc'` escrito à mão. Nenhum id de conteúdo
- * entra no domínio.
- */
+/** A pergunta da afinidade, num ponto ÚNICO — reducer, bot e tela leem daqui. */
 export function afinidadeCom(info: InfoItem, emJogo: ZonaEmJogo): GrauDeAfinidade {
   const exclusivo = info.exclusivo;
-  // Item comum: todo mundo veste cheio. É a primeira linha da tabela do spec §5.
   if (exclusivo === null) return 'plena';
 
   const meu = idNoEixo(exclusivo.eixo, emJogo);
-  // Sem nada no eixo = "quem não tem X" (decisão #2): veste, reduzido.
   if (meu === null) return 'sem';
-  return meu === exclusivo.id ? 'plena' : 'proibida';
+  return meu === exclusivo.donoId ? 'plena' : 'proibida';
 }
 
-/**
- * O que este item soma PARA ESTE CORPO — cheio ou reduzido. É por aqui que a
- * afinidade vira número, e é o único ponto que traduz `GrauDeAfinidade` em
- * modificadores.
- *
- * Devolve `Equipamento` (o contrato que `montarCombatente` consome), não um
- * número: o cálculo dos 4 stats continua inteiro no `personagem`, com o `PISO`
- * dele. Somar aqui seria a segunda cópia de `montarCombatente` — a mesma que a
- * auditoria de 2026-07-31 achou no `calcularPreview` do cliente.
- */
+/** O que este item soma PARA ESTE CORPO — cheio ou reduzido. */
 export function contribuicaoDe(info: InfoItem, emJogo: ZonaEmJogo): Equipamento {
   const grau = afinidadeCom(info, emJogo);
   switch (grau) {
     case 'plena':
       return info;
     case 'sem':
-      // `sem` só sai de item EXCLUSIVO — o comum responde `plena` na primeira
-      // linha de `afinidadeCom`. O teste de `null` aqui é o narrowing que o
-      // compilador exige, NÃO uma segunda leitura da regra: com
-      // `exclusivo === null` o grau nunca teria sido `sem`, e os dois lados do
-      // ternário devolveriam o mesmo `info`.
+      // O teste de `null` é o narrowing que o compilador exige, não uma segunda
+      // leitura da regra: `sem` só sai de item exclusivo.
       return info.exclusivo === null ? info : { ...info, modificadores: info.exclusivo.semAfinidade };
     case 'proibida':
-      // Item proibido NO CORPO é invariante NOSSA quebrada: `equiparCarta` recusa
-      // e `jogarCarta` derruba na troca de raça. `Error` cru => 500 sem vazar,
-      // nunca `AcaoInvalida` — ninguém pediu isto agora, então não há pedido a
-      // recusar. Mesma cadeia do id que o catálogo não conhece.
       throw new Error(`contribuicaoDe: item ${info.id} está no corpo e é proibido para esta zona`);
     default: {
       const naoTratado: never = grau;
@@ -142,10 +101,6 @@ export function combatenteDe(jogador: JogadorNaMesa, catalogo: CatalogoDaMesa): 
     if (info === undefined) {
       throw new Error(`combatenteDe: item ${carta.itemId} não está no catálogo`);
     }
-    // A contribuição EFETIVA, não o item cru: o mesmo item rende diferente
-    // conforme quem o veste (spec §5). Entregar `info` aqui somaria o cheio para
-    // todo mundo, e a fatia inteira ficaria sem efeito no único lugar em que ela
-    // vira stat.
     return contribuicaoDe(info, jogador.emJogo);
   });
   return { ...montarCombatente(classe, itens), level: jogador.patente };

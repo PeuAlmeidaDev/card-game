@@ -84,7 +84,7 @@ describe('exclusividade', () => {
     // são 4 sacáveis, não 5, e a #54 do bible existe porque três decisões erraram
     // exatamente isto. O Humano fica de fora porque ele É a ausência — um item
     // dele seria um item que só quem não tem raça veste cheio, invertendo a regra.
-    const donos = ITENS.flatMap((i) => (i.exclusivo?.eixo === 'raca' ? [i.exclusivo.id] : []));
+    const donos = ITENS.flatMap((i) => (i.exclusivo?.eixo === 'raca' ? [i.exclusivo.donoId] : []));
     expect([...donos].sort()).toEqual(RACAS_SACAVEIS.map((r) => r.id).sort());
   });
 
