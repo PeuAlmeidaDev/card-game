@@ -421,6 +421,29 @@ describe('aplicarAcao — queimarCarta', () => {
     expect(r2.estado.tesouros.cemiterio.map((c) => c.id)).toEqual(['t-a', 't-b']);
   });
 
+  it('queimar da MOCHILA abre a vaga: o deslocado entra e a escolhida vai ao cemitério', () => {
+    // O SEGUNDO ramo do verbo. Sem este teste, a Task 2 entregaria comportamento
+    // sem cobertura e a Task 3 (o evento) teria que testá-lo retroativamente —
+    // teste escrito depois do código, que é o que o TDD deste projeto proíbe.
+    const mochila = [
+      equipamento('t-alvo'),
+      ...Array.from({ length: LIMITE_MOCHILA - 1 }, (_, i) => equipamento(`t-resto-${String(i)}`)),
+    ];
+    const p = comQueima([equipamento('t-saiu')], mochila);
+
+    const r = aplicarAcao(p, { tipo: 'queimarCarta', jogadorId: 'p1', cartaId: 't-alvo' }, deps([]));
+
+    const depois = jogadorDe(r.estado, 'p1').mochila.map((c) => c.id);
+    expect(depois).toHaveLength(LIMITE_MOCHILA);
+    expect(depois).toContain('t-saiu');
+    expect(depois).not.toContain('t-alvo');
+    expect(r.estado.tesouros.cemiterio.map((c) => c.id)).toEqual(['t-alvo']);
+    // O `desequipou` do deslocado diz `mochila`, não `cemiterio`: ele SOBREVIVEU.
+    expect(r.eventos).toEqual([
+      { tipo: 'desequipou', jogadorId: 'p1', carta: equipamento('t-saiu'), destino: 'mochila', motivo: 'trocaDeSlot' },
+    ]);
+  });
+
   it('com a pendência aberta, NENHUMA outra ação passa', () => {
     const p = comQueima([equipamento('t-saiu')]);
 
@@ -642,22 +665,6 @@ silêncio.
 No describe `aplicarAcao — queimarCarta` (Task 2), acrescente:
 
 ```ts
-  it('queimar da MOCHILA abre a vaga: o deslocado entra e a escolhida vai ao cemitério', () => {
-    const mochila = [
-      equipamento('t-alvo'),
-      ...Array.from({ length: LIMITE_MOCHILA - 1 }, (_, i) => equipamento(`t-resto-${String(i)}`)),
-    ];
-    const p = comQueima([equipamento('t-saiu')], mochila);
-
-    const r = aplicarAcao(p, { tipo: 'queimarCarta', jogadorId: 'p1', cartaId: 't-alvo' }, deps([]));
-
-    const depois = jogadorDe(r.estado, 'p1').mochila.map((c) => c.id);
-    expect(depois).toHaveLength(LIMITE_MOCHILA);
-    expect(depois).toContain('t-saiu');
-    expect(depois).not.toContain('t-alvo');
-    expect(r.estado.tesouros.cemiterio.map((c) => c.id)).toEqual(['t-alvo']);
-  });
-
   it('a carta queimada da mochila ganha linha de log própria', () => {
     // Sem este evento a carta DESTRUÍDA some calada: o `desequipou` fala do item
     // que saiu do corpo (que foi para a mochila, destino benigno), e nada conta
@@ -676,23 +683,22 @@ No describe `aplicarAcao — queimarCarta` (Task 2), acrescente:
     ]);
   });
 
-  it('queimar o DESLOCADO não emite `queimou` — o desequipou já conta tudo', () => {
-    // Sem esta asserção, um `queimou` incondicional diria a mesma coisa duas
-    // vezes no caso mais comum.
-    const p = comQueima([equipamento('t-saiu')]);
-
-    const r = aplicarAcao(p, { tipo: 'queimarCarta', jogadorId: 'p1', cartaId: 't-saiu' }, deps([]));
-
-    expect(r.eventos.some((e) => e.tipo === 'queimou')).toBe(false);
-  });
 ```
+
+⚠️ **Um teste que você NÃO vai escrever, e o motivo importa:** *"queimar o deslocado não emite
+`queimou`"* seria **verde e vazio** antes desta task (o evento nem existe) e continuaria verde
+depois — o padrão *"teste de ausência virado vácuo"* que este projeto cataloga. O que já proíbe um
+`queimou` espúrio é o `toEqual` sobre o array **exato** de eventos nos dois testes de queima do
+deslocado (Task 2): array a mais reprova.
 
 - [ ] **Step 2: Rodar e ver falhar**
 
 Run: `pnpm --filter @card-dungeon/partida test mesa`
-Expected: FAIL — 1 teste (o do log próprio) falha; os outros dois já passam desde a Task 2.
+Expected: FAIL — **exatamente 1 teste**, o do log próprio.
 
-⚠️ Se **três** falharem, o ramo da mochila da Task 2 está errado — pare e conserte lá.
+⚠️ Se falhar **mais de um**, o ramo da mochila da Task 2 está errado — pare e conserte lá antes de
+seguir. O comportamento (a vaga abrindo, o cemitério recebendo) já foi entregue **e coberto** na
+Task 2; esta task acrescenta só a linha de log.
 
 - [ ] **Step 3: Declarar o evento em `tipos.ts`**
 
