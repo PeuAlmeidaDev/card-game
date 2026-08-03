@@ -751,6 +751,13 @@ mesa e o dev server no ar. ⚠️ **Isto NÃO é o gate tendo passado** — é o
 para este merge**, e a diferença importa: o gate pegou, **duas vezes seguidas**, o que dezenas de
 revisões e 500 testes não pegaram.
 
+✅ **ATUALIZAÇÃO 2026-08-03: o Pedro jogou e disse *"já testei o game, funcionou"*.** ⚠️ **Isso é
+conferência em partida real, NÃO o roteiro item a item** — os 5 itens da Task 11 não foram
+percorridos um a um, e três deles exigem cenário montado (raça já em jogo, exclusivo alheio na
+mão). Escrito assim de propósito: *"o Pedro conferiu"* e *"o roteiro passou"* são afirmações
+diferentes, e colapsá-las é a família de erro que este arquivo cataloga. **A fatia segue em pé**;
+o roteiro fica disponível para quem quiser fechá-lo item a item.
+
 ➡️ **O roteiro continua válido e agora roda contra a `main`** (Task 11 do plano, 5 itens). O que ele
 achar vira **fix em cima da `main`**, não revert. ⚠️ **Se alguém for rodá-lo, a ordem eficiente NÃO
 é a do plano:** três dos cinco itens exigem uma raça já em jogo. Ordem prática — (5) o contador de
@@ -955,8 +962,9 @@ contando a evolução da contagem desde o Plano 3b) **é** candidato — o `git 
 
 ### O que fica ABERTO ao sair desta fatia
 
-- 🔴 **O gate ocular do Pedro** — **DISPENSADO para o merge**, não cumprido. Roteiro na Task 11 do
-  plano e a ordem prática logo acima; roda contra a `main` e o que achar vira fix, não revert.
+- ⚠️ **O gate ocular do Pedro** — **DISPENSADO para o merge**. Em **2026-08-03** ele jogou e
+  reportou *"funcionou"*: é conferência real, mas **não** o roteiro item a item. Roteiro na Task 11
+  do plano e a ordem prática logo acima; roda contra a `main` e o que achar vira fix, não revert.
   ✅ A **revisão ampla do branch** foi feita (veredicto *"pronto com ressalvas"*, zero Critical) e as
   ressalvas viraram a leva final: dois testes que fecharam pares finos que **280/280 e 145/145
   verdes escondiam**, mais um comentário que já nascia mentindo.
@@ -972,7 +980,9 @@ contando a evolução da contagem desde o Plano 3b) **é** candidato — o `git 
   desta fatia o exibem de novo (`#0 · #1 · #2 · #3` = 105·68·42·25 · 92·70·50·28 · 82·66·57·35 ·
   105·65·35·35, N=240 cada). 🔴 **Nada aqui diz que esta fatia o causou, aumentou ou diminuiu.**
 - **Próxima fatia: `escolha do descarte`** (#59/#61) — traz a **terceira pendência do jogo**: estado
-  novo, verbo novo, e o bot obrigado a saber respondê-la.
+  novo, verbo novo, e o bot obrigado a saber respondê-la. ✅ **Spec escrito em 2026-08-03**
+  (`docs/superpowers/specs/2026-08-03-escolha-do-descarte-design.md`); a forma está nas decisões
+  **#80–#84** do bible. Nenhuma linha de código ainda.
 
 ## Stack (alvo)
 
