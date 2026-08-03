@@ -469,6 +469,24 @@ export interface CombateNaMesa {
 }
 
 /**
+ * O que saiu do corpo e ainda não tem destino, porque a mochila está cheia. O
+ * jogador escolhe entre queimar o primeiro da fila ou abrir vaga queimando uma
+ * carta da mochila (decisão #59 do game bible).
+ *
+ * Zona ABERTA: viaja inteira na projeção, para todos. A `espiada` é secreta pela
+ * ZONA dela (o topo do baralho), não por ser pendência.
+ */
+export interface QueimaPendente {
+  readonly jogadorId: string;
+  /**
+   * A fila. O PRIMEIRO é o que a escolha de agora resolve — tupla não-vazia para
+   * que "pendência aberta sem carta a resolver" não seja representável.
+   */
+  readonly deslocados: readonly [CartaEquipamento, ...CartaEquipamento[]];
+  readonly motivo: Extract<EventoDaMesa, { readonly tipo: 'desequipou' }>['motivo'];
+}
+
+/**
  * Topo do baralho revelado APENAS ao vidente (Presciência do Elfo), aguardando a
  * decisão manter/empurrar. `jogadorId` = de quem é a espiada (sempre o da vez);
  * explícito para a projeção mostrar a carta só a ele.
@@ -522,6 +540,7 @@ export interface EstadoPartida {
   readonly tesouros: Baralho<CartaTesouro>;
   readonly combate: CombateNaMesa | null;
   readonly espiada: EspiadaPendente | null;
+  readonly queima: QueimaPendente | null;
   /**
    * Onde o turno está. Só é significativa com `desfecho === 'emAndamento'`: a
    * partida terminada não tem turno, e o guard do topo do `aplicarAcao` recusa
@@ -558,6 +577,8 @@ export interface VistaDaPartida {
   readonly combate: CombateNaMesa | null;
   /** A carta espiada, presente SÓ na vista do dono da espiada. `null` para os outros. */
   readonly espiada: EspiadaPendente | null;
+  /** A queima pendente de QUEM ESTÁ NA VEZ. Pública: as duas pontas dela são zonas abertas. */
+  readonly queima: QueimaPendente | null;
   /**
    * Em que ponto do turno a mesa está. PÚBLICA: é regra, não segredo — a mesma
    * decisão do `limiteDeMao`, que já é publicado por jogador. É daqui que o

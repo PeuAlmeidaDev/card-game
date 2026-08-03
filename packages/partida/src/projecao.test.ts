@@ -7,7 +7,7 @@ import { AcaoInvalida } from './erros';
 import { filaDeDados } from './testes/dados';
 import { raca, equipamento } from './testes/cartas';
 import { catalogoDeTeste, ID_DA_CLASSE_DE_TESTE } from './testes/catalogo';
-import type { EntradaJogador, CartaTesouro } from './tipos';
+import type { EntradaJogador, CartaTesouro, EstadoPartida } from './tipos';
 
 /**
  * A projeção agora precisa do catálogo: `JogadorPublico.combatente` é calculado
@@ -47,6 +47,24 @@ describe('projetarPara', () => {
     // O segundo baralho segue a MESMA regra de contagem pública — nada saca dele
     // ainda, mas a vista já precisa saber que ele existe.
     expect(vista.tesourosNoMonte).toBe(COMPOSICAO_TESOURO_DE_TESTE.length * 2);
+  });
+
+  it('a queima pendente é PÚBLICA — vai inteira para quem não é o dono', () => {
+    // Assimetria deliberada com a `espiada`, que a projeção entrega só ao dono
+    // (decisão #82 do bible): quem decide é a ZONA, e slot e mochila são abertas.
+    // Sem esta asserção, alguém "consertaria" a projeção por simetria com a
+    // espiada e ninguém notaria — a mesa perderia o único aviso de que o jogador
+    // da vez está parado escolhendo.
+    const saiu = equipamento('t-9');
+    const comQueima: EstadoPartida = {
+      ...partida,
+      queima: { jogadorId: 'p1', deslocados: [saiu], motivo: 'trocaDeSlot' },
+    };
+
+    const vistaDoOutro = projetarPara('p2', comQueima, catalogoPadrao);
+
+    expect(vistaDoOutro.queima?.jogadorId).toBe('p1');
+    expect(vistaDoOutro.queima?.deslocados).toEqual([saiu]);
   });
 
   it('continua sem expor o monte depois de uma porta revelada', () => {

@@ -28,6 +28,7 @@ const vistaBase: VistaDaPartida = {
   tesourosNoMonte: 0,
   combate: null,
   espiada: null,
+  queima: null,
   fase: 'vasculhar',
   desfecho: 'emAndamento',
   classificacao: null,

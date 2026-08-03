@@ -22,6 +22,7 @@ import type {
   GrauDeAfinidade,
   JogadorPublico,
   PosicaoFinal,
+  QueimaPendente,
   Slot,
   VistaDaPartida,
   ZonaEmJogo,
@@ -280,6 +281,7 @@ export type {
   CartaTesouro,
   CartaEquipamento,
   EspiadaPendente,
+  QueimaPendente,
   Fase,
   // O vocabulário do corpo. `Slot` sai de `partida` (a regra) e `ItemCarta` de
   // `cartas` (o dado) — o `_CoberturaSlot` acima é quem garante que as duas

@@ -122,6 +122,7 @@ export function criarPartida(
     tesouros: { monte: monteTesouros, cemiterio: [] },
     combate: null,
     espiada: null,
+    queima: null,
     // CALCULADA, nunca a constante `'vasculhar'`: `MAO_INICIAL_PADRAO` e
     // `LIMITE_BASE_DE_MAO` são dials que o spec §8 diz que vão subir, e um mal
     // girado faria a mesa nascer estourada. Nesse caso a fase certa é `descartar`

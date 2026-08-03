@@ -65,6 +65,7 @@ export function projetarPara(
     combate: estado.combate,
     // Segredo do vidente: a carta espiada só aparece na vista de quem está com ela.
     espiada: estado.espiada && estado.espiada.jogadorId === jogadorId ? estado.espiada : null,
+    queima: estado.queima,
     fase: estado.fase,
     desfecho: estado.desfecho,
     classificacao: estado.classificacao,
