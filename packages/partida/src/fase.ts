@@ -58,6 +58,22 @@ export function acaoEhLegalNaFase(fase: Fase, tipo: AcaoDaMesa['tipo']): boolean
 }
 
 /**
+ * A ação cabe AGORA? Gate único do reducer e da tela.
+ *
+ * A queima pendente vem como booleano, e não como o objeto: quem responde
+ * legalidade não tem por que conhecer a forma da pendência, e o cliente já sabe
+ * dizer se tem uma.
+ */
+export function acaoEhLegal(
+  fase: Fase,
+  queimaPendente: boolean,
+  tipo: AcaoDaMesa['tipo'],
+): boolean {
+  if (queimaPendente) return tipo === 'queimarCarta';
+  return acaoEhLegalNaFase(fase, tipo);
+}
+
+/**
  * A fase se auto-pula? (spec §6.1) — `true` quando a ÚNICA ação legal nela é
  * `passar`, isto é, quando a fase não tem nada a oferecer a este jogador.
  *

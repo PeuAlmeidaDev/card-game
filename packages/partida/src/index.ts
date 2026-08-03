@@ -18,4 +18,4 @@ export type { DepsMesa, ResultadoAcao } from './mesa';
 export { AcaoInvalida } from './erros';
 export { classificar } from './classificacao';
 export { projetarPara, versaoDe } from './projecao';
-export { acaoEhLegalNaFase } from './fase';
+export { acaoEhLegal } from './fase';

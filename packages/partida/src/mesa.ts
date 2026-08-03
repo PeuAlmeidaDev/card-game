@@ -2,7 +2,8 @@ import type { Combatente, Passo, RolarD12, PassivaCombate } from '@card-dungeon/
 import { AcaoIlegal, criarCombate, proximoPasso } from '@card-dungeon/motor';
 import type {
   AcaoDaMesa, Carta, CartaEquipamento, CartaPorta, CartaTesouro, CatalogoDaMesa, Embaralhar,
-  EstadoPartida, EventoDaMesa, Fase, FaseParada, InfoRaca, JogadorNaMesa, Slot, ZonaEmJogo,
+  EstadoPartida, EventoDaMesa, Fase, FaseParada, InfoRaca, JogadorNaMesa, QueimaPendente, Slot,
+  ZonaEmJogo,
 } from './tipos';
 import { tirarDoTopo } from './baralho';
 import { LIMITE_MOCHILA } from './mao';
@@ -11,7 +12,7 @@ import { afinidadeCom, combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corp
 import { colocarNoSlot, destinoDoDesequipado } from './equipar';
 import { classificar } from './classificacao';
 import { AcaoInvalida } from './erros';
-import { acaoEhLegalNaFase, faseDoTurnoDe, faseSeAutoPula } from './fase';
+import { acaoEhLegal, faseDoTurnoDe, faseSeAutoPula } from './fase';
 
 /** As ações que só fazem sentido com um combate aberto. */
 type AcaoDeCombate = Extract<AcaoDaMesa, { readonly tipo: 'atacar' | 'esquivar' }>;
@@ -311,8 +312,12 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // A fatia da afinidade foi de catorze para DEZESSEIS: os dois pares de
   // `afinidadeCom` são DUAS linhas e não uma, porque `equiparCarta` é legal nas
   // duas fases paradas e a convenção é uma linha por par.
-  if (!acaoEhLegalNaFase(estado.fase, acao.tipo)) {
-    throw new AcaoInvalida(`aplicarAcao: ${acao.tipo} não é legal na fase ${estado.fase}`);
+  if (!acaoEhLegal(estado.fase, estado.queima !== null, acao.tipo)) {
+    throw new AcaoInvalida(
+      estado.queima === null
+        ? `aplicarAcao: ${acao.tipo} não é legal na fase ${estado.fase}`
+        : `aplicarAcao: há uma queima pendente — só queimarCarta é legal`,
+    );
   }
 
   if (acao.tipo === 'vasculhar') {
@@ -360,6 +365,10 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
 
   if (acao.tipo === 'procurarEncrenca') {
     return procurarEncrenca(estado, acao.jogadorId, acao.cartaId, deps);
+  }
+
+  if (acao.tipo === 'queimarCarta') {
+    return queimarCarta(estado, acao);
   }
 
   // Exaustividade: a cadeia de `if` acima cobre TODO `AcaoDaMesa['tipo']` de hoje
@@ -993,6 +1002,74 @@ function guardarCarta(
   return entrarOuPular(base, atualizado, estado.fase, [
     { tipo: 'guardou', jogadorId: acao.jogadorId, carta },
   ]);
+}
+
+/**
+ * Resolve UMA carta da fila de queima: a escolhida vai ao cemitério de Tesouros.
+ *
+ * Escolher o deslocado o destrói e deixa a mochila intocada; escolher uma da
+ * mochila abre a vaga em que o deslocado entra. Nos dois casos sai exatamente uma
+ * carta, e o jogador termina com a mochila cheia.
+ */
+function queimarCarta(
+  estado: EstadoPartida,
+  acao: Extract<AcaoDaMesa, { readonly tipo: 'queimarCarta' }>,
+): ResultadoAcao {
+  const queima = estado.queima;
+  if (queima === null) {
+    // Inalcançável pelo gate. Invariante NOSSA quebrada => Error cru, 500.
+    throw new Error('queimarCarta: não há queima pendente');
+  }
+  const [deslocado, ...restantes] = queima.deslocados;
+  const jogador = estado.jogadores.find((j) => j.id === acao.jogadorId);
+  if (jogador === undefined) {
+    throw new Error(`queimarCarta: jogador ${acao.jogadorId} não está na mesa`);
+  }
+
+  const daMochila = jogador.mochila.find((c) => c.id === acao.cartaId);
+  const queimaODeslocado = acao.cartaId === deslocado.id;
+  if (!queimaODeslocado && daMochila === undefined) {
+    throw new AcaoInvalida('aplicarAcao: essa carta não está entre as que podem ser queimadas');
+  }
+
+  const queimada: CartaTesouro | undefined = queimaODeslocado ? deslocado : daMochila;
+  if (queimada === undefined) {
+    // Inalcançável: o guard acima já recusou `cartaId` que não é nem o deslocado
+    // nem uma carta da mochila. O TS não estreita `daMochila` através do ternário,
+    // e um `??` aqui inventaria um fallback que a regra não tem.
+    throw new Error('queimarCarta: escolha sem carta — o guard acima deveria ter recusado');
+  }
+  const mochila = queimaODeslocado
+    ? jogador.mochila
+    : [...jogador.mochila.filter((c) => c.id !== queimada.id), deslocado];
+
+  const atualizado: JogadorNaMesa = { ...jogador, mochila };
+  const eventos: readonly EventoDaMesa[] = [
+    {
+      tipo: 'desequipou', jogadorId: acao.jogadorId, carta: deslocado,
+      destino: queimaODeslocado ? 'cemiterio' : 'mochila', motivo: queima.motivo,
+    },
+  ];
+
+  const [proximo, ...resto] = restantes;
+  const proxima: QueimaPendente | null =
+    proximo === undefined ? null : { ...queima, deslocados: [proximo, ...resto] };
+
+  const base: EstadoPartida = {
+    ...estado,
+    jogadores: estado.jogadores.map((j) => (j.id === atualizado.id ? atualizado : j)),
+    tesouros: { ...estado.tesouros, cemiterio: [...estado.tesouros.cemiterio, queimada] },
+    queima: proxima,
+  };
+
+  if (proxima !== null) return registrar(base, eventos);
+
+  if (!ehFaseParada(estado.fase)) {
+    // A pendência só nasce dentro de `recompor` e `jogar` — desequipar não
+    // acontece em fase nenhuma além dessas duas. Invariante NOSSA => Error cru.
+    throw new Error(`queimarCarta: fase não-parada ${estado.fase}`);
+  }
+  return entrarOuPular(base, atualizado, estado.fase, eventos);
 }
 
 function agirNoCombate(estado: EstadoPartida, acao: AcaoDeCombate, deps: DepsMesa): ResultadoAcao {

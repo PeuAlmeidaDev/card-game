@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api } from './api';
 import { PainelLog } from './PainelLog';
 import { descreverCarta } from './descreverCarta';
-import { acaoEhLegalNaFase, afinidadeCom, LIMITE_MOCHILA } from '@card-dungeon/shared';
+import { acaoEhLegal, afinidadeCom, LIMITE_MOCHILA } from '@card-dungeon/shared';
 import type { AcaoDaMesa, AcaoNoFio, Catalogo, Escolhas, Fase, ItemCarta, Slot, VistaDaPartida } from '@card-dungeon/shared';
 import { rotuloDeAfinidade } from './rotuloDeAfinidade';
 
@@ -156,7 +156,8 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
   // "Atacar"/"Esquivar". A lista completa dos pares está no comentário do
   // `aplicarAcao` (pacote `partida`): botão novo escrito só com `legal(tipo)`
   // acende onde o domínio recusa.
-  const legal = (tipo: AcaoDaMesa['tipo']): boolean => podeAgir && acaoEhLegalNaFase(vista.fase, tipo);
+  const legal = (tipo: AcaoDaMesa['tipo']): boolean =>
+    podeAgir && acaoEhLegal(vista.fase, vista.queima !== null, tipo);
 
   return (
     <section>

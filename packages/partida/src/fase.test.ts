@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { acaoEhLegalNaFase, faseDoTurnoDe, faseSeAutoPula } from './fase';
+import { acaoEhLegal, acaoEhLegalNaFase, faseDoTurnoDe, faseSeAutoPula } from './fase';
 import { criarPartida } from './montagem';
 import { aplicarAcao } from './mesa';
 import { escolherAcao } from './bot';
@@ -11,7 +11,7 @@ import { catalogoDeTeste, ID_DA_CLASSE_DE_TESTE } from './testes/catalogo';
 import { COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import { equipamento, monstro, monstros, raca } from './testes/cartas';
 import { SLOTS_VAZIOS } from './corpo';
-import type { JogadorNaMesa, EntradaJogador, EstadoPartida, Fase } from './tipos';
+import type { AcaoDaMesa, JogadorNaMesa, EntradaJogador, EstadoPartida, Fase } from './tipos';
 
 /** A projeção calcula `combatente`, então precisa do catálogo. Um só para o arquivo. */
 const catalogoPadrao = catalogoDeTeste();
@@ -532,5 +532,65 @@ describe('a fase nunca mente sobre o estado', () => {
     // monstro e cai em `saquear` — que só ADICIONA carta — quem finalmente deixa
     // o excedente sobreviver até `encerrarTurno`.
     expect([...fasesVistas].sort()).toEqual(['combate', 'descartar', 'encrenca', 'jogar', 'recompor', 'vasculhar']);
+  });
+});
+
+describe('acaoEhLegal — o gate com a pendência', () => {
+  it('sem queima pendente, responde exatamente o que a tabela de fase responde', () => {
+    expect(acaoEhLegal('recompor', false, 'equiparCarta')).toBe(true);
+    expect(acaoEhLegal('recompor', false, 'vasculhar')).toBe(false);
+    expect(acaoEhLegal('combate', false, 'atacar')).toBe(true);
+  });
+
+  it('com queima pendente, SÓ `queimarCarta` é legal — em qualquer fase', () => {
+    const fases: readonly Fase[] = ['recompor', 'vasculhar', 'encrenca', 'combate', 'jogar', 'descartar'];
+    for (const fase of fases) {
+      expect(acaoEhLegal(fase, true, 'queimarCarta')).toBe(true);
+      expect(acaoEhLegal(fase, true, 'equiparCarta')).toBe(false);
+      expect(acaoEhLegal(fase, true, 'passar')).toBe(false);
+      expect(acaoEhLegal(fase, true, 'atacar')).toBe(false);
+    }
+  });
+
+  it('`queimarCarta` NUNCA é legal por fase — só por pendência', () => {
+    const fases: readonly Fase[] = ['recompor', 'vasculhar', 'encrenca', 'combate', 'jogar', 'descartar'];
+    for (const fase of fases) {
+      expect(acaoEhLegal(fase, false, 'queimarCarta')).toBe(false);
+    }
+  });
+
+  it('toda ação do domínio tem lugar: está em alguma fase OU é a `queimarCarta`', () => {
+    // ⚠️ `queimarCarta` é a PRIMEIRA ação fora da tabela `LEGAL`, e quem ler a
+    // tabela procurando "quais ações existem" a perde. Este teste é o que paga
+    // esse preço — ação nova que ninguém legalizar em fase nenhuma cai aqui, em
+    // vez de nascer inalcançável e calada.
+    // 🔴 `as const satisfies`, NUNCA `: readonly AcaoDaMesa['tipo'][]`. Com a
+    // anotação larga, `(typeof TODAS)[number]` colapsa para a união INTEIRA, o
+    // `Exclude` do guard abaixo dá `never` sempre, e a checagem se auto-satisfaz
+    // — o guard existiria sem nunca poder reprovar. É a mesma armadilha que o
+    // `_CoberturaAcao` do `shared` documenta, por outro caminho.
+    const TODAS = [
+      'vasculhar', 'manterCarta', 'empurrarCarta', 'atacar', 'esquivar', 'jogarCarta',
+      'entregarCarta', 'equiparCarta', 'guardarCarta', 'procurarEncrenca', 'saquear',
+      'passar', 'queimarCarta',
+    ] as const satisfies readonly AcaoDaMesa['tipo'][];
+
+    // Guard de COMPILAÇÃO: a lista acima tem que cobrir a união inteira. Sem ele,
+    // ação nova entraria no domínio e o teste continuaria verde sobre a lista velha.
+    //
+    // ⚠️ A TUPLA é obrigatória, e pelo motivo já catalogado no `_CoberturaAcao`
+    // (`shared/src/index.ts`): o condicional DISTRIBUI sobre união, e `never`
+    // distribuído devolve `never` — `Exclude<…> extends never ? true : never`
+    // seria `never` mesmo com a lista completa, e o guard se auto-reprovaria.
+    type _Cobertura = [Exclude<AcaoDaMesa['tipo'], (typeof TODAS)[number]>] extends [never] ? true : never;
+    const _cobertura: _Cobertura = true;
+    void _cobertura;
+
+    const fases: readonly Fase[] = ['recompor', 'vasculhar', 'encrenca', 'combate', 'jogar', 'descartar'];
+
+    for (const tipo of TODAS) {
+      const temFase = fases.some((f) => acaoEhLegal(f, false, tipo));
+      expect(temFase || acaoEhLegal('recompor', true, tipo)).toBe(true);
+    }
   });
 });

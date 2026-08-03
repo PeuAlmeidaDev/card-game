@@ -442,6 +442,16 @@ export type AcaoDaMesa =
    */
   | { readonly tipo: 'saquear'; readonly jogadorId: string }
   /**
+   * Escolhe QUAL carta queimar quando o corpo deslocou um item e a mochila está
+   * cheia (decisão #59). O `cartaId` é o do deslocado da vez OU o de uma carta da
+   * mochila; queimar da mochila abre a vaga em que o deslocado entra.
+   *
+   * Não aparece na tabela `LEGAL` (`./fase`): ela nunca é legal por FASE, só por
+   * pendência. Quem garante que isso não a torna inalcançável é o teste de
+   * cobertura em `fase.test.ts`.
+   */
+  | { readonly tipo: 'queimarCarta'; readonly jogadorId: string; readonly cartaId: string }
+  /**
    * Encerra uma fase PARADA (`recompor`/`jogar`) sem fazer mais nada nela. É o
    * verbo que dá SAÍDA às duas — sem ele, `recompor` seria uma fase da qual não
    * se sai (o jogador com uma raça na mão travaria antes de vasculhar), que é

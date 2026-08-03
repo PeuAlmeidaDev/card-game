@@ -2969,3 +2969,115 @@ describe('procurarEncrenca', () => {
     )).toThrow(AcaoInvalida);
   });
 });
+
+describe('aplicarAcao — queimarCarta', () => {
+  const soMonstro = { ...config, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] };
+  const nascida = (): EstadoPartida => criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+
+  /**
+   * Mesa com a mochila de p1 CHEIA e uma queima pendente forjada. A fase é
+   * `recompor` cravada porque, com pendência aberta, `faseDoTurnoDe` não é quem
+   * decide — o gate recusa tudo até a escolha, e a fase só volta a importar
+   * quando ela se esvazia.
+   */
+  const comQueima = (
+    deslocados: readonly [CartaEquipamento, ...CartaEquipamento[]],
+    mochila: readonly CartaEquipamento[] = Array.from(
+      { length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-mochila-${String(i)}`),
+    ),
+  ): EstadoPartida => {
+    const base = nascida();
+    const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao: [], mochila } : j));
+    return {
+      ...base, jogadores, fase: 'recompor',
+      queima: { jogadorId: 'p1', deslocados, motivo: 'trocaDeSlot' },
+    };
+  };
+
+  it('queimar o DESLOCADO manda ele ao cemitério de Tesouros e não toca na mochila', () => {
+    const p = comQueima([equipamento('t-saiu')]);
+
+    const r = aplicarAcao(p, { tipo: 'queimarCarta', jogadorId: 'p1', cartaId: 't-saiu' }, deps([]));
+
+    expect(r.estado.tesouros.cemiterio.map((c) => c.id)).toContain('t-saiu');
+    expect(jogadorDe(r.estado, 'p1').mochila).toHaveLength(LIMITE_MOCHILA);
+    expect(jogadorDe(r.estado, 'p1').mochila.map((c) => c.id)).not.toContain('t-saiu');
+    expect(r.eventos).toEqual([
+      { tipo: 'desequipou', jogadorId: 'p1', carta: equipamento('t-saiu'), destino: 'cemiterio', motivo: 'trocaDeSlot' },
+    ]);
+  });
+
+  it('resolvida a última da fila, a pendência fecha e o turno volta a andar', () => {
+    const p = comQueima([equipamento('t-saiu')]);
+
+    const r = aplicarAcao(p, { tipo: 'queimarCarta', jogadorId: 'p1', cartaId: 't-saiu' }, deps([]));
+
+    expect(r.estado.queima).toBeNull();
+    // Mão vazia e mochila cheia: `recompor` NÃO se auto-pula (a mochila é origem
+    // de `equiparCarta`), então o jogador continua nela.
+    expect(r.estado.fase).toBe('recompor');
+    expect(r.estado.vezDe).toBe('p1');
+  });
+
+  it('com DOIS deslocados, a fila avança uma carta por escolha', () => {
+    // A mochila cheia continua cheia depois de cada resolução, então cada item
+    // que não coube vira sua própria pergunta. Uma pergunta por lote mandaria os
+    // dois para o mesmo destino.
+    const p = comQueima([equipamento('t-a'), equipamento('t-b')]);
+
+    const r1 = aplicarAcao(p, { tipo: 'queimarCarta', jogadorId: 'p1', cartaId: 't-a' }, deps([]));
+
+    expect(r1.estado.queima?.deslocados.map((c) => c.id)).toEqual(['t-b']);
+
+    const r2 = aplicarAcao(r1.estado, { tipo: 'queimarCarta', jogadorId: 'p1', cartaId: 't-b' }, deps([]));
+
+    expect(r2.estado.queima).toBeNull();
+    expect(r2.estado.tesouros.cemiterio.map((c) => c.id)).toEqual(['t-a', 't-b']);
+  });
+
+  it('queimar da MOCHILA abre a vaga: o deslocado entra e a escolhida vai ao cemitério', () => {
+    // O SEGUNDO ramo do verbo. Sem este teste, a Task 2 entregaria comportamento
+    // sem cobertura e a Task 3 (o evento) teria que testá-lo retroativamente —
+    // teste escrito depois do código, que é o que o TDD deste projeto proíbe.
+    const mochila = [
+      equipamento('t-alvo'),
+      ...Array.from({ length: LIMITE_MOCHILA - 1 }, (_, i) => equipamento(`t-resto-${String(i)}`)),
+    ];
+    const p = comQueima([equipamento('t-saiu')], mochila);
+
+    const r = aplicarAcao(p, { tipo: 'queimarCarta', jogadorId: 'p1', cartaId: 't-alvo' }, deps([]));
+
+    const depois = jogadorDe(r.estado, 'p1').mochila.map((c) => c.id);
+    expect(depois).toHaveLength(LIMITE_MOCHILA);
+    expect(depois).toContain('t-saiu');
+    expect(depois).not.toContain('t-alvo');
+    expect(r.estado.tesouros.cemiterio.map((c) => c.id)).toEqual(['t-alvo']);
+    // O `desequipou` do deslocado diz `mochila`, não `cemiterio`: ele SOBREVIVEU.
+    expect(r.eventos).toEqual([
+      { tipo: 'desequipou', jogadorId: 'p1', carta: equipamento('t-saiu'), destino: 'mochila', motivo: 'trocaDeSlot' },
+    ]);
+  });
+
+  it('com a pendência aberta, NENHUMA outra ação passa', () => {
+    const p = comQueima([equipamento('t-saiu')]);
+
+    expect(() => aplicarAcao(p, { tipo: 'passar', jogadorId: 'p1' }, deps([])))
+      .toThrow(AcaoInvalida);
+    expect(() => aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])))
+      .toThrow(AcaoInvalida);
+  });
+
+  it('sem pendência, `queimarCarta` é recusada em toda fase', () => {
+    const p = nascida();
+
+    expect(() => aplicarAcao(p, { tipo: 'queimarCarta', jogadorId: 'p1', cartaId: 't-x' }, deps([])))
+      .toThrow(AcaoInvalida);
+  });
+
+  it('carta que não é o deslocado nem está na mochila é recusada como AcaoInvalida', () => {
+    const p = comQueima([equipamento('t-saiu')]);
+
+    expect(() => aplicarAcao(p, { tipo: 'queimarCarta', jogadorId: 'p1', cartaId: 't-forasteira' }, deps([])))
+      .toThrow(AcaoInvalida);
+  });
+});
