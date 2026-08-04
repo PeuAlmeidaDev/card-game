@@ -242,6 +242,50 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
         </ol>
       ) : (
         <>
+          {vista.queima !== null && vista.queima.jogadorId === vista.voce && (
+            <section aria-label="queima pendente">
+              <p role="status">
+                Sua mochila está cheia. Escolha o que queimar — a carta escolhida vai para o
+                cemitério de Tesouros, e a outra fica com você.
+              </p>
+              <ul>
+                {/* O deslocado vem PRIMEIRO: é ele que abriu a pergunta, e é a
+                    escolha que mantém a mochila como está. */}
+                <li>
+                  {nomeDoItem(vista.queima.deslocados[0].itemId)} (saiu do corpo){' '}
+                  <button
+                    type="button"
+                    disabled={!legal('queimarCarta')}
+                    onClick={() => {
+                      const alvo = vista.queima;
+                      if (alvo !== null) void agir({ tipo: 'queimarCarta', cartaId: alvo.deslocados[0].id });
+                    }}
+                  >
+                    Queimar
+                  </button>
+                </li>
+                {minhaMochila.map((carta) => (
+                  <li key={carta.id}>
+                    {nomeDoItem(carta.itemId)} (na mochila){' '}
+                    <button
+                      type="button"
+                      disabled={!legal('queimarCarta')}
+                      onClick={() => void agir({ tipo: 'queimarCarta', cartaId: carta.id })}
+                    >
+                      Queimar
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {vista.queima !== null && vista.queima.jogadorId !== vista.voce && (
+            <p role="status">
+              {nomeDe(vista.queima.jogadorId)} está escolhendo o que queimar.
+            </p>
+          )}
+
           {espiada !== null && (
             <p>Você pressente {descreverCarta(espiada.carta, nomeDaRaca, nomeDoMonstro, nomeDoItem)} adiante.</p>
           )}
@@ -280,7 +324,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
                 mora aqui, na borda de apresentação. */}
             <button
               type="button"
-              disabled={!minhaVez || espiada === null}
+              disabled={!legal('manterCarta') || espiada === null}
               onClick={() => void agir({ tipo: 'manterCarta' })}
             >
               Encarar
@@ -296,7 +340,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
             <button
               type="button"
               disabled={
-                !minhaVez || espiada === null
+                !legal('empurrarCarta') || espiada === null
                 || (vista.cartasNoMonte === 0 && vista.cartasNoCemiterio === 0)
               }
               onClick={() => void agir({ tipo: 'empurrarCarta' })}
@@ -305,14 +349,14 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
             </button>
             <button
               type="button"
-              disabled={!minhaVez || decisao !== 'ataque'}
+              disabled={!legal('atacar') || decisao !== 'ataque'}
               onClick={() => void agir({ tipo: 'atacar' })}
             >
               Atacar
             </button>
             <button
               type="button"
-              disabled={!minhaVez || decisao !== 'esquiva'}
+              disabled={!legal('esquivar') || decisao !== 'esquiva'}
               onClick={() => void agir({ tipo: 'esquivar' })}
             >
               Esquivar

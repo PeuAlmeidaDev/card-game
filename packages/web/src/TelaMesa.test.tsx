@@ -1180,3 +1180,72 @@ describe('TelaMesa — afinidade de itens', () => {
     expect(await screen.findByText(/reduzido/)).toBeInTheDocument();
   });
 });
+
+describe('a queima pendente', () => {
+  const mochilaCheia: readonly CartaTesouro[] = Array.from(
+    { length: LIMITE_MOCHILA }, (_, i) => tesouro(`t-mochila-${String(i)}`, 'elmo-de-couro'),
+  );
+
+  /** A vista com a queima aberta para `dono`, e a mochila de p1 no teto. */
+  const comQueima = (dono: string): VistaDaPartida => ({
+    ...vistaBase,
+    fase: 'recompor',
+    jogadores: vistaBase.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: mochilaCheia } : j)),
+    queima: {
+      jogadorId: dono,
+      deslocados: [tesouro('t-saiu', 'espada-curta')],
+      motivo: 'trocaDeSlot',
+    },
+  });
+
+  it('lista as SEIS cartas: o deslocado e as cinco da mochila', async () => {
+    await abrirMesa(comQueima('p1'));
+
+    expect(screen.getAllByRole('button', { name: 'Queimar' })).toHaveLength(1 + LIMITE_MOCHILA);
+    const bloco = screen.getByLabelText('queima pendente');
+    expect(within(bloco).getByText(/Espada Curta/)).toBeInTheDocument();
+  });
+
+  it('com a pendência aberta, os outros botões ficam APAGADOS — não somem', async () => {
+    // Decisão #26: a tela tem UM vocabulário para "você não pode agora". E isto
+    // sai de graça — `legal()` lê `acaoEhLegal`, que já conhece a pendência.
+    // Nenhum botão existente foi tocado nesta fatia, e é essa a asserção.
+    await abrirMesa(comQueima('p1'));
+
+    expect(screen.getByRole('button', { name: 'Passar' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Vasculhar local' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Saquear' })).toBeDisabled();
+  });
+
+  it('a pendência de OUTRO jogador aparece na tela, e sem botões', async () => {
+    // A pendência é PÚBLICA (decisão #82): a mesa vê que o jogador da vez está
+    // parado escolhendo. Sem esta linha, o turno alheio ficaria congelado sem
+    // explicação — o padrão "o código faz certo e não conta a ninguém", que o
+    // gate ocular deste projeto já pegou duas vezes.
+    await abrirMesa({ ...comQueima('p2'), vezDe: 'p2' });
+
+    expect(screen.getByText(/Bot 1 está escolhendo o que queimar/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Queimar' })).not.toBeInTheDocument();
+  });
+
+  it('clicar em uma carta da mochila manda o id DELA, não o do deslocado', async () => {
+    // Escopado pela linha da carta: a tela tem seis botões com o mesmo rótulo, e
+    // um `getByRole` genérico pegaria o primeiro — que é justamente o deslocado,
+    // fazendo o teste passar com a ação errada.
+    const agir = vi.spyOn(api, 'agir').mockResolvedValue({ status: 200, body: comQueima('p1') } as never);
+    await abrirMesa(comQueima('p1'));
+    const bloco = screen.getByLabelText('queima pendente');
+    const linha = within(bloco).getAllByRole('listitem')[1];
+    if (linha === undefined) throw new Error('a segunda linha da queima não existe');
+
+    await userEvent.click(within(linha).getByRole('button', { name: 'Queimar' }));
+
+    // Objeto exato, não `objectContaining` (o brief pedia `objectContaining`, mas
+    // ele reprova o `no-unsafe-assignment` do lint da raiz — ver a nota da linha
+    // 544 acima, mesma convenção seguida aqui).
+    expect(agir).toHaveBeenCalledWith({
+      params: { id: 'm1' },
+      body: { acao: { tipo: 'queimarCarta', cartaId: 't-mochila-0' }, versao: 1 },
+    });
+  });
+});
