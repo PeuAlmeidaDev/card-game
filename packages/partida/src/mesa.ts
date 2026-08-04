@@ -198,12 +198,13 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
     throw new AcaoInvalida(`aplicarAcao: não é a vez de ${acao.jogadorId}`);
   }
 
-  // Gate de FASE — resposta única para "em que ponto do turno esta ação cabe?",
-  // não para "posso?" inteiro. Antes a pergunta estava espalhada em cinco
-  // funções, cada uma relendo `combate`, `espiada` e o limite de mão por conta
-  // própria — três booleanos ortogonais, oito combinações, e nenhum lugar que
-  // dissesse a verdade. A ação nova do Plano 3 precisava lembrar de repetir os
-  // guards certos; agora ela precisa entrar na tabela, e o `Record<Fase, …>` cobra.
+  // `acaoEhLegal` — resposta única para "esta ação cabe agora?" (fase MAIS
+  // queima pendente), não para "posso?" inteiro. Antes a pergunta estava
+  // espalhada em cinco funções, cada uma relendo `combate`, `espiada` e o
+  // limite de mão por conta própria — três booleanos ortogonais, oito
+  // combinações, e nenhum lugar que dissesse a verdade. A ação nova do
+  // Plano 3 precisava lembrar de repetir os guards certos; agora ela precisa
+  // entrar na tabela, e o `Record<Fase, …>` cobra.
   //
   // ⚠️ O QUE A TABELA NÃO RESPONDE. Passar aqui não garante que a ação será
   // aceita: a elegibilidade FINA continua em cada função, e hoje são DEZESSEIS
@@ -372,7 +373,7 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   }
 
   // Exaustividade: a cadeia de `if` acima cobre TODO `AcaoDaMesa['tipo']` de hoje
-  // (`procurarEncrenca`, Task 3, foi o último a ganhar ramo). Mesma proteção dos
+  // (`queimarCarta` foi o último a ganhar ramo). Mesma proteção dos
   // `naoTratada: never` dos `switch` deste arquivo (`resolverCarta`,
   // `descartarNoBaralhoCerto`): um tipo novo em `AcaoDaMesa` sem `if` próprio
   // quebra a COMPILAÇÃO aqui, não em produção — é a lição do Plano 4b Task 1,

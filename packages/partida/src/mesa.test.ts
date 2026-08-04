@@ -3063,11 +3063,16 @@ describe('aplicarAcao — queimarCarta', () => {
 
     expect(() => aplicarAcao(p, { tipo: 'passar', jogadorId: 'p1' }, deps([])))
       .toThrow(AcaoInvalida);
+    // A mensagem, não só a classe: sem cravá-la, `passar` recusado em `recompor`
+    // com pendência aberta poderia mentir dizendo "não é legal na fase" — e
+    // `passar` É legal em `recompor`. O motivo da recusa é a pendência.
+    expect(() => aplicarAcao(p, { tipo: 'passar', jogadorId: 'p1' }, deps([])))
+      .toThrow(/há uma queima pendente/);
     expect(() => aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])))
       .toThrow(AcaoInvalida);
   });
 
-  it('sem pendência, `queimarCarta` é recusada em toda fase', () => {
+  it('sem pendência, `queimarCarta` é recusada pelo gate (as seis fases são cobertas em `fase.test.ts`)', () => {
     const p = nascida();
 
     expect(() => aplicarAcao(p, { tipo: 'queimarCarta', jogadorId: 'p1', cartaId: 't-x' }, deps([])))
