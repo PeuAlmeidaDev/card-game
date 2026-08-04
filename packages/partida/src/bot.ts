@@ -39,6 +39,17 @@ import { afinidadeCom, contribuicaoDe } from './corpo';
  * `EstadoPartida`.
  */
 export function escolherAcao(vista: VistaDaPartida, jogadorId: string, catalogo: CatalogoDaMesa): AcaoDaMesa {
+  // A pendência é ORTOGONAL à fase: com ela aberta, nenhuma ação de fase é legal.
+  // Fica antes do `switch` e não dentro dos `case`s porque ela pode abrir em
+  // `recompor` E em `jogar`, e a cópia é o que fica para trás.
+  //
+  // Queima sempre o DESLOCADO (decisão #83): a política que deixa o bot idêntico
+  // ao de antes desta fatia. `deslocados[0]` não é `undefined` mesmo com
+  // `noUncheckedIndexedAccess` — a tupla é não-vazia por tipo.
+  if (vista.queima !== null) {
+    return { tipo: 'queimarCarta', jogadorId, cartaId: vista.queima.deslocados[0].id };
+  }
+
   const eu = vista.jogadores.find((j) => j.id === jogadorId);
 
   switch (vista.fase) {
