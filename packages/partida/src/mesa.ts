@@ -1045,12 +1045,18 @@ function queimarCarta(
     : [...jogador.mochila.filter((c) => c.id !== queimada.id), deslocado];
 
   const atualizado: JogadorNaMesa = { ...jogador, mochila };
-  const eventos: readonly EventoDaMesa[] = [
-    {
-      tipo: 'desequipou', jogadorId: acao.jogadorId, carta: deslocado,
-      destino: queimaODeslocado ? 'cemiterio' : 'mochila', motivo: queima.motivo,
-    },
-  ];
+  const eventos: readonly EventoDaMesa[] = queimaODeslocado
+    ? [{
+        tipo: 'desequipou', jogadorId: acao.jogadorId, carta: deslocado,
+        destino: 'cemiterio', motivo: queima.motivo,
+      }]
+    : [
+        {
+          tipo: 'desequipou', jogadorId: acao.jogadorId, carta: deslocado,
+          destino: 'mochila', motivo: queima.motivo,
+        },
+        { tipo: 'queimou', jogadorId: acao.jogadorId, carta: queimada },
+      ];
 
   const [proximo, ...resto] = restantes;
   const proxima: QueimaPendente | null =

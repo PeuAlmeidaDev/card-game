@@ -106,6 +106,20 @@ describe('narrarEvento — linhas de texto puro', () => {
     expect(linha.container.textContent).toContain('descartada');
   });
 
+  it('a carta queimada é NOMEADA, e a pessoa muda com o dono', () => {
+    // A mochila e o cemitério de Tesouros são zonas ABERTAS, então esconder aqui
+    // seria teatro — mesma regra do `guardou`.
+    expect(narrarEvento(
+      { tipo: 'queimou', jogadorId: 'p1', carta: { id: 't-1', tipo: 'equipamento', itemId: 'espada-curta' } },
+      ctx,
+    )).toBe('Você queima Espada Curta para abrir vaga na mochila.');
+
+    expect(narrarEvento(
+      { tipo: 'queimou', jogadorId: 'p2', carta: { id: 't-1', tipo: 'equipamento', itemId: 'espada-curta' } },
+      ctx,
+    )).toBe('Bot 1 queima Espada Curta para abrir vaga na mochila.');
+  });
+
   it('equipou MOSTRA a carta e a NOMEIA — o slot é zona aberta', () => {
     // Assimetria deliberada em relação ao `loot`: o que decide se o evento pode
     // ser narrado é a zona de DESTINO, e o corpo está à vista da mesa inteira.

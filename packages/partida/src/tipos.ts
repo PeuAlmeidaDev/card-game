@@ -391,6 +391,16 @@ export type EventoDaMesa =
       readonly carta: CartaEquipamento; readonly destino: 'mochila' | 'cemiterio';
       readonly motivo: 'trocaDeSlot' | 'perdeuAfinidade' }
   /**
+   * A carta da MOCHILA que o jogador escolheu destruir para abrir vaga ao item
+   * deslocado (decisão #59). CARREGA a carta: a mochila e o cemitério de Tesouros
+   * são zonas ABERTAS.
+   *
+   * Só sai quando a escolha foi por uma carta da mochila. Queimar o próprio
+   * deslocado já é contado pelo `desequipou` com `destino: 'cemiterio'`, e um
+   * evento a mais ali diria a mesma coisa duas vezes.
+   */
+  | { readonly tipo: 'queimou'; readonly jogadorId: string; readonly carta: CartaTesouro }
+  /**
    * O jogador declinou de agir numa fase parada. Emite evento — e não silêncio —
    * porque `versaoDe` é `log.length`: sem mover a versão, um duplo-clique em
    * "Passar" escaparia do guard de 409 do server e morreria como 400 na cara do

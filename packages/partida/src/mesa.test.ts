@@ -3055,6 +3055,25 @@ describe('aplicarAcao — queimarCarta', () => {
     // O `desequipou` do deslocado diz `mochila`, não `cemiterio`: ele SOBREVIVEU.
     expect(r.eventos).toEqual([
       { tipo: 'desequipou', jogadorId: 'p1', carta: equipamento('t-saiu'), destino: 'mochila', motivo: 'trocaDeSlot' },
+      { tipo: 'queimou', jogadorId: 'p1', carta: equipamento('t-alvo') },
+    ]);
+  });
+
+  it('a carta queimada da mochila ganha linha de log própria', () => {
+    // Sem este evento a carta DESTRUÍDA some calada: o `desequipou` fala do item
+    // que saiu do corpo (que foi para a mochila, destino benigno), e nada conta
+    // que uma outra carta foi ao cemitério. É a decisão #27 valendo de novo.
+    const mochila = [
+      equipamento('t-alvo'),
+      ...Array.from({ length: LIMITE_MOCHILA - 1 }, (_, i) => equipamento(`t-resto-${String(i)}`)),
+    ];
+    const p = comQueima([equipamento('t-saiu')], mochila);
+
+    const r = aplicarAcao(p, { tipo: 'queimarCarta', jogadorId: 'p1', cartaId: 't-alvo' }, deps([]));
+
+    expect(r.eventos).toEqual([
+      { tipo: 'desequipou', jogadorId: 'p1', carta: equipamento('t-saiu'), destino: 'mochila', motivo: 'trocaDeSlot' },
+      { tipo: 'queimou', jogadorId: 'p1', carta: equipamento('t-alvo') },
     ]);
   });
 

@@ -12,6 +12,12 @@ describe('participantesDe', () => {
     expect(participantesDe({ tipo: 'saqueou', jogadorId: 'p2' })).toEqual(['p2']);
   });
 
+  it('o `queimou` é do dono da mochila', () => {
+    expect(participantesDe({
+      tipo: 'queimou', jogadorId: 'p2', carta: { id: 't-1', tipo: 'equipamento', itemId: 'espada-curta' },
+    })).toEqual(['p2']);
+  });
+
   it('a entrega envolve as DUAS pontas — é a razão de esta função existir', () => {
     // O filtro do `PainelLog` indexava o evento só por `jogadorId` (o doador), e
     // com isso o botão "Você" ESCONDIA a carta que você recebeu: ela ficava
