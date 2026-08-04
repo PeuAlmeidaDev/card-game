@@ -148,14 +148,13 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
   // acenderia um botão que só serve para levar 400.
   //
   // ⚠️ `legal()` é um gate GROSSO, não a resposta inteira. O reducer ainda cobra
-  // condições que a tabela não conhece, e cada uma precisa de gêmeo aqui — é o
-  // `|| espiada !== null` de "Vasculhar" (o único par de espiada que sobrou: as
-  // Tasks 2 e 3 tiraram `jogarCarta` e `equiparCarta` da fase `vasculhar`, a
-  // única em que a espiada existe, e os gêmeos deles morreram junto), o
-  // `carta.tipo === 'raca'` que decide se "Jogar" existe, e o `decisao !== …` de
-  // "Atacar"/"Esquivar". A lista completa dos pares está no comentário do
-  // `aplicarAcao` (pacote `partida`): botão novo escrito só com `legal(tipo)`
-  // acende onde o domínio recusa.
+  // condições que a tabela não conhece, e cada uma precisa de gêmeo aqui — os TRÊS
+  // pares de espiada (`vasculhar` com `espiada === null`, "Encarar"/`manterCarta`
+  // e "Empurrar"/`empurrarCarta` com `espiada !== null`, os dois cobrados por
+  // `resolverEspiada`), o `carta.tipo === 'raca'` que decide se "Jogar" existe, e
+  // o `decisao !== …` de "Atacar"/"Esquivar". A lista completa dos pares está no
+  // comentário do `aplicarAcao` (pacote `partida`): botão novo escrito só com
+  // `legal(tipo)` acende onde o domínio recusa.
   const legal = (tipo: AcaoDaMesa['tipo']): boolean =>
     podeAgir && acaoEhLegal(vista.fase, vista.queima !== null, tipo);
 
