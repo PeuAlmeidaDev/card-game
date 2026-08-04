@@ -835,8 +835,7 @@ function tirarDosSlots(
  * Em `descartar` sobra só `entregarCarta`: `equiparCarta` saiu junto, para as duas
  * fases paradas que acontecem ANTES da cobrança do excedente.
  *
- * Trocar de raça DERRUBA o item que ficou proibido, por `destinoDoDesequipado`
- * como ele já era — mochila se houver vaga, cemitério de Tesouros se não.
+ * Trocar de raça DERRUBA o item que ficou proibido, por `destinoDoDesequipado`.
  */
 function jogarCarta(
   estado: EstadoPartida,
@@ -875,9 +874,10 @@ function jogarCarta(
     { tipo: 'racaEmJogo', jogadorId: acao.jogadorId, carta }, ...doDeslocado,
   ];
 
-  // Com pendência aberta, o turno PARA aqui: `entrarOuPular` poderia auto-pular a
-  // fase e, em `jogar`, passar a vez — deixando a queima pendurada num turno que
-  // já é de outro jogador.
+  // Este `return` carrega a `queima` para o estado registrado, sem passar por
+  // `entrarOuPular`. O auto-pulo é inalcançável enquanto ela está aberta: a
+  // pendência só nasce com a mochila NO TETO, e `faseSeAutoPula` conta a mochila
+  // como origem de equipamento (ver o teste gêmeo em `fase.test.ts`).
   if (queima !== null) return registrar({ ...base, queima }, eventos);
 
   return entrarOuPular(
@@ -946,16 +946,17 @@ function equiparCarta(
   const { estado: base, eventos: doDeslocado, queima } =
     destinoDoDesequipado(comJogador, deslocados, acao.jogadorId, 'trocaDeSlot');
   // `equipou` primeiro: o log conta a ação que o jogador pediu, e só então o que
-  // ela custou. Invertido, a linha "Espada Curta foi para o cemitério" apareceria
+  // ela custou. Invertido, a linha "Espada Curta foi para a mochila" apareceria
   // antes de existir motivo para ela.
   const eventos: readonly EventoDaMesa[] = [
     { tipo: 'equipou', jogadorId: acao.jogadorId, slot: info.slot, carta },
     ...doDeslocado,
   ];
 
-  // Com pendência aberta, o turno PARA aqui: `entrarOuPular` poderia auto-pular a
-  // fase e, em `jogar`, passar a vez — deixando a queima pendurada num turno que
-  // já é de outro jogador.
+  // Este `return` carrega a `queima` para o estado registrado, sem passar por
+  // `entrarOuPular`. O auto-pulo é inalcançável enquanto ela está aberta: a
+  // pendência só nasce com a mochila NO TETO, e `faseSeAutoPula` conta a mochila
+  // como origem de equipamento (ver o teste gêmeo em `fase.test.ts`).
   if (queima !== null) return registrar({ ...base, queima }, eventos);
 
   if (!ehFaseParada(estado.fase)) {

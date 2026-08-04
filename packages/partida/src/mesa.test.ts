@@ -1728,10 +1728,14 @@ describe('aplicarAcao — equiparCarta', () => {
       .toBeLessThan(eventos.findIndex((e) => e.tipo === 'desequipou'));
   });
 
-  it('equipar com a mochila cheia ABRE a pendência e o turno PARA', () => {
-    // Sem o `return` antes do `entrarOuPular`, a fase se auto-pularia com a
-    // pendência aberta — em `jogar` isso PASSA O TURNO, deixando a queima do
-    // jogador anterior pendurada num turno que já é de outro.
+  it('equipar com a mochila cheia ABRE a pendência: ela entra no estado e a vez NÃO passa', () => {
+    // O `return` antes de `entrarOuPular` é o que carrega a `queima` para o
+    // estado registrado — sem ele, a pendência se perderia. O auto-pulo em si é
+    // INALCANÇÁVEL aqui: a mochila no teto faz `faseSeAutoPula` devolver `false`
+    // nas duas fases paradas (prendido em `fase.test.ts`), então a pendência e o
+    // auto-pulo nunca coexistem. O que este teste prova é o efeito observável do
+    // `return` — a pendência chega ao estado e `vezDe` continua sendo de quem
+    // equipou.
     const cheia = Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
     const base = comSlots(comMao(nascida(), [equipamento('t-novo')]), { maoDireita: equipamento('t-0') });
     const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
@@ -1891,10 +1895,11 @@ describe('aplicarAcao — equiparCarta', () => {
     // EXATAMENTE uma vaga, e é nela que o item deslocado do slot precisa caber.
     //
     // Um refactor que hoiste-asse a chamada de `destinoDoDesequipado` para ANTES
-    // da remoção compilaria e passaria o resto da suíte inteira: a mochila ainda
-    // estaria cheia no instante da pergunta, o deslocado cairia no cemitério, e
-    // este teste é o único que nota — os outros ou não usam mochila cheia como
-    // origem, ou não deslocam nada do slot.
+    // da remoção mudaria o resultado: a mochila ainda estaria cheia no instante
+    // da pergunta, e o deslocado abriria uma pendência em vez de achar a vaga que
+    // esta asserção prova que ele acha. Não é o único teste que pega essa
+    // inversão — o pin gêmeo abaixo e o de `equipar.test.ts` dependem da mesma
+    // ordem —, mas é o único deste describe com origem MOCHILA cheia.
     const cheia = [equipamento('t-1'), ...Array.from({ length: LIMITE_MOCHILA - 1 }, (_, i) => equipamento(`t-cheia-${String(i)}`))];
     const base = comSlots(comMao(nascida(), []), { maoDireita: equipamento('t-0') });
     const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
