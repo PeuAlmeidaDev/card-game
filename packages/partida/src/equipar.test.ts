@@ -118,57 +118,61 @@ describe('colocarNoSlot', () => {
 });
 
 describe('destinoDoDesequipado — o ramo da mochila', () => {
-  it('o item trocado vai para a MOCHILA quando há vaga', () => {
-    // Spec §7.3. O jogador NÃO escolhe (decisão #8): entre os três destinos a
+  const cheia = Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
+  const umaVaga = cheia.slice(0, LIMITE_MOCHILA - 1);
+
+  it('com vaga na mochila, nada muda: o deslocado entra e não há pendência', () => {
+    // Spec §7.3. O jogador NÃO escolhe (decisão #8) enquanto houver vaga: a
     // resposta é sempre a mesma, e deixá-lo escolher seria uma pendência a mais
     // por troca de item.
     const estado = comMochilaDe('p1', []);
 
-    const r = destinoDoDesequipado(estado, [equipamento('t-velho')], 'p1', 'trocaDeSlot');
+    const r = destinoDoDesequipado(estado, [equipamento('t-0')], 'p1', 'trocaDeSlot');
 
-    expect(jogadorDe(r.estado, 'p1').mochila.map((c) => c.id)).toEqual(['t-velho']);
-    expect(r.estado.tesouros.cemiterio).toEqual([]);
-    // O destino viaja no evento: as duas zonas são ABERTAS, e sem o campo o
-    // jogador não distingue "guardado" de "queimado" — que é a regra nova.
+    expect(r.queima).toBeNull();
     expect(r.eventos).toEqual([
-      { tipo: 'desequipou', jogadorId: 'p1', carta: equipamento('t-velho'), destino: 'mochila', motivo: 'trocaDeSlot' },
+      { tipo: 'desequipou', jogadorId: 'p1', carta: equipamento('t-0'), destino: 'mochila', motivo: 'trocaDeSlot' },
     ]);
+    expect(jogadorDe(r.estado, 'p1').mochila.map((c) => c.id)).toEqual(['t-0']);
   });
 
-  it('cai no cemitério de Tesouros quando a mochila está CHEIA', () => {
-    const cheia = Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-${String(i)}`));
+  it('com a mochila CHEIA, o deslocado vira pendência em vez de ir ao cemitério', () => {
     const estado = comMochilaDe('p1', cheia);
 
-    const r = destinoDoDesequipado(estado, [equipamento('t-velho')], 'p1', 'trocaDeSlot');
+    const r = destinoDoDesequipado(estado, [equipamento('t-0')], 'p1', 'trocaDeSlot');
 
-    expect(jogadorDe(r.estado, 'p1').mochila).toHaveLength(LIMITE_MOCHILA);
-    expect(r.estado.tesouros.cemiterio.map((c) => c.id)).toEqual(['t-velho']);
-    // A carta foi DESTRUÍDA. É o único momento do jogo em que isso acontece sem
-    // o jogador pedir, e era invisível antes deste evento existir.
-    expect(r.eventos).toEqual([
-      { tipo: 'desequipou', jogadorId: 'p1', carta: equipamento('t-velho'), destino: 'cemiterio', motivo: 'trocaDeSlot' },
-    ]);
+    expect(r.queima).toEqual({
+      jogadorId: 'p1', deslocados: [equipamento('t-0')], motivo: 'trocaDeSlot',
+    });
+    expect(r.eventos).toEqual([]);
+    // Este arquivo DEIXOU de escrever no cemitério: quem manda a carta para lá é
+    // `queimarCarta`, depois de o jogador escolher.
+    expect(r.estado.tesouros.cemiterio).toEqual([]);
   });
 
-  it('com DOIS deslocados e uma vaga, o primeiro entra e o segundo vai ao cemitério', () => {
-    // Um montante por cima de duas armas de uma mão desloca DOIS itens. A regra é
-    // por item e na ordem recebida — sem isto, "a mochila cabe?" respondida uma vez
-    // para o lote inteiro mandaria os dois ao cemitério (ou os dois à mochila,
-    // estourando o teto).
-    const quaseCheia = Array.from({ length: LIMITE_MOCHILA - 1 }, (_, i) => equipamento(`t-${String(i)}`));
-    const estado = comMochilaDe('p1', quaseCheia);
+  it('com UMA vaga e DOIS deslocados, o primeiro entra e o segundo vira pendência', () => {
+    // A pergunta continua sendo por item, na ordem — nunca uma resposta para o
+    // lote. O primeiro acha a última vaga; a partir dali a mochila está cheia e
+    // TODO o resto fica pendente.
+    const estado = comMochilaDe('p1', umaVaga);
 
     const r = destinoDoDesequipado(estado, [equipamento('t-a'), equipamento('t-b')], 'p1', 'trocaDeSlot');
 
-    expect(jogadorDe(r.estado, 'p1').mochila.map((c) => c.id)).toContain('t-a');
-    expect(r.estado.tesouros.cemiterio.map((c) => c.id)).toEqual(['t-b']);
-    // UM evento por item, na MESMA ordem, cada um com o seu destino: é o lote em
-    // que os dois destinos acontecem juntos, e um evento só para o lote não
-    // conseguiria nomear os dois.
     expect(r.eventos).toEqual([
       { tipo: 'desequipou', jogadorId: 'p1', carta: equipamento('t-a'), destino: 'mochila', motivo: 'trocaDeSlot' },
-      { tipo: 'desequipou', jogadorId: 'p1', carta: equipamento('t-b'), destino: 'cemiterio', motivo: 'trocaDeSlot' },
     ]);
+    expect(r.queima?.deslocados.map((c) => c.id)).toEqual(['t-b']);
+  });
+
+  it('o `motivo` viaja na pendência, não é reinventado depois', () => {
+    // Sem isto, o `desequipou` que sair de `queimarCarta` poderia nascer com
+    // `trocaDeSlot` fixo, e a troca de raça diria a razão errada no log — que é
+    // metade do que a decisão #73 comprou.
+    const estado = comMochilaDe('p1', cheia);
+
+    const r = destinoDoDesequipado(estado, [equipamento('t-0')], 'p1', 'perdeuAfinidade');
+
+    expect(r.queima?.motivo).toBe('perdeuAfinidade');
   });
 
   it('sem nada deslocado, devolve o MESMO objeto de estado e nenhum evento', () => {
@@ -182,5 +186,6 @@ describe('destinoDoDesequipado — o ramo da mochila', () => {
 
     expect(r.estado).toBe(estado);
     expect(r.eventos).toEqual([]);
+    expect(r.queima).toBeNull();
   });
 });

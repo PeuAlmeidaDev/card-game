@@ -1,4 +1,6 @@
-import type { CartaEquipamento, EstadoPartida, EventoDaMesa, InfoItem, Slot, ZonaEmJogo } from './tipos';
+import type {
+  CartaEquipamento, EstadoPartida, EventoDaMesa, InfoItem, QueimaPendente, Slot, ZonaEmJogo,
+} from './tipos';
 import { LIMITE_MOCHILA } from './mao';
 
 /**
@@ -53,72 +55,60 @@ export function colocarNoSlot(
 }
 
 /**
- * Para onde vai o item que saiu do slot. Ponto **ÚNICO** (spec §7.3): a mochila,
- * se ainda houver vaga (< `LIMITE_MOCHILA`); o cemitério de Tesouros, só quando
- * ela está cheia. O jogador NÃO escolhe (decisão #8) — entre os três destinos a
- * resposta é sempre a mesma regra, nunca uma pendência a mais por troca de item.
+ * Para onde vai o item que saiu do slot. A mochila, enquanto houver vaga; no
+ * primeiro que não couber, a função PARA e devolve a fila — quem decide o
+ * cemitério passa a ser o jogador, por `queimarCarta` (decisão #59).
  *
- * A pergunta é feita **por item, na ordem recebida** — nunca uma vez para o lote
- * inteiro: um montante por cima de duas armas de uma mão desloca DOIS itens, e a
- * mochila pode caber só um. Responder de uma vez mandaria os dois para o mesmo
- * destino, estourando o teto ou perdendo espaço.
+ * A pergunta é feita por item, na ordem: um montante por cima de duas armas de
+ * uma mão desloca DOIS itens e a mochila pode caber só um. Depois que ela enche,
+ * TODO o resto fica pendente — cada resolução a devolve cheia.
  *
- * ⚠️ **Chame isto DEPOIS de já ter tirado a carta equipada da zona de origem.**
- * Quando ela vem de uma mochila CHEIA, equipá-la libera exatamente uma vaga, e é
- * essa vaga que o deslocado precisa achar aqui. Chamar antes leria a mochila
- * ainda cheia e mandaria o deslocado ao cemitério sem necessidade — o teste
- * "com DOIS deslocados e uma vaga" e o pin de ordem em `mesa.test.ts` existem
- * para pegar exatamente essa inversão.
+ * ⚠️ Chame isto DEPOIS de já ter tirado a carta equipada da zona de origem: vinda
+ * de uma mochila CHEIA, equipá-la libera exatamente uma vaga, e é essa vaga que o
+ * deslocado precisa achar aqui.
  *
- * ⚠️ Não reusa `descartarNoBaralhoCerto` (em `./mesa`) de propósito, e as duas não
- * são cópias: aquela responde **em qual dos dois cemitérios** uma carta de família
- * desconhecida cai, e por isso fecha em `never` sobre `Carta`. Aqui a família já é
- * `CartaEquipamento` — o compilador sabe — e a pergunta é outra: **cemitério ou
- * mochila**. Reusar traria os quatro ramos de Porta como código morto, poria o
- * ramo da mochila na função errada, e fecharia um ciclo de import `mesa` ↔
- * `equipar`.
- *
- * @param motivo Sem default de propósito: o valor certo depende de quem chamou,
- * e o compilador tem que cobrar cada call-site novo.
+ * @param motivo Sem default: o valor certo depende de quem chamou, e o compilador
+ * tem que cobrar cada call-site novo.
  */
 export function destinoDoDesequipado(
   estado: EstadoPartida,
   deslocados: readonly CartaEquipamento[],
   jogadorId: string,
   motivo: Extract<EventoDaMesa, { readonly tipo: 'desequipou' }>['motivo'],
-): { readonly estado: EstadoPartida; readonly eventos: readonly EventoDaMesa[] } {
-  // Sem nada deslocado, devolve o MESMO estado: um spread aqui trocaria a
-  // identidade do objeto por nada, e o caso comum (slot vazio) é este. Sem evento
-  // junto: slot vazio não é notícia, mesma regra que faz o `loot` calar quando o
-  // baralho acabou.
-  if (deslocados.length === 0) return { estado, eventos: [] };
+): {
+  readonly estado: EstadoPartida;
+  readonly eventos: readonly EventoDaMesa[];
+  readonly queima: QueimaPendente | null;
+} {
+  if (deslocados.length === 0) return { estado, eventos: [], queima: null };
 
   const jogador = estado.jogadores.find((j) => j.id === jogadorId);
   if (jogador === undefined) {
     throw new Error(`destinoDoDesequipado: jogador ${jogadorId} não está na mesa`);
   }
 
-  // Acumula em vez de responder "cabe?" uma vez para o lote: duas armas de uma
-  // mão trocadas por um montante deslocam DOIS itens, e a mochila pode caber um só.
-  // O evento nasce DENTRO do mesmo laço, e não de uma segunda passada sobre os
-  // arrays: é aqui que se sabe qual destino coube a qual carta, e reconstruir isso
-  // depois seria reimplementar a regra num segundo lugar.
   const mochila = [...jogador.mochila];
-  const paraOCemiterio: CartaEquipamento[] = [];
   const eventos: EventoDaMesa[] = [];
-  for (const carta of deslocados) {
-    const paraMochila = mochila.length < LIMITE_MOCHILA;
-    if (paraMochila) mochila.push(carta);
-    else paraOCemiterio.push(carta);
-    eventos.push({ tipo: 'desequipou', jogadorId, carta, destino: paraMochila ? 'mochila' : 'cemiterio', motivo });
+  let pendentes: readonly CartaEquipamento[] = [];
+  for (const [i, carta] of deslocados.entries()) {
+    if (mochila.length >= LIMITE_MOCHILA) {
+      pendentes = deslocados.slice(i);
+      break;
+    }
+    mochila.push(carta);
+    eventos.push({ tipo: 'desequipou', jogadorId, carta, destino: 'mochila', motivo });
   }
+
+  const [primeiro, ...resto] = pendentes;
+  const queima: QueimaPendente | null =
+    primeiro === undefined ? null : { jogadorId, deslocados: [primeiro, ...resto], motivo };
 
   return {
     estado: {
       ...estado,
       jogadores: estado.jogadores.map((j) => (j.id === jogadorId ? { ...j, mochila } : j)),
-      tesouros: { ...estado.tesouros, cemiterio: [...estado.tesouros.cemiterio, ...paraOCemiterio] },
     },
     eventos,
+    queima,
   };
 }

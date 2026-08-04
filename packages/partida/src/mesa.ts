@@ -869,8 +869,16 @@ function jogarCarta(
       cemiterio: anterior === null ? estado.portas.cemiterio : [...estado.portas.cemiterio, anterior],
     },
   };
-  const { estado: base, eventos: doDeslocado } =
+  const { estado: base, eventos: doDeslocado, queima } =
     destinoDoDesequipado(comJogador, perdidos, acao.jogadorId, 'perdeuAfinidade');
+  const eventos: readonly EventoDaMesa[] = [
+    { tipo: 'racaEmJogo', jogadorId: acao.jogadorId, carta }, ...doDeslocado,
+  ];
+
+  // Com pendência aberta, o turno PARA aqui: `entrarOuPular` poderia auto-pular a
+  // fase e, em `jogar`, passar a vez — deixando a queima pendurada num turno que
+  // já é de outro jogador.
+  if (queima !== null) return registrar({ ...base, queima }, eventos);
 
   return entrarOuPular(
     base,
@@ -880,7 +888,7 @@ function jogarCarta(
     // aqui. Um dia em que ela declarar noutra fase, este literal é a linha que
     // vai estar mentindo — e é por isso que ele fica visível em vez de derivado.
     'recompor',
-    [{ tipo: 'racaEmJogo', jogadorId: acao.jogadorId, carta }, ...doDeslocado],
+    eventos,
   );
 }
 
@@ -935,7 +943,8 @@ function equiparCarta(
     ...estado,
     jogadores: estado.jogadores.map((j) => (j.id === atualizado.id ? atualizado : j)),
   };
-  const { estado: base, eventos: doDeslocado } = destinoDoDesequipado(comJogador, deslocados, acao.jogadorId, 'trocaDeSlot');
+  const { estado: base, eventos: doDeslocado, queima } =
+    destinoDoDesequipado(comJogador, deslocados, acao.jogadorId, 'trocaDeSlot');
   // `equipou` primeiro: o log conta a ação que o jogador pediu, e só então o que
   // ela custou. Invertido, a linha "Espada Curta foi para o cemitério" apareceria
   // antes de existir motivo para ela.
@@ -943,6 +952,11 @@ function equiparCarta(
     { tipo: 'equipou', jogadorId: acao.jogadorId, slot: info.slot, carta },
     ...doDeslocado,
   ];
+
+  // Com pendência aberta, o turno PARA aqui: `entrarOuPular` poderia auto-pular a
+  // fase e, em `jogar`, passar a vez — deixando a queima pendurada num turno que
+  // já é de outro jogador.
+  if (queima !== null) return registrar({ ...base, queima }, eventos);
 
   if (!ehFaseParada(estado.fase)) {
     // Inalcançável pela tabela: `equiparCarta` só é legal em `recompor` e `jogar`,
