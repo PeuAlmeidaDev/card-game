@@ -3059,6 +3059,29 @@ describe('aplicarAcao — queimarCarta', () => {
     };
   };
 
+  it('pendência de OUTRO jogador é `Error` cru, não silêncio', () => {
+    // O verbo lê a mochila de `acao.jogadorId` e a fila de `estado.queima`. Que
+    // os dois sejam o MESMO jogador é hoje coincidência sustentada por outra
+    // regra (o gate de `vezDe` mais o fato de a pendência só nascer no turno de
+    // quem age) — não uma invariante que este arquivo garanta.
+    //
+    // Sem o guard, o estado forjado abaixo é ACEITO EM SILÊNCIO: a carta de p2
+    // entra na mochila de p1 e a de p1 vai ao cemitério — carta trocando de dono
+    // com o log inteiro dizendo `p1`. É `Error` cru e não `AcaoInvalida` porque
+    // nenhum cliente consegue pedir isso: se acontecer, quem quebrou fomos nós.
+    //
+    // 🔴 A `Interferência` do roteiro é a mecânica que derruba a premissa — ela
+    // faz jogador agir FORA do próprio turno.
+    const p = comQueima([equipamento('t-saiu')]);
+    const deOutro: EstadoPartida = {
+      ...p,
+      queima: { jogadorId: 'p2', deslocados: [equipamento('t-do-p2')], motivo: 'trocaDeSlot' },
+    };
+
+    expect(() => aplicarAcao(deOutro, { tipo: 'queimarCarta', jogadorId: 'p1', cartaId: 't-mochila-0' }, deps([])))
+      .toThrow(/queimarCarta: a queima pendente é de p2/);
+  });
+
   it('queimar o DESLOCADO manda ele ao cemitério de Tesouros e não toca na mochila', () => {
     const p = comQueima([equipamento('t-saiu')]);
 

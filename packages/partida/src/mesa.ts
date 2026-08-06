@@ -1052,6 +1052,16 @@ function queimarCarta(
     // Inalcançável pelo gate. Invariante NOSSA quebrada => Error cru, 500.
     throw new Error('queimarCarta: não há queima pendente');
   }
+  if (queima.jogadorId !== acao.jogadorId) {
+    // A fila vem de `estado.queima` e a mochila de `acao.jogadorId`: se os dois
+    // divergirem, a carta de um jogador entra na mochila do outro e o log inteiro
+    // sai no nome de quem agiu. Hoje eles coincidem por CONSEQUÊNCIA de outras
+    // regras (o gate de `vezDe`, mais a pendência só nascer no turno de quem
+    // age), não porque alguém garanta aqui — e a `Interferência` do roteiro é
+    // feita de agir fora do próprio turno.
+    throw new Error(`queimarCarta: a queima pendente é de ${queima.jogadorId}, não de ${acao.jogadorId}`);
+  }
+
   const [deslocado, ...restantes] = queima.deslocados;
   const jogador = estado.jogadores.find((j) => j.id === acao.jogadorId);
   if (jogador === undefined) {
