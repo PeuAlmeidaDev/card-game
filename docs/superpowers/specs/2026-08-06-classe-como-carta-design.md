@@ -73,6 +73,12 @@ teste, que é a família de defeito que este projeto mais cataloga.
 | A2 | **A ordem de composição vira regra escrita e testada** (§3.3) | a regra já existe hoje por omissão (com uma passiva, ela é trivial); o que muda é ela virar explícita e coberta |
 | A3 | `aoCausarDano` passa a devolver `{ dano, estado }` | é **migração de assinatura de um gancho que EXISTE e É USADO** — `sangueDeGuerra` (Orc) adota a forma nova e a equivalência do §7.1 prova que o comportamento não mudou. O próprio docstring dele já previa: *"quando algum pedir, este gancho passa a devolver `{dano, estado}`"* |
 
+**Uma invariante que cai junto com a coleção (A1):** duas passivas com o **mesmo `id`** dividiriam o
+scratch em silêncio, e o `usos` de uma zeraria o efeito da outra. `criarCombate` passa a recusar isso
+com **`Error` cru** — as passivas vêm do catálogo, nunca do cliente, então id repetido é **invariante
+nossa quebrada** (500), não pedido inválido (400). É a mesma cadeia que a **#62** firmou para
+`tirarDoTopo`.
+
 **Fica FORA do Plano A, por serem capacidade nova sem consumidor lá:**
 
 - o **gancho do empate de esquiva** (§5.1), que só o Guerreiro consome;
