@@ -30,9 +30,9 @@ function racaDoLutador(deps: DepsMesa, jogador: JogadorNaMesa | undefined): Info
   return deps.catalogo.raca(jogador?.emJogo.raca?.racaId);
 }
 
-/** A passiva de combate do jogador, `undefined` quando não há raça ou a raça não tem passiva. */
-function passivaDoLutador(deps: DepsMesa, jogador: JogadorNaMesa | undefined): PassivaCombate | undefined {
-  return racaDoLutador(deps, jogador)?.passivaCombate ?? undefined;
+function passivasDoLutador(deps: DepsMesa, jogador: JogadorNaMesa | undefined): readonly PassivaCombate[] {
+  const daRaca = racaDoLutador(deps, jogador)?.passivaCombate ?? null;
+  return daRaca === null ? [] : [daRaca];
 }
 
 export interface ResultadoAcao {
@@ -482,8 +482,8 @@ function resolverCarta(
     forca: info.forca, vida: info.vida, habilidade: info.habilidade,
     agilidade: info.agilidade, level: info.level,
   };
-  const passiva = passivaDoLutador(deps, jogador);
-  const passo = criarCombate(combatente, adversario, deps.rolar, passiva);
+  const passivas = passivasDoLutador(deps, jogador);
+  const passo = criarCombate(combatente, adversario, deps.rolar, passivas);
   eventos.push({ tipo: 'combate', jogadorId, eventos: passo.eventos });
   return registrar(
     {
@@ -1139,10 +1139,10 @@ function agirNoCombate(estado: EstadoPartida, acao: AcaoDeCombate, deps: DepsMes
   // para virar 500 sem vazar a mensagem interna. Um `catch` que traduzisse tudo
   // devolveria "culpa sua" — com um pedaço da nossa implementação junto.
   const lutador = estado.jogadores.find((j) => j.id === acao.jogadorId);
-  const passiva = passivaDoLutador(deps, lutador);
+  const passivas = passivasDoLutador(deps, lutador);
   let passo: Passo;
   try {
-    passo = proximoPasso(combate.estado, { tipo: acao.tipo }, deps.rolar, passiva);
+    passo = proximoPasso(combate.estado, { tipo: acao.tipo }, deps.rolar, passivas);
   } catch (erro) {
     if (erro instanceof AcaoIlegal) {
       throw new AcaoInvalida(erro.message);

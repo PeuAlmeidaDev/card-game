@@ -188,7 +188,7 @@ describe('trava de terminação', () => {
       ataqueDoMonstro: null,
       desfecho: 'emAndamento',
       vidaInicialJogador: jogador.vida,
-      passiva: null,
+      passivas: [],
     };
     // filaDeDados vazia: se a trava rolasse qualquer dado, o teste explodiria.
     const passo = avancar(travado, [], filaDeDados([]));
@@ -206,7 +206,7 @@ describe('trava de terminação', () => {
       ataqueDoMonstro: { rolagem: 5 },
       desfecho: 'emAndamento',
       vidaInicialJogador: jogador.vida,
-      passiva: null,
+      passivas: [],
     };
     const passo = avancar(travado, [], filaDeDados([]));
 

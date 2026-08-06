@@ -46,7 +46,7 @@ describe('equivalência — sem passiva', () => {
 describe('equivalência — Casca de Pedra (aoSofrerDano)', () => {
   it('reduz o primeiro acerto sofrido à metade, com o log inteiro conferido', () => {
     const rapido: Combatente = { ...monstro, agilidade: 12, forca: 5 };
-    const inicio = criarCombate(jogador, rapido, filaDeDados([5]), cascaDePedra);
+    const inicio = criarCombate(jogador, rapido, filaDeDados([5]), [cascaDePedra]);
 
     expect(inicio.eventos).toEqual([
       { tipo: 'iniciativa', primeiro: 'b', porAgilidade: true },
@@ -55,7 +55,7 @@ describe('equivalência — Casca de Pedra (aoSofrerDano)', () => {
     expect(inicio.proximaDecisao).toBe('esquiva');
 
     // esquiva 6 > 5 falha; dano base 1+5=6; metade floor = 3; 20-3=17
-    const passo = proximoPasso(inicio.estado, { tipo: 'esquivar' }, filaDeDados([6]), cascaDePedra);
+    const passo = proximoPasso(inicio.estado, { tipo: 'esquivar' }, filaDeDados([6]), [cascaDePedra]);
 
     expect(passo.eventos).toEqual([
       { tipo: 'esquiva', defensor: 'a', rolagem: 6, esquivou: false },
@@ -70,10 +70,10 @@ describe('equivalência — Casca de Pedra (aoSofrerDano)', () => {
 describe('equivalência — Escorregadio (aoFalharEsquiva)', () => {
   it('re-rola a esquiva falha e escapa, com as DUAS rolagens no log', () => {
     const rapido: Combatente = { ...monstro, agilidade: 12 };
-    const inicio = criarCombate(jogador, rapido, filaDeDados([5]), escorregadio);
+    const inicio = criarCombate(jogador, rapido, filaDeDados([5]), [escorregadio]);
 
     // esquiva 1: 6 > 5 falha; re-rola; esquiva 2: 5 <= 5 escapa (empate é do defensor)
-    const passo = proximoPasso(inicio.estado, { tipo: 'esquivar' }, filaDeDados([6, 5]), escorregadio);
+    const passo = proximoPasso(inicio.estado, { tipo: 'esquivar' }, filaDeDados([6, 5]), [escorregadio]);
 
     expect(passo.eventos).toEqual([
       { tipo: 'esquiva', defensor: 'a', rolagem: 6, esquivou: false },
@@ -89,11 +89,11 @@ describe('equivalência — Sangue de Guerra (aoCausarDano)', () => {
     const orc: Combatente = { forca: 3, vida: 10, habilidade: 8, agilidade: 4, level: 1 };
     const bruto: Combatente = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1 };
 
-    const inicio = criarCombate(orc, bruto, filaDeDados([1]), sangueDeGuerra);
+    const inicio = criarCombate(orc, bruto, filaDeDados([1]), [sangueDeGuerra]);
     expect(inicio.proximaDecisao).toBe('esquiva');
 
     // esquiva 12 > 1 falha; dano 1+5=6; vida 10-6=4, que é <= metade de 10
-    const ferido = proximoPasso(inicio.estado, { tipo: 'esquivar' }, filaDeDados([12]), sangueDeGuerra);
+    const ferido = proximoPasso(inicio.estado, { tipo: 'esquivar' }, filaDeDados([12]), [sangueDeGuerra]);
 
     expect(ferido.eventos).toEqual([
       { tipo: 'esquiva', defensor: 'a', rolagem: 12, esquivou: false },
@@ -104,7 +104,7 @@ describe('equivalência — Sangue de Guerra (aoCausarDano)', () => {
     // ataque 2 <= 8 acerta; esquiva do bruto 12 > 2 não esquiva
     // dano base 1+3=4, fúria +3 = 7; 100-7=93
     // o bruto ataca de novo com 1 <= 12 e acerta, pedindo esquiva
-    const golpe = proximoPasso(ferido.estado, { tipo: 'atacar' }, filaDeDados([2, 12, 1]), sangueDeGuerra);
+    const golpe = proximoPasso(ferido.estado, { tipo: 'atacar' }, filaDeDados([2, 12, 1]), [sangueDeGuerra]);
 
     expect(golpe.eventos).toEqual([
       { tipo: 'ataque', atacante: 'a', rolagem: 2, acertou: true },

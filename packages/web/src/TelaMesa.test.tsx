@@ -362,7 +362,7 @@ describe('TelaMesa', () => {
         ataqueDoMonstro: proximaDecisao === 'esquiva' ? { rolagem: 4 } : null,
         desfecho: 'emAndamento',
         vidaInicialJogador: combatente.vida,
-        passiva: null,
+        passivas: [],
       },
     },
   });
@@ -948,7 +948,7 @@ describe('TelaMesa — a fase e o botão Passar', () => {
           ataqueDoMonstro: null,
           desfecho: 'emAndamento',
           vidaInicialJogador: combatente.vida,
-          passiva: null,
+          passivas: [],
         },
       },
     });
@@ -1295,7 +1295,7 @@ describe('TelaMesa — atacar e esquivar', () => {
         ataqueDoMonstro: proximaDecisao === 'esquiva' ? { rolagem: 4 } : null,
         desfecho: 'emAndamento',
         vidaInicialJogador: combatente.vida,
-        passiva: null,
+        passivas: [],
       },
     },
   });
