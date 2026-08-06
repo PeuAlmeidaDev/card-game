@@ -629,3 +629,49 @@ describe('escolherAcao', () => {
     expect(escolherAcao(vista, 'p1', catalogoDeTeste())).toEqual({ tipo: 'entregarCarta', jogadorId: 'p1', cartaId: 'm1' });
   });
 });
+
+describe('escolherAcao — a queima pendente', () => {
+  /**
+   * A vista da fase MAIS a pendência aberta. `vistaEm` (topo do arquivo) projeta
+   * de verdade, então `combatente` e `mochila` saem do domínio; a queima entra
+   * por spread porque nenhum caminho de `criarPartida` a produz.
+   */
+  const comQueimaEm = (fase: Fase, deslocados: readonly [CartaEquipamento, ...CartaEquipamento[]]): VistaDaPartida => ({
+    ...vistaEm(fase, { suaMao: [equipamento('t-na-mao', ID_DO_ITEM_FORTE)] }),
+    queima: { jogadorId: 'p1', deslocados, motivo: 'trocaDeSlot' },
+  });
+
+  it('queima SEMPRE o deslocado, e não uma carta da mochila', () => {
+    // Política burra de propósito (decisão #83 do bible): é a ÚNICA que deixa o
+    // comportamento do bot idêntico ao de antes desta fatia — antes, com a
+    // mochila cheia, o deslocado ia ao cemitério. Um bot que escolhesse pelo
+    // valor efetivo evacuaria sozinho a carta proibida presa na mochila, que é a
+    // pergunta 19 do §18 e uma decisão que o Pedro não tomou.
+    const vista = comQueimaEm('recompor', [equipamento('t-saiu')]);
+
+    expect(escolherAcao(vista, 'p1', catalogoPadrao))
+      .toEqual({ tipo: 'queimarCarta', jogadorId: 'p1', cartaId: 't-saiu' });
+  });
+
+  it('a pendência vence a FASE — o bot não tenta a ação da fase em que está', () => {
+    // A pendência é ORTOGONAL à fase: ela abre dentro de `recompor` ou de
+    // `jogar`, e o `switch` por fase responderia `equiparCarta`/`passar`, que o
+    // gate recusa. O `AcaoInvalida` subiria por `avancarBots` e viraria 400 na
+    // jogada do HUMANO.
+    //
+    // ⚠️ A mão com um equipamento é LOAD-BEARING: sem ela `vestirOuGuardar`
+    // devolveria `passar`, que a pendência também recusa — o teste passaria com o
+    // `if` no lugar errado. Com ela, a resposta da fase é `equiparCarta`, e só a
+    // ordem certa produz `queimarCarta`.
+    const vista = comQueimaEm('jogar', [equipamento('t-saiu')]);
+
+    expect(escolherAcao(vista, 'p1', catalogoPadrao).tipo).toBe('queimarCarta');
+  });
+
+  it('com fila de dois, escolhe o PRIMEIRO', () => {
+    const vista = comQueimaEm('recompor', [equipamento('t-a'), equipamento('t-b')]);
+
+    expect(escolherAcao(vista, 'p1', catalogoPadrao))
+      .toEqual({ tipo: 'queimarCarta', jogadorId: 'p1', cartaId: 't-a' });
+  });
+});

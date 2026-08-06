@@ -2,7 +2,7 @@ export type {
   CartaPorta, CartaDeRaca, ReceitaPorta, ReceitaTesouro, CartaTesouro, CartaEquipamento, Carta, Slot, InfoItem,
   Afinidade, EixoDeAfinidade,
   Embaralhar, InfoRaca, InfoMonstro, CatalogoDaMesa, JogadorNaMesa,
-  JogadorPublico, ZonaEmJogo, PosicaoFinal, EventoDaMesa, AcaoDaMesa, CombateNaMesa, EspiadaPendente,
+  JogadorPublico, ZonaEmJogo, PosicaoFinal, EventoDaMesa, AcaoDaMesa, CombateNaMesa, EspiadaPendente, QueimaPendente,
   EstadoPartida, VistaDaPartida, ConfigPartida, EntradaJogador, Baralho, Fase,
 } from './tipos';
 export { montarComposicao, montarComposicaoTesouros, tirarDoTopo, type ReceitaDeBaralho } from './baralho';
@@ -18,4 +18,4 @@ export type { DepsMesa, ResultadoAcao } from './mesa';
 export { AcaoInvalida } from './erros';
 export { classificar } from './classificacao';
 export { projetarPara, versaoDe } from './projecao';
-export { acaoEhLegalNaFase } from './fase';
+export { acaoEhLegal } from './fase';

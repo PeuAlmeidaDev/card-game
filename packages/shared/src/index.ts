@@ -22,6 +22,7 @@ import type {
   GrauDeAfinidade,
   JogadorPublico,
   PosicaoFinal,
+  QueimaPendente,
   Slot,
   VistaDaPartida,
   ZonaEmJogo,
@@ -97,6 +98,10 @@ export const acaoDaMesaSchema = z.discriminatedUnion('tipo', [
   // mão (`jogarCarta`, `equiparCarta`, `guardarCarta`): o `cartaId` é o único
   // campo livre do fio, refletido verbatim no 400 e no log do server.
   z.object({ tipo: z.literal('procurarEncrenca'), cartaId: z.string().min(1).max(64) }),
+  // Mesmo teto de 64 e pelo mesmo motivo dos outros verbos que apontam carta: o
+  // `cartaId` é refletido verbatim no 400 e no log do server. O cliente aponta a
+  // carta, nunca o destino — o destino é sempre o cemitério de Tesouros.
+  z.object({ tipo: z.literal('queimarCarta'), cartaId: z.string().min(1).max(64) }),
 ]) satisfies z.ZodType<{ tipo: AcaoDaMesa['tipo'] }>;
 
 /** A intenção validada. A rota completa com o `jogadorId` da sessão. */
@@ -163,10 +168,10 @@ export const acaoRequisicaoSchema = z.object({
   versao: z.number().int().nonnegative(),
 });
 
-// Valor, não tipo: a tabela de legalidade é a MESMA nos dois lados. Duplicá-la no
-// cliente era o que fazia um botão acender numa hora em que o domínio recusa —
-// e a cópia que ficasse para trás só apareceria como 400 na cara do jogador.
-export { acaoEhLegalNaFase } from '@card-dungeon/partida';
+// Valor, não tipo: a tabela de legalidade é a MESMA nos dois lados. `acaoEhLegal`
+// e não `acaoEhLegalNaFase` — o cliente precisa da resposta INTEIRA, e a que só
+// olha a fase acenderia botão com uma queima pendente aberta.
+export { acaoEhLegal } from '@card-dungeon/partida';
 
 // Valor, pelo mesmo motivo: o corpo vazio é um `Record` com os cinco slots, e a
 // cópia escrita à mão no cliente é a que fica para trás quando o sexto nascer.
@@ -280,6 +285,7 @@ export type {
   CartaTesouro,
   CartaEquipamento,
   EspiadaPendente,
+  QueimaPendente,
   Fase,
   // O vocabulário do corpo. `Slot` sai de `partida` (a regra) e `ItemCarta` de
   // `cartas` (o dado) — o `_CoberturaSlot` acima é quem garante que as duas

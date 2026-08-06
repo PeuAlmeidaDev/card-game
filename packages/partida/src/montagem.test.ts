@@ -44,6 +44,12 @@ describe('criarPartida', () => {
     expect(p.log).toEqual([{ tipo: 'vez', jogadorId: 'p1' }]);
   });
 
+  it('a mesa nasce sem queima pendente', () => {
+    const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
+
+    expect(p.queima).toBeNull();
+  });
+
   it('lança com menos de dois jogadores', () => {
     expect(() => criarPartida('m1', [entradas[0]!], config, { embaralhar: semEmbaralhar }))
       .toThrow('criarPartida: a mesa precisa de pelo menos 2 jogadores');

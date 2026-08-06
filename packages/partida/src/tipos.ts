@@ -391,6 +391,16 @@ export type EventoDaMesa =
       readonly carta: CartaEquipamento; readonly destino: 'mochila' | 'cemiterio';
       readonly motivo: 'trocaDeSlot' | 'perdeuAfinidade' }
   /**
+   * A carta da MOCHILA que o jogador escolheu destruir para abrir vaga ao item
+   * deslocado (decisão #59). CARREGA a carta: a mochila e o cemitério de Tesouros
+   * são zonas ABERTAS.
+   *
+   * Só sai quando a escolha foi por uma carta da mochila. Queimar o próprio
+   * deslocado já é contado pelo `desequipou` com `destino: 'cemiterio'`, e um
+   * evento a mais ali diria a mesma coisa duas vezes.
+   */
+  | { readonly tipo: 'queimou'; readonly jogadorId: string; readonly carta: CartaTesouro }
+  /**
    * O jogador declinou de agir numa fase parada. Emite evento — e não silêncio —
    * porque `versaoDe` é `log.length`: sem mover a versão, um duplo-clique em
    * "Passar" escaparia do guard de 409 do server e morreria como 400 na cara do
@@ -442,6 +452,16 @@ export type AcaoDaMesa =
    */
   | { readonly tipo: 'saquear'; readonly jogadorId: string }
   /**
+   * Escolhe QUAL carta queimar quando o corpo deslocou um item e a mochila está
+   * cheia (decisão #59). O `cartaId` é o do deslocado da vez OU o de uma carta da
+   * mochila; queimar da mochila abre a vaga em que o deslocado entra.
+   *
+   * Não aparece na tabela `LEGAL` (`./fase`): ela nunca é legal por FASE, só por
+   * pendência. Quem garante que isso não a torna inalcançável é o teste de
+   * cobertura em `fase.test.ts`.
+   */
+  | { readonly tipo: 'queimarCarta'; readonly jogadorId: string; readonly cartaId: string }
+  /**
    * Encerra uma fase PARADA (`recompor`/`jogar`) sem fazer mais nada nela. É o
    * verbo que dá SAÍDA às duas — sem ele, `recompor` seria uma fase da qual não
    * se sai (o jogador com uma raça na mão travaria antes de vasculhar), que é
@@ -466,6 +486,24 @@ export interface CombateNaMesa {
    * identidade veio trazer.
    */
   readonly monstroId: string;
+}
+
+/**
+ * O que saiu do corpo e ainda não tem destino, porque a mochila está cheia. O
+ * jogador escolhe entre queimar o primeiro da fila ou abrir vaga queimando uma
+ * carta da mochila (decisão #59 do game bible).
+ *
+ * Zona ABERTA: viaja inteira na projeção, para todos. A `espiada` é secreta pela
+ * ZONA dela (o topo do baralho), não por ser pendência.
+ */
+export interface QueimaPendente {
+  readonly jogadorId: string;
+  /**
+   * A fila. O PRIMEIRO é o que a escolha de agora resolve — tupla não-vazia para
+   * que "pendência aberta sem carta a resolver" não seja representável.
+   */
+  readonly deslocados: readonly [CartaEquipamento, ...CartaEquipamento[]];
+  readonly motivo: Extract<EventoDaMesa, { readonly tipo: 'desequipou' }>['motivo'];
 }
 
 /**
@@ -522,6 +560,7 @@ export interface EstadoPartida {
   readonly tesouros: Baralho<CartaTesouro>;
   readonly combate: CombateNaMesa | null;
   readonly espiada: EspiadaPendente | null;
+  readonly queima: QueimaPendente | null;
   /**
    * Onde o turno está. Só é significativa com `desfecho === 'emAndamento'`: a
    * partida terminada não tem turno, e o guard do topo do `aplicarAcao` recusa
@@ -558,6 +597,8 @@ export interface VistaDaPartida {
   readonly combate: CombateNaMesa | null;
   /** A carta espiada, presente SÓ na vista do dono da espiada. `null` para os outros. */
   readonly espiada: EspiadaPendente | null;
+  /** A queima pendente de QUEM ESTÁ NA VEZ. Pública: as duas pontas dela são zonas abertas. */
+  readonly queima: QueimaPendente | null;
   /**
    * Em que ponto do turno a mesa está. PÚBLICA: é regra, não segredo — a mesma
    * decisão do `limiteDeMao`, que já é publicado por jogador. É daqui que o

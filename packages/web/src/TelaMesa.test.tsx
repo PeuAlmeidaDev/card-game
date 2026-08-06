@@ -28,6 +28,7 @@ const vistaBase: VistaDaPartida = {
   tesourosNoMonte: 0,
   combate: null,
   espiada: null,
+  queima: null,
   fase: 'vasculhar',
   desfecho: 'emAndamento',
   classificacao: null,
@@ -1177,5 +1178,143 @@ describe('TelaMesa — afinidade de itens', () => {
     );
 
     expect(await screen.findByText(/reduzido/)).toBeInTheDocument();
+  });
+});
+
+describe('TelaMesa — a queima pendente', () => {
+  const mochilaCheia: readonly CartaTesouro[] = Array.from(
+    { length: LIMITE_MOCHILA }, (_, i) => tesouro(`t-mochila-${String(i)}`, 'elmo-de-couro'),
+  );
+
+  /** A vista com a queima aberta para `dono`, e a mochila de p1 no teto. */
+  const comQueima = (dono: string): VistaDaPartida => ({
+    ...vistaBase,
+    fase: 'recompor',
+    jogadores: vistaBase.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: mochilaCheia } : j)),
+    queima: {
+      jogadorId: dono,
+      deslocados: [tesouro('t-saiu', 'espada-curta')],
+      motivo: 'trocaDeSlot',
+    },
+  });
+
+  it('lista as SEIS cartas: o deslocado e as cinco da mochila', async () => {
+    await abrirMesa(comQueima('p1'));
+
+    expect(screen.getAllByRole('button', { name: 'Queimar' })).toHaveLength(1 + LIMITE_MOCHILA);
+    const bloco = screen.getByLabelText('queima pendente');
+    expect(within(bloco).getByText(/Espada Curta/)).toBeInTheDocument();
+  });
+
+  it('com a pendência aberta, os outros botões ficam APAGADOS — não somem', async () => {
+    // Decisão #26: a tela tem UM vocabulário para "você não pode agora" — a
+    // pendência apaga o que a fase `recompor` ofereceria. "Vasculhar local" e
+    // "Saquear" NÃO servem de prova: não estão em `LEGAL.recompor` (fase.ts) e já
+    // apagariam nesta fase sem pendência nenhuma — achado 4 da revisão. "Passar",
+    // "Jogar" e "Equipar" SÃO legais em `recompor`; só apagam aqui por causa da
+    // pendência, e é isso que o teste prende. A mão ganha uma raça só para "Jogar"
+    // existir; "Equipar" já tem 5 ocorrências pela mochila cheia.
+    await abrirMesa(comMao(comQueima('p1'), [{ id: 'p-raca', tipo: 'raca', racaId: 'orc' }]));
+
+    expect(screen.getByRole('button', { name: 'Passar' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Jogar' })).toBeDisabled();
+    for (const botaoEquipar of screen.getAllByRole('button', { name: 'Equipar' })) {
+      expect(botaoEquipar).toBeDisabled();
+    }
+  });
+
+  it('a pendência de OUTRO jogador aparece na tela, e sem botões', async () => {
+    // A pendência é PÚBLICA (decisão #82): a mesa vê que o jogador da vez está
+    // parado escolhendo. Sem esta linha, o turno alheio ficaria congelado sem
+    // explicação — o padrão "o código faz certo e não conta a ninguém", que o
+    // gate ocular deste projeto já pegou duas vezes.
+    await abrirMesa({ ...comQueima('p2'), vezDe: 'p2' });
+
+    expect(screen.getByText(/Bot 1 está escolhendo o que queimar/)).toBeInTheDocument();
+    // A ausência do BLOCO, não do rótulo do botão (achado 5 da revisão): afirmar
+    // só `queryByRole('button', { name: 'Queimar' })` sobrevive a um renome do
+    // botão sem pegar a regressão que importa — o bloco inteiro não pode
+    // renderizar para quem não é o dono da pendência.
+    expect(screen.queryByLabelText('queima pendente')).not.toBeInTheDocument();
+  });
+
+  it('clicar no botão do DESLOCADO manda o id dele, não um da mochila', async () => {
+    // Gêmeo do teste abaixo (achado 1 da revisão): sem ele, o ramo com o `const
+    // alvo = vista.queima` — o único código novo desta task com lógica de
+    // verdade, e a escolha que PRESERVA a mochila — podia mandar qualquer id que
+    // a suíte continuava verde.
+    const agir = vi.spyOn(api, 'agir').mockResolvedValue({ status: 200, body: comQueima('p1') } as never);
+    await abrirMesa(comQueima('p1'));
+    const bloco = screen.getByLabelText('queima pendente');
+    const linha = within(bloco).getAllByRole('listitem')[0];
+    if (linha === undefined) throw new Error('a primeira linha da queima não existe');
+
+    await userEvent.click(within(linha).getByRole('button', { name: 'Queimar' }));
+
+    expect(agir).toHaveBeenCalledWith({
+      params: { id: 'm1' },
+      body: { acao: { tipo: 'queimarCarta', cartaId: 't-saiu' }, versao: 1 },
+    });
+  });
+
+  it('clicar em uma carta da mochila manda o id DELA, não o do deslocado', async () => {
+    // Escopado pela linha da carta: a tela tem seis botões com o mesmo rótulo, e
+    // um `getByRole` genérico pegaria o primeiro — que é justamente o deslocado,
+    // fazendo o teste passar com a ação errada.
+    const agir = vi.spyOn(api, 'agir').mockResolvedValue({ status: 200, body: comQueima('p1') } as never);
+    await abrirMesa(comQueima('p1'));
+    const bloco = screen.getByLabelText('queima pendente');
+    const linha = within(bloco).getAllByRole('listitem')[1];
+    if (linha === undefined) throw new Error('a segunda linha da queima não existe');
+
+    await userEvent.click(within(linha).getByRole('button', { name: 'Queimar' }));
+
+    // Objeto exato, não `objectContaining` (o brief pedia `objectContaining`, mas
+    // ele reprova o `no-unsafe-assignment` do lint da raiz — ver a nota da linha
+    // 544 acima, mesma convenção seguida aqui).
+    expect(agir).toHaveBeenCalledWith({
+      params: { id: 'm1' },
+      body: { acao: { tipo: 'queimarCarta', cartaId: 't-mochila-0' }, versao: 1 },
+    });
+  });
+});
+
+describe('TelaMesa — atacar e esquivar', () => {
+  /** Combate em curso, na decisão que `proximaDecisao` indica. */
+  const emCombateContra = (proximaDecisao: 'ataque' | 'esquiva'): VistaDaPartida => ({
+    ...vistaBase,
+    fase: 'combate',
+    combate: {
+      monstroId: 'goblin',
+      proximaDecisao,
+      estado: {
+        jogador: { ...combatente, vida: 6 },
+        monstro: { forca: 4, vida: 23, habilidade: 2, agilidade: 4, level: 5 },
+        vez: proximaDecisao === 'esquiva' ? 'monstro' : 'jogador',
+        turno: 3,
+        ataqueDoMonstro: proximaDecisao === 'esquiva' ? { rolagem: 4 } : null,
+        desfecho: 'emAndamento',
+        vidaInicialJogador: combatente.vida,
+        passiva: null,
+      },
+    },
+  });
+
+  it('"Atacar" acende na decisão de ataque, "Esquivar" fica apagado', async () => {
+    // Achado 2 da revisão: nenhum teste do arquivo cruzava os nomes "Atacar" e
+    // "Esquivar" antes desta rodada — revertendo os dois `disabled` de volta para
+    // `!minhaVez` a suíte inteira continuava 72/72 verde, porque nada olhava
+    // especificamente para esses dois botões.
+    await abrirMesa(emCombateContra('ataque'));
+
+    expect(screen.getByRole('button', { name: 'Atacar' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Esquivar' })).toBeDisabled();
+  });
+
+  it('"Esquivar" acende na decisão de esquiva, "Atacar" fica apagado', async () => {
+    await abrirMesa(emCombateContra('esquiva'));
+
+    expect(screen.getByRole('button', { name: 'Esquivar' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Atacar' })).toBeDisabled();
   });
 });

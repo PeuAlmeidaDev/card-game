@@ -8,7 +8,7 @@ import { escolherAcao } from './bot';
 // Importado pelos helpers `comMao`: eles DERIVAM a fase da mão que montam em vez
 // de cravá-la, para não produzirem estado que o domínio nunca geraria.
 import { faseDoTurnoDe } from './fase';
-import { projetarPara } from './projecao';
+import { projetarPara, versaoDe } from './projecao';
 import { AcaoInvalida } from './erros';
 import { filaDeDados, criarDadoCiclico } from './testes/dados';
 import { monstro, monstros, raca, equipamento } from './testes/cartas';
@@ -1545,7 +1545,7 @@ describe('trocar de raça derruba o que perdeu afinidade', () => {
     expect(depois.jogadores[0]?.mochila.map((c) => c.id)).toContain('t-1');
   });
 
-  it('com UMA vaga na mochila e DOIS itens caindo, um vai para cada destino', () => {
+  it('com UMA vaga na mochila e DOIS itens caindo, o primeiro entra e o segundo abre a pendência', () => {
     // O teste que o spec §6.2 nomeia. Com a mochila VAZIA ou CHEIA as duas
     // implementações (perguntar por item × perguntar uma vez para o lote) dão o
     // mesmo resultado, e o teste ficaria verde por acidente.
@@ -1554,7 +1554,8 @@ describe('trocar de raça derruba o que perdeu afinidade', () => {
     // `ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS` (as duas mãos, MESMA instância — dedup por
     // `itensEquipados` conta como UM item, não dois): a ordem de `itensEquipados`
     // segue `SLOTS_VAZIOS` (capacete antes de maoDireita), então o capacete é o
-    // primeiro a pedir vaga na mochila e o montante é o segundo, que já não cabe.
+    // primeiro a pedir vaga na mochila e o montante é o segundo, que já não cabe
+    // — e vira a pendência, em vez de ir direto ao cemitério (decisão #59).
     const exclusivo = equipamento('t-1', ID_DO_ITEM_EXCLUSIVO);
     const montante = equipamento('t-2', ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS);
     const quaseCheia = Array.from({ length: LIMITE_MOCHILA - 1 }, (_, i) => equipamento(`t-cheia-${String(i)}`));
@@ -1566,13 +1567,15 @@ describe('trocar de raça derruba o que perdeu afinidade', () => {
       quaseCheia,
     );
 
-    const { eventos } = aplicarAcao(
+    const { eventos, estado: depois } = aplicarAcao(
       estado, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'p-9' }, deps([]),
     );
 
     const saidas = eventos.filter((e) => e.tipo === 'desequipou');
-    expect(saidas.map((e) => e.destino)).toEqual(['mochila', 'cemiterio']);
+    expect(saidas.map((e) => e.destino)).toEqual(['mochila']);
     expect(saidas.every((e) => e.motivo === 'perdeuAfinidade')).toBe(true);
+    expect(depois.queima?.deslocados.map((c) => c.id)).toEqual(['t-2']);
+    expect(depois.queima?.motivo).toBe('perdeuAfinidade');
   });
 
   it('o item que caiu NA MOCHILA segura a fase — a fase não se auto-pula', () => {
@@ -1591,6 +1594,22 @@ describe('trocar de raça derruba o que perdeu afinidade', () => {
     );
 
     expect(depois.fase).toBe('recompor');
+  });
+
+  it('trocar de raça com a mochila cheia abre a pendência, com o motivo `perdeuAfinidade`', () => {
+    const cheia = Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
+    const p = comCorpo(
+      nascida(),
+      { capacete: equipamento('t-excl', ID_DO_ITEM_EXCLUSIVO) },
+      [raca('r-1', ID_DA_RACA_OUTRA)],
+      cheia,
+    );
+
+    const r = aplicarAcao(p, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'r-1' }, deps([]));
+
+    expect(r.estado.queima?.deslocados.map((c) => c.id)).toEqual(['t-excl']);
+    expect(r.estado.queima?.motivo).toBe('perdeuAfinidade');
+    expect(r.estado.tesouros.cemiterio).toEqual([]);
   });
 });
 
@@ -1649,17 +1668,25 @@ describe('aplicarAcao — equiparCarta', () => {
     expect(combatenteDe(jogadorDe(depois, 'p1'), catalogoPadrao).forca).toBe(antes + 1);
   });
 
-  it('o item deslocado vai para o cemitério de Tesouros quando a mochila está CHEIA', () => {
-    // A mochila entrou como destino preferencial (Task 5 do Plano 4a):
-    // `destinoDoDesequipado` só cai aqui quando ela não tem vaga. Sem forjar a
-    // mochila cheia, o deslocado iria PARA ELA, e este teste pararia de exercitar
-    // o cemitério — o ramo "há vaga" tem teste próprio em `equipar.test.ts`.
+  it('o item deslocado vai para o cemitério de Tesouros quando a mochila está CHEIA e o jogador escolhe queimá-lo', () => {
+    // A mochila entrou como destino preferencial desde o Plano 4a, e desde esta
+    // task ela deixou de ser a palavra final: com a mochila CHEIA, `equiparCarta`
+    // ABRE uma pendência (decisão #59) em vez de mandar direto ao cemitério — o
+    // ramo "há vaga" tem teste próprio em `equipar.test.ts`. O resultado final —
+    // a carta no cemitério — é o mesmo de antes quando o jogador escolhe queimar
+    // o próprio deslocado; é essa sequência de DUAS ações que este teste afirma
+    // agora.
     const cheia = Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
     const base = comSlots(comMao(nascida(), [equipamento('t-1')]), { maoDireita: equipamento('t-0') });
     const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
     const p: EstadoPartida = { ...base, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...base, jogadores }, 'p1')) };
 
-    const { estado: depois } = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+    const { estado: naPendencia } = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+    expect(naPendencia.queima?.deslocados.map((c) => c.id)).toEqual(['t-0']);
+
+    const { estado: depois } = aplicarAcao(
+      naPendencia, { tipo: 'queimarCarta', jogadorId: 'p1', cartaId: 't-0' }, deps([]),
+    );
 
     expect(depois.tesouros.cemiterio.map((c) => c.id)).toContain('t-0');
     // E no cemitério de TESOUROS, não no de Portas: o roteamento por família vale
@@ -1684,23 +1711,60 @@ describe('aplicarAcao — equiparCarta', () => {
     // eventos, aqui se prova que `equiparCarta` os REPASSA. Sem este, a função
     // poderia montar os eventos e o reducer descartá-los, com a suíte verde.
     //
-    // Mochila CHEIA de propósito: é o ramo em que a carta é DESTRUÍDA, o único
-    // momento do jogo em que isso acontece sem o jogador pedir, e o que estava
-    // invisível antes deste evento existir.
-    const cheia = Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
+    // Mochila com VAGA de propósito: é o ramo em que `destinoDoDesequipado` ainda
+    // emite o `desequipou` na hora — com ela CHEIA a decisão vira pendência, e o
+    // evento só nasce quando `queimarCarta` a resolve (ver o teste acima e o
+    // describe de `queimarCarta`).
     const b = comSlots(comMao(nascida(), [equipamento('t-1')]), { maoDireita: equipamento('t-0') });
-    const jogadores = b.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
-    const p: EstadoPartida = { ...b, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...b, jogadores }, 'p1')) };
 
-    const { eventos } = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+    const { eventos } = aplicarAcao(b, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
 
     expect(eventos).toContainEqual({
-      tipo: 'desequipou', jogadorId: 'p1', destino: 'cemiterio', motivo: 'trocaDeSlot',
+      tipo: 'desequipou', jogadorId: 'p1', destino: 'mochila', motivo: 'trocaDeSlot',
       carta: { id: 't-0', tipo: 'equipamento', itemId: 'i-teste' },
     });
     // E na ordem: a ação pedida antes do que ela custou.
     expect(eventos.findIndex((e) => e.tipo === 'equipou'))
       .toBeLessThan(eventos.findIndex((e) => e.tipo === 'desequipou'));
+  });
+
+  it('equipar com a mochila cheia ABRE a pendência: ela entra no estado e a vez NÃO passa', () => {
+    // O `return` antes de `entrarOuPular` é o que carrega a `queima` para o
+    // estado registrado — sem ele, a pendência se perderia. O auto-pulo em si é
+    // INALCANÇÁVEL aqui: a mochila no teto faz `faseSeAutoPula` devolver `false`
+    // nas duas fases paradas (prendido em `fase.test.ts`), então a pendência e o
+    // auto-pulo nunca coexistem. O que este teste prova é o efeito observável do
+    // `return` — a pendência chega ao estado e `vezDe` continua sendo de quem
+    // equipou.
+    const cheia = Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
+    const base = comSlots(comMao(nascida(), [equipamento('t-novo')]), { maoDireita: equipamento('t-0') });
+    const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
+    const p: EstadoPartida = { ...base, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...base, jogadores }, 'p1')) };
+
+    const r = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-novo' }, deps([]));
+
+    expect(r.estado.queima?.deslocados.map((c) => c.id)).toEqual(['t-0']);
+    expect(r.estado.queima?.motivo).toBe('trocaDeSlot');
+    expect(r.estado.vezDe).toBe('p1');
+    expect(r.estado.tesouros.cemiterio).toEqual([]);
+    // O `equipou` sai na hora; o `desequipou` só quando a escolha for feita.
+    expect(r.eventos.map((e) => e.tipo)).toEqual(['equipou']);
+  });
+
+  it('abrir a queima MOVE a versão', () => {
+    // A `espiada` precisou de um `+ 1` em `versaoDe` porque não emite evento. A
+    // queima não precisa: abrir sempre acompanha um `equipou` ou um `racaEmJogo`.
+    // Somar um termo que nunca sustenta nada seria comentário disfarçado de
+    // código — esta asserção é o que segura a propriedade no lugar dele.
+    const cheia = Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
+    const base = comSlots(comMao(nascida(), [equipamento('t-novo')]), { maoDireita: equipamento('t-0') });
+    const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
+    const p: EstadoPartida = { ...base, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...base, jogadores }, 'p1')) };
+    const antes = versaoDe(p);
+
+    const r = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-novo' }, deps([]));
+
+    expect(versaoDe(r.estado)).toBeGreaterThan(antes);
   });
 
   it('slot vazio NÃO emite `desequipou` — nada saiu do corpo', () => {
@@ -1831,10 +1895,11 @@ describe('aplicarAcao — equiparCarta', () => {
     // EXATAMENTE uma vaga, e é nela que o item deslocado do slot precisa caber.
     //
     // Um refactor que hoiste-asse a chamada de `destinoDoDesequipado` para ANTES
-    // da remoção compilaria e passaria o resto da suíte inteira: a mochila ainda
-    // estaria cheia no instante da pergunta, o deslocado cairia no cemitério, e
-    // este teste é o único que nota — os outros ou não usam mochila cheia como
-    // origem, ou não deslocam nada do slot.
+    // da remoção mudaria o resultado: a mochila ainda estaria cheia no instante
+    // da pergunta, e o deslocado abriria uma pendência em vez de achar a vaga que
+    // esta asserção prova que ele acha. Não é o único teste que pega essa
+    // inversão — o pin gêmeo abaixo e o de `equipar.test.ts` dependem da mesma
+    // ordem —, mas é o único deste describe com origem MOCHILA cheia.
     const cheia = [equipamento('t-1'), ...Array.from({ length: LIMITE_MOCHILA - 1 }, (_, i) => equipamento(`t-cheia-${String(i)}`))];
     const base = comSlots(comMao(nascida(), []), { maoDireita: equipamento('t-0') });
     const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
@@ -2967,5 +3032,164 @@ describe('procurarEncrenca', () => {
       { tipo: 'procurarEncrenca', jogadorId: 'p1', cartaId: 'r-1' },
       deps([]),
     )).toThrow(AcaoInvalida);
+  });
+});
+
+describe('aplicarAcao — queimarCarta', () => {
+  const soMonstro = { ...config, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] };
+  const nascida = (): EstadoPartida => criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+
+  /**
+   * Mesa com a mochila de p1 CHEIA e uma queima pendente forjada. A fase é
+   * `recompor` cravada porque, com pendência aberta, `faseDoTurnoDe` não é quem
+   * decide — o gate recusa tudo até a escolha, e a fase só volta a importar
+   * quando ela se esvazia.
+   */
+  const comQueima = (
+    deslocados: readonly [CartaEquipamento, ...CartaEquipamento[]],
+    mochila: readonly CartaEquipamento[] = Array.from(
+      { length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-mochila-${String(i)}`),
+    ),
+  ): EstadoPartida => {
+    const base = nascida();
+    const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao: [], mochila } : j));
+    return {
+      ...base, jogadores, fase: 'recompor',
+      queima: { jogadorId: 'p1', deslocados, motivo: 'trocaDeSlot' },
+    };
+  };
+
+  it('pendência de OUTRO jogador é `Error` cru, não silêncio', () => {
+    // O verbo lê a mochila de `acao.jogadorId` e a fila de `estado.queima`. Que
+    // os dois sejam o MESMO jogador é hoje coincidência sustentada por outra
+    // regra (o gate de `vezDe` mais o fato de a pendência só nascer no turno de
+    // quem age) — não uma invariante que este arquivo garanta.
+    //
+    // Sem o guard, o estado forjado abaixo é ACEITO EM SILÊNCIO: a carta de p2
+    // entra na mochila de p1 e a de p1 vai ao cemitério — carta trocando de dono
+    // com o log inteiro dizendo `p1`. É `Error` cru e não `AcaoInvalida` porque
+    // nenhum cliente consegue pedir isso: se acontecer, quem quebrou fomos nós.
+    //
+    // 🔴 A `Interferência` do roteiro é a mecânica que derruba a premissa — ela
+    // faz jogador agir FORA do próprio turno.
+    const p = comQueima([equipamento('t-saiu')]);
+    const deOutro: EstadoPartida = {
+      ...p,
+      queima: { jogadorId: 'p2', deslocados: [equipamento('t-do-p2')], motivo: 'trocaDeSlot' },
+    };
+
+    expect(() => aplicarAcao(deOutro, { tipo: 'queimarCarta', jogadorId: 'p1', cartaId: 't-mochila-0' }, deps([])))
+      .toThrow(/queimarCarta: a queima pendente é de p2/);
+  });
+
+  it('queimar o DESLOCADO manda ele ao cemitério de Tesouros e não toca na mochila', () => {
+    const p = comQueima([equipamento('t-saiu')]);
+
+    const r = aplicarAcao(p, { tipo: 'queimarCarta', jogadorId: 'p1', cartaId: 't-saiu' }, deps([]));
+
+    expect(r.estado.tesouros.cemiterio.map((c) => c.id)).toContain('t-saiu');
+    expect(jogadorDe(r.estado, 'p1').mochila).toHaveLength(LIMITE_MOCHILA);
+    expect(jogadorDe(r.estado, 'p1').mochila.map((c) => c.id)).not.toContain('t-saiu');
+    expect(r.eventos).toEqual([
+      { tipo: 'desequipou', jogadorId: 'p1', carta: equipamento('t-saiu'), destino: 'cemiterio', motivo: 'trocaDeSlot' },
+    ]);
+  });
+
+  it('resolvida a última da fila, a pendência fecha e o turno volta a andar', () => {
+    const p = comQueima([equipamento('t-saiu')]);
+
+    const r = aplicarAcao(p, { tipo: 'queimarCarta', jogadorId: 'p1', cartaId: 't-saiu' }, deps([]));
+
+    expect(r.estado.queima).toBeNull();
+    // Mão vazia e mochila cheia: `recompor` NÃO se auto-pula (a mochila é origem
+    // de `equiparCarta`), então o jogador continua nela.
+    expect(r.estado.fase).toBe('recompor');
+    expect(r.estado.vezDe).toBe('p1');
+  });
+
+  it('com DOIS deslocados, a fila avança uma carta por escolha', () => {
+    // A mochila cheia continua cheia depois de cada resolução, então cada item
+    // que não coube vira sua própria pergunta. Uma pergunta por lote mandaria os
+    // dois para o mesmo destino.
+    const p = comQueima([equipamento('t-a'), equipamento('t-b')]);
+
+    const r1 = aplicarAcao(p, { tipo: 'queimarCarta', jogadorId: 'p1', cartaId: 't-a' }, deps([]));
+
+    expect(r1.estado.queima?.deslocados.map((c) => c.id)).toEqual(['t-b']);
+
+    const r2 = aplicarAcao(r1.estado, { tipo: 'queimarCarta', jogadorId: 'p1', cartaId: 't-b' }, deps([]));
+
+    expect(r2.estado.queima).toBeNull();
+    expect(r2.estado.tesouros.cemiterio.map((c) => c.id)).toEqual(['t-a', 't-b']);
+  });
+
+  it('queimar da MOCHILA abre a vaga: o deslocado entra e a escolhida vai ao cemitério', () => {
+    // O SEGUNDO ramo do verbo. Sem este teste, a Task 2 entregaria comportamento
+    // sem cobertura e a Task 3 (o evento) teria que testá-lo retroativamente —
+    // teste escrito depois do código, que é o que o TDD deste projeto proíbe.
+    const mochila = [
+      equipamento('t-alvo'),
+      ...Array.from({ length: LIMITE_MOCHILA - 1 }, (_, i) => equipamento(`t-resto-${String(i)}`)),
+    ];
+    const p = comQueima([equipamento('t-saiu')], mochila);
+
+    const r = aplicarAcao(p, { tipo: 'queimarCarta', jogadorId: 'p1', cartaId: 't-alvo' }, deps([]));
+
+    const depois = jogadorDe(r.estado, 'p1').mochila.map((c) => c.id);
+    expect(depois).toHaveLength(LIMITE_MOCHILA);
+    expect(depois).toContain('t-saiu');
+    expect(depois).not.toContain('t-alvo');
+    expect(r.estado.tesouros.cemiterio.map((c) => c.id)).toEqual(['t-alvo']);
+    // O `desequipou` do deslocado diz `mochila`, não `cemiterio`: ele SOBREVIVEU.
+    expect(r.eventos).toEqual([
+      { tipo: 'desequipou', jogadorId: 'p1', carta: equipamento('t-saiu'), destino: 'mochila', motivo: 'trocaDeSlot' },
+      { tipo: 'queimou', jogadorId: 'p1', carta: equipamento('t-alvo') },
+    ]);
+  });
+
+  it('a carta queimada da mochila ganha linha de log própria', () => {
+    // Sem este evento a carta DESTRUÍDA some calada: o `desequipou` fala do item
+    // que saiu do corpo (que foi para a mochila, destino benigno), e nada conta
+    // que uma outra carta foi ao cemitério. É a decisão #27 valendo de novo.
+    const mochila = [
+      equipamento('t-alvo'),
+      ...Array.from({ length: LIMITE_MOCHILA - 1 }, (_, i) => equipamento(`t-resto-${String(i)}`)),
+    ];
+    const p = comQueima([equipamento('t-saiu')], mochila);
+
+    const r = aplicarAcao(p, { tipo: 'queimarCarta', jogadorId: 'p1', cartaId: 't-alvo' }, deps([]));
+
+    expect(r.eventos).toEqual([
+      { tipo: 'desequipou', jogadorId: 'p1', carta: equipamento('t-saiu'), destino: 'mochila', motivo: 'trocaDeSlot' },
+      { tipo: 'queimou', jogadorId: 'p1', carta: equipamento('t-alvo') },
+    ]);
+  });
+
+  it('com a pendência aberta, NENHUMA outra ação passa', () => {
+    const p = comQueima([equipamento('t-saiu')]);
+
+    expect(() => aplicarAcao(p, { tipo: 'passar', jogadorId: 'p1' }, deps([])))
+      .toThrow(AcaoInvalida);
+    // A mensagem, não só a classe: sem cravá-la, `passar` recusado em `recompor`
+    // com pendência aberta poderia mentir dizendo "não é legal na fase" — e
+    // `passar` É legal em `recompor`. O motivo da recusa é a pendência.
+    expect(() => aplicarAcao(p, { tipo: 'passar', jogadorId: 'p1' }, deps([])))
+      .toThrow(/há uma queima pendente/);
+    expect(() => aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])))
+      .toThrow(AcaoInvalida);
+  });
+
+  it('sem pendência, `queimarCarta` é recusada pelo gate (as seis fases são cobertas em `fase.test.ts`)', () => {
+    const p = nascida();
+
+    expect(() => aplicarAcao(p, { tipo: 'queimarCarta', jogadorId: 'p1', cartaId: 't-x' }, deps([])))
+      .toThrow(AcaoInvalida);
+  });
+
+  it('carta que não é o deslocado nem está na mochila é recusada como AcaoInvalida', () => {
+    const p = comQueima([equipamento('t-saiu')]);
+
+    expect(() => aplicarAcao(p, { tipo: 'queimarCarta', jogadorId: 'p1', cartaId: 't-forasteira' }, deps([])))
+      .toThrow(AcaoInvalida);
   });
 });

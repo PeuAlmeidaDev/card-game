@@ -2,7 +2,8 @@ import type { Combatente, Passo, RolarD12, PassivaCombate } from '@card-dungeon/
 import { AcaoIlegal, criarCombate, proximoPasso } from '@card-dungeon/motor';
 import type {
   AcaoDaMesa, Carta, CartaEquipamento, CartaPorta, CartaTesouro, CatalogoDaMesa, Embaralhar,
-  EstadoPartida, EventoDaMesa, Fase, FaseParada, InfoRaca, JogadorNaMesa, Slot, ZonaEmJogo,
+  EstadoPartida, EventoDaMesa, Fase, FaseParada, InfoRaca, JogadorNaMesa, QueimaPendente, Slot,
+  ZonaEmJogo,
 } from './tipos';
 import { tirarDoTopo } from './baralho';
 import { LIMITE_MOCHILA } from './mao';
@@ -11,7 +12,7 @@ import { afinidadeCom, combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corp
 import { colocarNoSlot, destinoDoDesequipado } from './equipar';
 import { classificar } from './classificacao';
 import { AcaoInvalida } from './erros';
-import { acaoEhLegalNaFase, faseDoTurnoDe, faseSeAutoPula } from './fase';
+import { acaoEhLegal, faseDoTurnoDe, faseSeAutoPula } from './fase';
 
 /** As ações que só fazem sentido com um combate aberto. */
 type AcaoDeCombate = Extract<AcaoDaMesa, { readonly tipo: 'atacar' | 'esquivar' }>;
@@ -197,17 +198,18 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
     throw new AcaoInvalida(`aplicarAcao: não é a vez de ${acao.jogadorId}`);
   }
 
-  // Gate de FASE — resposta única para "em que ponto do turno esta ação cabe?",
-  // não para "posso?" inteiro. Antes a pergunta estava espalhada em cinco
-  // funções, cada uma relendo `combate`, `espiada` e o limite de mão por conta
-  // própria — três booleanos ortogonais, oito combinações, e nenhum lugar que
-  // dissesse a verdade. A ação nova do Plano 3 precisava lembrar de repetir os
-  // guards certos; agora ela precisa entrar na tabela, e o `Record<Fase, …>` cobra.
+  // `acaoEhLegal` — resposta única para "esta ação cabe agora?" (fase MAIS
+  // queima pendente), não para "posso?" inteiro. Antes a pergunta estava
+  // espalhada em cinco funções, cada uma relendo `combate`, `espiada` e o
+  // limite de mão por conta própria — três booleanos ortogonais, oito
+  // combinações, e nenhum lugar que dissesse a verdade. A ação nova do
+  // Plano 3 precisava lembrar de repetir os guards certos; agora ela precisa
+  // entrar na tabela, e o `Record<Fase, …>` cobra.
   //
   // ⚠️ O QUE A TABELA NÃO RESPONDE. Passar aqui não garante que a ação será
   // aceita: a elegibilidade FINA continua em cada função, e hoje são DEZESSEIS
-  // pares em DEZOITO linhas — cada par precisa de gêmeo na tela, porque o
-  // `legal()` da `TelaMesa` lê ESTA tabela e não sabe deles. As duas linhas que
+  // pares em DEZENOVE linhas — cada par precisa de gêmeo na tela, porque o
+  // `legal()` da `TelaMesa` lê ESTA tabela e não sabe deles. As três linhas que
   // não são par estão marcadas na própria tabela e explicadas logo abaixo dela.
   //
   // ⚠️ O 13º entrou em 2026-07-28, e não era par novo: existia desde o Plano 3b e
@@ -239,10 +241,11 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   //   combate              atacar         `proximaDecisao`             o motor (`AcaoIlegal`)
   //   combate              esquivar       `proximaDecisao`             o motor (`AcaoIlegal`)
   //   encrenca             procurarEncrenca  a carta é do tipo monstro `procurarEncrenca`
-  //   ↑ DEZESSEIS pares. As duas linhas abaixo NÃO são par — estão aqui para provar
-  //     que a recontagem chegou até estes dois verbos:
+  //   ↑ DEZESSEIS pares. As três linhas abaixo NÃO são par — estão aqui para provar
+  //     que a recontagem chegou até estes verbos:
   //   encrenca             saquear        — (nenhum guard fino; #62)   — (ausência)
   //   encrenca             procurarEncrenca  a carta está na sua mão   (gêmeo ESTRUTURAL)
+  //   (com queima)         queimarCarta   a carta está entre as seis   (gêmeo ESTRUTURAL)
   //
   // `saquear` NÃO soma ao total: a recontagem partiu do `switch`, e a função não
   // tem NENHUM guard fino — a decisão #62 do game bible (o baralho de Portas
@@ -261,6 +264,15 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // `equiparCarta`), e `entregarCarta` não tem UMA linha nesta tabela — o guard
   // de `cartaDaMao` é o único fino que ela tem. Listar aqui e não lá inflaria a
   // contagem sem acrescentar gêmeo nenhum a escrever.
+  //
+  // `queimarCarta` (fatia `escolha do descarte`) também NÃO soma, pelo mesmo
+  // motivo do anterior: o gêmeo é ESTRUTURAL. A tela renderiza um botão "Queimar"
+  // por carta do conjunto queimável — o deslocado da vez mais as cinco da mochila
+  // — então "essa carta não está entre as que podem ser queimadas" é um estado que
+  // a tela não consegue produzir. ⚠️ A fase da linha é `(com queima)` e não uma
+  // das seis: este verbo NUNCA é legal por fase (`acaoEhLegal` o libera só pela
+  // pendência), e escrever `recompor`/`jogar` ali faria a tabela prometer um gate
+  // de fase que não existe.
   //
   // `procurarEncrenca` soma, então, UM par: a carta apontada tem que SER um
   // monstro — sem esse guard, uma carta de raça cairia no ramo `raca` de
@@ -311,8 +323,18 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // A fatia da afinidade foi de catorze para DEZESSEIS: os dois pares de
   // `afinidadeCom` são DUAS linhas e não uma, porque `equiparCarta` é legal nas
   // duas fases paradas e a convenção é uma linha por par.
-  if (!acaoEhLegalNaFase(estado.fase, acao.tipo)) {
-    throw new AcaoInvalida(`aplicarAcao: ${acao.tipo} não é legal na fase ${estado.fase}`);
+  //
+  // A fatia `escolha do descarte` manteve DEZESSEIS e levou as linhas de dezoito
+  // a DEZENOVE: o verbo novo (`queimarCarta`) tem guard fino, mas gêmeo
+  // estrutural. Recontagem feita a partir do reducer, `AcaoInvalida` por
+  // `AcaoInvalida` — par que não cresce também se declara, senão a próxima
+  // recontagem não sabe se alguém olhou.
+  if (!acaoEhLegal(estado.fase, estado.queima !== null, acao.tipo)) {
+    throw new AcaoInvalida(
+      estado.queima === null
+        ? `aplicarAcao: ${acao.tipo} não é legal na fase ${estado.fase}`
+        : `aplicarAcao: há uma queima pendente — só queimarCarta é legal`,
+    );
   }
 
   if (acao.tipo === 'vasculhar') {
@@ -362,8 +384,12 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
     return procurarEncrenca(estado, acao.jogadorId, acao.cartaId, deps);
   }
 
+  if (acao.tipo === 'queimarCarta') {
+    return queimarCarta(estado, acao);
+  }
+
   // Exaustividade: a cadeia de `if` acima cobre TODO `AcaoDaMesa['tipo']` de hoje
-  // (`procurarEncrenca`, Task 3, foi o último a ganhar ramo). Mesma proteção dos
+  // (`queimarCarta` foi o último a ganhar ramo). Mesma proteção dos
   // `naoTratada: never` dos `switch` deste arquivo (`resolverCarta`,
   // `descartarNoBaralhoCerto`): um tipo novo em `AcaoDaMesa` sem `if` próprio
   // quebra a COMPILAÇÃO aqui, não em produção — é a lição do Plano 4b Task 1,
@@ -825,8 +851,7 @@ function tirarDosSlots(
  * Em `descartar` sobra só `entregarCarta`: `equiparCarta` saiu junto, para as duas
  * fases paradas que acontecem ANTES da cobrança do excedente.
  *
- * Trocar de raça DERRUBA o item que ficou proibido, por `destinoDoDesequipado`
- * como ele já era — mochila se houver vaga, cemitério de Tesouros se não.
+ * Trocar de raça DERRUBA o item que ficou proibido, por `destinoDoDesequipado`.
  */
 function jogarCarta(
   estado: EstadoPartida,
@@ -859,8 +884,17 @@ function jogarCarta(
       cemiterio: anterior === null ? estado.portas.cemiterio : [...estado.portas.cemiterio, anterior],
     },
   };
-  const { estado: base, eventos: doDeslocado } =
+  const { estado: base, eventos: doDeslocado, queima } =
     destinoDoDesequipado(comJogador, perdidos, acao.jogadorId, 'perdeuAfinidade');
+  const eventos: readonly EventoDaMesa[] = [
+    { tipo: 'racaEmJogo', jogadorId: acao.jogadorId, carta }, ...doDeslocado,
+  ];
+
+  // Este `return` carrega a `queima` para o estado registrado, sem passar por
+  // `entrarOuPular`. O auto-pulo é inalcançável enquanto ela está aberta: a
+  // pendência só nasce com a mochila NO TETO, e `faseSeAutoPula` conta a mochila
+  // como origem de equipamento (ver o teste gêmeo em `fase.test.ts`).
+  if (queima !== null) return registrar({ ...base, queima }, eventos);
 
   return entrarOuPular(
     base,
@@ -870,7 +904,7 @@ function jogarCarta(
     // aqui. Um dia em que ela declarar noutra fase, este literal é a linha que
     // vai estar mentindo — e é por isso que ele fica visível em vez de derivado.
     'recompor',
-    [{ tipo: 'racaEmJogo', jogadorId: acao.jogadorId, carta }, ...doDeslocado],
+    eventos,
   );
 }
 
@@ -925,14 +959,21 @@ function equiparCarta(
     ...estado,
     jogadores: estado.jogadores.map((j) => (j.id === atualizado.id ? atualizado : j)),
   };
-  const { estado: base, eventos: doDeslocado } = destinoDoDesequipado(comJogador, deslocados, acao.jogadorId, 'trocaDeSlot');
+  const { estado: base, eventos: doDeslocado, queima } =
+    destinoDoDesequipado(comJogador, deslocados, acao.jogadorId, 'trocaDeSlot');
   // `equipou` primeiro: o log conta a ação que o jogador pediu, e só então o que
-  // ela custou. Invertido, a linha "Espada Curta foi para o cemitério" apareceria
+  // ela custou. Invertido, a linha "Espada Curta foi para a mochila" apareceria
   // antes de existir motivo para ela.
   const eventos: readonly EventoDaMesa[] = [
     { tipo: 'equipou', jogadorId: acao.jogadorId, slot: info.slot, carta },
     ...doDeslocado,
   ];
+
+  // Este `return` carrega a `queima` para o estado registrado, sem passar por
+  // `entrarOuPular`. O auto-pulo é inalcançável enquanto ela está aberta: a
+  // pendência só nasce com a mochila NO TETO, e `faseSeAutoPula` conta a mochila
+  // como origem de equipamento (ver o teste gêmeo em `fase.test.ts`).
+  if (queima !== null) return registrar({ ...base, queima }, eventos);
 
   if (!ehFaseParada(estado.fase)) {
     // Inalcançável pela tabela: `equiparCarta` só é legal em `recompor` e `jogar`,
@@ -993,6 +1034,90 @@ function guardarCarta(
   return entrarOuPular(base, atualizado, estado.fase, [
     { tipo: 'guardou', jogadorId: acao.jogadorId, carta },
   ]);
+}
+
+/**
+ * Resolve UMA carta da fila de queima: a escolhida vai ao cemitério de Tesouros.
+ *
+ * Escolher o deslocado o destrói e deixa a mochila intocada; escolher uma da
+ * mochila abre a vaga em que o deslocado entra. Nos dois casos sai exatamente uma
+ * carta, e o jogador termina com a mochila cheia.
+ */
+function queimarCarta(
+  estado: EstadoPartida,
+  acao: Extract<AcaoDaMesa, { readonly tipo: 'queimarCarta' }>,
+): ResultadoAcao {
+  const queima = estado.queima;
+  if (queima === null) {
+    // Inalcançável pelo gate. Invariante NOSSA quebrada => Error cru, 500.
+    throw new Error('queimarCarta: não há queima pendente');
+  }
+  if (queima.jogadorId !== acao.jogadorId) {
+    // A fila vem de `estado.queima` e a mochila de `acao.jogadorId`: se os dois
+    // divergirem, a carta de um jogador entra na mochila do outro e o log inteiro
+    // sai no nome de quem agiu. Hoje eles coincidem por CONSEQUÊNCIA de outras
+    // regras (o gate de `vezDe`, mais a pendência só nascer no turno de quem
+    // age), não porque alguém garanta aqui — e a `Interferência` do roteiro é
+    // feita de agir fora do próprio turno.
+    throw new Error(`queimarCarta: a queima pendente é de ${queima.jogadorId}, não de ${acao.jogadorId}`);
+  }
+
+  const [deslocado, ...restantes] = queima.deslocados;
+  const jogador = estado.jogadores.find((j) => j.id === acao.jogadorId);
+  if (jogador === undefined) {
+    throw new Error(`queimarCarta: jogador ${acao.jogadorId} não está na mesa`);
+  }
+
+  const daMochila = jogador.mochila.find((c) => c.id === acao.cartaId);
+  const queimaODeslocado = acao.cartaId === deslocado.id;
+  if (!queimaODeslocado && daMochila === undefined) {
+    throw new AcaoInvalida('aplicarAcao: essa carta não está entre as que podem ser queimadas');
+  }
+
+  const queimada: CartaTesouro | undefined = queimaODeslocado ? deslocado : daMochila;
+  if (queimada === undefined) {
+    // Inalcançável: o guard acima já recusou `cartaId` que não é nem o deslocado
+    // nem uma carta da mochila. O TS não estreita `daMochila` através do ternário,
+    // e um `??` aqui inventaria um fallback que a regra não tem.
+    throw new Error('queimarCarta: escolha sem carta — o guard acima deveria ter recusado');
+  }
+  const mochila = queimaODeslocado
+    ? jogador.mochila
+    : [...jogador.mochila.filter((c) => c.id !== queimada.id), deslocado];
+
+  const atualizado: JogadorNaMesa = { ...jogador, mochila };
+  const eventos: readonly EventoDaMesa[] = queimaODeslocado
+    ? [{
+        tipo: 'desequipou', jogadorId: acao.jogadorId, carta: deslocado,
+        destino: 'cemiterio', motivo: queima.motivo,
+      }]
+    : [
+        {
+          tipo: 'desequipou', jogadorId: acao.jogadorId, carta: deslocado,
+          destino: 'mochila', motivo: queima.motivo,
+        },
+        { tipo: 'queimou', jogadorId: acao.jogadorId, carta: queimada },
+      ];
+
+  const [proximo, ...resto] = restantes;
+  const proxima: QueimaPendente | null =
+    proximo === undefined ? null : { ...queima, deslocados: [proximo, ...resto] };
+
+  const base: EstadoPartida = {
+    ...estado,
+    jogadores: estado.jogadores.map((j) => (j.id === atualizado.id ? atualizado : j)),
+    tesouros: { ...estado.tesouros, cemiterio: [...estado.tesouros.cemiterio, queimada] },
+    queima: proxima,
+  };
+
+  if (proxima !== null) return registrar(base, eventos);
+
+  if (!ehFaseParada(estado.fase)) {
+    // A pendência só nasce dentro de `recompor` e `jogar` — desequipar não
+    // acontece em fase nenhuma além dessas duas. Invariante NOSSA => Error cru.
+    throw new Error(`queimarCarta: fase não-parada ${estado.fase}`);
+  }
+  return entrarOuPular(base, atualizado, estado.fase, eventos);
 }
 
 function agirNoCombate(estado: EstadoPartida, acao: AcaoDeCombate, deps: DepsMesa): ResultadoAcao {

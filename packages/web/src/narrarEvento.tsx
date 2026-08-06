@@ -124,6 +124,11 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
         ? `${porque} — vai para a mochila.`
         : `${porque} — a mochila está cheia, e a carta é descartada.`;
     }
+    // A mochila e o cemitério de Tesouros são zonas ABERTAS, então o evento
+    // carrega a carta e a narração pode nomeá-la — mesma regra do `guardou`.
+    case 'queimou':
+      return `${evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId)} queima `
+        + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem)} para abrir vaga na mochila.`;
     // A única pista que o jogador tem de que a economia da mesa secou. NOMEIA o
     // baralho em vez de dizer só "não ganhou nada": sem isso ele lê a própria
     // vitória como bug — foi exatamente o que aconteceu no gate ocular do 4a.
