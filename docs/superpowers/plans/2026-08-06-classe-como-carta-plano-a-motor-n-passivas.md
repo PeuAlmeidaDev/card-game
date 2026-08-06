@@ -15,6 +15,7 @@
 - Node ≥ 22.13; pnpm 11.9.0.
 - TypeScript **strict** + `noUncheckedIndexedAccess`. Nada de `any`, nada de `as` para calar o compilador.
 - **TDD:** teste antes do código de domínio, em toda task. O passo "rode e veja FALHAR" não é decorativo — evidência de RED que ninguém observou já foi achada neste projeto.
+  ⚠️ **UMA exceção, declarada:** a **Task 1** é rede de equivalência e começa **VERDE** de propósito — ela descreve comportamento que já existe. Ela não fica sem prova por isso: o RED dela é obtido por **mutação** (quebrar `danoDe` e ver os testes caírem), e esse passo é obrigatório. Nenhuma outra task pode invocar esta exceção.
 - **Um commit por task**, Conventional Commits com **tipo/escopo em inglês e descrição em português** (convenção deste repo, sobrescreve a global).
 - Antes de cada commit: `pnpm test`, `pnpm typecheck` e `pnpm lint` **verdes**, rodados agora.
 - **Política de comentário enxuto** (decidida em 2026-08-02): o nome da função diz o que ela faz; comentário só onde o código não consegue falar; restrição *load-bearing* vira **teste ou nome**, nunca prosa.
