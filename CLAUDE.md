@@ -83,8 +83,9 @@ ESTRUTURAL: o §6 do bible e o `Fase` do código passam a ter as mesmas **seis**
 **`afinidade`**, está construída (sessão de 2026-08-02/03). A segunda, a **`escolha do descarte`**
 (#59/#61), está **construída na branch `feat/escolha-do-descarte`** — a **terceira pendência do
 jogo**, com estado novo, verbo novo e o bot que a responde; detalhe na sessão de 2026-08-03/06, no
-fim deste arquivo. ⬜ **Falta o gate ocular do Pedro e o merge.** **Próxima: `classe como carta`**
-(#60/#61), a que tira o topo da tela.
+fim deste arquivo. ✅ **Gate ocular fechado pelo Pedro em 2026-08-06** (escopo do que ele cobriu na
+própria seção); ⬜ falta o **merge**. **Próxima: `classe como carta`** (#60/#61), a que tira o topo
+da tela.
 
 O Plano 2 trocou os guards espalhados do reducer por uma **máquina de fases**:
 `EstadoPartida.fase` (então `vasculhar | combate | descartar`; o 3b levou a cinco, o 4b a **seis**)
@@ -1103,7 +1104,28 @@ atenção.
   substantivo estava OK — as mutações provaram que os testes mordem. É a família *"texto que afirma
   o que se observou, sem ter observado"*.
 
-### 🖐️ O roteiro do gate ocular do Pedro — **TODO item é CENÁRIO FORÇADO**
+### ✅ O GATE OCULAR FOI FECHADO PELO PEDRO em 2026-08-06 — e o que ele cobriu está escrito
+
+**O que aconteceu:** o Pedro subiu o dev server, montou o cenário e reportou *"consegui escolher
+qual carta queimar"*. Depois autorizou o fechamento do gate.
+
+⚠️ **O que isso É e o que NÃO é, e a distinção é a mesma que a `afinidade` teve que aprender:** é
+**conferência em partida real do núcleo da fatia** — a pendência abriu num cenário forçado e o verbo
+a resolveu na tela. **Não** é o roteiro de 5 itens percorrido um a um: os itens **4** (as DUAS linhas
+de log ao queimar da mochila) e **5** (a fila dupla pela arma de duas mãos) **não foram reportados**,
+e o item **2** teve a metade da pergunta confirmada mas não a dos botões apagados.
+
+📌 **Escrito assim de propósito.** *"O Pedro conferiu"* e *"o roteiro passou"* são afirmações
+diferentes, e colapsá-las é a família de erro que este arquivo cataloga. A fatia segue em pé; o que
+não foi percorrido fica listado abaixo para quem quiser fechar item a item — e o que isso achar vira
+**fix**, não revert.
+
+🔑 **O item 5 pode ser inalcançável na prática, e isso não é defeito do código:** a medição diz que
+`trocaDeSlot` produziu **zero** filas ≥2 em **548** aberturas (#86) — quem for tentar montá-lo
+precisa saber disso antes, senão gasta a sessão perseguindo um estado que a política do bot
+raramente alcança.
+
+### 🖐️ O roteiro do gate ocular — **TODO item é CENÁRIO FORÇADO**
 
 🔴 **NENHUM item na forma *"jogue e veja aparecer"*** (decisão #84, agora com número: o assento #0 vê
 o gatilho em **33,1%** das partidas). Cada linha abaixo termina com o aviso, de propósito, para a
@@ -1123,9 +1145,9 @@ próxima fatia não copiar item quebrado.
 
 ### O que fica ABERTO ao sair desta fatia
 
-- 🔴 **O gate ocular do Pedro** — roteiro acima, contra a branch, **antes** do merge. ⚠️ O gate pegou
-  o que dezenas de revisões e 500 testes não pegaram **duas vezes seguidas**; na `afinidade` ele foi
-  **dispensado** para o merge, o que não é o mesmo que ter passado.
+- ✅ **O gate ocular do Pedro — FECHADO em 2026-08-06** (detalhe e escopo logo acima). ⬜ **O que
+  sobra dele:** os itens **4** e **5** do roteiro, e a metade "os outros botões apagam" do item 2.
+  Rodam contra a branch (ou contra a `main`, depois do merge) e o que acharem vira fix.
 - 🔴 **A carta proibida presa na mochila** (pergunta **19** do §18) — **não tocada nesta fatia, de
   propósito**. O bot queima sempre o deslocado (#83) justamente para **não** evacuar sozinho a carta
   presa: um bot que escolhesse pelo valor efetivo estaria respondendo uma pergunta que **é do
