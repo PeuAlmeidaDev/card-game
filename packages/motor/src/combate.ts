@@ -23,6 +23,11 @@ export function criarCombate(
   rolar: RolarD12,
   passivas: readonly PassivaCombate[] = [],
 ): Passo {
+  const ids = new Set(passivas.map((p) => p.id));
+  if (ids.size !== passivas.length) {
+    throw new Error('criarCombate: passivas com id repetido dividiriam o mesmo scratch');
+  }
+
   const ini = decidirIniciativa(jogador, monstro, rolar); // jogador = 'a', monstro = 'b'
   const estado: EstadoCombate = {
     jogador,

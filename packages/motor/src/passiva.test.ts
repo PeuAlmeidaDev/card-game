@@ -136,3 +136,13 @@ describe('duas passivas no mesmo combate', () => {
     expect(inicio.estado.passivas).toEqual([]);
   });
 });
+
+describe('criarCombate com ids repetidos', () => {
+  it('recusa duas passivas com o mesmo id, porque elas dividiriam o scratch', () => {
+    const uma: PassivaCombate = { id: 'mesma', aoCausarDano: (base, ctx) => ({ dano: base, estado: ctx.estado }) };
+    const outra: PassivaCombate = { id: 'mesma', aoSofrerDano: (base, ctx) => ({ dano: base, estado: ctx.estado }) };
+
+    expect(() => criarCombate(jogador, monstro, filaDeDados([]), [uma, outra]))
+      .toThrow('criarCombate: passivas com id repetido');
+  });
+});
