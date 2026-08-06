@@ -24,13 +24,11 @@ export interface ContextoPassiva {
  */
 export interface PassivaCombate {
   readonly id: string;
-  /**
-   * Ajusta o dano que o portador CAUSA num golpe que conectou. **Stateless por
-   * design:** devolve só o dano novo e não consome `usos` (ao contrário dos
-   * outros dois ganchos). Um efeito "N×/combate" no dano causado não cabe aqui —
-   * quando algum pedir, este gancho passa a devolver `{ dano, estado }` como os demais.
-   */
-  readonly aoCausarDano?: (danoBase: number, ctx: ContextoPassiva) => number;
+  /** Ajusta o dano que o portador CAUSA num golpe que conectou; pode consumir um uso. */
+  readonly aoCausarDano?: (
+    danoBase: number,
+    ctx: ContextoPassiva,
+  ) => { readonly dano: number; readonly estado: EstadoPassiva };
   /** Ajusta o dano que o portador SOFRE; pode consumir um uso. */
   readonly aoSofrerDano?: (
     danoBase: number,

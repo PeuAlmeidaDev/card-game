@@ -9,7 +9,7 @@ const monstro: Combatente = { forca: 2, vida: 10, habilidade: 6, agilidade: 4, l
 
 const maisDois: PassivaCombate = {
   id: 'fake-mais-dois',
-  aoCausarDano: (base) => base + 2,
+  aoCausarDano: (base, ctx) => ({ dano: base + 2, estado: ctx.estado }),
 };
 
 describe('gancho aoCausarDano', () => {
@@ -30,6 +30,26 @@ describe('gancho aoCausarDano', () => {
     const inicio = criarCombate(jogador, monstro, filaDeDados([]));
     const passo = proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([4, 9, 12]));
     expect(passo.estado.monstro.vida).toBe(6);
+  });
+
+  it('consome uso no dano causado: o segundo golpe já não recebe o bônus', () => {
+    const soNoPrimeiro: PassivaCombate = {
+      id: 'fake-so-no-primeiro',
+      aoCausarDano: (base, ctx) =>
+        ctx.estado.usos >= 1
+          ? { dano: base, estado: ctx.estado }
+          : { dano: base + 2, estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } },
+    };
+
+    const inicio = criarCombate(jogador, monstro, filaDeDados([]), soNoPrimeiro);
+    // golpe 1: 4 acerta, 9 não esquiva, dano 4+2=6 => vida 10-6=4; monstro erra com 12
+    const primeiro = proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([4, 9, 12]), soNoPrimeiro);
+    expect(primeiro.estado.monstro.vida).toBe(4);
+
+    // golpe 2: mesmo dado, mas o uso já foi gasto => dano base 4 => vida 4-4=0, vitória
+    const segundo = proximoPasso(primeiro.estado, { tipo: 'atacar' }, filaDeDados([4, 9]), soNoPrimeiro);
+    expect(segundo.eventos).toContainEqual({ tipo: 'dano', alvo: 'b', quantidade: 4, vidaRestante: 0 });
+    expect(segundo.estado.desfecho).toBe('vitoriaJogador');
   });
 });
 

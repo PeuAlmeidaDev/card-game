@@ -108,16 +108,17 @@ function atacar(estado: EstadoCombate, rolar: RolarD12, passiva?: PassivaCombate
   const { dano: base, eventos } = resolverAtaque(estado.jogador, 'a', 'b', rolar);
   const log: EventoCombate[] = [...eventos];
 
-  const dano = base > 0 && passiva?.aoCausarDano
-    ? passiva.aoCausarDano(base, {
-        portador: estado.jogador,
-        vidaInicial: estado.vidaInicialJogador,
-        // `estado.passiva` está sempre semeado quando `passiva` foi injetada
-        // (criarCombate o inicializa); o fallback é inalcançável sob esse
-        // contrato de injeção — existe só para o tipo fechar sem asserção.
-        estado: estado.passiva ?? { id: passiva.id, usos: 0 },
-      })
-    : base;
+  let dano = base;
+  let scratch: EstadoPassiva | null = estado.passiva;
+  if (base > 0 && passiva?.aoCausarDano && scratch) {
+    const r = passiva.aoCausarDano(base, {
+      portador: estado.jogador,
+      vidaInicial: estado.vidaInicialJogador,
+      estado: scratch,
+    });
+    dano = r.dano;
+    scratch = r.estado;
+  }
 
   let monstro = estado.monstro;
   if (dano > 0) {
@@ -128,6 +129,7 @@ function atacar(estado: EstadoCombate, rolar: RolarD12, passiva?: PassivaCombate
   const proximo: EstadoCombate = {
     ...estado,
     monstro,
+    passiva: scratch,
     turno: estado.turno + 1,
     vez: 'monstro',
     desfecho: monstro.vida <= 0 ? 'vitoriaJogador' : 'emAndamento',

@@ -28,6 +28,8 @@ export const escorregadio: PassivaCombate = {
 const BONUS_FURIA = 3;
 export const sangueDeGuerra: PassivaCombate = {
   id: 'sangue-de-guerra',
-  aoCausarDano: (danoBase, ctx) =>
-    ctx.portador.vida <= ctx.vidaInicial / 2 ? danoBase + BONUS_FURIA : danoBase,
+  aoCausarDano: (danoBase, ctx) => ({
+    dano: ctx.portador.vida <= ctx.vidaInicial / 2 ? danoBase + BONUS_FURIA : danoBase,
+    estado: ctx.estado,
+  }),
 };
