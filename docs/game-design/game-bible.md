@@ -241,11 +241,12 @@ Composto pela zona **em jogo**, que é **persistente entre turnos**:
     couber, cemitério de Tesouros se estiver cheia, com o evento `desequipou` **nomeando o motivo**
     (`perdeuAfinidade`, contra `trocaDeSlot`). O ganho simétrico é automático: equipar reduzido e
     depois ganhar a raça passa a render o cheio no mesmo instante, porque `combatenteDe` recalcula a
-    cada consulta. ⬜ **O jogador não escolhe o que queimar quando a mochila está cheia** — é a #59,
-    que **segue de pé**, tem **spec escrito em 2026-08-03**
-    (`docs/superpowers/specs/2026-08-03-escolha-do-descarte-design.md`, decisões **#80–#84**) e é a
-    fatia `escolha do descarte` (§17). ⚠️ **DESENHO, não código:** enquanto ela não for construída,
-    o destino continua automático como esta linha descreve.
+    cada consulta. ✅ **E o jogador ESCOLHE o que queimar quando a mochila está cheia** — a #59,
+    **construída em 2026-08-03/06** (fatia `escolha do descarte`; forma nas **#80–#84**): o item
+    proibido que não cabe abre a **pendência de queima** em vez de ir direto ao cemitério, e o
+    `motivo` (`perdeuAfinidade`) **viaja na pendência** até a escolha, para o log dizer a razão
+    certa. 📊 Este é o caminho que produz **12 de 12** das filas com ≥2 deslocados (#86) — trocar de
+    raça pode derrubar vários exclusivos de uma vez, e cada um vira **sua própria pergunta**.
   - ⬜ **O eixo `classe` existe no TIPO e nenhum item o declara** (#74). Não é buraco: é a metade da
     mecânica que a fatia `classe como carta` herda pronta, e a promessa é travada por **teste
     vermelho** (*"nenhum item do catálogo declara exclusividade de CLASSE"*), não por comentário —
@@ -545,13 +546,15 @@ do zero e ainda pegar o 2º lugar é exatamente o tipo de história que §14 que
   ter o que equipar já no primeiro turno — e a mesa nasce **exatamente no teto** (4+4=8 = limite
   do Humano); quem devolve a folga é equipar, não a caridade.
 - **Mochila: 5 itens**, aberta, fora do limite de mão. ✅ **Dial travado** (Plano 4a):
-  `LIMITE_MOCHILA = 5`. Item deslocado do corpo vai para a mochila se houver vaga, senão para o
-  cemitério de Tesouros — o jogador não escolhe. ⬜ **Esta última metade tem data para morrer:** a
-  **#59** troca o cemitério automático por uma **escolha entre seis cartas** (o deslocado + as cinco
-  da mochila), com spec escrito em 2026-08-03 e as decisões **#80–#84** desenhando o como. ⚠️ Até a
-  fatia `escolha do descarte` ser construída, **o que vale é o automático** — esta linha descreve o
-  código de hoje, não o desenho de amanhã. **O log NOMEIA o destino** (evento `desequipou`,
-  decisão #27): sem isso, a ramificação cara — a carta ser destruída — acontecia calada.
+  `LIMITE_MOCHILA = 5`. Item deslocado do corpo vai para a mochila se houver vaga; **com a mochila
+  cheia o jogo PERGUNTA** o que queimar — um menu de **seis** cartas (o deslocado + as cinco da
+  mochila) resolvido pelo verbo `queimarCarta`, e a escolhida vai ao cemitério de Tesouros.
+  ✅ **CONSTRUÍDO em 2026-08-03/06** (fatia `escolha do descarte`, #59 e #80–#84); revoga a
+  **decisão #8 do spec da fatia 8**. Enquanto a pendência está aberta **só `queimarCarta` é legal**,
+  em qualquer fase, e ela é **pública** (#82) — a mesa vê quem está parado escolhendo. **O log
+  NOMEIA o destino** (evento `desequipou`, decisão #27) e a carta queimada da mochila tem **linha
+  própria** (evento `queimou`): sem isso, a ramificação cara — a carta ser destruída — acontecia
+  calada.
   Medido por simulação sobre o domínio, com dado e
   embaralho reais (80 partidas, censo id-a-id após cada ação — não há tráfego de produção): zero divergência de carta, inclusive nos 948 `guardarCarta` e 50 roteamentos
   ao cemitério por mochila cheia que a amostra exercitou.
@@ -828,7 +831,7 @@ Copiamos a *ideia mecânica*, nunca a *expressão*.
 | 0 | ✅ **Corte da `salaVazia`** — **CONSTRUÍDO em 2026-07-30 e MERGEADO** | executou a #42 e fixou a composição da #52/#54. **Fatia própria e ANTES do 4b** (decisão #51), para que a caridade fosse medida uma vez de cada vez — e a resposta veio: **ela não voltou** (#55) | ✅ |
 | 1 | ✅ **Plano 4b — `encrenca`** — **CONSTRUÍDO em 2026-08-01 e MERGEADO** (gate ocular fechado pelo Pedro em 2026-08-02) | os verbos `procurarEncrenca` e `saquear`, e o bot que avalia o combate (#63). **Última peça ESTRUTURAL da fatia 8** — o §6 do bible e o `Fase` do código passam a ter as **mesmas seis fases**. Medido nas decisões #65–#68 | ✅ |
 | — | ✅ **`afinidade`** (desenho: #56–#58, #61) — **CONSTRUÍDA em 2026-08-02** | itens **exclusivos** com valor cheio × reduzido, o guard do equipar, e o item caindo quando a troca de raça o proíbe. **12 itens no catálogo** (8 comuns + 4 exclusivos) e o baralho de Tesouros de 32 → 48. Spec: `2026-07-31-afinidade-de-itens-design.md`. Medida e registrada nas decisões **#71–#79** | ✅ |
-| — | **`escolha do descarte`** (decisão #59) — 👉 **É A PRÓXIMA, com SPEC ESCRITO em 2026-08-03** (`2026-08-03-escolha-do-descarte-design.md`; a forma nas decisões **#80–#84**) | com a mochila cheia o jogo **pergunta** o que queimar, em **todo** desequipamento — um menu de **seis** cartas resolvido pelo verbo `queimarCarta` (#80). Revoga a decisão #8 do spec da fatia 8. Traz a **3ª pendência** do jogo — estado novo, verbo novo, e o bot obrigado a saber respondê-la | ✅ |
+| — | ✅ **`escolha do descarte`** (decisão #59) — **CONSTRUÍDA em 2026-08-03/06** (spec `2026-08-03-escolha-do-descarte-design.md`; a forma nas **#80–#84**, os números medidos nas **#85–#86**) | com a mochila cheia o jogo **pergunta** o que queimar, em **todo** desequipamento — um menu de **seis** cartas resolvido pelo verbo `queimarCarta` (#80). **Revoga a decisão #8 do spec da fatia 8.** Traz a **3ª pendência** do jogo — estado novo, verbo novo, e o bot que sabe respondê-la (#83). ⬜ **Falta o gate ocular do Pedro** (roteiro na Task 8 do plano, todo de cenário forçado) | ✅ |
 | — | **`classe como carta`** (decisão #60) | a classe entra pelo baralho, o **Aprendiz** é a ausência, e morrem `classeId`, o `escolhasSchema`, a rota `/duelo` e o construtor no `web` | ✅ |
 | 2 | **Maldições / Bad Stuff** | a 1ª carta que **mira outro jogador**, + a **morte/evacuação** do §10 — que é o **conserto da economia** (#46) | ✅ |
 | 3 | **Frontend animado** | a mesa desenhada + playback do turno alheio, 1x/2x (#35) | ✅ |
@@ -1206,3 +1209,19 @@ jogador escolhe) e *por quê* (*"mais poder de barganha"*); estas dizem a forma.
 | 82 | **A queima pendente é PÚBLICA** — `VistaDaPartida.queima` viaja inteira para todos, ao contrário da `espiada`, que a projeção entrega só ao dono | O que decide **não é a ação, é a ZONA**: slot e mochila são abertas, o topo do baralho não é. É a mesma regra que já governa `porta` (carrega a carta) × `achado` (não carrega), `descarte` × `entrega`, e `equipou`/`guardou`/`desequipou` × `loot`. 🔑 Registrado porque a leitura preguiçosa é *"pendência é como a espiada, logo é secreta"* — e a `espiada` é secreta pela zona dela, não por ser pendência |
 | 83 | **O bot QUEIMA SEMPRE O DESLOCADO** — burro de propósito, como ele já é em `descartar` (*"entrega a primeira carta, sem critério nenhum"*) | ✅ **É a única política que deixa o comportamento do bot IDÊNTICO AO DE HOJE byte a byte** — hoje, com a mochila cheia, o deslocado vai ao cemitério. Consequência aceita e declarada: numa mesa 100% bot **nada muda**, então o soak desta fatia é **checagem de regressão** (zero `AcaoInvalida`, zero `Error` cru, zero mesa morta), **não medição** — o ganho da fatia é para o jogador humano. 🔴 **A alternativa foi recusada com motivo:** queimar o de **menor valor efetivo** (reusando `valorEfetivoDe`, que já dá 0 para item proibido) faria o bot **evacuar sozinho** a carta proibida presa na mochila — que é a **pergunta 19 do §18** e uma decisão do Pedro **ainda não tomada**. Seria a **terceira variável** da fatia: o erro catalogado pelas **#24/#25**, repetido pela **#51** e recusado pela **#69** uma fatia atrás. ⚠️ Bot travado em pendência é mesa morta — foi assim que **28 de 30 partidas** morreram no Plano 3b, e é por isso que a #59 exigiu fatia própria |
 | 84 | 🔴 **O GATILHO DESTA REGRA É EVENTO DE CAUDA, e o gate ocular da fatia já nasce sem o item que pediria para vê-lo em partida.** O gatilho é *"item deslocado **com a mochila cheia**"*, e ele já está contado: o Plano 4a mediu **50 desequipados roteados ao cemitério por mochila cheia em 80 partidas** de mesa de 4 — ~**0,6 vez por partida na mesa inteira**, ~**0,16 por jogador**. O roteiro do gate dirá *"encha a mochila de propósito e então troque um item"*, não *"jogue e veja aparecer"* | ➡️ **É a decisão #70 aplicada ANTES de o código existir**, em vez de depois de um item de gate defeituoso ter sido escrito e ter quase comprado um giro de dial com evidência invertida. A #77 já a repetiu **na fatia seguinte à dela**; esta é a primeira vez que a regra age na direção certa — **preventiva**. 📌 **A pergunta que a #70 manda fazer é *"qual é a frequência esperada do evento?"***, e desta vez ela tinha resposta **sem sonda nova**, porque uma fatia anterior já a mediu de passagem. ⚠️ **Isto NÃO encolhe a fatia:** a #59 é sobre a regra ser **justa quando dispara**, não sobre frequência — a raridade governa **como se valida**, não **se se constrói**. A frequência real com o baralho de 48 vira número medido no soak |
+
+### Sessão de 2026-08-03/06 — a `escolha do descarte` foi CONSTRUÍDA
+
+**A fatia está implementada** (branch `feat/escolha-do-descarte`, 8 tasks, **597 testes verdes**,
+typecheck 7/7, lint limpo). ✅ **Nenhuma decisão de JOGO nova saiu da execução: as #80–#84 foram
+executadas como desenhadas** — a escrita disso é informação, e a ausência de linha não seria.
+
+O que a execução produziu são **dois registros de MEDIÇÃO** (o soak da Task 7), abaixo. ⚠️ **O bot
+ficou idêntico ao de antes desta fatia** (#83), então **nenhum número desta sessão mede efeito** da
+fatia sobre ritmo, força de bot ou taxa de vitória — o soak é checagem de **regressão** mais a
+frequência do gatilho. 🔴 **N por medida, nunca global.**
+
+| # | Registro | Porquê / o que ele fecha |
+|---|---|---|
+| 85 | 📊 **A QUEIMA PENDENTE ABRE ~2× MAIS QUE O ESTIMADO, E A CONCLUSÃO DA #84 SOBREVIVE MAIS FORTE.** Medido: **621 aberturas em 480 partidas** = **1,29 por partida na mesa** e **0,323 por jogador** (faixa por rodada 0,281–0,394), mediana **1** por partida, **73,1%** das partidas com ≥1 na mesa — mas **só 33,1% (159/480) com ≥1 no ASSENTO #0** (faixa 27,5%–38,8%). Regressão: `AcaoInvalida` (bot e humano), `Error` cru, teto de 30.000 ações e censo de conservação id-a-id **deram ZERO** — em **960 partidas**, somando as duas medições (só a regressão tem esse N; as demais linhas são de **480**) | A estimativa do **§11 do spec** era ~**0,6/partida** e ~**0,16/jogador** — o spec dá **os dois** números, então a comparação já era por-partida × por-partida: veio ~2× em **ambas** as unidades. 🔴 **A explicação NÃO é a unidade** (essa versão foi escrita no relatório, revisada e removida): a **MESA mudou** desde o Plano 4a de onde a estimativa foi extrapolada — baralho de Tesouros 32→48, `salaVazia` cortada, `encrenca` construída, e o caminho **`perdeuAfinidade`** que **nem existia**. ⚠️ Desses quatro, **só um está medido**: `perdeuAfinidade` responde por **11,8%** (73/621) das aberturas; os outros três ficam declarados como **não medidos**. ✅ **A previsão do §11 acertou** (*"sobe com o baralho de 48, mas continua abaixo de 1 por jogador por partida"*): 0,323 < 1. ✅ **E a #84 fica validada, não desmentida** — com o assento #0 vendo ≥1 em 33,1% das partidas, *"jogue e veja aparecer"* reprovaria **código correto em ~67% das observações**, que é exatamente o motivo de o roteiro do gate desta fatia ser **todo de cenário forçado**. 🔑 **A #84 não foi corrigida em silêncio: a conclusão fica, o número medido é anexado** |
+| 86 | 🔴 **A FILA COM ≥2 DESLOCADOS VEM DE `perdeuAfinidade`, NÃO DO MONTANTE — 12 de 12.** Medido: fila ≥2 em **12 de 621 aberturas (1,9%)**; `trocaDeSlot` produziu **ZERO em 548 aberturas**, `perdeuAfinidade` produziu **12 em 73 (16,4%)**. N=480 | O relatório da Task 7 **afirmava o mecanismo oposto** (*"o montante de duas mãos deslocando dois itens com a mochila cheia"*) sem número que o ligasse, e o split por `motivo` o **contradisse**. 🔑 **A fila 3 medida é a prova limpa:** o montante desloca **no máximo 2** itens (mão direita + mão esquerda), então fila 3 é **aritmeticamente impossível** pelo mecanismo afirmado — e perfeitamente possível por troca de raça, que pode proibir até 5 slots de uma vez. ⚠️ Isto **não** diz que o montante nunca produzirá fila 2; diz que em **548** aberturas ele não produziu nenhuma. ➡️ **Consequência prática:** o cenário "mochila cheia com DOIS deslocados por troca de slot" é o candidato a **inexercitável pelo fixture** que a nota final do plano já marcava — e o conserto, as três vezes que esse padrão mordeu a fatia `afinidade`, foi **dublê novo no catálogo de teste**, não mais atenção |

@@ -208,8 +208,8 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   //
   // ⚠️ O QUE A TABELA NÃO RESPONDE. Passar aqui não garante que a ação será
   // aceita: a elegibilidade FINA continua em cada função, e hoje são DEZESSEIS
-  // pares em DEZOITO linhas — cada par precisa de gêmeo na tela, porque o
-  // `legal()` da `TelaMesa` lê ESTA tabela e não sabe deles. As duas linhas que
+  // pares em DEZENOVE linhas — cada par precisa de gêmeo na tela, porque o
+  // `legal()` da `TelaMesa` lê ESTA tabela e não sabe deles. As três linhas que
   // não são par estão marcadas na própria tabela e explicadas logo abaixo dela.
   //
   // ⚠️ O 13º entrou em 2026-07-28, e não era par novo: existia desde o Plano 3b e
@@ -241,10 +241,11 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   //   combate              atacar         `proximaDecisao`             o motor (`AcaoIlegal`)
   //   combate              esquivar       `proximaDecisao`             o motor (`AcaoIlegal`)
   //   encrenca             procurarEncrenca  a carta é do tipo monstro `procurarEncrenca`
-  //   ↑ DEZESSEIS pares. As duas linhas abaixo NÃO são par — estão aqui para provar
-  //     que a recontagem chegou até estes dois verbos:
+  //   ↑ DEZESSEIS pares. As três linhas abaixo NÃO são par — estão aqui para provar
+  //     que a recontagem chegou até estes verbos:
   //   encrenca             saquear        — (nenhum guard fino; #62)   — (ausência)
   //   encrenca             procurarEncrenca  a carta está na sua mão   (gêmeo ESTRUTURAL)
+  //   (com queima)         queimarCarta   a carta está entre as seis   (gêmeo ESTRUTURAL)
   //
   // `saquear` NÃO soma ao total: a recontagem partiu do `switch`, e a função não
   // tem NENHUM guard fino — a decisão #62 do game bible (o baralho de Portas
@@ -263,6 +264,15 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // `equiparCarta`), e `entregarCarta` não tem UMA linha nesta tabela — o guard
   // de `cartaDaMao` é o único fino que ela tem. Listar aqui e não lá inflaria a
   // contagem sem acrescentar gêmeo nenhum a escrever.
+  //
+  // `queimarCarta` (fatia `escolha do descarte`) também NÃO soma, pelo mesmo
+  // motivo do anterior: o gêmeo é ESTRUTURAL. A tela renderiza um botão "Queimar"
+  // por carta do conjunto queimável — o deslocado da vez mais as cinco da mochila
+  // — então "essa carta não está entre as que podem ser queimadas" é um estado que
+  // a tela não consegue produzir. ⚠️ A fase da linha é `(com queima)` e não uma
+  // das seis: este verbo NUNCA é legal por fase (`acaoEhLegal` o libera só pela
+  // pendência), e escrever `recompor`/`jogar` ali faria a tabela prometer um gate
+  // de fase que não existe.
   //
   // `procurarEncrenca` soma, então, UM par: a carta apontada tem que SER um
   // monstro — sem esse guard, uma carta de raça cairia no ramo `raca` de
@@ -313,6 +323,12 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // A fatia da afinidade foi de catorze para DEZESSEIS: os dois pares de
   // `afinidadeCom` são DUAS linhas e não uma, porque `equiparCarta` é legal nas
   // duas fases paradas e a convenção é uma linha por par.
+  //
+  // A fatia `escolha do descarte` manteve DEZESSEIS e levou as linhas de dezoito
+  // a DEZENOVE: o verbo novo (`queimarCarta`) tem guard fino, mas gêmeo
+  // estrutural. Recontagem feita a partir do reducer, `AcaoInvalida` por
+  // `AcaoInvalida` — par que não cresce também se declara, senão a próxima
+  // recontagem não sabe se alguém olhou.
   if (!acaoEhLegal(estado.fase, estado.queima !== null, acao.tipo)) {
     throw new AcaoInvalida(
       estado.queima === null
