@@ -74,6 +74,20 @@ describe('comporSofrerDano', () => {
   });
 });
 
+describe('invariante: todo id de passiva precisa de scratch semeado', () => {
+  it('lança quando a passiva não tem scratch correspondente em `scratches`', () => {
+    // `portadorCom` semeia 1:1 por construção — este cenário só existe montando
+    // o `Portador` à mão.
+    const semScratch: Portador = {
+      combatente,
+      vidaInicial: 20,
+      passivas: [somaUm],
+      scratches: [],
+    };
+    expect(() => comporCausarDano(4, semScratch)).toThrow('scratch de soma-um não foi semeado');
+  });
+});
+
 const reRola: PassivaCombate = {
   id: 're-rola',
   aoFalharEsquiva: (ctx) => ({ reRolar: true, estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } }),
