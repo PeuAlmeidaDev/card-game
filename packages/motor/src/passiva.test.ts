@@ -146,3 +146,47 @@ describe('criarCombate com ids repetidos', () => {
       .toThrow('criarCombate: passivas com id repetido');
   });
 });
+
+describe('atacar erra com passiva injetada (dano zero)', () => {
+  it('preserva os scratches acumulados quando o golpe não conecta', () => {
+    const contaToques: PassivaCombate = {
+      id: 'fake-conta-toques',
+      aoCausarDano: (base, ctx) => ({ dano: base, estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } }),
+    };
+
+    const inicio = criarCombate(jogador, monstro, filaDeDados([]), [contaToques]);
+    // golpe 1: 4<=8 acerta; esquiva 9>4 não esquiva; a passiva é consultada e soma usos: 0 -> 1
+    const primeiro = proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([4, 9, 12]), [contaToques]);
+    expect(primeiro.estado.passivas).toEqual([{ id: 'fake-conta-toques', usos: 1 }]);
+
+    // golpe 2: 9 > 8 ERRA — `atacar` pula o composto (base=0); o monstro erra em seguida (12>6)
+    const segundo = proximoPasso(primeiro.estado, { tipo: 'atacar' }, filaDeDados([9, 12]), [contaToques]);
+    expect(segundo.eventos).toContainEqual({ tipo: 'ataque', atacante: 'a', rolagem: 9, acertou: false });
+    expect(segundo.estado.passivas).toEqual([{ id: 'fake-conta-toques', usos: 1 }]);
+  });
+});
+
+describe('esquivar acerta de primeira com passiva injetada', () => {
+  it('preserva os scratches acumulados quando nenhum gancho é consultado', () => {
+    const contaSofrimento: PassivaCombate = {
+      id: 'fake-conta-sofrimento',
+      aoSofrerDano: (base, ctx) => ({ dano: base, estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } }),
+    };
+    const rapido: Combatente = { ...monstro, agilidade: 12 };
+
+    // rodada 1: monstro acerta (5<=6); esquiva do jogador falha (6>5) => sofre dano, usos 0 -> 1
+    const inicio = criarCombate(jogador, rapido, filaDeDados([5]), [contaSofrimento]);
+    const rodada1 = proximoPasso(inicio.estado, { tipo: 'esquivar' }, filaDeDados([6]), [contaSofrimento]);
+    expect(rodada1.estado.passivas).toEqual([{ id: 'fake-conta-sofrimento', usos: 1 }]);
+
+    // jogador erra (9>8); monstro acerta de novo (5<=6), pedindo esquiva outra vez
+    const rodada2 = proximoPasso(rodada1.estado, { tipo: 'atacar' }, filaDeDados([9, 5]), [contaSofrimento]);
+    expect(rodada2.proximaDecisao).toBe('esquiva');
+
+    // esquiva ACERTA DE PRIMEIRA (1<=5): nem `comporFalharEsquiva` nem `comporSofrerDano` são chamados
+    const rodada3 = proximoPasso(rodada2.estado, { tipo: 'esquivar' }, filaDeDados([1]), [contaSofrimento]);
+    expect(rodada3.eventos).toEqual([{ tipo: 'esquiva', defensor: 'a', rolagem: 1, esquivou: true }]);
+    expect(rodada3.estado.jogador.vida).toBe(rodada2.estado.jogador.vida);
+    expect(rodada3.estado.passivas).toEqual([{ id: 'fake-conta-sofrimento', usos: 1 }]);
+  });
+});
