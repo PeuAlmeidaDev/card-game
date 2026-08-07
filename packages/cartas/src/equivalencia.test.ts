@@ -5,13 +5,13 @@ import { filaDeDados } from './testes/filaDeDados';
 import { cascaDePedra, escorregadio, sangueDeGuerra } from './passivas';
 
 /**
- * Rede de equivalência do Plano A: o motor vai trocar UMA passiva por N, e estes
+ * Rede de equivalência do Plano A: o motor trocou UMA passiva por N, e estes
  * testes são a prova de que o comportamento não mudou. Eles não asseguram nada
- * novo — asseguram o que já existe, evento a evento, com dado determinístico.
+ * novo — asseguram o que já existia, evento a evento, com dado determinístico.
  *
- * Não asserte `estado.passiva` aqui: a forma desse campo é o que o refactor
- * troca, e um teste que precisa ser editado durante o refactor não prova nada
- * sobre ele.
+ * Não asserte `estado.passivas` aqui: a forma desse campo foi o que o refactor
+ * trocou, e um teste que precisasse ser editado durante o refactor não provaria
+ * nada sobre ele.
  */
 
 const jogador: Combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 9, level: 1 };
