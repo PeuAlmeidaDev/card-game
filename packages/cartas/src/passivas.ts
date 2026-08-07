@@ -49,3 +49,12 @@ export const impacto: PassivaCombate = {
   id: 'impacto',
   aoEmpatarEsquiva: (ctx) => ({ empateSalva: false, estado: ctx.estado }),
 };
+
+/** Explosão (Mago de Fogo): o primeiro golpe do combate que conecta causa dano dobrado. */
+export const explosao: PassivaCombate = {
+  id: 'explosao',
+  aoCausarDano: (danoBase, ctx) => {
+    if (ctx.estado.usos >= 1) return { dano: danoBase, estado: ctx.estado };
+    return { dano: danoBase * 2, estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } };
+  },
+};
