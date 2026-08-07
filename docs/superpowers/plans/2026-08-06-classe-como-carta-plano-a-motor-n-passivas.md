@@ -15,6 +15,7 @@
 - Node ≥ 22.13; pnpm 11.9.0.
 - TypeScript **strict** + `noUncheckedIndexedAccess`. Nada de `any`, nada de `as` para calar o compilador.
 - **TDD:** teste antes do código de domínio, em toda task. O passo "rode e veja FALHAR" não é decorativo — evidência de RED que ninguém observou já foi achada neste projeto.
+  ⚠️ **UMA exceção, declarada:** a **Task 1** é rede de equivalência e começa **VERDE** de propósito — ela descreve comportamento que já existe. Ela não fica sem prova por isso: o RED dela é obtido por **mutação** (quebrar `danoDe` e ver os testes caírem), e esse passo é obrigatório. Nenhuma outra task pode invocar esta exceção.
 - **Um commit por task**, Conventional Commits com **tipo/escopo em inglês e descrição em português** (convenção deste repo, sobrescreve a global).
 - Antes de cada commit: `pnpm test`, `pnpm typecheck` e `pnpm lint` **verdes**, rodados agora.
 - **Política de comentário enxuto** (decidida em 2026-08-02): o nome da função diz o que ela faz; comentário só onde o código não consegue falar; restrição *load-bearing* vira **teste ou nome**, nunca prosa.
@@ -508,6 +509,13 @@ Expected: **FAIL** — `Failed to resolve import "./composicao"`.
 
 - [ ] **Step 3: Escrever `composicao.ts`**
 
+⚠️ **Marcado na rodada de fix 1 (2026-08-06):** a versão abaixo já reflete duas decisões do Pedro
+tomadas depois da revisão da Task 3 — extrair o fold comum de `comporCausarDano`/`comporSofrerDano`
+(finding Important, duplicação verbatim) e fazer `contextoDe` lançar `Error` cru quando o scratch
+de um id não existe, em vez de devolver `{ id, usos: 0 }` em silêncio (finding Important, perda
+silenciosa de escrita). O bloco original deste Step tinha os dois `compor*` de dano repetidos
+inteiros e o `?? { id, usos: 0 }`; o que fica aqui é o que entrou em produção.
+
 ```ts
 import type { Combatente } from './tipos';
 import type { PassivaCombate, EstadoPassiva, ContextoPassiva } from './passiva';
@@ -516,9 +524,9 @@ import type { PassivaCombate, EstadoPassiva, ContextoPassiva } from './passiva';
  * Quem carrega passivas num combate: o código (`passivas`), o estado
  * (`scratches`, um por passiva) e o que os ganchos consultam para decidir.
  *
- * A ORDEM de `passivas` é a ordem de composição, e quem a declara é o chamador
- * (`partida`, hoje: raça primeiro, classe depois). Este módulo não a escolhe —
- * ele a obedece, e os testes provam que obedecer muda o resultado.
+ * A ordem de `passivas` É a ordem de composição — o array já é a decisão de
+ * quem o monta; este módulo só a obedece, e os testes provam que obedecer
+ * muda o resultado.
  */
 export interface Portador {
   readonly combatente: Combatente;
@@ -527,11 +535,22 @@ export interface Portador {
   readonly scratches: readonly EstadoPassiva[];
 }
 
+/**
+ * Todo `id` de passiva tem que ter scratch semeado em `scratches` — é
+ * invariante nossa (as passivas vêm do catálogo, nunca do cliente), não
+ * entrada do jogador. Sem essa guarda, `comScratch` escreveria no vácuo: uma
+ * passiva cujo id não bate com nenhum scratch nunca acumularia estado, e
+ * ninguém seria avisado.
+ */
 function contextoDe(portador: Portador, scratches: readonly EstadoPassiva[], id: string): ContextoPassiva {
+  const estado = scratches.find((s) => s.id === id);
+  if (estado === undefined) {
+    throw new Error(`composicao: scratch de ${id} não foi semeado`);
+  }
   return {
     portador: portador.combatente,
     vidaInicial: portador.vidaInicial,
-    estado: scratches.find((s) => s.id === id) ?? { id, usos: 0 },
+    estado,
   };
 }
 
@@ -542,34 +561,40 @@ function comScratch(
   return scratches.map((s) => (s.id === novo.id ? novo : s));
 }
 
-export function comporCausarDano(
+type GanchoDeDano = (
+  danoBase: number,
+  ctx: ContextoPassiva,
+) => { readonly dano: number; readonly estado: EstadoPassiva };
+
+function comporDano(
   danoBase: number,
   portador: Portador,
+  ganchoDe: (passiva: PassivaCombate) => GanchoDeDano | undefined,
 ): { readonly dano: number; readonly scratches: readonly EstadoPassiva[] } {
   let dano = danoBase;
   let scratches = portador.scratches;
   for (const passiva of portador.passivas) {
-    if (passiva.aoCausarDano === undefined) continue;
-    const r = passiva.aoCausarDano(dano, contextoDe(portador, scratches, passiva.id));
+    const gancho = ganchoDe(passiva);
+    if (gancho === undefined) continue;
+    const r = gancho(dano, contextoDe(portador, scratches, passiva.id));
     dano = r.dano;
     scratches = comScratch(scratches, r.estado);
   }
   return { dano, scratches };
 }
 
+export function comporCausarDano(
+  danoBase: number,
+  portador: Portador,
+): { readonly dano: number; readonly scratches: readonly EstadoPassiva[] } {
+  return comporDano(danoBase, portador, (passiva) => passiva.aoCausarDano);
+}
+
 export function comporSofrerDano(
   danoBase: number,
   portador: Portador,
 ): { readonly dano: number; readonly scratches: readonly EstadoPassiva[] } {
-  let dano = danoBase;
-  let scratches = portador.scratches;
-  for (const passiva of portador.passivas) {
-    if (passiva.aoSofrerDano === undefined) continue;
-    const r = passiva.aoSofrerDano(dano, contextoDe(portador, scratches, passiva.id));
-    dano = r.dano;
-    scratches = comScratch(scratches, r.estado);
-  }
-  return { dano, scratches };
+  return comporDano(danoBase, portador, (passiva) => passiva.aoSofrerDano);
 }
 
 /**

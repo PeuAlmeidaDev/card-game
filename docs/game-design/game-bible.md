@@ -223,6 +223,14 @@ Composto pela zona **em jogo**, que é **persistente entre turnos**:
   - Raça = **uma passiva, não stats** (corrigido 2026-07-24 — ver `docs/game-design/mecanica-cartas.md` §5). Stats vêm dos **itens**. Isso mantém o **Humano** (sem carta de raça) jogável: jogar uma raça é **trocar generalismo por especialização**, não ganhar poder bruto de graça.
   - 🎭 **A carta não é a raça — é um ARTEFATO DE TRANSFORMAÇÃO, consumido no uso** (decisão #38): *"Pergaminho do Elfo"*, *"Pergaminho do Anão"*. Usá-lo transforma você naquela raça e **gasta o pergaminho**. **Por que isso importa e não é só nome:** o tom do jogo é **sério** (§1), e *"trocar de raça no meio da masmorra"* é incoerente numa ficção séria de um jeito que numa satírica não seria. O artefato conserta a troca **sem mexer na mecânica** — e explica de graça por que a carta anterior vai para o cemitério: ela foi **gasta**. ➡️ Sustenta a #37: uma mão com vários pergaminhos é **inventário**, não palha. ⚠️ **Nome de trabalho** — nomenclatura é a pergunta 1 do §18. ⚠️ **Modelagem a resolver quando for construída:** hoje a carta **fica** em `emJogo.raca`; no modelo do artefato ela é consumida e o que permanece em jogo é a **raça resultante** (mesma informação pública, modelo diferente).
   - Classe = modificadores + **1 habilidade ativa + 1 passiva**.
+  - ⚙️ ✅ **O MOTOR JÁ SEGURA a passiva de classe — construído em 2026-08-06 (fatia `classe como
+    carta`, Plano A, decisão #87).** `criarCombate`/`proximoPasso` recebem `readonly
+    PassivaCombate[]` (N, não mais uma), compostas numa ordem **declarada**:
+    `aoCausarDano`/`aoSofrerDano` em cadeia, `aoFalharEsquiva` por curto-circuito. ⚠️ **Isto NÃO é a
+    classe virando carta** — nenhuma classe do catálogo declara passiva ainda (`passivasDoLutador`
+    monta o array só com a raça), e a ordem `raça → classe` continua **inexercitável** por carta
+    real até o **Plano B**. O motor está pronto para receber; a classe segue sendo `classeId`
+    resolvido do catálogo, não uma carta na mão.
   - 🎓 **Quem está sem carta de classe em jogo é o APRENDIZ** (decisão #60) — o análogo exato do
     Humano no eixo da raça. Não é um buraco nem um caso especial: é o estado nomeado de "não me
     especializei", e a #56 é o que o paga.
@@ -1225,3 +1233,42 @@ frequência do gatilho. 🔴 **N por medida, nunca global.**
 |---|---|---|
 | 85 | 📊 **A QUEIMA PENDENTE ABRE ~2× MAIS QUE O ESTIMADO, E A CONCLUSÃO DA #84 SOBREVIVE MAIS FORTE.** Medido: **621 aberturas em 480 partidas** = **1,29 por partida na mesa** e **0,323 por jogador** (faixa por rodada 0,281–0,394), mediana **1** por partida, **73,1%** das partidas com ≥1 na mesa — mas **só 33,1% (159/480) com ≥1 no ASSENTO #0** (faixa 27,5%–38,8%). Regressão: `AcaoInvalida` (bot e humano), `Error` cru, teto de 30.000 ações e censo de conservação id-a-id **deram ZERO** — em **960 partidas**, somando as duas medições (só a regressão tem esse N; as demais linhas são de **480**) | A estimativa do **§11 do spec** era ~**0,6/partida** e ~**0,16/jogador** — o spec dá **os dois** números, então a comparação já era por-partida × por-partida: veio ~2× em **ambas** as unidades. 🔴 **A explicação NÃO é a unidade** (essa versão foi escrita no relatório, revisada e removida): a **MESA mudou** desde o Plano 4a de onde a estimativa foi extrapolada — baralho de Tesouros 32→48, `salaVazia` cortada, `encrenca` construída, e o caminho **`perdeuAfinidade`** que **nem existia**. ⚠️ Desses quatro, **só um está medido**: `perdeuAfinidade` responde por **11,8%** (73/621) das aberturas; os outros três ficam declarados como **não medidos**. ✅ **A previsão do §11 acertou** (*"sobe com o baralho de 48, mas continua abaixo de 1 por jogador por partida"*): 0,323 < 1. ✅ **E a #84 fica validada, não desmentida** — com o assento #0 vendo ≥1 em 33,1% das partidas, *"jogue e veja aparecer"* reprovaria **código correto em ~67% das observações**, que é exatamente o motivo de o roteiro do gate desta fatia ser **todo de cenário forçado**. 🔑 **A #84 não foi corrigida em silêncio: a conclusão fica, o número medido é anexado** |
 | 86 | 🔴 **A FILA COM ≥2 DESLOCADOS VEM DE `perdeuAfinidade`, NÃO DO MONTANTE — 12 de 12.** Medido: fila ≥2 em **12 de 621 aberturas (1,9%)**; `trocaDeSlot` produziu **ZERO em 548 aberturas**, `perdeuAfinidade` produziu **12 em 73 (16,4%)**. N=480 | O relatório da Task 7 **afirmava o mecanismo oposto** (*"o montante de duas mãos deslocando dois itens com a mochila cheia"*) sem número que o ligasse, e o split por `motivo` o **contradisse**. 🔑 **A fila 3 medida é a prova limpa:** o montante desloca **no máximo 2** itens (mão direita + mão esquerda), então fila 3 é **aritmeticamente impossível** pelo mecanismo afirmado — e perfeitamente possível por troca de raça, que pode proibir até 5 slots de uma vez. ⚠️ Isto **não** diz que o montante nunca produzirá fila 2; diz que em **548** aberturas ele não produziu nenhuma. ➡️ **Consequência prática:** o cenário "mochila cheia com DOIS deslocados por troca de slot" é o candidato a **inexercitável pelo fixture** que a nota final do plano já marcava — e o conserto, as três vezes que esse padrão mordeu a fatia `afinidade`, foi **dublê novo no catálogo de teste**, não mais atenção |
+
+### Sessão de 2026-08-06 — o Plano A da `classe como carta`: o motor passa a segurar N passivas, e o jogo fica idêntico
+
+**O Plano A está construído** (branch `feat/classe-como-carta-plano-a`, 5 tasks de código + uma de
+documentação + uma leva final de correção, **619 testes verdes**, typecheck 7/7, lint limpo). Ele é
+**metade** da fatia `classe
+como carta` — a que refatora o motor por baixo; a que tira o topo da tela é o **Plano B**, ainda não
+escrito. Nenhuma carta nova entrou no jogo nesta sessão: as raças continuam com uma passiva cada,
+nenhuma classe do catálogo declara passiva, e a mão inicial não muda.
+
+**A prova de que o jogo não mudou é `packages/cartas/src/equivalencia.test.ts`** — 4 casos (sem
+passiva, Casca de Pedra, Escorregadio, Sangue de Guerra), log conferido **evento a evento** com dado
+determinístico, os 4 confirmados **verdes e nomeados** antes desta linha ser escrita
+(`vitest run src/equivalencia.test.ts --reporter=verbose`, os quatro `describe` na saída). Verificados
+por **mutação dirigida nos TRÊS ganchos** de `PassivaCombate` (`aoCausarDano`, `aoSofrerDano`,
+`aoFalharEsquiva`), cada um com falha confirmada e desfeita sem entrar em commit.
+
+| # | Decisão | Porquê |
+|---|---|---|
+| 87 | **O motor segura N passivas, e a ordem de composição é DECLARADA.** `EstadoCombate.passiva` (uma) virou `passivas: readonly EstadoPassiva[]` (N), com a regra num módulo próprio (`packages/motor/src/composicao.ts`). `aoCausarDano` e `aoSofrerDano` compõem em **cadeia**, na ordem declarada — o dano que sai de uma é a base da seguinte; `aoFalharEsquiva` tem **curto-circuito** — a primeira que re-rola vence e as seguintes **não são consultadas** (logo não gastam uso). ⚠️ **Metade surpreendente, não escrita antes:** as passivas **ANTERIORES** à vencedora **SÃO** consultadas, e podem gastar `usos` sem produzir efeito nenhum — `composicao.test.ts` prende isso (*"quem recusa é consultado e o scratch dele persiste, e a seguinte decide"*). `passivasDoLutador` (`packages/partida/src/mesa.ts`) monta o array hoje só com a passiva da raça — é a montagem que fixa a ordem `raça → classe`, não o motor | Sem regra escrita, a ordem do array decidiria o jogo por acidente. O curto-circuito existe porque duas passivas de re-rolagem gastariam uso na **mesma** esquiva e só uma re-rolagem aconteceria — cobrar dois usos por um efeito é o modo de falha silencioso deste gancho. ⚠️ A ordem `raça → classe` é **arbitrária**: o valor está em ser determinada e testada, não em qual vem antes. ⚠️ **A regra é INEXERCITÁVEL pelas cartas de hoje** — nenhum jogador tem duas passivas até o **Plano B** dar passiva a alguma classe —, e por isso está travada por **dublês** (`composicao.test.ts`), não por carta real. É a mesma causa raiz que mordeu a fatia `afinidade` três vezes (Tasks 6, 7 e 8 dela, ver #78): o fixture não consegue produzir o cenário, e o conserto sempre foi um dublê novo, nunca mais atenção |
+
+### 🔬 O que a execução pegou, e que vale mais que a decisão
+
+- 📌 **Duas previsões numéricas do plano saíram erradas, e quem as corrigiu foi a medição, não o
+  texto do plano.** A Task 1 previa que a mutação em `danoDe` (`+1` no dano base) derrubaria "pelo
+  menos 3 de 4" testes de `equivalencia.test.ts`; derrubaram **2** — `Math.floor` colapsa `6` e `7`
+  no mesmo `3` (Casca de Pedra sobrevive por coincidência aritmética) e o Escorregadio esquiva no
+  cenário testado e nunca chega a causar dano. A Task 3 previa que a mutação do curto-circuito em
+  `comporFalharEsquiva` (trocar o `return` cedo por `continue`) derrubaria **1** teste; derrubaram
+  **2** — sem o `return`, a função sempre cai no `reRolar: false` do fim do loop, e há dois testes
+  que esperam `true`. Nos dois casos quem implementou rodou o comando, leu a saída e escreveu o
+  número **observado**, não o previsto.
+- 🔴 **E a primeira divergência expôs um buraco real, não só uma previsão errada.** Os dois testes
+  que a mutação de `danoDe` não derruba são **exatamente** os que guardam `aoSofrerDano` (Casca de
+  Pedra) e `aoFalharEsquiva` (Escorregadio) — os dois ganchos mais mexidos pelo refactor das Tasks 3
+  e 4. Sem mutação dirigida a cada um, eles ficavam **sem prova de que mordem**. Fechado na mesma
+  sessão com duas mutações extras, direto nos ganchos: as duas falharam como esperado, com diff
+  completo no evento afetado — os 3 ganchos que `PassivaCombate` tem hoje ficaram, todos, com
+  mutação dirigida e falha confirmada.

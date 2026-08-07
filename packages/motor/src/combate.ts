@@ -2,17 +2,47 @@ import type {
   Combatente, RolarD12, EventoCombate, EstadoCombate, AcaoCombate, Passo,
 } from './tipos';
 import type { PassivaCombate, EstadoPassiva } from './passiva';
+import { comporCausarDano, comporSofrerDano, comporFalharEsquiva, type Portador } from './composicao';
 import { decidirIniciativa } from './iniciativa';
 import { rolarAtaqueDe, rolarEsquivaContra, danoDe, resolverAtaque } from './ataque';
 import { MAX_TURNOS } from './limites';
 import { AcaoIlegal } from './erros';
 
+function portadorDe(
+  estado: EstadoCombate,
+  passivas: readonly PassivaCombate[],
+  scratches: readonly EstadoPassiva[],
+): Portador {
+  return {
+    combatente: estado.jogador,
+    vidaInicial: estado.vidaInicialJogador,
+    passivas,
+    scratches,
+  };
+}
+
+/**
+ * Passivas com o mesmo id dividiriam o mesmo scratch em silêncio — invariante
+ * nossa (as passivas vêm do catálogo, nunca do cliente), não pedido inválido.
+ * `criarCombate` e `proximoPasso` são as duas portas de entrada de `passivas`;
+ * as duas chamam esta guarda, para que id repetido injetado só num
+ * `proximoPasso` isolado seja recusado tão cedo quanto o seria em `criarCombate`.
+ */
+function recusarPassivasComIdRepetido(nomeDaFuncao: string, passivas: readonly PassivaCombate[]): void {
+  const ids = new Set(passivas.map((p) => p.id));
+  if (ids.size !== passivas.length) {
+    throw new Error(`${nomeDaFuncao}: passivas com id repetido dividiriam o mesmo scratch`);
+  }
+}
+
 export function criarCombate(
   jogador: Combatente,
   monstro: Combatente,
   rolar: RolarD12,
-  passiva?: PassivaCombate,
+  passivas: readonly PassivaCombate[] = [],
 ): Passo {
+  recusarPassivasComIdRepetido('criarCombate', passivas);
+
   const ini = decidirIniciativa(jogador, monstro, rolar); // jogador = 'a', monstro = 'b'
   const estado: EstadoCombate = {
     jogador,
@@ -22,7 +52,7 @@ export function criarCombate(
     ataqueDoMonstro: null,
     desfecho: 'emAndamento',
     vidaInicialJogador: jogador.vida,
-    passiva: passiva ? { id: passiva.id, usos: 0 } : null,
+    passivas: passivas.map((p): EstadoPassiva => ({ id: p.id, usos: 0 })),
   };
   return avancar(estado, [ini.evento], rolar);
 }
@@ -79,8 +109,10 @@ export function proximoPasso(
   estado: EstadoCombate,
   acao: AcaoCombate,
   rolar: RolarD12,
-  passiva?: PassivaCombate,
+  passivas: readonly PassivaCombate[] = [],
 ): Passo {
+  recusarPassivasComIdRepetido('proximoPasso', passivas);
+
   if (estado.desfecho !== 'emAndamento') {
     throw new AcaoIlegal('proximoPasso: o combate já terminou');
   }
@@ -89,13 +121,13 @@ export function proximoPasso(
     if (estado.vez !== 'jogador' || estado.ataqueDoMonstro !== null) {
       throw new AcaoIlegal('proximoPasso: não é a vez de atacar');
     }
-    return atacar(estado, rolar, passiva);
+    return atacar(estado, rolar, passivas);
   }
 
   if (estado.ataqueDoMonstro === null) {
     throw new AcaoIlegal('proximoPasso: não há ataque do monstro para esquivar');
   }
-  return esquivar(estado, estado.ataqueDoMonstro.rolagem, rolar, passiva);
+  return esquivar(estado, estado.ataqueDoMonstro.rolagem, rolar, passivas);
 }
 
 /**
@@ -104,30 +136,24 @@ export function proximoPasso(
  * composto `resolverAtaque`, enquanto `esquivar` usa as primitivas: lá o ataque
  * já foi rolado num passo anterior, esperando o clique do jogador.
  */
-function atacar(estado: EstadoCombate, rolar: RolarD12, passiva?: PassivaCombate): Passo {
+function atacar(estado: EstadoCombate, rolar: RolarD12, passivas: readonly PassivaCombate[]): Passo {
   const { dano: base, eventos } = resolverAtaque(estado.jogador, 'a', 'b', rolar);
   const log: EventoCombate[] = [...eventos];
 
-  const dano = base > 0 && passiva?.aoCausarDano
-    ? passiva.aoCausarDano(base, {
-        portador: estado.jogador,
-        vidaInicial: estado.vidaInicialJogador,
-        // `estado.passiva` está sempre semeado quando `passiva` foi injetada
-        // (criarCombate o inicializa); o fallback é inalcançável sob esse
-        // contrato de injeção — existe só para o tipo fechar sem asserção.
-        estado: estado.passiva ?? { id: passiva.id, usos: 0 },
-      })
-    : base;
+  const composto = base > 0
+    ? comporCausarDano(base, portadorDe(estado, passivas, estado.passivas))
+    : { dano: base, scratches: estado.passivas };
 
   let monstro = estado.monstro;
-  if (dano > 0) {
-    monstro = { ...monstro, vida: monstro.vida - dano };
-    log.push({ tipo: 'dano', alvo: 'b', quantidade: dano, vidaRestante: monstro.vida });
+  if (composto.dano > 0) {
+    monstro = { ...monstro, vida: monstro.vida - composto.dano };
+    log.push({ tipo: 'dano', alvo: 'b', quantidade: composto.dano, vidaRestante: monstro.vida });
   }
 
   const proximo: EstadoCombate = {
     ...estado,
     monstro,
+    passivas: composto.scratches,
     turno: estado.turno + 1,
     vez: 'monstro',
     desfecho: monstro.vida <= 0 ? 'vitoriaJogador' : 'emAndamento',
@@ -140,22 +166,17 @@ function esquivar(
   estado: EstadoCombate,
   rolagemAtaque: number,
   rolar: RolarD12,
-  passiva?: PassivaCombate,
+  passivas: readonly PassivaCombate[],
 ): Passo {
   const log: EventoCombate[] = [];
-  let scratch: EstadoPassiva | null = estado.passiva;
+  let scratches = estado.passivas;
 
   let esquiva = rolarEsquivaContra(rolagemAtaque, 'a', rolar);
   log.push(esquiva.evento);
 
-  // Gancho de re-rolagem: a passiva pode refazer uma esquiva falha, gastando um uso.
-  if (!esquiva.esquivou && passiva?.aoFalharEsquiva && scratch) {
-    const r = passiva.aoFalharEsquiva({
-      portador: estado.jogador,
-      vidaInicial: estado.vidaInicialJogador,
-      estado: scratch,
-    });
-    scratch = r.estado;
+  if (!esquiva.esquivou) {
+    const r = comporFalharEsquiva(portadorDe(estado, passivas, scratches));
+    scratches = r.scratches;
     if (r.reRolar) {
       esquiva = rolarEsquivaContra(rolagemAtaque, 'a', rolar);
       log.push(esquiva.evento);
@@ -164,24 +185,16 @@ function esquivar(
 
   let jogador = estado.jogador;
   if (!esquiva.esquivou) {
-    let dano = danoDe(estado.monstro);
-    if (passiva?.aoSofrerDano && scratch) {
-      const r = passiva.aoSofrerDano(dano, {
-        portador: estado.jogador,
-        vidaInicial: estado.vidaInicialJogador,
-        estado: scratch,
-      });
-      dano = r.dano;
-      scratch = r.estado;
-    }
-    jogador = { ...jogador, vida: jogador.vida - dano };
-    log.push({ tipo: 'dano', alvo: 'a', quantidade: dano, vidaRestante: jogador.vida });
+    const sofrido = comporSofrerDano(danoDe(estado.monstro), portadorDe(estado, passivas, scratches));
+    scratches = sofrido.scratches;
+    jogador = { ...jogador, vida: jogador.vida - sofrido.dano };
+    log.push({ tipo: 'dano', alvo: 'a', quantidade: sofrido.dano, vidaRestante: jogador.vida });
   }
 
   const proximo: EstadoCombate = {
     ...estado,
     jogador,
-    passiva: scratch,
+    passivas: scratches,
     ataqueDoMonstro: null,
     turno: estado.turno + 1,
     vez: 'jogador',
