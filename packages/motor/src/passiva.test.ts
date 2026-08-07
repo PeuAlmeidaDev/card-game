@@ -147,6 +147,19 @@ describe('criarCombate com ids repetidos', () => {
   });
 });
 
+describe('proximoPasso com ids repetidos', () => {
+  it('recusa mesmo quando o id repetido só aparece aqui, não em criarCombate', () => {
+    // criarCombate viu passivas sem duplicata: a guarda de proximoPasso tem
+    // que valer sozinha, sem depender do que criarCombate já checou.
+    const inicio = criarCombate(jogador, monstro, filaDeDados([]));
+    const uma: PassivaCombate = { id: 'mesma', aoCausarDano: (base, ctx) => ({ dano: base, estado: ctx.estado }) };
+    const outra: PassivaCombate = { id: 'mesma', aoSofrerDano: (base, ctx) => ({ dano: base, estado: ctx.estado }) };
+
+    expect(() => proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([]), [uma, outra]))
+      .toThrow('proximoPasso: passivas com id repetido');
+  });
+});
+
 describe('atacar erra com passiva injetada (dano zero)', () => {
   it('preserva os scratches acumulados quando o golpe não conecta', () => {
     const contaToques: PassivaCombate = {

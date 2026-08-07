@@ -21,16 +21,27 @@ function portadorDe(
   };
 }
 
+/**
+ * Passivas com o mesmo id dividiriam o mesmo scratch em silêncio — invariante
+ * nossa (as passivas vêm do catálogo, nunca do cliente), não pedido inválido.
+ * `criarCombate` e `proximoPasso` são as duas portas de entrada de `passivas`;
+ * as duas chamam esta guarda, para que id repetido injetado só num
+ * `proximoPasso` isolado seja recusado tão cedo quanto o seria em `criarCombate`.
+ */
+function recusarPassivasComIdRepetido(nomeDaFuncao: string, passivas: readonly PassivaCombate[]): void {
+  const ids = new Set(passivas.map((p) => p.id));
+  if (ids.size !== passivas.length) {
+    throw new Error(`${nomeDaFuncao}: passivas com id repetido dividiriam o mesmo scratch`);
+  }
+}
+
 export function criarCombate(
   jogador: Combatente,
   monstro: Combatente,
   rolar: RolarD12,
   passivas: readonly PassivaCombate[] = [],
 ): Passo {
-  const ids = new Set(passivas.map((p) => p.id));
-  if (ids.size !== passivas.length) {
-    throw new Error('criarCombate: passivas com id repetido dividiriam o mesmo scratch');
-  }
+  recusarPassivasComIdRepetido('criarCombate', passivas);
 
   const ini = decidirIniciativa(jogador, monstro, rolar); // jogador = 'a', monstro = 'b'
   const estado: EstadoCombate = {
@@ -100,6 +111,8 @@ export function proximoPasso(
   rolar: RolarD12,
   passivas: readonly PassivaCombate[] = [],
 ): Passo {
+  recusarPassivasComIdRepetido('proximoPasso', passivas);
+
   if (estado.desfecho !== 'emAndamento') {
     throw new AcaoIlegal('proximoPasso: o combate já terminou');
   }
