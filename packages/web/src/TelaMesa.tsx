@@ -3,16 +3,8 @@ import { api } from './api';
 import { PainelLog } from './PainelLog';
 import { descreverCarta } from './descreverCarta';
 import { acaoEhLegal, afinidadeCom, LIMITE_MOCHILA } from '@card-dungeon/shared';
-import type { AcaoDaMesa, AcaoNoFio, Catalogo, Escolhas, Fase, ItemCarta, Slot, VistaDaPartida } from '@card-dungeon/shared';
+import type { AcaoDaMesa, AcaoNoFio, Catalogo, Fase, ItemCarta, Slot, VistaDaPartida } from '@card-dungeon/shared';
 import { rotuloDeAfinidade } from './rotuloDeAfinidade';
-
-/**
- * Usado quando a tela roda sozinha; o `App` passa as escolhas reais do construtor.
- *
- * O tipo é `Escolhas` (inferido do schema Zod), não `EscolhasPersonagem` (o do
- * domínio): quem manda no corpo da rota é o tipo da borda.
- */
-const ESCOLHAS_PADRAO: Escolhas = { classeId: 'guerreiro' };
 
 /**
  * Os cinco encaixes na ordem em que o corpo se lê, da cabeça aos pés. É ordem de
@@ -51,18 +43,19 @@ const NOME_DA_FASE: Record<Fase, string> = {
   descartar: 'Descartar — sua mão está acima do limite',
 };
 
-export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = [], itens = [] }: {
-  readonly escolhas?: Escolhas;
+export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }: {
   readonly racas?: Catalogo['racas'];
   readonly monstros?: Catalogo['monstros'];
   readonly itens?: Catalogo['itens'];
+  readonly classes?: Catalogo['classes'];
 }) {
   const [vista, definirVista] = useState<VistaDaPartida | null>(null);
   const [erro, definirErro] = useState<string | null>(null);
 
   const novaPartida = async (): Promise<void> => {
     definirErro(null);
-    const resposta = await api.criarPartida({ body: escolhas });
+    // Corpo VAZIO: a classe virou carta do baralho e não há mais escolha a mandar.
+    const resposta = await api.criarPartida({ body: {} });
     if (resposta.status === 200) {
       definirVista(resposta.body);
       return;
@@ -115,6 +108,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
   // item novo no server) tem que virar um rótulo feio, nunca uma exceção que
   // apaga a mesa inteira por causa de um nome.
   const nomeDoItem = (id: string): string => itens.find((i) => i.id === id)?.nome ?? id;
+  const nomeDaClasse = (id: string): string => classes.find((c) => c.id === id)?.nome ?? id;
   // A vida máxima do jogador vem PRONTA da vista: `combatente` já é o total
   // calculado pelo domínio (classe + itens equipados), com a patente no `level`.
   // A patente muda o dano, não a vida. Do monstro só temos o valor corrente: a
@@ -286,7 +280,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
           )}
 
           {espiada !== null && (
-            <p>Você pressente {descreverCarta(espiada.carta, nomeDaRaca, nomeDoMonstro, nomeDoItem)} adiante.</p>
+            <p>Você pressente {descreverCarta(espiada.carta, nomeDaRaca, nomeDoMonstro, nomeDoItem, nomeDaClasse)} adiante.</p>
           )}
 
           <div>
@@ -441,7 +435,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
         <ul>
           {vista.suaMao.map((carta) => (
             <li key={carta.id}>
-              {descreverCarta(carta, nomeDaRaca, nomeDoMonstro, nomeDoItem)}
+              {descreverCarta(carta, nomeDaRaca, nomeDoMonstro, nomeDoItem, nomeDaClasse)}
               {carta.tipo === 'equipamento' && rotuloDe(carta.itemId)}{' '}
               {/* Só raça entra em jogo nesta fatia — o domínio recusa o resto, e um
                   botão que só serve para levar 400 ensina o jogador a errar. */}
@@ -532,6 +526,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
         racas={racas}
         monstros={monstros}
         itens={itens}
+        classes={classes}
       />
 
       {erro !== null && <p role="alert">{erro}</p>}

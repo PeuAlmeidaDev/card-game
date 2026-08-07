@@ -12,6 +12,7 @@ const ctx: ContextoDeNarracao = {
   nomeDaRaca: (id) => (id === 'orc' ? 'Orc' : id === 'elfo' ? 'Elfo' : id),
   nomeDoMonstro: (id) => (id === 'goblin' ? 'Goblin' : id),
   nomeDoItem: (id) => (id === 'espada-curta' ? 'Espada Curta' : id),
+  nomeDaClasse: (id) => (id === 'guerreiro' ? 'Guerreiro' : id),
 };
 
 describe('narrarEvento — linhas de texto puro', () => {

@@ -4,14 +4,13 @@ import { montarComposicaoTesouros } from './baralho';
 import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import { MAO_INICIAL_PADRAO, MAO_INICIAL_TESOUROS, LIMITE_MOCHILA } from './mao';
 import { SLOTS_VAZIOS } from './corpo';
-import { ID_DA_CLASSE_DE_TESTE } from './testes/catalogo';
 import type { EntradaJogador } from './tipos';
 
 const semEmbaralhar = <T,>(itens: readonly T[]): T[] => [...itens];
 
 const entradas: readonly EntradaJogador[] = [
-  { id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE },
-  { id: 'p2', nome: 'Bot 1', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
+  { id: 'p1', nome: 'Você', ehBot: false },
+  { id: 'p2', nome: 'Bot 1', ehBot: true },
 ];
 
 const config = {
@@ -61,8 +60,8 @@ describe('criarPartida', () => {
     // a vez nunca sairia do assento 0 e a classificação teria duas linhas do mesmo
     // jogador. Zod na borda valida a forma de cada entrada, não a unicidade entre elas.
     const repetido: readonly EntradaJogador[] = [
-      { id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE },
-      { id: 'p1', nome: 'Bot 1', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
+      { id: 'p1', nome: 'Você', ehBot: false },
+      { id: 'p1', nome: 'Bot 1', ehBot: true },
     ];
     expect(() => criarPartida('m1', repetido, config, { embaralhar: semEmbaralhar }))
       .toThrow('criarPartida: ids de jogador repetidos');
@@ -91,6 +90,19 @@ describe('criarPartida', () => {
     // "corpo ausente" não podem ser o mesmo estado, senão cada leitor decide
     // por conta própria o que fazer com a ausência.
     expect(p.jogadores.map((j) => j.emJogo.slots)).toEqual([SLOTS_VAZIOS, SLOTS_VAZIOS]);
+  });
+
+  it('a mesa nasce APRENDIZ: nenhum jogador tem classe em jogo', () => {
+    // A classe deixou de ser semeada na criação — ela é carta do baralho, como a
+    // raça desde a fatia 7. Nascer com uma classe em jogo era o andaime do
+    // construtor, e ele fazia o baralho CRESCER 1 quando a carta fosse trocada.
+    const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
+    expect(p.jogadores.every((j) => j.emJogo.classe === null)).toBe(true);
+  });
+
+  it('nenhum jogador carrega `classeId` — a zona é a fonte', () => {
+    const p = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
+    expect(p.jogadores.every((j) => !('classeId' in j))).toBe(true);
   });
 
   it('distribui a mão inicial do topo do baralho', () => {

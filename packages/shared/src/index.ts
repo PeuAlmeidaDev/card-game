@@ -30,9 +30,8 @@ import type {
 import type { Slot as SlotDaCarta, ItemCarta, EixoDeAfinidade as EixoDaCarta } from '@card-dungeon/cartas';
 
 /**
- * Corpo do POST /api/duelo e /api/partida: as escolhas do jogador (ids).
- * Restrito ao tipo de domínio via `satisfies` — o `personagem` continua a fonte
- * única do tipo.
+ * Corpo do POST /api/duelo: as escolhas do jogador (ids). Restrito ao tipo de
+ * domínio via `satisfies` — o `personagem` continua a fonte única do tipo.
  *
  * **Sem `racaId` e sem `itemIds`:** desde a fatia 7 a raça não é escolha de menu,
  * e desde a fatia 8 o item também não — os dois são carta que se saca do baralho
@@ -40,12 +39,23 @@ import type { Slot as SlotDaCarta, ItemCarta, EixoDeAfinidade as EixoDaCarta } f
  * obrigado a mandar e o servidor ignora: um tipo que mente no fio. E duas fontes
  * para o mesmo stat (nascer equipado + sacar Tesouro) distorceriam uma corrida
  * ranqueada, que é o motivo de jogo por trás do motivo de tipo.
+ *
+ * ⚠️ Serve SÓ ao `/duelo`, que genuinamente monta um combatente a partir de um
+ * `classeId`. A mesa saiu daqui: ver `semEscolhasSchema`.
  */
 export const escolhasSchema = z.object({
   classeId: z.string(),
 }) satisfies z.ZodType<EscolhasPersonagem>;
 
 export type Escolhas = z.infer<typeof escolhasSchema>;
+
+/**
+ * Corpo do POST /api/partida: **vazio**. A classe virou carta do baralho, como a
+ * raça na fatia 7 e o item na 8 — a mesa nasce Aprendiz e não há escolha a
+ * mandar. Continuar exigindo `classeId` deixaria um dado que o cliente é obrigado
+ * a preencher e o servidor ignora, que é exatamente o tipo que mente no fio.
+ */
+export const semEscolhasSchema = z.object({});
 
 /** Espelho Zod do Combatente do motor (preso ao tipo de domínio por `satisfies`). */
 export const combatenteSchema = z.object({
@@ -225,12 +235,12 @@ export const contrato = c.router({
   criarPartida: {
     method: 'POST',
     path: '/api/partida',
-    body: escolhasSchema,
+    body: semEscolhasSchema,
     responses: {
       200: c.type<VistaDaPartida>(),
       400: c.type<{ erro: string }>(),
     },
-    summary: 'Cria a mesa com o humano (das escolhas) mais 3 bots e devolve a vista dele.',
+    summary: 'Cria a mesa com o humano mais 3 bots e devolve a vista dele.',
   },
   agir: {
     method: 'POST',

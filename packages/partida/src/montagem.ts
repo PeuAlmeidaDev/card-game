@@ -32,20 +32,19 @@ export function criarPartida(
     id: e.id,
     nome: e.nome,
     ehBot: e.ehBot,
-    classeId: e.classeId,
     patente: 1,
     derrotas: 0,
     mao: [],
     mochila: [],
-    // Todo mundo começa Humano: a raça agora é carta que se saca e se joga
-    // (`jogarCarta`). Nascer com uma raça em jogo era o andaime do construtor —
-    // e ele custava caro: a carta semeada nunca tinha saído do baralho, então
-    // trocá-la fazia o baralho CRESCER 1.
+    // Todo mundo começa Humano e Aprendiz: raça e classe são cartas que se sacam
+    // e se jogam (`jogarCarta`). Nascer com uma delas em jogo era o andaime do
+    // construtor — e ele custava caro: a carta semeada nunca tinha saído do
+    // baralho, então trocá-la fazia o baralho CRESCER 1.
     //
     // Corpo VAZIO pelo mesmo motivo: os 5 slots existem desde o nascimento,
-    // todos `null`. Nascer equipado é o andaime que sai nesta fatia — item agora
-    // é carta que se saca, como a raça saiu na 7.
-    emJogo: { raca: null, slots: { ...SLOTS_VAZIOS } },
+    // todos `null`. Nascer equipado é o andaime que saiu na fatia 8 — item também
+    // é carta que se saca.
+    emJogo: { raca: null, classe: null, slots: { ...SLOTS_VAZIOS } },
   }));
 
   // Baralho da MESA: a composição por jogador multiplicada pelo tamanho da mesa.

@@ -1,5 +1,5 @@
 import type { Combatente } from '@card-dungeon/motor';
-import type { RacaResumo, MonstroCarta, ItemCarta } from '@card-dungeon/cartas';
+import type { RacaResumo, ClasseResumo, MonstroCarta, ItemCarta } from '@card-dungeon/cartas';
 
 /** Modificadores parciais dos 4 stats de combate. `level` nunca é modificado. */
 export interface ModificadoresDeStat {
@@ -31,7 +31,12 @@ export interface Catalogo {
    * informação pública — a carta é revelada com a face para cima.
    */
   readonly monstros: readonly MonstroCarta[];
-  readonly classes: readonly Classe[];
+  /**
+   * A projeção pública das classes, gêmea de `racas`: sem `passivaCombate` (que é
+   * código e não sobrevive ao JSON) e sem `modificadores` (resolvidos server-side
+   * por `obterClasse`). Quem soma é o domínio, nunca o cliente.
+   */
+  readonly classes: readonly ClasseResumo[];
   /**
    * O baralho de Tesouros como catálogo. `ItemCarta` e não `Equipamento`: o
    * cliente precisa do `slot` (para desenhar os cinco encaixes do corpo) e do

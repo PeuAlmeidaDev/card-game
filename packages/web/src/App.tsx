@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from './api';
 import { TelaMesa } from './TelaMesa';
-import { montarCombatente } from '@card-dungeon/shared';
 import type { Catalogo, ResultadoDuelo } from '@card-dungeon/shared';
 
 function descrever(r: ResultadoDuelo): string {
@@ -26,19 +25,15 @@ export function App() {
 
   if (!catalogo) return <p>Carregando catálogo…</p>;
 
-  const classe = catalogo.classes.find((c) => c.id === classeId);
-  // Só a CLASSE soma no preview. O item saiu do construtor na fatia 8 (virou
-  // carta de Tesouro, sacada em jogo) e a raça saiu na 7 (é passiva, não stat) —
-  // somar aqui algo que o servidor não monta seria a tela prometendo um
-  // personagem que não vai existir.
+  // O preview é a BASE, e nada mais: desde que a classe virou carta do baralho o
+  // catálogo publica `ClasseResumo` (id/nome/texto) e os `modificadores` ficam no
+  // servidor (`obterClasse`) — não há o que somar aqui.
   //
-  // ⚠️ Quem soma é o DOMÍNIO (`montarCombatente`, via `shared`), nunca este
-  // arquivo. Havia aqui um `calcularPreview` que refazia a conta à mão e já tinha
-  // divergido: ele não aplicava o `PISO = 1` do `montar.ts`, então a tela
-  // mostrava `Agilidade -5` num personagem que o servidor montaria com `1`. Sem
-  // classe (catálogo vazio), o preview é a própria `base` — ela já vem pronta do
-  // domínio, e não há o que somar.
-  const stats = classe ? montarCombatente(classe, []) : catalogo.base;
+  // ⚠️ E não deve voltar a haver. Havia neste arquivo um `calcularPreview` que
+  // refazia a conta à mão e já tinha divergido: ele não aplicava o `PISO = 1` do
+  // `montar.ts`, então a tela mostrava `Agilidade -5` num personagem que o
+  // servidor montaria com `1`. O construtor inteiro sai na Task 12.
+  const stats = catalogo.base;
 
   async function duelar(): Promise<void> {
     setTexto('Rolando os dados…');
@@ -71,20 +66,20 @@ export function App() {
       <button onClick={() => void duelar()}>Duelar</button>
       <p>{texto}</p>
 
-      {/* A mesa recebe as MESMAS escolhas do construtor acima — o servidor monta
-          o combatente a partir delas, como já faz no duelo. Passar as escolhas
-          em vez de um personagem fixo é o que liga esta tela ao resto do jogo.
+      {/* A mesa não recebe mais escolha nenhuma: a classe virou carta do baralho,
+          como a raça na fatia 7 e o item na 8.
 
           `racas` continua vindo do catálogo: não para ESCOLHER, e sim para a mesa
           nomear as cartas de raça que aparecem na mão e no log. `monstros` faz o
-          mesmo papel para o bestiário, e `itens` para o baralho de Tesouros — é
-          dele que sai o nome de cada peça e o slot onde ela encaixa, que é o que
-          a mesa precisa para desenhar o corpo. */}
+          mesmo papel para o bestiário, `classes` para as cartas de classe, e
+          `itens` para o baralho de Tesouros — é dele que sai o nome de cada peça e
+          o slot onde ela encaixa, que é o que a mesa precisa para desenhar o
+          corpo. */}
       <TelaMesa
-        escolhas={{ classeId }}
         racas={catalogo.racas}
         monstros={catalogo.monstros}
         itens={catalogo.itens}
+        classes={catalogo.classes}
       />
     </main>
   );

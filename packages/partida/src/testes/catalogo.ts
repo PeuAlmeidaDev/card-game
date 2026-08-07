@@ -1,4 +1,4 @@
-import type { CatalogoDaMesa } from '../tipos';
+import type { CartaDeClasse, CatalogoDaMesa, EstadoPartida } from '../tipos';
 
 /**
  * Monstro default dos testes. **Numericamente idêntico ao `monstroPadrao` que
@@ -62,7 +62,32 @@ export const ID_DA_CLASSE_DE_TESTE = 'c-teste';
  */
 export const CLASSE_DE_TESTE = {
   id: ID_DA_CLASSE_DE_TESTE, nome: 'Classe de Teste', modificadores: { vida: 10, habilidade: 2 },
+  passivaCombate: null,
 };
+
+export const ID_DA_CARTA_DE_CLASSE_DE_TESTE = 'pc-teste';
+export const CARTA_DE_CLASSE_DE_TESTE: CartaDeClasse = {
+  id: ID_DA_CARTA_DE_CLASSE_DE_TESTE, tipo: 'classe', classeId: ID_DA_CLASSE_DE_TESTE,
+};
+
+/**
+ * `criarPartida` deixou de semear classe: ela é carta do baralho, e a mesa nasce
+ * Aprendiz. Este stamp devolve a statline histórica das fixtures (3/20/8/5), sem a
+ * qual metade das asserções de combate deste pacote passaria a medir outro
+ * personagem. Quem testa a mesa NASCENDO (`montagem.test.ts`) não usa este helper.
+ *
+ * ⚠️ A carta carimbada NÃO sai de baralho nenhum, então um censo de conservação
+ * id-a-id sobre estes fixtures acusaria uma carta a mais. O censo é do soak, que
+ * roda contra a mesa de PRODUÇÃO.
+ */
+export function comClasseDeTeste(estado: EstadoPartida): EstadoPartida {
+  return {
+    ...estado,
+    jogadores: estado.jogadores.map((j) => ({
+      ...j, emJogo: { ...j.emJogo, classe: CARTA_DE_CLASSE_DE_TESTE },
+    })),
+  };
+}
 
 export const ID_DO_ITEM_DE_TESTE = 'i-teste';
 export const ITEM_DE_TESTE = {

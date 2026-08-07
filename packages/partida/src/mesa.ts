@@ -401,11 +401,11 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
 
 /**
  * Resolve uma carta JÁ comprada (o baralho em `base` já reflete a compra) e é
- * dona do seu DESTINO: `monstro` abre combate; `raca` (indo para a mão de quem
- * a revelou) entrega o turno à fase `encrenca`, que cobra `procurarEncrenca` ou
- * `saquear` — ela não se auto-pula e não aceita `passar` (decisão #62 do game
- * bible). É o núcleo compartilhado dos TRÊS chamadores: o vasculhar atômico, a
- * resolução da espiada e `procurarEncrenca`.
+ * dona do seu DESTINO: `monstro` abre combate; `raca` e `classe` (indo para a mão
+ * de quem as revelou) entregam o turno à fase `encrenca`, que cobra
+ * `procurarEncrenca` ou `saquear` — ela não se auto-pula e não aceita `passar`
+ * (decisão #62 do game bible). É o núcleo compartilhado dos TRÊS chamadores: o
+ * vasculhar atômico, a resolução da espiada e `procurarEncrenca`.
  *
  * O EVENTO sai por ramo, não antes do `switch`, porque quem decide se a carta
  * pode ser anunciada é o DESTINO dela — e é este `switch` que o conhece. Um
@@ -430,7 +430,10 @@ function resolverCarta(
   };
 
   switch (carta.tipo) {
-    case 'raca': {
+    // Raça e classe compartilham o ramo porque a carta que não é monstro vai para
+    // a mão e cobra a `encrenca` — o TIPO dela não muda esse destino.
+    case 'raca':
+    case 'classe': {
       // A carta sacada NÃO vai ao cemitério: ela fica com quem vasculhou. Por isso
       // o estado usado aqui é `base` (sem a carta), e não `revelada`.
       const jogadores = base.jogadores.map((j) => (
@@ -722,8 +725,8 @@ function cartaEquipavelDe(
 /**
  * Manda a carta para o cemitério do baralho A QUE ELA PERTENCE. Ponto único, e
  * exaustivo por construção: o `switch` sobre a união fecha em `never`, então a
- * terceira família de carta (maldição, classe — spec §4) não consegue nascer sem
- * alguém decidir para onde ela é descartada.
+ * próxima família de carta (maldição — spec §4) não consegue nascer sem alguém
+ * decidir para onde ela é descartada.
  *
  * Sem isto, um tesouro descartado pela caridade entraria no baralho de PORTAS e
  * voltaria como Porta na compra seguinte, onde `resolverCarta` lança `Error` cru
@@ -734,6 +737,7 @@ function descartarNoBaralhoCerto(estado: EstadoPartida, carta: Carta): EstadoPar
   switch (carta.tipo) {
     case 'monstro':
     case 'raca':
+    case 'classe':
       return { ...estado, portas: { ...estado.portas, cemiterio: [...estado.portas.cemiterio, carta] } };
     case 'equipamento':
       return { ...estado, tesouros: { ...estado.tesouros, cemiterio: [...estado.tesouros.cemiterio, carta] } };

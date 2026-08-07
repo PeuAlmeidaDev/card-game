@@ -7,7 +7,7 @@ import { projetarPara } from './projecao';
 import { limiteDeMao, LIMITE_BASE_DE_MAO, LIMITE_MOCHILA } from './mao';
 import { montarComposicao } from './baralho';
 import { criarDadoCiclico } from './testes/dados';
-import { catalogoDeTeste, ID_DA_CLASSE_DE_TESTE } from './testes/catalogo';
+import { CARTA_DE_CLASSE_DE_TESTE, catalogoDeTeste, comClasseDeTeste } from './testes/catalogo';
 import { COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import { equipamento, monstro, monstros, raca } from './testes/cartas';
 import { SLOTS_VAZIOS } from './corpo';
@@ -16,10 +16,14 @@ import type { AcaoDaMesa, JogadorNaMesa, EntradaJogador, EstadoPartida, Fase } f
 /** A projeção calcula `combatente`, então precisa do catálogo. Um só para o arquivo. */
 const catalogoPadrao = catalogoDeTeste();
 const jogador = (mao: JogadorNaMesa['mao'], comRaca: boolean): JogadorNaMesa => ({
-  id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE,
+  id: 'p1', nome: 'Você', ehBot: false,
   patente: 1, derrotas: 0, mao, mochila: [],
-  emJogo: { raca: comRaca ? raca('r1', 'anao') : null, slots: { ...SLOTS_VAZIOS } },
+  emJogo: { raca: comRaca ? raca('r1', 'anao') : null, classe: CARTA_DE_CLASSE_DE_TESTE, slots: { ...SLOTS_VAZIOS } },
 });
+
+/** `criarPartida` mais o stamp da classe de teste na zona — ver `comClasseDeTeste`. */
+const criar = (...args: Parameters<typeof criarPartida>): EstadoPartida =>
+  comClasseDeTeste(criarPartida(...args));
 
 describe('acaoEhLegalNaFase', () => {
   it('em `recompor` valem jogar raça, equipar e passar', () => {
@@ -352,10 +356,10 @@ describe('a fase nunca mente sobre o estado', () => {
 
   it('vale em todo estado de uma partida inteira, e as seis fases aparecem', () => {
     const quatro: readonly EntradaJogador[] = [
-      { id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE },
-      { id: 'p2', nome: 'Bot 1', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
-      { id: 'p3', nome: 'Bot 2', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
-      { id: 'p4', nome: 'Bot 3', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
+      { id: 'p1', nome: 'Você', ehBot: false },
+      { id: 'p2', nome: 'Bot 1', ehBot: true },
+      { id: 'p3', nome: 'Bot 2', ehBot: true },
+      { id: 'p4', nome: 'Bot 3', ehBot: true },
     ];
     const semEmbaralhar = <T,>(itens: readonly T[]): T[] => [...itens];
     const depsPartida = {
@@ -440,7 +444,7 @@ describe('a fase nunca mente sobre o estado', () => {
     // 🎚️ O tamanho da composição (10 por jogador) é preservado do fixture
     // anterior — a proporção monstro/raça mudou (ver o comentário acima), o
     // TOTAL não.
-    let estado = criarPartida('m1', quatro,
+    let estado = criar('m1', quatro,
       {
         patenteAlvo: 4,
         composicaoPorJogador: composicao,

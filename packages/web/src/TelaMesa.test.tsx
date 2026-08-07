@@ -18,8 +18,8 @@ const vistaBase: VistaDaPartida = {
   voce: 'p1',
   versao: 1,
   jogadores: [
-    { id: 'p1', nome: 'Você', ehBot: false, patente: 1, derrotas: 0, combatente, emJogo: { raca: null, slots: SLOTS_VAZIOS }, cartasNaMao: 0, limiteDeMao: 8, mochila: [] },
-    { id: 'p2', nome: 'Bot 1', ehBot: true, patente: 2, derrotas: 1, combatente, emJogo: { raca: null, slots: SLOTS_VAZIOS }, cartasNaMao: 0, limiteDeMao: 8, mochila: [] },
+    { id: 'p1', nome: 'Você', ehBot: false, patente: 1, derrotas: 0, combatente, emJogo: { raca: null, classe: null, slots: SLOTS_VAZIOS }, cartasNaMao: 0, limiteDeMao: 8, mochila: [] },
+    { id: 'p2', nome: 'Bot 1', ehBot: true, patente: 2, derrotas: 1, combatente, emJogo: { raca: null, classe: null, slots: SLOTS_VAZIOS }, cartasNaMao: 0, limiteDeMao: 8, mochila: [] },
   ],
   vezDe: 'p1',
   patenteAlvo: 10,
@@ -647,7 +647,7 @@ describe('TelaMesa — o corpo', () => {
   const comCorpo = (slots: VistaDaPartida['jogadores'][number]['emJogo']['slots']): VistaDaPartida => ({
     ...vistaBase,
     jogadores: vistaBase.jogadores.map((j) => (
-      j.id === 'p1' ? { ...j, emJogo: { raca: null, slots } } : j
+      j.id === 'p1' ? { ...j, emJogo: { raca: null, classe: null, slots } } : j
     )),
   });
 
@@ -717,7 +717,7 @@ describe('TelaMesa — os stats na lista', () => {
               // o justifica. Mexer num sem o outro seria uma vista que o domínio
               // não consegue produzir.
               combatente: { ...combatente, forca: 5 },
-              emJogo: { raca: null, slots: { ...SLOTS_VAZIOS, maoDireita: tesouro('t-1') } },
+              emJogo: { raca: null, classe: null, slots: { ...SLOTS_VAZIOS, maoDireita: tesouro('t-1') } },
             }
           : j
       )),
@@ -756,7 +756,7 @@ describe('TelaMesa — os stats na lista', () => {
               // `level: 2` porque o level É a patente (`combatenteDe`), e o p2
               // está na patente 2 — um level 1 aqui seria vista impossível.
               combatente: { ...combatente, forca: 5, level: 2 },
-              emJogo: { raca: null, slots: { ...SLOTS_VAZIOS, maoDireita: tesouro('t-2') } },
+              emJogo: { raca: null, classe: null, slots: { ...SLOTS_VAZIOS, maoDireita: tesouro('t-2') } },
             }
           : j
       )),
@@ -1129,7 +1129,7 @@ describe('TelaMesa — afinidade de itens', () => {
         fase: 'recompor',
         jogadores: vistaBase.jogadores.map((j) => (
           j.id === 'p1'
-            ? { ...j, emJogo: { raca: { id: 'r1', tipo: 'raca', racaId: 'anao' }, slots: SLOTS_VAZIOS }, limiteDeMao: 7 }
+            ? { ...j, emJogo: { raca: { id: 'r1', tipo: 'raca', racaId: 'anao' }, classe: null, slots: SLOTS_VAZIOS }, limiteDeMao: 7 }
             : j
         )),
         suaMao: [tesouro('t-1', 'machado')],
@@ -1155,7 +1155,7 @@ describe('TelaMesa — afinidade de itens', () => {
           j.id === 'p1'
             ? {
               ...j,
-              emJogo: { raca: { id: 'r1', tipo: 'raca', racaId: 'anao' }, slots: SLOTS_VAZIOS },
+              emJogo: { raca: { id: 'r1', tipo: 'raca', racaId: 'anao' }, classe: null, slots: SLOTS_VAZIOS },
               limiteDeMao: 7,
               mochila: [tesouro('t-1', 'machado')],
             }

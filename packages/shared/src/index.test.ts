@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { escolhasSchema, contrato, acaoDaMesaSchema, acaoRequisicaoSchema } from './index';
+import { escolhasSchema, semEscolhasSchema, contrato, acaoDaMesaSchema, acaoRequisicaoSchema } from './index';
 
 const valido = { classeId: 'ladino' };
 
@@ -40,10 +40,15 @@ describe('escolhasSchema', () => {
 });
 
 describe('rotas da mesa', () => {
-  it('cria a partida como POST /api/partida', () => {
+  it('cria a partida como POST /api/partida, com corpo VAZIO', () => {
     expect(contrato.criarPartida.method).toBe('POST');
     expect(contrato.criarPartida.path).toBe('/api/partida');
-    expect(contrato.criarPartida.body).toBe(escolhasSchema);
+    // A classe virou carta do baralho: não sobrou escolha a mandar, e continuar
+    // exigindo `classeId` deixaria um dado que o servidor ignora — o tipo que
+    // mente no fio. O `/duelo` fica com o `escolhasSchema`, que ele usa de verdade.
+    expect(contrato.criarPartida.body).toBe(semEscolhasSchema);
+    expect(contrato.criarPartida.body).not.toBe(escolhasSchema);
+    expect(semEscolhasSchema.safeParse({}).success).toBe(true);
   });
 
   it('age como POST /api/partida/:id/acao com a requisição validada', () => {

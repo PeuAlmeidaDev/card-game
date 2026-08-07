@@ -16,7 +16,9 @@ const catalogo: Catalogo = {
     { id: 'orc', nome: 'Orc', texto: 'Sangue de Guerra: ferido, golpeia com mais fúria.' },
   ],
   monstros: [{ id: 'goblin', nome: 'Goblin', forca: 4, vida: 20, habilidade: 2, agilidade: 4, level: 1, tesouros: 1 }],
-  classes: [{ id: 'guerreiro', nome: 'Guerreiro', modificadores: { forca: 1, vida: 5 } }],
+  // `ClasseResumo`: sem `modificadores`, que ficaram no servidor desde que a
+  // classe virou carta do baralho.
+  classes: [{ id: 'guerreiro', nome: 'Guerreiro', texto: 'Impacto: quando ele ataca, o empate não salva ninguém.' }],
   // Os itens do catálogo são as cartas de Tesouro (com `slot` e `duasMaos`): o
   // construtor não os oferece mais, mas a mesa precisa deles para desenhar o corpo.
   itens: [{ id: 'espada-curta', nome: 'Espada Curta', slot: 'maoDireita', duasMaos: false, modificadores: { forca: 2 }, exclusivo: null }],
@@ -48,33 +50,38 @@ function mockFetch(): void {
 }
 
 describe('App', () => {
-  it('carrega o catálogo e mostra o preview do primeiro personagem', async () => {
+  it('carrega o catálogo e mostra o preview — que é a BASE, sem a classe', async () => {
+    // 🎚️ Mudou nesta task: o catálogo publica `ClasseResumo`, sem `modificadores`
+    // (eles ficaram no servidor, em `obterClasse`), então não há mais o que somar
+    // no cliente. O preview passa a ser a `base` que o próprio domínio entrega.
+    expect(catalogo.base.forca).toBe(3);
     mockFetch();
     render(<App />);
-    // A raça não soma stat (é passiva): preview = base + Guerreiro (forca+1, vida+5) => forca 4, vida 15
-    expect(await screen.findByText(/Força 4/)).toBeInTheDocument();
-    expect(screen.getByText(/Vida 15/)).toBeInTheDocument();
+    expect(await screen.findByText(/Força 3/)).toBeInTheDocument();
+    expect(screen.getByText(/Vida 10/)).toBeInTheDocument();
   });
 
-  it('o preview aplica o PISO do domínio — não soma por conta própria', async () => {
+  it('o preview NÃO soma por conta própria, nem se a classe vier com modificadores', async () => {
     // 🐛 Regressão de 2026-07-31: o `calcularPreview` que morava neste arquivo
     // refazia a soma à mão e NÃO aplicava o `PISO = 1` de
     // `personagem/src/montar.ts:12`. Com uma classe fortemente negativa a tela
     // mostrava `Agilidade -5` — um personagem que o servidor nunca montaria.
-    // Hoje quem soma é `montarCombatente`, re-exportado por `shared`.
-    const amaldicoado: Catalogo = {
-      ...catalogo,
-      classes: [{ id: 'amaldicoado', nome: 'Amaldiçoado', modificadores: { agilidade: -10 } }],
-    };
+    //
+    // O payload abaixo traz um `modificadores` CLANDESTINO (o contrato não o
+    // declara mais): se alguém voltar a somar na tela, o preview muda e isto
+    // reprova. É o que sobrou do alarme depois que a soma saiu do cliente.
     vi.stubGlobal(
       'fetch',
-      vi.fn(() => Promise.resolve(json(amaldicoado))),
+      vi.fn(() => Promise.resolve(json({
+        ...catalogo,
+        classes: [{ id: 'amaldicoado', nome: 'Amaldiçoado', texto: '', modificadores: { agilidade: -10 } }],
+      }))),
     );
     render(<App />);
 
-    // base 5 - 10 = -5, mas o piso do domínio é 1.
-    expect(await screen.findByText(/Agilidade 1/)).toBeInTheDocument();
+    expect(await screen.findByText(/Agilidade 5/)).toBeInTheDocument();
     expect(screen.queryByText(/Agilidade -5/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Agilidade 1/)).not.toBeInTheDocument();
   });
 
   it('não tem seletor de raça: a raça é carta sacável, não escolha de menu', async () => {

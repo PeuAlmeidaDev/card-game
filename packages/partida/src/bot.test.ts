@@ -8,7 +8,7 @@ import { filaDeDados } from './testes/dados';
 import { equipamento, monstro as cartaMonstro, monstros, raca } from './testes/cartas';
 import { LIMITE_BASE_DE_MAO, LIMITE_MOCHILA } from './mao';
 import {
-  catalogoDeTeste, ID_DA_CLASSE_DE_TESTE, ID_DA_RACA_DONA, ID_DA_RACA_OUTRA, ID_DO_ITEM_DE_CAPACETE,
+  catalogoDeTeste, comClasseDeTeste, ID_DA_RACA_DONA, ID_DA_RACA_OUTRA, ID_DO_ITEM_DE_CAPACETE,
   ID_DO_ITEM_DUAS_MAOS, ID_DO_ITEM_EXCLUSIVO, ID_DO_ITEM_FORTE, ID_DO_ITEM_FRACO, ID_DO_ITEM_LASTRO,
   ID_DO_MONSTRO_FORTE,
 } from './testes/catalogo';
@@ -21,14 +21,18 @@ import type {
 const catalogoPadrao = catalogoDeTeste();
 const semEmbaralhar = <T,>(itens: readonly T[]): T[] => [...itens];
 const entradas: readonly EntradaJogador[] = [
-  { id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE },
-  { id: 'p2', nome: 'Bot 1', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
+  { id: 'p1', nome: 'Você', ehBot: false },
+  { id: 'p2', nome: 'Bot 1', ehBot: true },
 ];
 const soMonstro = {
   patenteAlvo: 5,
   composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }],
   composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE,
 };
+
+/** `criarPartida` mais o stamp da classe de teste na zona — ver `comClasseDeTeste`. */
+const criar = (...args: Parameters<typeof criarPartida>): EstadoPartida =>
+  comClasseDeTeste(criarPartida(...args));
 
 /**
  * Mão que estoura o teto de quem TEM raça em jogo (limite = `LIMITE_BASE_DE_MAO`).
@@ -64,7 +68,7 @@ function vistaEm(
     readonly slots?: Partial<Record<Slot, CartaEquipamento | null>>;
   } = {},
 ): VistaDaPartida {
-  const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+  const p = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
   const forjado: EstadoPartida = {
     ...p,
     fase,
@@ -93,13 +97,13 @@ function vistaEm(
 
 describe('escolherAcao', () => {
   it('sem combate em curso, chuta a porta', () => {
-    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const p = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     expect(escolherAcao(projetarPara('p1', p, catalogoPadrao), 'p1', catalogoPadrao))
       .toEqual({ tipo: 'vasculhar', jogadorId: 'p1' });
   });
 
   it('com decisão de ataque pendente, ataca', () => {
-    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const p = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const comCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' },
       { rolar: filaDeDados([]), embaralhar: semEmbaralhar, catalogo: catalogoDeTeste() }).estado;
 
@@ -110,7 +114,7 @@ describe('escolherAcao', () => {
   it('com esquiva pendente, esquiva', () => {
     // monstro mais ágil ataca primeiro e acerta => a máquina para pedindo a esquiva
     const rapido = { nome: 'Veloz', forca: 2, vida: 10, habilidade: 6, agilidade: 12, level: 1, tesouros: 1 };
-    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const p = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const pedindoEsquiva = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' },
       { rolar: filaDeDados([1]), embaralhar: semEmbaralhar,
         catalogo: catalogoDeTeste({ monstro: () => rapido }) }).estado;
@@ -125,7 +129,7 @@ describe('escolherAcao', () => {
     // espiada pendente, a vez não passa, e a próxima escolha seria `vasculhar`
     // de novo — que o reducer recusa ("há uma espiada pendente"). Bot burro não
     // blefa: mantém sempre, igual já faz com atacar/esquivar.
-    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const p = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, {
       rolar: filaDeDados([]), embaralhar: semEmbaralhar,
       catalogo: catalogoDeTeste({ raca: () => ({ passivaCombate: null, espiaTopo: true }) }),
@@ -140,7 +144,7 @@ describe('escolherAcao', () => {
     // O bot joga pela MESMA projeção que um humano. Se ele pudesse ver o monte,
     // a projeção viraria decoração: bastaria um bot esperto para provar que o
     // segredo não é segredo. Esta asserção é o que torna a projeção verificável.
-    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const p = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const vista = projetarPara('p1', p, catalogoPadrao);
     expect('monte' in vista).toBe(false);
   });
@@ -149,7 +153,7 @@ describe('escolherAcao', () => {
     // Sem esta regra o bot trava a mesa: a vez não passa (o limite a segura), ele
     // tentaria vasculhar, o reducer recusaria, e `avancarBots` mataria a jogada do
     // humano com um 400. Mesmo modo de falha do bot vidente que ignorava a espiada.
-    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const p = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const estourado: EstadoPartida = {
       ...p,
       vezDe: 'p2',
@@ -171,7 +175,7 @@ describe('escolherAcao', () => {
   });
 
   it('dentro do limite, ignora a mão e joga normalmente', () => {
-    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const p = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const comMao: EstadoPartida = {
       ...p,
       jogadores: p.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao: [cartaMonstro('c1')] } : j)),
@@ -184,7 +188,7 @@ describe('escolherAcao', () => {
   it('em `recompor`, sem raça em jogo e com raça na mão, joga a raça', () => {
     // Fecha o ciclo do spec §7 regra 2: os bots passam a ser Elfo/Anão/Orc por
     // terem SACADO a carta, nunca por ela ter sido colada na criação da mesa.
-    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const p = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const comRacaNaMao: EstadoPartida = {
       ...p,
       jogadores: p.jogadores.map((j) => (
@@ -207,7 +211,7 @@ describe('escolherAcao', () => {
   it('com raça JÁ em jogo, ignora a raça da mão e vasculha', () => {
     // Trocar de raça é decisão de jogo; bot burro não decide, só executa a jogada
     // legal óbvia. Trocar por trocar ainda mandaria a raça anterior pro cemitério.
-    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const p = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const jaEspecializado: EstadoPartida = {
       ...p,
       jogadores: p.jogadores.map((j) => (
@@ -223,7 +227,7 @@ describe('escolherAcao', () => {
     // Sem raça em jogo, jogar a raça é net-zero: a mão cai 1 e o limite cai 1
     // junto (a especialização derruba o bônus do Adaptável). Entregar primeiro
     // resolve o excedente de verdade; a raça entra no turno seguinte.
-    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const p = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const estourado: EstadoPartida = {
       ...p,
       jogadores: p.jogadores.map((j) => (
@@ -320,7 +324,7 @@ describe('escolherAcao', () => {
       maoInicial: 3,
       maoInicialTesouros: 5,
     };
-    const p = criarPartida('m1', entradas, soMonstros, { embaralhar: semEmbaralhar });
+    const p = criar('m1', entradas, soMonstros, { embaralhar: semEmbaralhar });
     const naFase2 = aplicarAcao(p, { tipo: 'passar', jogadorId: 'p1' }, deps()).estado;
     const emCombate = aplicarAcao(naFase2, { tipo: 'vasculhar', jogadorId: 'p1' }, deps()).estado;
     expect(emCombate.fase).toBe('combate');
@@ -367,7 +371,7 @@ describe('escolherAcao', () => {
 
   it('uma mesa de bots com a mão estourada não trava `avancarBots`', () => {
     // O teste de ponta: é o laço automático que a regra existe para proteger.
-    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const p = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const estourado: EstadoPartida = {
       ...p,
       vezDe: 'p2',

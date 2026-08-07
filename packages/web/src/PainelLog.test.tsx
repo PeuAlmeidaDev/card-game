@@ -7,8 +7,8 @@ import type { EventoDaMesa, JogadorPublico } from '@card-dungeon/shared';
 
 const combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
 const jogadores: readonly JogadorPublico[] = [
-  { id: 'p1', nome: 'Você', ehBot: false, patente: 1, derrotas: 0, combatente, emJogo: { raca: null, slots: SLOTS_VAZIOS }, cartasNaMao: 0, limiteDeMao: 5, mochila: [] },
-  { id: 'p2', nome: 'Bot 1', ehBot: true, patente: 1, derrotas: 0, combatente, emJogo: { raca: null, slots: SLOTS_VAZIOS }, cartasNaMao: 0, limiteDeMao: 5, mochila: [] },
+  { id: 'p1', nome: 'Você', ehBot: false, patente: 1, derrotas: 0, combatente, emJogo: { raca: null, classe: null, slots: SLOTS_VAZIOS }, cartasNaMao: 0, limiteDeMao: 5, mochila: [] },
+  { id: 'p2', nome: 'Bot 1', ehBot: true, patente: 1, derrotas: 0, combatente, emJogo: { raca: null, classe: null, slots: SLOTS_VAZIOS }, cartasNaMao: 0, limiteDeMao: 5, mochila: [] },
 ];
 const racas = [
   { id: 'elfo', nome: 'Elfo', texto: 'Presciência: vê o perigo antes de encará-lo.' },
@@ -19,6 +19,9 @@ const monstros = [
 ];
 const itens = [
   { id: 'espada-curta', nome: 'Espada Curta', slot: 'maoDireita' as const, duasMaos: false, modificadores: { forca: 2 }, exclusivo: null },
+];
+const classes = [
+  { id: 'guerreiro', nome: 'Guerreiro', texto: 'Impacto: quando ele ataca, o empate não salva ninguém.' },
 ];
 
 afterEach(cleanup);
@@ -42,7 +45,7 @@ describe('PainelLog', () => {
       { tipo: 'patente', jogadorId: 'p1', patente: 2 },
       { tipo: 'derrota', jogadorId: 'p2', derrotas: 1 },
     ];
-    render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} />);
+    render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} classes={classes} />);
 
     expect(screen.getByText(/subiu para a patente 2/)).toHaveStyle({ color: corDoJogador(jogadores, 'p1') });
     expect(screen.getByText(/foi evacuado/)).toHaveStyle({ color: corDoJogador(jogadores, 'p2') });
@@ -59,7 +62,7 @@ describe('PainelLog', () => {
         ],
       },
     ];
-    render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} />);
+    render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} classes={classes} />);
 
     // combate alheio é narrado no nome do dono, não como "Você"
     expect(screen.getByText(/Bot 1 ataca: rolou 4 — acertou/)).toBeInTheDocument();
@@ -71,7 +74,7 @@ describe('PainelLog', () => {
       { tipo: 'porta', jogadorId: 'p1', carta: { id: 'p-0', tipo: 'monstro', monstroId: 'goblin' } },
       { tipo: 'porta', jogadorId: 'p2', carta: { id: 'p-1', tipo: 'raca', racaId: 'r-teste' } },
     ];
-    render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} />);
+    render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} classes={classes} />);
 
     expect(screen.getByText(/Você dá de cara com um Goblin!/)).toBeInTheDocument();
     expect(screen.getByText(/Bot 1 encontra uma carta de r-teste\./)).toBeInTheDocument();
@@ -83,7 +86,7 @@ describe('PainelLog', () => {
     const log: readonly EventoDaMesa[] = [
       { tipo: 'porta', jogadorId: 'p2', carta: { id: 'p-2', tipo: 'monstro', monstroId: 'goblin' } },
     ];
-    render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} />);
+    render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} classes={classes} />);
 
     const linha = screen.getByText(/dá de cara com um Goblin!/);
     expect(linha).toHaveTextContent('Bot 1');
@@ -92,7 +95,7 @@ describe('PainelLog', () => {
 
   it('mostra o evento de vez de forma discreta', () => {
     const log: readonly EventoDaMesa[] = [{ tipo: 'vez', jogadorId: 'p2' }];
-    render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} />);
+    render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} classes={classes} />);
 
     // `vez` é ruído de ritmo: precisa existir para o jogador acompanhar, mas não
     // pode competir visualmente com o que aconteceu de fato.
@@ -105,7 +108,7 @@ describe('PainelLog', () => {
       jogadores={jogadores}
       voce="p1"
       racas={racas}
-      monstros={monstros} itens={itens}
+      monstros={monstros} itens={itens} classes={classes}
     />);
 
     expect(screen.getByText(/Bot 1 entra em campo como Orc/)).toBeInTheDocument();
@@ -119,7 +122,7 @@ describe('PainelLog', () => {
       jogadores={jogadores}
       voce="p1"
       racas={racas}
-      monstros={monstros} itens={itens}
+      monstros={monstros} itens={itens} classes={classes}
     />);
 
     expect(screen.getByText(/Você entregou uma carta a Bot 1/)).toBeInTheDocument();
@@ -131,7 +134,7 @@ describe('PainelLog', () => {
       jogadores={jogadores}
       voce="p1"
       racas={racas}
-      monstros={monstros} itens={itens}
+      monstros={monstros} itens={itens} classes={classes}
     />);
 
     expect(screen.getByText(/1d12: 7/)).toBeInTheDocument();
@@ -143,7 +146,7 @@ describe('PainelLog', () => {
       jogadores={jogadores}
       voce="p1"
       racas={racas}
-      monstros={monstros} itens={itens}
+      monstros={monstros} itens={itens} classes={classes}
     />);
 
     expect(screen.getByText(/Bot 1 descartou uma carta de Elfo/)).toBeInTheDocument();
@@ -160,7 +163,7 @@ describe('PainelLog', () => {
       jogadores={jogadores}
       voce="p1"
       racas={racas}
-      monstros={monstros} itens={itens}
+      monstros={monstros} itens={itens} classes={classes}
     />);
 
     expect(screen.getByText(/Bot 1 equipa Espada Curta/)).toBeInTheDocument();
@@ -175,7 +178,7 @@ describe('PainelLog — filtro e cauda', () => {
   ];
 
   it('começa mostrando todos os jogadores', () => {
-    render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} />);
+    render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} classes={classes} />);
 
     expect(screen.getByText(/subiu para a patente 2/)).toBeInTheDocument();
     expect(screen.getByText(/foi evacuado/)).toBeInTheDocument();
@@ -183,7 +186,7 @@ describe('PainelLog — filtro e cauda', () => {
   });
 
   it('filtrando por um jogador, esconde a história dos outros', async () => {
-    render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} />);
+    render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} classes={classes} />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Bot 1' }));
 
@@ -194,7 +197,7 @@ describe('PainelLog — filtro e cauda', () => {
   it('eventos globais aparecem em qualquer filtro', async () => {
     // O `fim` não tem dono. Escondê-lo num filtro sumiria com o desfecho da
     // partida — o único evento que interessa a todo mundo.
-    render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} />);
+    render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} classes={classes} />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Bot 1' }));
 
@@ -210,7 +213,7 @@ describe('PainelLog — filtro e cauda', () => {
     const comEntrega: readonly EventoDaMesa[] = [
       { tipo: 'entrega', jogadorId: 'p2', paraJogadorId: 'p1', rolagem: null },
     ];
-    render(<PainelLog log={comEntrega} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} />);
+    render(<PainelLog log={comEntrega} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} classes={classes} />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Você' }));
 
@@ -225,7 +228,7 @@ describe('PainelLog — filtro e cauda', () => {
     const comEntrega: readonly EventoDaMesa[] = [
       { tipo: 'entrega', jogadorId: 'p2', paraJogadorId: 'p1', rolagem: null },
     ];
-    render(<PainelLog log={comEntrega} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} />);
+    render(<PainelLog log={comEntrega} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} classes={classes} />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Bot 1' }));
 
@@ -238,7 +241,7 @@ describe('PainelLog — filtro e cauda', () => {
     // Você 1 · Bot 1 1), contra Todos 1 · Você 0 · Bot 1 1 antes. Degradar
     // multiplicando ruído por assento é degradar para pior.
     const desconhecido = { tipo: 'interferencia', jogadorId: 'p2' } as unknown as EventoDaMesa;
-    render(<PainelLog log={[desconhecido]} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} />);
+    render(<PainelLog log={[desconhecido]} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} classes={classes} />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Você' }));
     expect(screen.queryByText(/não sabe descrever/)).not.toBeInTheDocument();
@@ -248,7 +251,7 @@ describe('PainelLog — filtro e cauda', () => {
   });
 
   it('volta a mostrar tudo ao clicar em Todos', async () => {
-    render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} />);
+    render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} classes={classes} />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Bot 1' }));
     await userEvent.click(screen.getByRole('button', { name: /todos/i }));
@@ -260,7 +263,7 @@ describe('PainelLog — filtro e cauda', () => {
     // A rodada dos bots despeja vários eventos de uma vez; sem auto-scroll o
     // jogador tem que arrastar a barra a cada turno para ver o que houve.
     const rolou = vi.spyOn(Element.prototype, 'scrollIntoView');
-    const { rerender } = render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} />);
+    const { rerender } = render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} classes={classes} />);
     rolou.mockClear();
 
     rerender(
@@ -269,7 +272,7 @@ describe('PainelLog — filtro e cauda', () => {
         jogadores={jogadores}
         voce="p1"
         racas={racas}
-        monstros={monstros} itens={itens}
+        monstros={monstros} itens={itens} classes={classes}
       />,
     );
 
@@ -286,7 +289,7 @@ describe('PainelLog — filtro e cauda', () => {
         jogadores={jogadores}
         voce="p1"
         racas={racas}
-        monstros={monstros} itens={itens}
+        monstros={monstros} itens={itens} classes={classes}
       />,
     );
 

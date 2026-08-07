@@ -4,7 +4,7 @@ import { resolverDuelo, type RolarD12, type Combatente } from '@card-dungeon/mot
 import { contrato } from '@card-dungeon/shared';
 import { CATALOGO, MONSTRO_PADRAO, resolverEscolhas, montarCombatente } from '@card-dungeon/personagem';
 import {
-  MONSTROS_SACAVEIS, RACAS_SACAVEIS, ITENS_SACAVEIS, obterRaca, obterItem, type MonstroCarta,
+  MONSTROS_SACAVEIS, RACAS_SACAVEIS, ITENS_SACAVEIS, obterRaca, obterClasse, obterItem, type MonstroCarta,
 } from '@card-dungeon/cartas';
 import {
   AcaoInvalida, MAO_INICIAL_PADRAO, MAO_INICIAL_TESOUROS, aplicarAcao, avancarBots, criarPartida, montarComposicao,
@@ -101,28 +101,15 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
   const catalogo: CatalogoDaMesa = {
     raca: (racaId) => (racaId === undefined ? undefined : obterRaca(racaId)),
     monstro: acharMonstro,
-    classe: (classeId) => CATALOGO.classes.find((c) => c.id === classeId),
+    classe: obterClasse,
     item: obterItem,
   };
   const deps = { rolar, embaralhar, catalogo };
 
-  const montarBots = (): readonly EntradaJogador[] => {
-    const classes = embaralhar(CATALOGO.classes);
-    return [0, 1, 2].map((i) => {
-      const classe = classes[i % classes.length];
-      if (classe === undefined) {
-        throw new Error('montarBots: catálogo vazio');
-      }
-      // A CLASSE, não a statline pronta: quem monta o combatente é `combatenteDe`,
-      // no domínio, a cada consulta. A borda parou de tirar o retrato.
-      return {
-        id: randomUUID(),
-        nome: `Bot ${String(i + 1)}`,
-        ehBot: true,
-        classeId: classe.id,
-      };
-    });
-  };
+  // Sem classe: a mesa nasce Aprendiz e a especialização vem da carta que se saca.
+  // O embaralho de classes que existia aqui era o andaime do construtor.
+  const montarBots = (): readonly EntradaJogador[] =>
+    [0, 1, 2].map((i) => ({ id: randomUUID(), nome: `Bot ${String(i + 1)}`, ehBot: true }));
 
   // Implementa o contrato do `shared`: o adapter valida o `body` do duelo contra
   // o escolhasSchema antes do handler (corpo inválido → 400). A validação de
@@ -133,7 +120,7 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
   const router = s.router(contrato, {
     catalogo: async () => ({ status: 200 as const, body: CATALOGO }),
     duelo: async ({ body }) => {
-      const resolvido = resolverEscolhas(CATALOGO, body);
+      const resolvido = resolverEscolhas(body);
       if (!resolvido) {
         return { status: 400 as const, body: { erro: 'classe inexistente' } };
       }
@@ -146,17 +133,8 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
       return { status: 200 as const, body: resolverDuelo(jogador, monstro, rolar) };
     },
 
-    criarPartida: async ({ body }) => {
-      const resolvido = resolverEscolhas(CATALOGO, body);
-      if (!resolvido) {
-        return { status: 400 as const, body: { erro: 'classe inexistente' } };
-      }
-      const humano: EntradaJogador = {
-        id: randomUUID(),
-        nome: 'Você',
-        ehBot: false,
-        classeId: resolvido.classe.id,
-      };
+    criarPartida: async () => {
+      const humano: EntradaJogador = { id: randomUUID(), nome: 'Você', ehBot: false };
       const estado = criarPartida(
         randomUUID(),
         [humano, ...montarBots()],

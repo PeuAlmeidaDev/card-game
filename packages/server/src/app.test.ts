@@ -123,10 +123,11 @@ function criarDadoCiclico(valores: readonly number[]): RolarD12 {
 }
 
 describe('mesa', () => {
-  // Todo mundo nasce Humano (o baseline, sem passiva): a raça é carta sacável, não
-  // escolha de menu. Quem precisa de uma raça na zona faz o que o jogador faz —
-  // ver `comRacaEmJogo`.
-  const escolhas = { classeId: 'guerreiro' };
+  // Todo mundo nasce Humano e Aprendiz (o baseline, sem passiva e sem modificador
+  // de stat): raça e classe são carta sacável, não escolha de menu. Quem precisa
+  // de uma delas na zona faz o que o jogador faz — ver `comRacaEmJogo`.
+  //
+  // Por isso o `POST /api/partida` deixou de ter corpo: não há escolha a mandar.
   const semEmbaralhar: Embaralhar = (itens) => [...itens];
   // Embaralhamento DIRIGIDO: sobe as cartas de raça para o topo, então a mão
   // inicial do humano nasce com uma de cada. É assim que um teste de borda
@@ -166,8 +167,8 @@ describe('mesa', () => {
   const appDeJogo = () => buildApp({ rolar: criarDadoCiclico([4, 12]), embaralhar: semEmbaralhar });
   const appDeJogoComRacas = () => buildApp({ rolar: criarDadoCiclico([4, 12]), embaralhar: racasNoTopo });
 
-  const criar = async (app: ReturnType<typeof buildApp>, payload: typeof escolhas = escolhas) => {
-    const res = await app.inject({ method: 'POST', url: '/api/partida', payload });
+  const criar = async (app: ReturnType<typeof buildApp>) => {
+    const res = await app.inject({ method: 'POST', url: '/api/partida', payload: {} });
     return res.json<VistaDaPartida>();
   };
 
@@ -242,7 +243,7 @@ describe('mesa', () => {
 
   it('cria a partida com 4 jogadores e devolve a vista do humano', async () => {
     const app = buildApp({ embaralhar: semEmbaralhar });
-    const res = await app.inject({ method: 'POST', url: '/api/partida', payload: escolhas });
+    const res = await app.inject({ method: 'POST', url: '/api/partida', payload: {} });
 
     expect(res.statusCode).toBe(200);
     const vista = res.json<VistaDaPartida>();
@@ -264,7 +265,7 @@ describe('mesa', () => {
     // das constantes faria a asserção repetir a conta da borda e ela passaria
     // qualquer que fosse o dial.
     const app = buildApp({ embaralhar: semEmbaralhar });
-    const res = await app.inject({ method: 'POST', url: '/api/partida', payload: escolhas });
+    const res = await app.inject({ method: 'POST', url: '/api/partida', payload: {} });
     const vista = res.json<VistaDaPartida>();
 
     expect(vista.suaMao).toHaveLength(8);
@@ -370,13 +371,30 @@ describe('mesa', () => {
     expect(() => buildApp({ monstros: [] })).toThrow(/bestiário vazio/);
   });
 
-  it('rejeita escolhas inválidas com 400', async () => {
-    const app = buildApp();
+  it('o classeId que o cliente mandar é DESCARTADO: a mesa nasce Aprendiz', async () => {
+    // Este teste ocupa o lugar do antigo "rejeita escolhas inválidas com 400", que
+    // deixou de fazer sentido: `criarPartida.body` virou `semEscolhasSchema`
+    // (`z.object({})`), então não há escolha a invalidar. Mesma garantia do
+    // `itemIds` no `/duelo` (e do `jogadorId` na ação): o campo saiu do fio, e um
+    // cliente velho — ou hostil — que insista em mandá-lo não muda o personagem.
+    //
+    // 🔴 A asserção NÃO é o 200. Um 200 sozinho passaria também se o servidor
+    // tivesse HONRADO o `classeId`; o que prende a regra é o combatente ser a
+    // linha BASE crua. Números cravados de propósito (mesma convenção do teste
+    // das mãos iniciais): derivar de `BASE` faria a asserção repetir a conta da
+    // borda e passar qualquer que fosse o valor.
+    const app = buildApp({ embaralhar: semEmbaralhar });
     const res = await app.inject({
       method: 'POST', url: '/api/partida',
-      payload: { classeId: 'nao-existe' },
+      payload: { classeId: 'guerreiro' },
     });
-    expect(res.statusCode).toBe(400);
+
+    expect(res.statusCode).toBe(200);
+    const vista = res.json<VistaDaPartida>();
+    const voce = vista.jogadores.find((j) => j.id === vista.voce);
+    // O Guerreiro somaria +1 força e +5 vida — 4/15/6/5. A mesa nasce 3/10/6/5.
+    expect(voce?.combatente).toEqual({ forca: 3, vida: 10, habilidade: 6, agilidade: 5, level: 1 });
+    expect(voce?.emJogo.classe).toBeNull();
     await app.close();
   });
 
@@ -494,8 +512,13 @@ describe('mesa', () => {
     // Monstro rápido e certeiro (agilidade/habilidade máximas) ataca primeiro.
     // dado[0]=1: ataque do monstro acerta (<=12). dado[1]=12: esquiva do humano
     // falha (12 > 1). Dano base = level(1)+forca(5) = 6; a passiva reduz o
-    // PRIMEIRO dano sofrido no combate à metade -> 3. Vida do guerreiro Anão
-    // (base 10 + guerreiro +5 = 15) cai para 12.
+    // PRIMEIRO dano sofrido no combate à metade -> 3.
+    //
+    // 🎚️ Era 12 até esta fatia, e a queda para 7 é a FATIA, não um ajuste de
+    // número: o humano nascia Guerreiro porque o construtor semeava a classe
+    // (base 10 + guerreiro +5 = 15 - 3 = 12). A classe virou carta do baralho e
+    // ninguém a jogou aqui, então ele é APRENDIZ — a linha BASE crua, vida 10, que
+    // cai para 7. O Anão não entra nesta conta: ele dá passiva, não stat.
     const monstros = [{ id: 'goblin', nome: 'Goblin', forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1, tesouros: 1 }];
     const app = buildApp({ rolar: filaDeDados([1, 12]), embaralhar: racasNoTopo, monstros });
 
@@ -515,7 +538,7 @@ describe('mesa', () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json<VistaDaPartida>().combate?.estado.jogador.vida).toBe(12);
+    expect(res.json<VistaDaPartida>().combate?.estado.jogador.vida).toBe(7);
     await app.close();
   });
 

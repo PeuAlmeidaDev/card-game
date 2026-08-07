@@ -11,6 +11,7 @@ export interface ContextoDeNarracao {
   readonly nomeDaRaca: (racaId: string) => string;
   readonly nomeDoMonstro: (monstroId: string) => string;
   readonly nomeDoItem: (itemId: string) => string;
+  readonly nomeDaClasse: (classeId: string) => string;
 }
 
 /**
@@ -33,6 +34,7 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
         evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId),
         ctx.nomeDaRaca,
         ctx.nomeDoMonstro,
+        ctx.nomeDaClasse,
       );
     // Porta FECHADA: o evento não carrega a carta, e a narração não pode inventar
     // o que ele não diz. Vale inclusive para quem sacou — ele descobre o quê pela
@@ -71,7 +73,7 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
     // adversário ficou mais perigoso, que é a única razão de a zona ser aberta.
     case 'equipou':
       return `${evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId)} equipa `
-        + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem)}.`;
+        + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem, ctx.nomeDaClasse)}.`;
     // A mochila é zona ABERTA, então o evento carrega a carta e a narração pode
     // nomeá-la — mesma regra do `equipou`, e a mesma assimetria com o `loot`.
     // Passa por `descreverCarta` e não por `nomeDoItem` direto: hoje o resultado é
@@ -81,11 +83,11 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
     // continuaria compilando, calado.
     case 'guardou':
       return `${evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId)} guarda `
-        + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem)} na mochila.`;
+        + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem, ctx.nomeDaClasse)} na mochila.`;
     // O descarte é PÚBLICO: o cemitério já é zona aberta, esconder aqui seria teatro.
     case 'descarte':
       return `${ctx.nomeDe(evento.jogadorId)} descartou `
-        + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem)}.`;
+        + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem, ctx.nomeDaClasse)}.`;
     case 'combate':
       return (
         <>
@@ -114,7 +116,7 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
     // independentes, e quatro frases à mão seriam quatro lugares para divergir.
     case 'desequipou': {
       const quem = evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId);
-      const item = descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem);
+      const item = descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem, ctx.nomeDaClasse);
       const porque = evento.motivo === 'trocaDeSlot'
         ? `${quem} tira ${item} do corpo`
         : `${item} não serve à nova especialização de ${quem === 'Você' ? 'você' : quem} e sai do corpo`;
@@ -128,7 +130,7 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
     // carrega a carta e a narração pode nomeá-la — mesma regra do `guardou`.
     case 'queimou':
       return `${evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId)} queima `
-        + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem)} para abrir vaga na mochila.`;
+        + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem, ctx.nomeDaClasse)} para abrir vaga na mochila.`;
     // A única pista que o jogador tem de que a economia da mesa secou. NOMEIA o
     // baralho em vez de dizer só "não ganhou nada": sem isso ele lê a própria
     // vitória como bug — foi exatamente o que aconteceu no gate ocular do 4a.

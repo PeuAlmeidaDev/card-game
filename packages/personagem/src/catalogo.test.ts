@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ITENS, RACAS_PUBLICAS } from '@card-dungeon/cartas';
+import { CLASSES_PUBLICAS, ITENS, RACAS_PUBLICAS, obterClasse } from '@card-dungeon/cartas';
 import { CATALOGO, resolverEscolhas } from './catalogo';
 
 describe('CATALOGO', () => {
@@ -9,8 +9,13 @@ describe('CATALOGO', () => {
     expect(CATALOGO.racas).toHaveLength(5);
   });
 
-  it('tem as classes semente + a base', () => {
-    expect(CATALOGO.classes.map((c) => c.id)).toEqual(['guerreiro', 'ladino']);
+  it('entrega a projeção pública das classes (sem passivaCombate nem modificadores) + a base', () => {
+    // O array semente local morreu, como o de itens já tinha morrido: a classe
+    // virou carta, e um segundo catálogo aqui seria uma fonte paralela — o
+    // construtor ofereceria classes que o baralho nunca produz.
+    expect(CATALOGO.classes).toBe(CLASSES_PUBLICAS);
+    expect(CATALOGO.classes[0]).not.toHaveProperty('passivaCombate');
+    expect(CATALOGO.classes[0]).not.toHaveProperty('modificadores');
     expect(CATALOGO.base.level).toBe(1);
   });
 
@@ -40,11 +45,19 @@ describe('resolverEscolhas', () => {
     // Nascer equipado era andaime: desde a fatia 8 o item é carta de Tesouro,
     // sacada do baralho. Duas fontes para o mesmo stat distorceriam uma corrida
     // ranqueada, e é a mesma jogada que a raça sofreu na fatia 7.
-    const r = resolverEscolhas(CATALOGO, { classeId: 'guerreiro' });
-    expect(r).toEqual({ classe: CATALOGO.classes.find((c) => c.id === 'guerreiro') });
+    const r = resolverEscolhas({ classeId: 'guerreiro' });
+    expect(r).toEqual({ classe: obterClasse('guerreiro') });
+  });
+
+  it('resolve pela CARTA, que é quem tem os modificadores', () => {
+    // O catálogo publica `ClasseResumo` (sem `modificadores`): se a resolução
+    // voltasse a sair dele, o `/duelo` montaria o personagem com a linha BASE
+    // crua e ninguém notaria — os stats continuariam saindo, só que errados.
+    expect(resolverEscolhas({ classeId: 'guerreiro' })?.classe.modificadores)
+      .toEqual({ forca: 1, vida: 5 });
   });
 
   it('devolve null se a classe não existe', () => {
-    expect(resolverEscolhas(CATALOGO, { classeId: 'xxx' })).toBeNull();
+    expect(resolverEscolhas({ classeId: 'xxx' })).toBeNull();
   });
 });
