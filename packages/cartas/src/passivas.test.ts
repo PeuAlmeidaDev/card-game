@@ -163,15 +163,26 @@ describe('Explosão (Mago de Fogo)', () => {
 
 describe('composição raça + classe no mesmo gancho', () => {
   it('Sangue de Guerra e Explosão compõem em CADEIA, na ordem raça → classe', () => {
-    // Orc ferido (+3) e Explosão (×2) no MESMO `aoCausarDano`. Em cadeia e nessa
-    // ordem: (base + 3) * 2. A ordem inversa daria base * 2 + 3 — é ela que este
+    // Para a ORDEM importar, o portador precisa estar FERIDO (fúria ativa) no
+    // PRIMEIRO golpe que ele conecta — senão a Explosão já queimou e as duas
+    // ordens dariam o mesmo número. O alvo, mais ágil, ataca primeiro e fere o
+    // orcMago antes do turno de ataque dele; só então o orcMago ataca por vez
+    // com fúria E Explosão as duas frescas no mesmo golpe.
+    const orcMago: Combatente = { forca: 6, vida: 10, habilidade: 8, agilidade: 4, level: 1 };
+    const alvo: Combatente = { forca: 5, vida: 200, habilidade: 12, agilidade: 12, level: 1 };
+
+    const inicio = criarCombate(orcMago, alvo, filaDeDados([1]), [sangueDeGuerra, explosao]);
+    // alvo ataca primeiro (mais ágil): 1 <= 12 acerta.
+    const ferido = proximoPasso(inicio.estado, { tipo: 'esquivar' }, filaDeDados([12]), [sangueDeGuerra, explosao]);
+    // esquiva 12 > 1 falha; dano = level 1 + força 5 = 6; vida 10 - 6 = 4 (<= 5, ferido)
+    expect(ferido.estado.jogador.vida).toBe(4);
+
+    // primeiro ataque do orcMago: ataque 2 <= 8 acerta; esquiva 12 > 2 falha;
+    // base = level 1 + força 6 = 7. Em cadeia, na ordem raça → classe:
+    // (7 + 3) * 2 = 20. A ordem inversa daria (7 * 2) + 3 = 17 — é ela que este
     // teste separa, e é a ordem que `passivasDoLutador` (partida) declara.
-    const orcMago: Combatente = { forca: 6, vida: 10, habilidade: 12, agilidade: 12, level: 1 };
-    const alvo: Combatente = { forca: 2, vida: 200, habilidade: 1, agilidade: 1, level: 1 };
-    const inicio = criarCombate(orcMago, alvo, filaDeDados([]), [sangueDeGuerra, explosao]);
-    // vida 10 > metade: sem fúria. dano 1+6 = 7, dobrado = 14 => 186
-    const g1 = proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([4, 12, 12]), [sangueDeGuerra, explosao]);
-    expect(g1.estado.monstro.vida).toBe(186);
+    const golpe = proximoPasso(ferido.estado, { tipo: 'atacar' }, filaDeDados([2, 12, 1]), [sangueDeGuerra, explosao]);
+    expect(golpe.estado.monstro.vida).toBe(180);
   });
 });
 

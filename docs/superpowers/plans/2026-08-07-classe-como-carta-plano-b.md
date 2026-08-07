@@ -1027,23 +1027,63 @@ Expected: o teste *"dobra o PRIMEIRO golpe … uma vez por combate"* reprova no 
 
 - [ ] **Step 6: teste da COMPOSIÇÃO real (Orc + Mago), que é o ponto do §5.4**
 
+🔴 **Corrigido em 2026-08-07, na execução da Task 5.** A versão original deste bloco (abaixo, para
+registro) tinha vida CHEIA no cenário (`vida: 10`, sem ferir o portador antes do golpe medido) —
+com a fúria do Orc nunca disparando (`10 > 10/2`), o dano fica `7 * 2 = 14` **na mesma conta
+independente da ordem do array**: `[sangueDeGuerra, explosao]` e `[explosao, sangueDeGuerra]` dão
+os DOIS 186. O nome do teste prometia *"na ordem raça → classe"* e o comentário afirmava *"a ordem
+inversa daria base * 2 + 3"* — nenhum dos dois é verdade para o cenário escrito. A conta batia com
+o número (186), então o defeito era no NOME/comentário, não na aritmética; o revisor pegou isso e
+pediu o conserto antes do merge. Versão original, riscada, para quem for comparar:
+
 ```ts
+// ❌ NÃO EXERCITA A ORDEM — ver a correção abaixo. Ficou aqui só como registro do defeito.
 describe('composição raça + classe no mesmo gancho', () => {
   it('Sangue de Guerra e Explosão compõem em CADEIA, na ordem raça → classe', () => {
-    // Orc ferido (+3) e Explosão (×2) no MESMO `aoCausarDano`. Em cadeia e nessa
-    // ordem: (base + 3) * 2. A ordem inversa daria base * 2 + 3 — é ela que este
-    // teste separa, e é a ordem que `passivasDoLutador` (partida) declara.
     const orcMago: Combatente = { forca: 6, vida: 10, habilidade: 12, agilidade: 12, level: 1 };
     const alvo: Combatente = { forca: 2, vida: 200, habilidade: 1, agilidade: 1, level: 1 };
     const inicio = criarCombate(orcMago, alvo, filaDeDados([]), [sangueDeGuerra, explosao]);
-    // vida 10 > metade: sem fúria. dano 1+6 = 7, dobrado = 14 => 186
     const g1 = proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([4, 12, 12]), [sangueDeGuerra, explosao]);
     expect(g1.estado.monstro.vida).toBe(186);
   });
 });
 ```
+
+**Versão que exercita a ordem de verdade:** o portador precisa estar FERIDO (fúria ativa) no
+PRIMEIRO golpe que ele conecta — senão a Explosão já queimou. O alvo, mais ágil, ataca primeiro e
+fere o orcMago antes do turno de ataque dele; só então o orcMago ataca por vez com fúria E
+Explosão as duas frescas no mesmo golpe. Com `base = 7`: raça → classe dá `(7+3)*2 = 20`; a ordem
+inversa dá `(7*2)+3 = 17` — os dois separados, e verificado invertendo o array (ver Step 6b).
+
+```ts
+describe('composição raça + classe no mesmo gancho', () => {
+  it('Sangue de Guerra e Explosão compõem em CADEIA, na ordem raça → classe', () => {
+    const orcMago: Combatente = { forca: 6, vida: 10, habilidade: 8, agilidade: 4, level: 1 };
+    const alvo: Combatente = { forca: 5, vida: 200, habilidade: 12, agilidade: 12, level: 1 };
+
+    const inicio = criarCombate(orcMago, alvo, filaDeDados([1]), [sangueDeGuerra, explosao]);
+    // alvo ataca primeiro (mais ágil): 1 <= 12 acerta.
+    const ferido = proximoPasso(inicio.estado, { tipo: 'esquivar' }, filaDeDados([12]), [sangueDeGuerra, explosao]);
+    // esquiva 12 > 1 falha; dano = level 1 + força 5 = 6; vida 10 - 6 = 4 (<= 5, ferido)
+    expect(ferido.estado.jogador.vida).toBe(4);
+
+    // primeiro ataque do orcMago: ataque 2 <= 8 acerta; esquiva 12 > 2 falha;
+    // base = level 1 + força 6 = 7. Em cadeia, na ordem raça → classe:
+    // (7 + 3) * 2 = 20. A ordem inversa daria (7 * 2) + 3 = 17 — é ela que este
+    // teste separa, e é a ordem que `passivasDoLutador` (partida) declara.
+    const golpe = proximoPasso(ferido.estado, { tipo: 'atacar' }, filaDeDados([2, 12, 1]), [sangueDeGuerra, explosao]);
+    expect(golpe.estado.monstro.vida).toBe(180);
+  });
+});
+```
 📌 Este é o **primeiro teste de composição com cartas REAIS** do projeto — até aqui a regra só era
 exercitada por dublês (`composicao.test.ts`). Escreva-o.
+
+- [ ] **Step 6b: prove que a ordem importa**
+
+Troque só o array de passivas do `proximoPasso` do golpe medido para `[explosao, sangueDeGuerra]`
+(mantendo a expectativa em `180`) e rode. Expected: reprova com `183` (200 − 17) — a prova de que
+invertendo a ordem o número muda. Desfaça antes de commitar.
 
 - [ ] **Step 7: commit**
 
