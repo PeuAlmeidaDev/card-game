@@ -8,12 +8,16 @@ import { rolarAtaqueDe, rolarEsquivaContra, danoDe, resolverAtaque } from './ata
 import { MAX_TURNOS } from './limites';
 import { AcaoIlegal } from './erros';
 
-function portadorDe(estado: EstadoCombate, passivas: readonly PassivaCombate[]): Portador {
+function portadorDe(
+  estado: EstadoCombate,
+  passivas: readonly PassivaCombate[],
+  scratches: readonly EstadoPassiva[],
+): Portador {
   return {
     combatente: estado.jogador,
     vidaInicial: estado.vidaInicialJogador,
     passivas,
-    scratches: estado.passivas,
+    scratches,
   };
 }
 
@@ -124,7 +128,7 @@ function atacar(estado: EstadoCombate, rolar: RolarD12, passivas: readonly Passi
   const log: EventoCombate[] = [...eventos];
 
   const composto = base > 0
-    ? comporCausarDano(base, portadorDe(estado, passivas))
+    ? comporCausarDano(base, portadorDe(estado, passivas, estado.passivas))
     : { dano: base, scratches: estado.passivas };
 
   let monstro = estado.monstro;
@@ -158,7 +162,7 @@ function esquivar(
   log.push(esquiva.evento);
 
   if (!esquiva.esquivou) {
-    const r = comporFalharEsquiva({ ...portadorDe(estado, passivas), scratches });
+    const r = comporFalharEsquiva(portadorDe(estado, passivas, scratches));
     scratches = r.scratches;
     if (r.reRolar) {
       esquiva = rolarEsquivaContra(rolagemAtaque, 'a', rolar);
@@ -168,7 +172,7 @@ function esquivar(
 
   let jogador = estado.jogador;
   if (!esquiva.esquivou) {
-    const sofrido = comporSofrerDano(danoDe(estado.monstro), { ...portadorDe(estado, passivas), scratches });
+    const sofrido = comporSofrerDano(danoDe(estado.monstro), portadorDe(estado, passivas, scratches));
     scratches = sofrido.scratches;
     jogador = { ...jogador, vida: jogador.vida - sofrido.dano };
     log.push({ tipo: 'dano', alvo: 'a', quantidade: sofrido.dano, vidaRestante: jogador.vida });
