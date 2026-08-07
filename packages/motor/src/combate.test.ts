@@ -208,7 +208,7 @@ describe('rolagemDeAtaque nos ganchos de defesa — dublê', () => {
   });
 });
 
-describe('atacar() com dano zero — o scratch do empate sobrevive', () => {
+describe('atacar() — o scratch do empate sobrevive nos dois braços do composto', () => {
   it('empate consultado e RESPEITADO (dano zero) não perde o uso gasto em aoEmpatarEsquiva', () => {
     // Se o ramo de dano zero devolvesse `estado.passivas` (o scratch de ANTES da
     // consulta) em vez do `scratches` local, este uso se perderia em silêncio.
@@ -223,6 +223,23 @@ describe('atacar() com dano zero — o scratch do empate sobrevive', () => {
 
     expect(passo.estado.monstro.vida).toBe(10);
     expect(passo.estado.passivas).toEqual([{ id: 'respeita-e-gasta', usos: 1 }]);
+  });
+
+  it('empate consultado e ANULADO (dano > 0) também não perde o uso — atravessa comporCausarDano', () => {
+    // Gêmeo do teste acima para o braço `base > 0`: se ele propagasse `estado.passivas`
+    // (o scratch de ANTES da consulta) em vez do `scratches` local, o uso gasto no
+    // empate se perderia do mesmo jeito — só que aqui o golpe CONECTA.
+    const anulaEGasta: PassivaCombate = {
+      id: 'anula-e-gasta',
+      aoEmpatarEsquiva: (ctx) => ({ empateSalva: false, estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } }),
+    };
+    const inicio = criarCombate(jogador, monstro, filaDeDados([]), [anulaEGasta]);
+    // ataque 5 acerta; esquiva 5 EMPATA; a passiva anula o empate: dano = 1+3 = 4.
+    // 12 > habilidade 6: o monstro erra o contra-ataque e devolve a vez.
+    const passo = proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([5, 5, 12]), [anulaEGasta]);
+
+    expect(passo.estado.monstro.vida).toBe(6);
+    expect(passo.estado.passivas).toEqual([{ id: 'anula-e-gasta', usos: 1 }]);
   });
 });
 
