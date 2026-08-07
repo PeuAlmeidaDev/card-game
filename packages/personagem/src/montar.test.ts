@@ -24,4 +24,12 @@ describe('montarCombatente', () => {
     // agilidade base 5 - 10 = -5 -> piso 1
     expect(montarCombatente(nula, []).agilidade).toBe(1);
   });
+
+  it('sem classe (o Aprendiz) o combatente é a BASE crua', () => {
+    expect(montarCombatente(null, [])).toEqual(BASE);
+  });
+
+  it('sem classe, os itens continuam somando', () => {
+    expect(montarCombatente(null, [espada]).forca).toBe(BASE.forca + 2);
+  });
 });
