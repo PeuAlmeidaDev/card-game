@@ -50,44 +50,20 @@ function mockFetch(): void {
 }
 
 describe('App', () => {
-  it('carrega o catálogo e mostra o preview — que é a BASE, sem a classe', async () => {
+  it('carrega o catálogo e renderiza o construtor: o <select> lista as classes dele', async () => {
     // 🎚️ Mudou nesta task: o catálogo publica `ClasseResumo`, sem `modificadores`
-    // (eles ficaram no servidor, em `obterClasse`), então não há mais o que somar
-    // no cliente. O preview passa a ser a `base` que o próprio domínio entrega.
-    expect(catalogo.base.forca).toBe(3);
+    // (eles ficaram no servidor, em `obterClasse`) — não há mais preview de stats
+    // no cliente. O que sobrevive a checar é o catálogo tendo carregado e o
+    // <select> de classe refletindo as classes que ele trouxe.
     mockFetch();
     render(<App />);
-    expect(await screen.findByText(/Força 3/)).toBeInTheDocument();
-    expect(screen.getByText(/Vida 10/)).toBeInTheDocument();
-  });
-
-  it('o preview NÃO soma por conta própria, nem se a classe vier com modificadores', async () => {
-    // 🐛 Regressão de 2026-07-31: o `calcularPreview` que morava neste arquivo
-    // refazia a soma à mão e NÃO aplicava o `PISO = 1` de
-    // `personagem/src/montar.ts:12`. Com uma classe fortemente negativa a tela
-    // mostrava `Agilidade -5` — um personagem que o servidor nunca montaria.
-    //
-    // O payload abaixo traz um `modificadores` CLANDESTINO (o contrato não o
-    // declara mais): se alguém voltar a somar na tela, o preview muda e isto
-    // reprova. É o que sobrou do alarme depois que a soma saiu do cliente.
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => Promise.resolve(json({
-        ...catalogo,
-        classes: [{ id: 'amaldicoado', nome: 'Amaldiçoado', texto: '', modificadores: { agilidade: -10 } }],
-      }))),
-    );
-    render(<App />);
-
-    expect(await screen.findByText(/Agilidade 5/)).toBeInTheDocument();
-    expect(screen.queryByText(/Agilidade -5/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Agilidade 1/)).not.toBeInTheDocument();
+    expect(await screen.findByRole('option', { name: 'Guerreiro' })).toBeInTheDocument();
   });
 
   it('não tem seletor de raça: a raça é carta sacável, não escolha de menu', async () => {
     mockFetch();
     render(<App />);
-    await screen.findByText(/Força/); // espera o catálogo carregar
+    await screen.findByRole('button', { name: 'Duelar' }); // espera o catálogo carregar
     expect(screen.queryByLabelText(/Raça/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Casca de Pedra/i)).not.toBeInTheDocument();
   });
@@ -97,7 +73,7 @@ describe('App', () => {
     // (nascer equipado + sacar do baralho) distorceriam uma corrida ranqueada.
     mockFetch();
     render(<App />);
-    await screen.findByText(/Força/);
+    await screen.findByRole('button', { name: 'Duelar' });
     expect(screen.queryByRole('group', { name: /itens/i })).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Espada Curta/i)).not.toBeInTheDocument();
   });
@@ -108,8 +84,7 @@ describe('App', () => {
     // preencher e o servidor ignora — um tipo que mente no fio.
     mockFetch();
     render(<App />);
-    await screen.findByText(/Força/);
-    await userEvent.click(screen.getByRole('button', { name: 'Duelar' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Duelar' }));
     await screen.findByText("Vitória de 'a' em 3 turnos");
 
     const enviado = chamadas.find((c) => c.url.includes('/api/duelo'))?.init?.body;
@@ -122,8 +97,7 @@ describe('App', () => {
   it('ao clicar em Duelar mostra o desfecho', async () => {
     mockFetch();
     render(<App />);
-    await screen.findByText(/Força/); // espera o catálogo carregar
-    await userEvent.click(screen.getByRole('button', { name: 'Duelar' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Duelar' }));
     expect(await screen.findByText("Vitória de 'a' em 3 turnos")).toBeInTheDocument();
   });
 });

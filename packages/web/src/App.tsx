@@ -25,16 +25,6 @@ export function App() {
 
   if (!catalogo) return <p>Carregando catálogo…</p>;
 
-  // O preview é a BASE, e nada mais: desde que a classe virou carta do baralho o
-  // catálogo publica `ClasseResumo` (id/nome/texto) e os `modificadores` ficam no
-  // servidor (`obterClasse`) — não há o que somar aqui.
-  //
-  // ⚠️ E não deve voltar a haver. Havia neste arquivo um `calcularPreview` que
-  // refazia a conta à mão e já tinha divergido: ele não aplicava o `PISO = 1` do
-  // `montar.ts`, então a tela mostrava `Agilidade -5` num personagem que o
-  // servidor montaria com `1`. O construtor inteiro sai na Task 12.
-  const stats = catalogo.base;
-
   async function duelar(): Promise<void> {
     setTexto('Rolando os dados…');
     const resposta = await api.duelo({ body: { classeId } });
@@ -57,11 +47,6 @@ export function App() {
           ))}
         </select>
       </label>
-
-      <p>
-        Personagem: Força {stats.forca} · Vida {stats.vida} · Habilidade {stats.habilidade} · Agilidade{' '}
-        {stats.agilidade}
-      </p>
 
       <button onClick={() => void duelar()}>Duelar</button>
       <p>{texto}</p>
