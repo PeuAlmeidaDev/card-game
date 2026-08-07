@@ -1176,7 +1176,9 @@ escrito — não confunda "Plano A construído" com "a fatia `classe como carta`
 (`EstadoCombate.passiva`) e passou a segurar **N** (`passivas: readonly EstadoPassiva[]`), com a
 regra de composição num módulo próprio, `packages/motor/src/composicao.ts`. `aoCausarDano` e
 `aoSofrerDano` compõem em **cadeia** — o dano que sai de uma é a base da seguinte; `aoFalharEsquiva`
-tem **curto-circuito** — a primeira que re-rola vence e as seguintes não são consultadas. A ordem
+tem **curto-circuito** — a primeira que re-rola vence e as seguintes não são consultadas. ⚠️ **Metade
+que não estava escrita:** as **anteriores** à vencedora SÃO consultadas e podem gastar `usos` sem
+produzir efeito nenhum — `composicao.test.ts` já prendia isso, só faltava dizer. A ordem
 `raça → classe` é fixada por `passivasDoLutador` (`packages/partida/src/mesa.ts`), não pelo motor, e
 hoje ela monta o array só com a passiva da raça — nenhuma classe do catálogo declara passiva ainda.
 ⚠️ **Nenhuma carta nova, e o jogo NÃO mudou** — as raças continuam com uma passiva cada e a mão
