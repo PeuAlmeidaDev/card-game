@@ -24,10 +24,11 @@ export function rolarEsquivaContra(
   rolagemAtaque: number,
   ladoDefensor: Lado,
   rolar: RolarD12,
-): { readonly esquivou: boolean; readonly evento: EventoCombate } {
+): { readonly rolagem: number; readonly esquivou: boolean; readonly evento: EventoCombate } {
   const rolagem = rolar();
   const esquivou = rolagem <= rolagemAtaque;
   return {
+    rolagem,
     esquivou,
     evento: { tipo: 'esquiva', defensor: ladoDefensor, rolagem, esquivou },
   };

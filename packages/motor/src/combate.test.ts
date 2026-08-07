@@ -208,6 +208,24 @@ describe('rolagemDeAtaque nos ganchos de defesa — dublê', () => {
   });
 });
 
+describe('atacar() com dano zero — o scratch do empate sobrevive', () => {
+  it('empate consultado e RESPEITADO (dano zero) não perde o uso gasto em aoEmpatarEsquiva', () => {
+    // Se o ramo de dano zero devolvesse `estado.passivas` (o scratch de ANTES da
+    // consulta) em vez do `scratches` local, este uso se perderia em silêncio.
+    const respeitaEGasta: PassivaCombate = {
+      id: 'respeita-e-gasta',
+      aoEmpatarEsquiva: (ctx) => ({ empateSalva: true, estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } }),
+    };
+    const inicio = criarCombate(jogador, monstro, filaDeDados([]), [respeitaEGasta]);
+    // ataque 5 acerta; esquiva 5 EMPATA; a passiva respeita o empate (dano fica 0).
+    // 12 > habilidade 6: o monstro erra o contra-ataque e devolve a vez.
+    const passo = proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([5, 5, 12]), [respeitaEGasta]);
+
+    expect(passo.estado.monstro.vida).toBe(10);
+    expect(passo.estado.passivas).toEqual([{ id: 'respeita-e-gasta', usos: 1 }]);
+  });
+});
+
 describe('trava de terminação', () => {
   it('no teto de turnos declara impasse sem rolar dado', () => {
     const travado: EstadoCombate = {

@@ -1,6 +1,6 @@
 import type { PassivaCombate } from '@card-dungeon/motor';
 import type { ModificadoresDeStat } from './stats';
-import { golpeCerteiro } from './passivas';
+import { golpeCerteiro, impacto } from './passivas';
 
 /**
  * Uma carta de classe: identidade + stats (dado) + passiva (código). Gêmea de
@@ -17,7 +17,7 @@ export interface ClasseCarta {
 
 export const CLASSES: readonly ClasseCarta[] = [
   { id: 'aprendiz', nome: 'Aprendiz', texto: 'Sem escola: carrega mais do que veste.', modificadores: {}, passivaCombate: null },
-  { id: 'guerreiro', nome: 'Guerreiro', texto: 'Impacto: quando ele ataca, o empate não salva ninguém.', modificadores: { forca: 1, vida: 5 }, passivaCombate: null },
+  { id: 'guerreiro', nome: 'Guerreiro', texto: 'Impacto: quando ele ataca, o empate não salva ninguém.', modificadores: { forca: 1, vida: 5 }, passivaCombate: impacto },
   { id: 'ladino', nome: 'Ladino', texto: 'Golpe Certeiro: onde a mão é precisa, o corte é dobrado.', modificadores: { habilidade: 2, agilidade: 1 }, passivaCombate: golpeCerteiro },
   { id: 'mago-de-fogo', nome: 'Mago de Fogo', texto: 'Explosão: o primeiro golpe sai com o poder do feitiço, não o do braço.', modificadores: { forca: 3, vida: -3 }, passivaCombate: null },
 ];

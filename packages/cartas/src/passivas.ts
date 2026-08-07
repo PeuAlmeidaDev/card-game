@@ -43,3 +43,9 @@ export const golpeCerteiro: PassivaCombate = {
     estado: ctx.estado,
   }),
 };
+
+/** Impacto (Guerreiro): quando ELE ataca, o empate de esquiva não salva o defensor. */
+export const impacto: PassivaCombate = {
+  id: 'impacto',
+  aoEmpatarEsquiva: (ctx) => ({ empateSalva: false, estado: ctx.estado }),
+};
