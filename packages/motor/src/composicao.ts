@@ -14,6 +14,7 @@ export interface Portador {
   readonly vidaInicial: number;
   readonly passivas: readonly PassivaCombate[];
   readonly scratches: readonly EstadoPassiva[];
+  readonly rolagemDeAtaque: number | null;
 }
 
 /**
@@ -32,6 +33,7 @@ function contextoDe(portador: Portador, scratches: readonly EstadoPassiva[], id:
     portador: portador.combatente,
     vidaInicial: portador.vidaInicial,
     estado,
+    rolagemDeAtaque: portador.rolagemDeAtaque,
   };
 }
 

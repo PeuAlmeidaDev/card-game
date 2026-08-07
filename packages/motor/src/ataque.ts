@@ -47,16 +47,16 @@ export function resolverAtaque(
   ladoAtacante: Lado,
   ladoDefensor: Lado,
   rolar: RolarD12,
-): { readonly dano: number; readonly eventos: readonly EventoCombate[] } {
+): { readonly dano: number; readonly rolagem: number; readonly eventos: readonly EventoCombate[] } {
   const ataque = rolarAtaqueDe(atacante, ladoAtacante, rolar);
   if (!ataque.acertou) {
-    return { dano: 0, eventos: [ataque.evento] };
+    return { dano: 0, rolagem: ataque.rolagem, eventos: [ataque.evento] };
   }
 
   const esquiva = rolarEsquivaContra(ataque.rolagem, ladoDefensor, rolar);
   if (esquiva.esquivou) {
-    return { dano: 0, eventos: [ataque.evento, esquiva.evento] };
+    return { dano: 0, rolagem: ataque.rolagem, eventos: [ataque.evento, esquiva.evento] };
   }
 
-  return { dano: danoDe(atacante), eventos: [ataque.evento, esquiva.evento] };
+  return { dano: danoDe(atacante), rolagem: ataque.rolagem, eventos: [ataque.evento, esquiva.evento] };
 }

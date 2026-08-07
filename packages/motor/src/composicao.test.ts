@@ -11,6 +11,7 @@ function portadorCom(passivas: readonly PassivaCombate[]): Portador {
     vidaInicial: 20,
     passivas,
     scratches: passivas.map((p) => ({ id: p.id, usos: 0 })),
+    rolagemDeAtaque: null,
   };
 }
 
@@ -83,6 +84,7 @@ describe('invariante: todo id de passiva precisa de scratch semeado', () => {
       vidaInicial: 20,
       passivas: [somaUm],
       scratches: [],
+      rolagemDeAtaque: null,
     };
     expect(() => comporCausarDano(4, semScratch)).toThrow('scratch de soma-um não foi semeado');
   });

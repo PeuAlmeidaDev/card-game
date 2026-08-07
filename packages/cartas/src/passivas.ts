@@ -33,3 +33,13 @@ export const sangueDeGuerra: PassivaCombate = {
     estado: ctx.estado,
   }),
 };
+
+/** Golpe Certeiro (Ladino): rolagem de ataque baixa é golpe preciso. 🎚️ dial: ≤ 2 (16,7% do d12). */
+const CRITICO_ATE = 2;
+export const golpeCerteiro: PassivaCombate = {
+  id: 'golpe-certeiro',
+  aoCausarDano: (danoBase, ctx) => ({
+    dano: ctx.rolagemDeAtaque !== null && ctx.rolagemDeAtaque <= CRITICO_ATE ? danoBase * 2 : danoBase,
+    estado: ctx.estado,
+  }),
+};

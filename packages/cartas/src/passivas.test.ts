@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { criarCombate, proximoPasso } from '@card-dungeon/motor';
 import type { Combatente } from '@card-dungeon/motor';
 import { filaDeDados } from './testes/filaDeDados';
-import { cascaDePedra, escorregadio, sangueDeGuerra } from './passivas';
+import { cascaDePedra, escorregadio, sangueDeGuerra, golpeCerteiro } from './passivas';
 import { RACAS, obterRaca } from './racas';
 
 const jogador: Combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 9, level: 1 };
@@ -43,6 +43,35 @@ describe('Sangue de Guerra (Orc)', () => {
     // dado 1: ataque seguinte do monstro acerta e pede esquiva
     const golpe = proximoPasso(feridoPasso.estado, { tipo: 'atacar' }, filaDeDados([2, 12, 1]), [sangueDeGuerra]);
     expect(golpe.estado.monstro.vida).toBe(93);
+  });
+});
+
+describe('Golpe Certeiro (Ladino)', () => {
+  const ladino: Combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 9, level: 1 };
+  const alvo: Combatente = { forca: 2, vida: 100, habilidade: 6, agilidade: 4, level: 1 };
+
+  it('rolagem de ataque ≤ 2 dobra o dano', () => {
+    const inicio = criarCombate(ladino, alvo, filaDeDados([]), [golpeCerteiro]);
+    // ataque 2 (≤ 2, crítico) acerta; esquiva 9 > 2 falha; dano base 1+3=4, dobrado 8
+    // 12 > habilidade 6: o alvo erra o contra-ataque e devolve a vez
+    const passo = proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([2, 9, 12]), [golpeCerteiro]);
+    expect(passo.estado.monstro.vida).toBe(92);
+  });
+
+  it('rolagem 3 já não é crítico — o dial é o 2', () => {
+    const inicio = criarCombate(ladino, alvo, filaDeDados([]), [golpeCerteiro]);
+    const passo = proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([3, 9, 12]), [golpeCerteiro]);
+    expect(passo.estado.monstro.vida).toBe(96);
+  });
+
+  it('não dobra o dano SOFRIDO — o crítico é do golpe do portador', () => {
+    // Sem este teste, ler `rolagemDeAtaque` de um contexto que não é de ataque
+    // passaria despercebido: em `esquivar` ele é `null`, e é isso que se afirma.
+    const veloz: Combatente = { ...alvo, agilidade: 12, forca: 5, habilidade: 12 };
+    const inicio = criarCombate(ladino, veloz, filaDeDados([1]), [golpeCerteiro]); // ataque 1 do monstro acerta
+    const passo = proximoPasso(inicio.estado, { tipo: 'esquivar' }, filaDeDados([12]), [golpeCerteiro]);
+    // dano sofrido = level 1 + forca 5 = 6, NÃO dobrado; 20 - 6 = 14
+    expect(passo.estado.jogador.vida).toBe(14);
   });
 });
 
