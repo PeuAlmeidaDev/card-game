@@ -108,6 +108,14 @@ outra dobra, para que trocar a ordem mude o resultado). ⚠️ **Não é zelo, �
 fatia `afinidade` TRÊS vezes:** o defeito nunca foi desatenção, foi o **fixture não conseguir produzir
 o cenário**, e o conserto, as três vezes, foi **dublê novo no catálogo de teste**.
 
+⚠️ **Dívida explícita para o Plano B, encontrada na revisão final do Plano A: a ordem `raça →
+classe` acima é regra DECLARADA e SEM COBERTURA em `partida`.** `passivasDoLutador`
+(`partida/src/mesa.ts:31`) devolve no máximo 1 elemento hoje — um teste que afirmasse a ordem seria
+**vazio**, e por isso não foi escrito (não inventar teste vazio para "cobrir" ausência). O primeiro
+commit do Plano B que der passiva a uma classe real é o primeiro momento em que a ordem se torna
+**afirmável** — e o último em que dá para acertá-la de graça, antes de `passivasDoLutador` virar
+`[raça, classe]` sem ninguém escrever o teste que prende essa ordem contra uma inversão silenciosa.
+
 ⚠️ **Consequência a NÃO esquecer:** com a cadeia, dois efeitos multiplicativos no mesmo golpe
 compõem (o crítico do Ladino × a Explosão do Mago **não** se encontram, porque um jogador tem uma
 classe só — mas raça + classe se encontram, ex.: Orc + Mago no `aoCausarDano`).
