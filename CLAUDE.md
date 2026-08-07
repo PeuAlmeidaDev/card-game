@@ -1166,11 +1166,22 @@ próxima fatia não copiar item quebrado.
 
 ## ⚠️ SESSÃO DE 2026-08-06 — o Plano A da `classe como carta` está construído, e o jogo fica idêntico
 
-**O Plano A está construído** (branch `feat/classe-como-carta-plano-a`, 5 tasks de código + esta de
-documentação, **616 testes verdes** — motor 60, cartas 32, personagem 9, partida 304, shared 25,
-server 31, web 155 —, typecheck 7/7, lint limpo). Decisão **#87** do bible. ✅ **Ele é METADE da
-fatia**, a que refatora o motor por baixo; a que tira o topo da tela é o **Plano B**, ainda não
-escrito — não confunda "Plano A construído" com "a fatia `classe como carta` construída".
+**O Plano A está construído** (branch `feat/classe-como-carta-plano-a`, 5 tasks de código + uma de
+documentação + uma leva final de correção, **619 testes verdes** — motor 63, cartas 32, personagem 9,
+partida 304, shared 25, server 31, web 155 —, typecheck 7/7, lint limpo). Decisão **#87** do bible.
+✅ **Ele é METADE da fatia**, a que refatora o motor por baixo; a que tira o topo da tela é o
+**Plano B**, ainda não escrito — não confunda "Plano A construído" com "a fatia `classe como carta`
+construída".
+
+🔴 **A revisão final do branch achou o que as seis revisões de task não podiam achar, e vale mais que
+os números:** a rede de equivalência **não visitava dois ramos do código que ela refatorou** — `atacar`
+com dano zero (o golpe que erra) e `esquivar` acertando de primeira, os dois com passiva injetada. A
+promessa *"o jogo não mudou"* se sustentava (os ramos são idênticos ao código antigo), mas a **prova**
+não os cobria: trocar `scratches: estado.passivas` por `[]` no ramo do dano zero **passava a suíte
+inteira** e só explodiria depois, como `Error` cru de `contextoDe` — **500 na cara de quem errou um
+golpe**. ➡️ **A lição é sobre o alcance de uma revisão escopada:** cada task foi revisada contra o
+próprio diff, e nenhuma tinha como perguntar *"que ramos do refactor inteiro ninguém visita?"*. Os dois
+ganharam teste, verificado por mutação.
 
 **O que entrou em produção:** o motor deixou de segurar **uma** passiva por combatente
 (`EstadoCombate.passiva`) e passou a segurar **N** (`passivas: readonly EstadoPassiva[]`), com a

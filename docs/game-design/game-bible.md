@@ -1236,8 +1236,9 @@ frequência do gatilho. 🔴 **N por medida, nunca global.**
 
 ### Sessão de 2026-08-06 — o Plano A da `classe como carta`: o motor passa a segurar N passivas, e o jogo fica idêntico
 
-**O Plano A está construído** (branch `feat/classe-como-carta-plano-a`, 5 tasks de código + esta de
-documentação, **616 testes verdes**, typecheck 7/7, lint limpo). Ele é **metade** da fatia `classe
+**O Plano A está construído** (branch `feat/classe-como-carta-plano-a`, 5 tasks de código + uma de
+documentação + uma leva final de correção, **619 testes verdes**, typecheck 7/7, lint limpo). Ele é
+**metade** da fatia `classe
 como carta` — a que refatora o motor por baixo; a que tira o topo da tela é o **Plano B**, ainda não
 escrito. Nenhuma carta nova entrou no jogo nesta sessão: as raças continuam com uma passiva cada,
 nenhuma classe do catálogo declara passiva, e a mão inicial não muda.
