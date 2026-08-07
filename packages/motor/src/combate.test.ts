@@ -4,6 +4,7 @@ import { AcaoIlegal } from './erros';
 import { MAX_TURNOS } from './limites';
 import { filaDeDados } from './testes/filaDeDados';
 import type { Combatente, EstadoCombate } from './tipos';
+import type { PassivaCombate } from './passiva';
 
 const jogador: Combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 9, level: 1 };
 const monstro: Combatente = { forca: 2, vida: 10, habilidade: 6, agilidade: 4, level: 1 };
@@ -175,6 +176,35 @@ describe('classe das recusas do proximoPasso', () => {
     const inicio = criarCombate(jogador, rapido, filaDeDados([5]));
     expect(() => proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([])))
       .toThrow(Error);
+  });
+});
+
+describe('rolagemDeAtaque nos ganchos de defesa — dublê', () => {
+  it('aoFalharEsquiva e aoSofrerDano recebem null, nunca a rolagem do ataque do monstro', () => {
+    // `golpeCerteiro` (packages/cartas) não hooka nenhum dos dois — ele só lê
+    // `rolagemDeAtaque` em `aoCausarDano`. Sem um dublê que hooka os dois ganchos
+    // que `esquivar()` compõe, os `null` escritos à mão em `combate.ts` são código
+    // morto para qualquer mutação: nenhuma passiva do catálogo os consultaria.
+    const observadas: Array<{ gancho: string; rolagemDeAtaque: number | null }> = [];
+    const espiaRolagem: PassivaCombate = {
+      id: 'espia-rolagem',
+      aoFalharEsquiva: (ctx) => {
+        observadas.push({ gancho: 'aoFalharEsquiva', rolagemDeAtaque: ctx.rolagemDeAtaque });
+        return { reRolar: false, estado: ctx.estado };
+      },
+      aoSofrerDano: (danoBase, ctx) => {
+        observadas.push({ gancho: 'aoSofrerDano', rolagemDeAtaque: ctx.rolagemDeAtaque });
+        return { dano: danoBase, estado: ctx.estado };
+      },
+    };
+    const rapido: Combatente = { ...monstro, agilidade: 12 };
+    const inicio = criarCombate(jogador, rapido, filaDeDados([5]), [espiaRolagem]); // ataque do monstro 5 acerta
+    proximoPasso(inicio.estado, { tipo: 'esquivar' }, filaDeDados([6]), [espiaRolagem]); // esquiva 6 > 5 falha
+
+    expect(observadas).toEqual([
+      { gancho: 'aoFalharEsquiva', rolagemDeAtaque: null },
+      { gancho: 'aoSofrerDano', rolagemDeAtaque: null },
+    ]);
   });
 });
 

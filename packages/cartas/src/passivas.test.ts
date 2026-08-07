@@ -65,8 +65,10 @@ describe('Golpe Certeiro (Ladino)', () => {
   });
 
   it('não dobra o dano SOFRIDO — o crítico é do golpe do portador', () => {
-    // Sem este teste, ler `rolagemDeAtaque` de um contexto que não é de ataque
-    // passaria despercebido: em `esquivar` ele é `null`, e é isso que se afirma.
+    // `golpeCerteiro` só hooka `aoCausarDano`; o dano que o Ladino SOFRE nunca passa
+    // por ele, então não há como dobrar aqui. (A prova de que `rolagemDeAtaque`
+    // chega `null` aos ganchos que `esquivar()` compõe é o dublê em
+    // `motor/src/combate.test.ts` — este teste não a faz.)
     const veloz: Combatente = { ...alvo, agilidade: 12, forca: 5, habilidade: 12 };
     const inicio = criarCombate(ladino, veloz, filaDeDados([1]), [golpeCerteiro]); // ataque 1 do monstro acerta
     const passo = proximoPasso(inicio.estado, { tipo: 'esquivar' }, filaDeDados([12]), [golpeCerteiro]);
