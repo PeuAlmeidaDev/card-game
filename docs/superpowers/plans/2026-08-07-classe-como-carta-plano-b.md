@@ -410,8 +410,7 @@ export function obterClasse(id: string): ClasseCarta | undefined {
 
 /**
  * Projeção **serializável** para o catálogo/cliente. Sem `passivaCombate` (código,
- * que não sobrevive ao JSON) e sem `modificadores` (resolvidos server-side por
- * `obterClasse`, via `combatenteDe`). Gêmea de `RacaResumo`.
+ * que não sobrevive ao JSON) e sem `modificadores`. Gêmea de `RacaResumo`.
  */
 export interface ClasseResumo {
   readonly id: string;
@@ -423,11 +422,19 @@ export const CLASSES_PUBLICAS: readonly ClasseResumo[] = CLASSES.map(({ id, nome
 
 /**
  * As classes que existem **como carta** no baralho de Portais. Gêmea exata de
- * `RACAS_SACAVEIS`, e o Aprendiz fica de fora pelo mesmo motivo do Humano: ele É a
- * ausência de carta (`emJogo.classe === null`).
+ * `RACAS_SACAVEIS`, e o Aprendiz fica de fora pelo mesmo motivo do Humano: uma
+ * carta de Aprendiz seria estritamente ruim — classe sem modificador nem passiva.
  */
 export const CLASSES_SACAVEIS: readonly ClasseResumo[] = CLASSES_PUBLICAS.filter((c) => c.id !== 'aprendiz');
 ```
+
+⚠️ **Corrigido no fix round 1 da Task 2 (2026-08-07):** os dois docstrings acima afirmavam o
+PRESENTE de coisa que só a Task 6 constrói — `ClasseResumo` dizia que os modificadores são
+"resolvidos server-side por `obterClasse`, via `combatenteDe`" (na Task 2, é
+`CATALOGO.classes.find` do `personagem`; `combatenteDe`/`obterClasse` só ligam esse fio na Task 6),
+e `CLASSES_SACAVEIS` citava `emJogo.classe === null`, campo que `ZonaEmJogo` não tem até a Task 6.
+Achado pela revisão como 15ª ocorrência em potencial da família "comentário que afirma um presente
+errado" — cortado antes de nascer.
 
 Em `packages/cartas/src/index.ts`, acrescente:
 
