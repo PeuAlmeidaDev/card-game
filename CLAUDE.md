@@ -1695,10 +1695,22 @@ consigo usar dois machados"*. ⚠️ **Não era bug de código — era o modelo 
 **exatamente uma** opção no jogo inteiro (o Escudo Redondo). O código estava **fiel ao §5 escrito**
 desde o Plano 3a; o que esta fatia muda é **o escrito**.
 
-🔴 **O GATE OCULAR DO PEDRO NÃO FOI RODADO.** O roteiro está abaixo, com a **frequência esperada** em
-cada linha, e **nenhum item foi conferido** quando estas linhas foram escritas. ⚠️ *"O Pedro
-conferiu"* e *"o roteiro passou"* são afirmações diferentes, e aqui **nenhuma das duas é verdadeira
-ainda**.
+✅ **O GATE OCULAR FOI RODADO PELO PEDRO em 2026-08-08, e o que ele cobriu está escrito.** Ele subiu o
+dev server (⚠️ a 5173 estava ocupada por outra sessão; o Vite subiu na **5174**), jogou, e reportou
+***"aparentemente tudo ok"***, autorizando push + PR + merge na mesma frase.
+
+⚠️ **Isso é conferência em partida real, NÃO o roteiro de 5 itens percorrido um a um** — e a
+distinção é a mesma que a fatia `afinidade` teve que aprender. **Os itens 4 e 5 são CENÁRIO FORÇADO**
+(o Montante sobre duas armas de uma mão, e a volta) e **não aparecem sozinhos numa partida**: o item 4
+é o ramo que a política do bot **nunca** visita — zero em 3.859 deslocamentos medidos. Não há relato
+de que tenham sido montados. 🔑 **A palavra dele foi *"aparentemente"***, e ela fica registrada como
+ele a disse, em vez de virar "aprovado" — laundering a hedge do dono é a mesma família de defeito que
+este arquivo cataloga em comentário.
+
+📌 **O que isso significa na prática:** o item 1 (duas armas coexistindo) é a fatia inteira e é o que
+uma partida exibe sozinha em ~52% dos assentos; ele quase certamente foi visto. Os itens 2 e 3 saem
+dele por um clique. **O que fica sem relato são o 4 e o 5.** Quem quiser fechá-los roda contra a
+`main` depois do merge, e o que achar vira **fix**, não revert.
 
 **O que entrou em produção:**
 
@@ -1993,7 +2005,7 @@ significativo**. O único degrau que se repete em **todos** é o **#3 na lantern
   pacote `server` sob carga paralela do `pnpm -r test`. Reproduziu limpo em isolamento e num segundo
   run completo; o diff da task que a viu toca **só** `packages/web`. Registrado para quem vir de novo.
 
-### 🖐️ O roteiro do gate ocular — **NÃO RODADO**, com a FREQUÊNCIA ESPERADA em CADA linha
+### 🖐️ O roteiro do gate ocular — ✅ **RODADO em 2026-08-08** (*"aparentemente tudo ok"*; itens 4 e 5 sem relato), com a FREQUÊNCIA ESPERADA em CADA linha
 
 🔴 **Item cuja frequência esperada não for quase certa numa sessão de observação é declarado DE
 SONDA, NÃO DE OLHO, na própria linha** — decisões **#70** e **#84**. **Um falso negativo num gate é
@@ -2098,8 +2110,10 @@ O que a fatia mudou é o número de caminhos até lá, não a existência dele.
 
 ### O que fica ABERTO ao sair desta fatia
 
-- 🔴 **O gate ocular do Pedro — NÃO RODADO.** Roteiro de 5 itens acima. O que ele achar vira **fix**,
-  não revert.
+- ✅ **O gate ocular do Pedro — RODADO em 2026-08-08** (*"aparentemente tudo ok"*, seguido da
+  autorização de push + PR + merge). ⬜ **O que sobra dele:** os itens **4** e **5**, que são cenário
+  forçado e **não aparecem sozinhos** — o 4 é o ramo que o bot nunca visita (zero em 3.859). Rodam
+  contra a `main` depois do merge, e o que acharem vira **fix**, não revert.
 - ✅ **A revisão ampla do branch — FEITA**, com a leva de correção logo acima. **Não há segunda leva:
   o que sobrou está nesta lista.**
 - ✅ ~~**A revisão ampla do BRANCH INTEIRO** (`MERGE_BASE..HEAD`)~~ **FEITA em 2026-08-08** — e o
