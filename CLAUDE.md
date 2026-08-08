@@ -2288,6 +2288,25 @@ Atacante rola 1d12 → ACERTA se ≤ Habilidade.
 Troca atacante/defensor. Repete até Vida ≤ 0. O outro vence.
 ```
 
+🔴 **A linha da ESQUIVA acima é o que o CÓDIGO faz hoje (`packages/motor/src/ataque.ts:29`), e ela
+está REVOGADA por decisão — não construída.** A **decisão #105** do bible (2026-08-08) troca a
+condição para `rolagem ≤ **habilidade do DEFENSOR**`: quem decide passa a ser o stat de quem esquiva,
+não a rolagem de quem ataca. ⚠️ **O bloco NÃO foi reescrito de propósito** — ele descreve o presente,
+e o presente ainda é a regra antiga. Reescrevê-lo antes de construir seria o defeito nº 1 deste
+projeto com o sinal invertido.
+
+**O que vem junto quando for construída** (fatia **Maldições / Bad Stuff**): a esquiva sobe de **~29%
+para 50%** com habilidade 6 dos dois lados, e a habilidade passa a **acertar E esquivar** — dois
+efeitos que se **multiplicam**, de modo que hab. 9 contra hab. 6 conecta **3× mais**. ⚠️ Isso quebra a
+justificativa escrita da **#63** (*"habilidade baixa acerta pouco, mas acerta com rolagem baixa,
+difícil de esquivar"*) e afrouxa ainda mais a `MARGEM_DE_ENCRENCA` (pergunta 18). 💰 **Custo de método
+aceito:** as Maldições são a fatia da economia, então **nenhum número vai isolar economia de duração
+de combate** — é a #51, repetida com o Pedro avisado antes de decidir.
+
+⬜ **Duas perguntas ficaram abertas e são dele:** a **21** (teto de habilidade por raça/classe, com
+força e vida pagando por ela) e a **22** (a esquiva é pela habilidade ou pela **agilidade**? e o
+Impacto do Guerreiro ainda vale a pena?). São a mesma conversa e pedem `grill-me`.
+
 ## Convenções (inegociáveis)
 
 Seguir o `CLAUDE.md` global do Pedro **+** o game bible **+** o spec da fatia. **TDD** (teste
