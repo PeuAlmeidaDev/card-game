@@ -5,12 +5,12 @@ import { avancarBots } from './automacao';
 import { criarPartida } from './montagem';
 import { projetarPara } from './projecao';
 import { filaDeDados } from './testes/dados';
-import { equipamento, monstro as cartaMonstro, monstros, raca } from './testes/cartas';
+import { classe, equipamento, monstro as cartaMonstro, monstros, raca } from './testes/cartas';
 import { LIMITE_BASE_DE_MAO, LIMITE_BASE_DE_MOCHILA } from './mao';
 import {
-  catalogoDeTeste, comClasseDeTeste, ID_DA_RACA_DONA, ID_DA_RACA_OUTRA, ID_DO_ITEM_DE_CAPACETE,
-  ID_DO_ITEM_DUAS_MAOS, ID_DO_ITEM_EXCLUSIVO, ID_DO_ITEM_FORTE, ID_DO_ITEM_FRACO, ID_DO_ITEM_LASTRO,
-  ID_DO_MONSTRO_FORTE,
+  CARTA_DE_CLASSE_DE_TESTE, catalogoDeTeste, comClasseDeTeste, ID_DA_CLASSE_DE_TESTE, ID_DA_RACA_DONA,
+  ID_DA_RACA_OUTRA, ID_DO_ITEM_DE_CAPACETE, ID_DO_ITEM_DUAS_MAOS, ID_DO_ITEM_EXCLUSIVO, ID_DO_ITEM_FORTE,
+  ID_DO_ITEM_FRACO, ID_DO_ITEM_LASTRO, ID_DO_MONSTRO_FORTE,
 } from './testes/catalogo';
 import { COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import type {
@@ -250,6 +250,47 @@ describe('escolherAcao', () => {
 
     expect(escolherAcao(projetarPara('p1', estourado, catalogoPadrao), 'p1', catalogoPadrao).tipo)
       .toBe('entregarCarta');
+  });
+
+  it('em `recompor`, joga a carta de CLASSE quando está Aprendiz', () => {
+    // Espelha a raça (spec §8): a especialização entra no ramo que precede
+    // `vestirOuGuardar`. A raça vem preenchida de propósito — sem ela o ramo da
+    // raça responderia primeiro e este teste passaria sem nunca visitar o ramo
+    // da classe.
+    const vista = vistaEm('recompor', {
+      suaMao: [classe('pc-1', ID_DA_CLASSE_DE_TESTE)],
+      racaEmJogo: raca('pr-0', ID_DA_RACA_DONA),
+      classeEmJogo: null,
+    });
+
+    expect(escolherAcao(vista, 'p1', catalogoPadrao))
+      .toEqual({ tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'pc-1' });
+  });
+
+  it('NÃO troca de classe quando já tem uma em jogo — a segunda morre na mão', () => {
+    // É esperado, e é medido no soak (§7.2 do brief): gêmeo do 30,8%–36,1% da
+    // raça. A raça vem preenchida de propósito, pelo mesmo motivo do teste acima.
+    const vista = vistaEm('recompor', {
+      suaMao: [classe('pc-1', ID_DA_CLASSE_DE_TESTE)],
+      racaEmJogo: raca('pr-0', ID_DA_RACA_DONA),
+      classeEmJogo: CARTA_DE_CLASSE_DE_TESTE,
+    });
+
+    expect(escolherAcao(vista, 'p1', catalogoPadrao))
+      .not.toEqual(expect.objectContaining({ tipo: 'jogarCarta' }));
+  });
+
+  it('a RAÇA tem precedência sobre a classe quando faltam as duas', () => {
+    // Ordem arbitrária, mas OBSERVÁVEL: sem esta asserção, trocá-la mudaria a
+    // primeira jogada de todo bot sem nada acusar.
+    const vista = vistaEm('recompor', {
+      suaMao: [classe('pc-1', ID_DA_CLASSE_DE_TESTE), raca('pr-1', ID_DA_RACA_DONA)],
+      racaEmJogo: null,
+      classeEmJogo: null,
+    });
+
+    expect(escolherAcao(vista, 'p1', catalogoPadrao))
+      .toEqual({ tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'pr-1' });
   });
 
   /**
