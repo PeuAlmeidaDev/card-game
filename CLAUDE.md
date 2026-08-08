@@ -102,12 +102,23 @@ faz certo e ninguém consegue ver): *"consigo usar um machado de orc e um escudo
 dois machados"* — ver a sessão de 2026-08-07/08, mais abaixo. ⚠️ O achado é **pré-existente e
 ortogonal** a esta fatia, então virou **fatia própria** em vez de fix aqui.
 
-✅ **E essa fatia própria — a `empunhadura dupla` — está CONSTRUÍDA** (branch
-`feat/empunhadura-dupla`, decisões **#98–#104** do bible, detalhe na sessão de 2026-08-08 no fim
-deste arquivo). As duas mãos viraram **vagas equivalentes**. 🔴 **Gate ocular do Pedro PENDENTE** —
-roteiro de **5** itens, nenhum conferido.
+✅ **E essa fatia própria — a `empunhadura dupla` — está CONSTRUÍDA E MERGEADA** pelo **PR #36**
+(`main` em **`e787d63`**), decisões **#98–#104** do bible, detalhe na sessão de 2026-08-08 no fim
+deste arquivo. As duas mãos viraram **vagas equivalentes**. ✅ **Gate ocular RODADO pelo Pedro em
+2026-08-08** — ele jogou e reportou ***"aparentemente tudo ok"***; ⚠️ os itens **4** e **5** do
+roteiro são cenário forçado e ficaram **sem relato**.
+✏️ **CORREÇÃO MARCADA (2026-08-08, madrugada):** este parágrafo dizia *"está CONSTRUÍDA"* e
+*"🔴 Gate ocular do Pedro PENDENTE — nenhum conferido"*, e as **duas** metades já eram falsas quando
+foram lidas. 🔴 **É o vício nº 1 cometido TRÊS LINHAS DEPOIS do parágrafo acima, que existe para
+catalogar a ocorrência anterior dele** — e o mecanismo é idêntico ao que aquele parágrafo descreve:
+a sessão de 2026-08-08 no fim deste arquivo foi escrita com o merge e o gate corretos, e **ninguém
+releu o cabeçalho**. ➡️ **Atualizar o corpo do documento não é conferir o resumo dele.**
+
 **Próxima fatia: `Maldições / Bad Stuff`** (bloco 2 do §3.1 — a que encara a economia, pergunta 11,
-com os consumíveis da #40).
+com os consumíveis da #40). ⚠️ **Mas a ordem tem uma pendência aberta desde 2026-08-08:** as decisões
+**#106/#107** (esquiva pela agilidade + teto por raça/classe) eram para pegar **carona** nas Maldições
+quando ainda eram uma linha de código, e **deixaram de caber lá** — ver o bloco de combate na seção
+"Combate", mais abaixo. **O Pedro não escolheu a ordem.**
 
 O Plano 2 trocou os guards espalhados do reducer por uma **máquina de fases**:
 `EstadoPartida.fase` (então `vasculhar | combate | descartar`; o 3b levou a cinco, o 4b a **seis**)
@@ -2289,23 +2300,55 @@ Troca atacante/defensor. Repete até Vida ≤ 0. O outro vence.
 ```
 
 🔴 **A linha da ESQUIVA acima é o que o CÓDIGO faz hoje (`packages/motor/src/ataque.ts:29`), e ela
-está REVOGADA por decisão — não construída.** A **decisão #105** do bible (2026-08-08) troca a
-condição para `rolagem ≤ **habilidade do DEFENSOR**`: quem decide passa a ser o stat de quem esquiva,
-não a rolagem de quem ataca. ⚠️ **O bloco NÃO foi reescrito de propósito** — ele descreve o presente,
-e o presente ainda é a regra antiga. Reescrevê-lo antes de construir seria o defeito nº 1 deste
-projeto com o sinal invertido.
+está REVOGADA por decisão — não construída.** ⚠️ **O bloco NÃO foi reescrito de propósito** — ele
+descreve o presente, e o presente ainda é a regra antiga. Reescrevê-lo antes de construir seria o
+defeito nº 1 deste projeto com o sinal invertido.
 
-**O que vem junto quando for construída** (fatia **Maldições / Bad Stuff**): a esquiva sobe de **~29%
-para 50%** com habilidade 6 dos dois lados, e a habilidade passa a **acertar E esquivar** — dois
-efeitos que se **multiplicam**, de modo que hab. 9 contra hab. 6 conecta **3× mais**. ⚠️ Isso quebra a
-justificativa escrita da **#63** (*"habilidade baixa acerta pouco, mas acerta com rolagem baixa,
-difícil de esquivar"*) e afrouxa ainda mais a `MARGEM_DE_ENCRENCA` (pergunta 18). 💰 **Custo de método
-aceito:** as Maldições são a fatia da economia, então **nenhum número vai isolar economia de duração
-de combate** — é a #51, repetida com o Pedro avisado antes de decidir.
+⚠️ **A regra que vai substituí-la MUDOU DUAS VEZES em 2026-08-08, e as duas ficam registradas:**
 
-⬜ **Duas perguntas ficaram abertas e são dele:** a **21** (teto de habilidade por raça/classe, com
-força e vida pagando por ela) e a **22** (a esquiva é pela habilidade ou pela **agilidade**? e o
-Impacto do Guerreiro ainda vale a pena?). São a mesma conversa e pedem `grill-me`.
+| | Condição da esquiva | Estado |
+|---|---|---|
+| **código de hoje** | `rolagem ≤ rolagem do ATACANTE` | vivo |
+| **decisão #105** (2026-08-08, tarde) | `rolagem ≤ HABILIDADE do defensor` | 🔴 **EMENDADA no mesmo dia** |
+| **decisão #106** (2026-08-08, madrugada) | ✅ `rolagem ≤ **AGILIDADE** do defensor` | **é esta que vale** |
+
+🔑 **Por que a #105 caiu em menos de um dia:** ela acertou o diagnóstico (*"o defensor precisa ter um
+stat na esquiva"*) e **errou o stat**. Com a habilidade acertando **e** esquivando, os dois efeitos se
+**multiplicam** e ela vira o jogo inteiro (hab. 9 contra hab. 6 conecta **3× mais**). Com a
+**agilidade**, cada stat fica com **um** trabalho — habilidade acerta · agilidade esquiva · força dana
+· vida dura — e o composto **some**. 💰 Composto **menor** aceito: a agilidade segue decidindo
+iniciativa, que é **uma vez por combate** contra **toda troca** da esquiva.
+
+🎚️ **E nasce o TETO (decisão #107), que NÃO é enfeite — é o freio da #106.** `esquiva = agilidade/12`
+é **convexa**: vida efetiva = `vida × 12/(12 − agilidade)`, ou seja ×1,7 com agi 5, ×3 com 8, ×4 com 9
+e **infinito com 12**. **Agilidade 9 já é alcançável no catálogo de hoje** (Aquático Ladino com Botas
+de Maré). O teto é **composto por raça + classe, somado**, vale **só para habilidade e agilidade** (as
+duas que rolam contra o d12; força e vida são linha reta e seguem em modificador), e o **máximo global
+é 9**. 💰 **Custo: revoga a linha do §5 que diz *"raça = uma passiva, NÃO stats"***.
+
+📐 **Três números conferidos contra o catálogo — aritmética, NÃO medição, e nenhum soak rodou:**
+
+1. 🔴 **A #105 dizia *"o combate fica bem mais longo"* e isso está ERRADO para o jogo que existe.** O
+   *"~29% → 50%"* é um **espelho de habilidade 6**, e os monstros têm habilidade **2–4**. Jogador nu ×
+   Goblin, ataques até matar: **hoje 14,1 × 13,7** → **#105 12 × 24** → **#106 15 × 20,6**. **As duas
+   versões deixam o jogo MAIS FÁCIL** — o catálogo de monstros vai precisar de conta (**pergunta 24**).
+2. 🔑 **Hoje os cinco monstros são DEFENSIVAMENTE IDÊNTICOS** (todos esquivam a 29,2%, porque a
+   esquiva depende de quem ataca). Com a #106 a `agilidade` da carta deles passa a valer: **Ogro 17% ·
+   Rato 25% · Goblin e Carniçal 33% · Lobo Sombrio 58%**. ➡️ Variedade real **sem uma carta nova** —
+   é a coisa mais barata que este jogo tem disponível.
+3. ⚠️ **O mesmo teto não vale o mesmo nos dois stats:** habilidade 5→9 é **1,8×**; agilidade 3→9 é
+   **3,0×**. Recomendação **registrada e não respondida**: habilidade máx. 9, **agilidade máx. 7**.
+
+🔴 **O ESCOPO MUDOU: a #105 pegava carona nas Maldições e a #106+#107 já NÃO cabem lá.** A #105 era
+uma linha em `ataque.ts`; isto é trocar o stat da esquiva **+** campo de teto em 5 raças e 4 classes
+**+** aplicar o teto em `montarCombatente` **+** reprecificar 12 itens **+** rever 5 monstros.
+⬜ **Ordem não decidida.**
+
+⬜ **O que ficou aberto e é decisão do Pedro** (o `grill-me` foi interrompido no meio): a **21**
+(o desenho do teto — *só teto* ou *teto + modificador*? teto da agilidade 9 ou 7? os 9 números? como
+reconciliar com o §5), a **23** (o que acontece com o **Impacto** do Guerreiro, cujo gancho
+`aoEmpatarEsquiva` fica **sem significado** com as duas rolagens independentes) e a **24** (o
+rebalanceamento dos monstros). ✅ A **22** foi respondida pela #106.
 
 ## Convenções (inegociáveis)
 
