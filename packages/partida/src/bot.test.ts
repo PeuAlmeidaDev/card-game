@@ -584,14 +584,17 @@ describe('escolherAcao', () => {
   });
 
   it('não desloca por EMPATE — ganho zero não é melhora (anti-loop)', () => {
-    // 🔴 Fecha o comparador `> 0` ESTRITO por MUTAÇÃO: nem o teste acima nem o de
-    // "desloca a de MENOR valor" prendem `>` contra `>=` no ramo de UMA mão — os
-    // dois ganhos deles são NEGATIVOS (−2), e trocar `>` por `>=` só muda o
-    // resultado quando o ganho é EXATAMENTE zero. As duas mãos ocupadas por
-    // Fraco (1) e o candidato também vale 1: ganho zero nas duas. Com `>=` no
-    // lugar de `>`, isto equiparia — e a próxima decisão desequiparia de volta,
-    // repetindo para sempre: é o loop de troca que a `afinidade` mediu travando
-    // a partida (ritmo 179–207 contra ~105, com 5.942–8.692 `trocaDeSlot` por 80
+    // 🔴 Fecha o comparador `> 0` ESTRITO por MUTAÇÃO: nem o teste acima (ganhos
+    // NEGATIVOS, −2 nas duas mãos) nem o de "desloca a de MENOR valor" (ganhos
+    // POSITIVOS, +2 e +4) prendem `>` contra `>=` no ramo de UMA mão — o de cima
+    // porque `>=` também recusa ganho negativo, e o de MENOR valor porque `>=`
+    // chega ao MESMO máximo (a 2ª mão, +4, ainda vence a 1ª, +2, sob `>=`): os
+    // dois só divergem quando o ganho é EXATAMENTE zero, e nenhum dos dois
+    // produz esse zero. As duas mãos ocupadas por Fraco (1) e o candidato
+    // também vale 1: ganho zero nas duas. Com `>=` no lugar de `>`, isto
+    // equiparia — e a próxima decisão desequiparia de volta, repetindo para
+    // sempre: é o loop de troca que a `afinidade` mediu travando a partida
+    // (ritmo 179–207 contra ~105, com 5.942–8.692 `trocaDeSlot` por 80
     // partidas). Verificado por mutação (`>=` no lugar de `>`): SÓ este teste
     // reprova — os outros dois desta Task ficam verdes.
     const vista = vistaEm('recompor', {
