@@ -145,7 +145,9 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
   // condições que a tabela não conhece, e cada uma precisa de gêmeo aqui — os TRÊS
   // pares de espiada (`vasculhar` com `espiada === null`, "Encarar"/`manterCarta`
   // e "Empurrar"/`empurrarCarta` com `espiada !== null`, os dois cobrados por
-  // `resolverEspiada`), o `carta.tipo === 'raca'` que decide se "Jogar" existe, e
+  // `resolverEspiada`), o `carta.tipo === 'raca'` que decide se "Jogar" existe
+  // (o domínio aceita raça OU classe desde a Task 7 — este botão SÓ raça é
+  // deferimento deliberado até a Task 11, não gêmeo fiel do reducer), e
   // o `decisao !== …` de "Atacar"/"Esquivar". A lista completa dos pares está no
   // comentário do `aplicarAcao` (pacote `partida`): botão novo escrito só com
   // `legal(tipo)` acende onde o domínio recusa.
@@ -437,8 +439,11 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
             <li key={carta.id}>
               {descreverCarta(carta, nomeDaRaca, nomeDoMonstro, nomeDoItem, nomeDaClasse)}
               {carta.tipo === 'equipamento' && rotuloDe(carta.itemId)}{' '}
-              {/* Só raça entra em jogo nesta fatia — o domínio recusa o resto, e um
-                  botão que só serve para levar 400 ensina o jogador a errar. */}
+              {/* O domínio aceita raça OU classe desde a Task 7 (`jogarCarta`,
+                  `mesa.ts`) — este botão continua SÓ raça de propósito, deferido
+                  para a Task 11 (tela rica da carta de classe). O gap é
+                  inalcançável hoje: nenhuma classe chega à mão antes da Task 10
+                  pôr classe no baralho de produção. */}
               {carta.tipo === 'raca' && (
                 <button
                   type="button"

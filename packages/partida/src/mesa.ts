@@ -854,7 +854,7 @@ function tirarDosSlots(
  * `descartar`. Não é perda — nunca foi saída de verdade quando o jogador estava
  * sem raça em jogo: ali a jogada é NET-ZERO, porque o limite era
  * `LIMITE_BASE_DE_MAO + 1` (hoje 8) e cai para o base junto com a mão, já que a
- * especialização derruba o próprio bônus que ela substitui (o Adaptável do
+ * raça derruba o próprio bônus que ela substitui (o Adaptável do
  * Humano, em `./mao`). Pelo mesmo cálculo, quem está DENTRO do limite (o único
  * jeito de chegar a `recompor`) nunca estoura ao jogar uma raça.
  *
