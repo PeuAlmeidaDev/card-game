@@ -1536,19 +1536,28 @@ novos, o comentário do `mesa.ts`, o título do teste, o bloco histórico do §1
 **"descarta"** não vieram. O que segue é o balde **"conserta depois"** — trabalho real, medido,
 **nenhum deles é bug vivo**.
 
+⚠️ **2026-08-08, re-verificação: 8 das 21 citações com linha estavam ERRADAS** (arquivo trocado,
+teste na posição errada, ou linha deslocada) — a mesma família catalogada acima, agora **dentro da
+lista que existe para evitá-la**. Cada bullet corrigido abaixo marca o que a citação anterior dizia,
+em vez de reescrever calado. As 13 restantes foram conferidas e batem.
+
 **🧪 Teste que não morde** (a mutação passa, ou passa pelo motivo errado)
 
-- `partida/src/mesa.test.ts:1574` — o gêmeo de `mochilaEncolheu` não morde `>` → `>=` em `mesa.ts:906`.
-  ⚠️ **A mutação NÃO fica verde** (2 outros testes reprovam): o invariante está protegido, só **não
-  pelo teste que o comentário dele promete**. Conserto de 1 linha (afirmar que `r.eventos` não traz
-  `desequipou`).
+- `partida/src/mesa.test.ts:1542` (`'jogar CLASSE com o Aprendiz no teto (6) ENCOLHE a mochila e
+  abre a queima'`) — o gêmeo de `mochilaEncolheu` não morde `>` → `>=` em `mesa.ts:906`. ⚠️ A citação
+  anterior (`:1574`) apontava para outro teste (o da fila COMPOSTA, escrito depois nesta mesma leva)
+  — não serve de gêmeo. **A mutação NÃO fica verde** (2 outros testes reprovam): o invariante está
+  protegido, só **não pelo teste que o comentário dele promete**. Conserto de 1 linha (afirmar que
+  `r.eventos` não traz `desequipou`).
 - `personagem/src/catalogo.test.ts:17-18` — as duas asserções passam **VAZIAS** se o array esvaziar
   (`CATALOGO.classes[0] === undefined` não reprova `.not.toHaveProperty`); o gêmeo das raças ainda
   tem `toHaveLength(5)`. Família *"teste de ausência vira vácuo"*.
 - `partida/src/montagem.test.ts:105` — `!('classeId' in j)` fica verde e **mudo** se o campo renascer
   com outro nome; duplica `projecao.test.ts:165`.
-- `web/src/TelaMesa.test.tsx` (guard estrutural do construtor) — cobre **`<select>`**; um construtor
-  que voltasse como grupo de `<radio>` ou lista de botões passaria pelas quatro asserções.
+- `web/src/App.test.tsx:41-52` (`'não há construtor: sem seletor de classe, sem preview e sem
+  "Duelar"'`) — arquivo errado na citação anterior (não é `TelaMesa.test.tsx`). Guard estrutural do
+  construtor: cobre **`<select>`** (`queryByRole('combobox')`); um construtor que voltasse como
+  grupo de `<radio>` ou lista de botões passaria pelas quatro asserções.
 - `web/src/TelaMesa.tsx:509` — o `disabled` de "Guardar" continua **sem morder `>= 6`** (cravar o
   valor do Aprendiz). O `>= 5` (a constante global que a Task 8 matou) foi fechado nesta leva.
 - **Nenhum teste cobre o BOT** jogando classe → encolher a mochila → abrir a queima — a interação que
@@ -1556,19 +1565,26 @@ novos, o comentário do `mesa.ts`, o título do teste, o bloco histórico do §1
 
 **🎯 Asserção fraca** (não prova o que o nome diz)
 
-- `partida/src/mesa.test.ts:1499` e `:1508` — `.toThrow(AcaoInvalida)` **sem fixar a mensagem**: o
-  gate de fase lança a MESMA classe, então um fixture que caísse noutra fase passaria **pelo motivo
-  errado**. O irmão mais velho (`:1348`) fixa a string, e é a convenção do arquivo.
-- `server/src/app.ts:132` (asserção em `app.test.ts`) — usa `.find(c => c.tipo === 'classe')` e confere
-  **só a primeira** carta de classe: substituição **MISTA** por `'aprendiz'` dá **29/29**. Prova
-  *"existe ao menos uma válida"*, não *"todo `classeId` pertence a `CLASSES_SACAVEIS`"*.
+- `partida/src/mesa.test.ts:3487-3488` e `:3494-3495` — `.toThrow(AcaoInvalida)` **sem fixar a
+  mensagem**: o gate de fase lança a MESMA classe, então um fixture que caísse noutra fase passaria
+  **pelo motivo errado**. O irmão mais velho (`:1348`) fixa a string, e é a convenção do arquivo.
+  ⚠️ A citação anterior (`:1499` e `:1508`) não tem `.toThrow` nenhum nessas linhas.
+- `server/src/app.test.ts:290` (`'o baralho de produção TEM carta de classe — e é uma classe
+  SACÁVEL de verdade'`) — arquivo errado na citação anterior (era `server/app.ts:132`, que não é
+  onde a asserção mora). Usa `.find(c => c.tipo === 'classe')` e confere **só a primeira** carta de
+  classe: substituição **MISTA** por `'aprendiz'` dá **29/29**. Prova *"existe ao menos uma
+  válida"*, não *"todo `classeId` pertence a `CLASSES_SACAVEIS`"*.
 - `partida/src/projecao.test.ts:196-207` — **não prova "por jogador"**, que é o que o nome diz: `[6,6]`
   passaria com um `6` cravado. Quem pega é `bot.test.ts:560-572`, em **outro arquivo**.
 - `web/src/App.test.tsx:35` — o **título afirma o que a asserção não checa** (*"não há mais nada entre
   o título e ela"*, e a asserção só busca um botão). Medido: um `<p>` no meio passa **2/2**.
-- `partida/src/mesa.test.ts:1543-1548` — o teste da ordem depende de `criar` carimbar a classe e
+- `partida/src/mesa.test.ts:1644` (describe `'a ordem de composição das passivas é raça →
+  classe'`, it `'a passiva da RAÇA compõe primeiro, e a da CLASSE em cima do resultado dela'`) — a
+  citação anterior (`:1543-1548`) apontava para outro teste (o do Aprendiz no teto); a re-revisão
+  não achou o teste descrito nessa posição. O teste da ordem depende de `criar` carimbar a classe e
   **nunca afirma isso**; a falha viria como *"filaDeDados esgotada"*, que não aponta a causa.
-- `web/src/TelaMesa.tsx:47` — `api.criarPartida({ body: {} })` sem asserção sobre o argumento.
+- `web/src/TelaMesa.tsx:58` — `api.criarPartida({ body: {} })` sem asserção sobre o argumento.
+  (citação anterior: `:47`, que é a tabela de rótulos de fase.)
 
 **🕰️ Comentário / título / doc envelhecido** (o vício nº 1 deste projeto)
 
@@ -1586,8 +1602,10 @@ novos, o comentário do `mesa.ts`, o título do teste, o bloco histórico do §1
   (`LIMITE_BASE_DE_MOCHILA` + `limiteDeMochila(jogador)`).
 - `partida/src/fase.test.ts:208` — o texto diz que a queima só abre com a mochila em
   `LIMITE_BASE_DE_MOCHILA`; um Aprendiz com **6** que joga raça abre com 6. A proteção segue válida.
-- `partida/src/mesa.ts:238` e `:394-398` — coluna desalinhada na tabela de pares finos, e 5 linhas de
-  narração histórica onde 1 bastava (o bloco já é candidato a deleção: *"o `git log` já guarda"*).
+- `partida/src/mesa.ts:238` (coluna desalinhada na tabela de pares finos) e `:309-342` (bloco
+  HISTÓRICO da contagem). ⚠️ A citação anterior (`:394-398`) hoje é o roteamento de
+  `saquear`/`procurarEncrenca`/`queimarCarta`, não narração — e o bloco cresceu bem além de "5
+  linhas" (um parágrafo por fatia desde então). Candidato a deleção: *"o `git log` já guarda"*.
 - `MEMORY.md` — a linha de `texto-do-plano-e-a-fonte-de-achado.md` diz *"3 de 4"*; os registros novos
   dizem **8**.
 
@@ -1599,7 +1617,9 @@ novos, o comentário do `mesa.ts`, o título do teste, o bloco histórico do §1
 
 **🧬 Fixture duplicado ou que o domínio não produz**
 
-- `partida/src/mesa.test.ts:1465` e `:1536` — `soMonstro` duplicado verbatim (3ª e 4ª cópias).
+- `partida/src/mesa.test.ts:1453` e `:1642` — `soMonstro` duplicado verbatim (3ª e 4ª cópias, cada
+  uma no topo do seu próprio `describe`; a citação anterior, `:1465` e `:1536`, cai dentro de
+  outros testes, não na declaração).
 - `partida/src/mao.test.ts:32-39` e `:47-56` — são **o MESMO teste**; o nome do segundo (*"o bônus é da
   CLASSE, não da raça"*) exigiria o caso que o arquivo nunca produz (com raça e **sem** classe → 6).
 - `web/src/PainelLog.test.tsx:10-11` — `limiteDeMao: 5`, valor que o domínio **não emite** desde o giro
