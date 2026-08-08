@@ -7,6 +7,9 @@ export type {
 } from './tipos';
 export { montarComposicao, montarComposicaoTesouros, tirarDoTopo, type ReceitaDeBaralho } from './baralho';
 export { combatenteDe, itensEquipados, afinidadeCom, contribuicaoDe, SLOTS_VAZIOS, type GrauDeAfinidade } from './corpo';
+// Valor: o par fino "as duas mãos ocupadas => `mao` obrigatória" tem dois
+// leitores, o reducer e a tela. Ver o docstring em `./equipar`.
+export { precisaEscolherMao } from './equipar';
 export { aplicarAcao } from './mesa';
 export { avancarBots } from './automacao';
 export { criarPartida } from './montagem';

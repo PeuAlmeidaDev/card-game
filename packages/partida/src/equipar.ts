@@ -24,6 +24,28 @@ function resolverMao(slots: ZonaEmJogo['slots'], maoAlvo?: MaoSlot): MaoSlot {
 }
 
 /**
+ * O item exige que o jogador APONTE uma mão? Só quando ele é de mão, não é de
+ * duas mãos e as duas estão ocupadas: sem vaga livre não há mão que
+ * `resolverMao` prefira, e escolher por ele seria destruir um item ao acaso
+ * (spec §4 regra 4). Com uma só ocupada isto é `false` de propósito — apontar
+ * para a ocupada ali é o jogador trocando aquele item de propósito (regra 3).
+ *
+ * Mora aqui, e não em `mesa.ts`, porque tem DOIS leitores: o reducer, que cobra
+ * o `mao` da ação, e a tela, que decide quantos botões "Equipar" renderizar. A
+ * cópia escrita à mão no cliente é a que fica para trás no dia em que a regra
+ * mudar — e o preço é um 400 na cara do jogador, que é exatamente o que a tabela
+ * de pares finos do `aplicarAcao` existe para evitar. `shared` reexporta como
+ * VALOR, mesma porta de `afinidadeCom`, `acaoEhLegal` e `SLOTS_VAZIOS`.
+ *
+ * Recebe a `ZonaEmJogo` inteira, não os `slots`: é a forma que os dois lados já
+ * têm na mão (`jogador.emJogo` no reducer, `eu.emJogo` da projeção na tela), e é
+ * a mesma assinatura de `afinidadeCom`.
+ */
+export function precisaEscolherMao(info: InfoItem, emJogo: ZonaEmJogo): boolean {
+  return info.slot === 'mao' && !info.duasMaos && MAOS.every((m) => emJogo.slots[m] !== null);
+}
+
+/**
  * Põe a carta no slot que o item declara e devolve o corpo novo mais o que saiu.
  *
  * Item de mão (`slot: 'mao'`) sem `duasMaos` resolve para `maoAlvo` quando a

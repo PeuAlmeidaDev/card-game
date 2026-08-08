@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api } from './api';
 import { PainelLog } from './PainelLog';
 import { descreverCarta } from './descreverCarta';
-import { acaoEhLegal, afinidadeCom } from '@card-dungeon/shared';
+import { acaoEhLegal, afinidadeCom, precisaEscolherMao } from '@card-dungeon/shared';
 import type { AcaoDaMesa, AcaoNoFio, Catalogo, Fase, ItemCarta, Slot, VistaDaPartida } from '@card-dungeon/shared';
 import { rotuloDeAfinidade } from './rotuloDeAfinidade';
 
@@ -28,17 +28,6 @@ const NOME_DO_SLOT: Record<Slot, string> = {
   maoEsquerda: 'Mão esquerda',
   pes: 'Pés',
 };
-
-/**
- * As duas mãos, mesmo par que `MAOS` em `packages/partida/src/equipar.ts` —
- * copiado aqui em vez de reexportado por `shared` (como `acaoEhLegal`,
- * `SLOTS_VAZIOS` e `afinidadeCom` são). ⚠️ A cópia não é FORÇADA — `web` já
- * depende de `shared`, e `MAOS` já é exportado de `equipar.ts:16`; dava para
- * reexportar como valor pela mesma porta. Ficou como está por decisão da
- * revisão desta task (o re-export vai para a revisão final da fatia), não
- * porque não houvesse caminho.
- */
-const MAOS: readonly ['maoDireita', 'maoEsquerda'] = ['maoDireita', 'maoEsquerda'];
 
 /**
  * O nome humano de cada fase. `Record<Fase, string>` é o que obriga a fase nova a
@@ -165,17 +154,16 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
     podeAgir && acaoEhLegal(vista.fase, vista.queima !== null, tipo);
 
   // O par fino novo da fatia `empunhadura dupla` (Task 2, tabela do `aplicarAcao`
-  // em `packages/partida/src/mesa.ts`): item de mão, sem `duasMaos`, com as DUAS
-  // ocupadas — a mesma condição que o reducer cobra para exigir `mao` na ação.
-  const precisaEscolherMao = (itemId: string): boolean => {
+  // em `packages/partida/src/mesa.ts`). A condição NÃO é reescrita aqui: é a
+  // mesma função que o reducer chama, lida por `shared` — a cópia que divergisse
+  // renderizaria o número velho de botões e cada clique viraria 400.
+  const euPrecisoEscolherMao = (itemId: string): boolean => {
     const info = infoDoItem(itemId);
-    if (info === undefined || minhaZona === null) return false;
-    const zona = minhaZona;
-    return info.slot === 'mao' && !info.duasMaos && MAOS.every((m) => zona.slots[m] !== null);
+    return info !== undefined && minhaZona !== null && precisaEscolherMao(info, minhaZona);
   };
 
   /**
-   * O botão "Equipar" — um, ou dois (um por mão) quando `precisaEscolherMao`
+   * O botão "Equipar" — um, ou dois (um por mão) quando `euPrecisoEscolherMao`
    * vale. Reusada pelas DUAS listas que equipam, mão e mochila: a decisão de
    * quantos botões renderizar não pode divergir entre elas.
    *
@@ -188,7 +176,7 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
    */
   const botaoEquipar = (cartaId: string, itemId: string) => {
     const desabilitado = !legal('equiparCarta') || euNaoPossoVestir(itemId);
-    if (!precisaEscolherMao(itemId)) {
+    if (!euPrecisoEscolherMao(itemId)) {
       return (
         <button
           type="button"

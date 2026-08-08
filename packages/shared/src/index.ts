@@ -191,6 +191,12 @@ export { SLOTS_VAZIOS } from '@card-dungeon/partida';
 // de quem veste reduzido é a tela mentindo.
 export { afinidadeCom, contribuicaoDe } from '@card-dungeon/partida';
 
+// Valor, pelo mesmo motivo: "as duas mãos ocupadas => a ação precisa de `mao`" é
+// o par fino que o reducer cobra, e é ele que decide se a tela renderiza UM
+// botão "Equipar" ou um por mão. Copiado no cliente, a tela oferece o número
+// velho de botões no dia em que a regra mudar — e isso é 400 na cara do jogador.
+export { precisaEscolherMao } from '@card-dungeon/partida';
+
 const c = initContract();
 
 /**

@@ -9,7 +9,7 @@ import { tirarDoTopo } from './baralho';
 import { limiteDeMochila } from './mao';
 import { destinoDaCaridade } from './caridade';
 import { afinidadeCom, combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
-import { colocarNoSlot, destinoDoDesequipado, MAOS } from './equipar';
+import { colocarNoSlot, destinoDoDesequipado, precisaEscolherMao } from './equipar';
 import { classificar } from './classificacao';
 import { AcaoInvalida } from './erros';
 import { acaoEhLegal, faseDoTurnoDe, faseSeAutoPula } from './fase';
@@ -999,14 +999,11 @@ function equiparCarta(
     throw new AcaoInvalida(`aplicarAcao: ${info.nome} é exclusivo de outra especialização`);
   }
 
-  // Item de mão, sem `duasMaos`, com as DUAS ocupadas: sem alvo explícito não há
-  // vaga livre para `resolverMao` preferir nem regra determinística que não seja
-  // arbitrária — é o par fino novo da fatia (spec §4 regra 4). ⚠️ Com só UMA
-  // ocupada isto NÃO dispara: apontar para a ocupada ali é o jogador trocando
-  // aquele item de propósito (regra 3 e a armadilha dela), jogada legítima.
-  const precisaDeAlvo =
-    info.slot === 'mao' && !info.duasMaos && MAOS.every((m) => jogador.emJogo.slots[m] !== null);
-  if (precisaDeAlvo && acao.mao === undefined) {
+  // O par fino novo da fatia (spec §4 regra 4), lido de `./equipar` — a MESMA
+  // função que a `TelaMesa` chama por `shared` para decidir quantos botões
+  // "Equipar" renderizar. Reescrevê-lo aqui inline deixaria a tela oferecendo um
+  // botão a menos no dia em que a regra mudasse, e isso é 400 na cara do jogador.
+  if (precisaEscolherMao(info, jogador.emJogo) && acao.mao === undefined) {
     throw new AcaoInvalida('equiparCarta: as duas mãos estão ocupadas — escolha qual liberar');
   }
 
