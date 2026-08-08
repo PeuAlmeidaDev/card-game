@@ -145,12 +145,11 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
   // condições que a tabela não conhece, e cada uma precisa de gêmeo aqui — os TRÊS
   // pares de espiada (`vasculhar` com `espiada === null`, "Encarar"/`manterCarta`
   // e "Empurrar"/`empurrarCarta` com `espiada !== null`, os dois cobrados por
-  // `resolverEspiada`), o `carta.tipo === 'raca'` que decide se "Jogar" existe
-  // (o domínio aceita raça OU classe desde a Task 7 — este botão SÓ raça é
-  // deferimento deliberado até a Task 11, não gêmeo fiel do reducer), e
-  // o `decisao !== …` de "Atacar"/"Esquivar". A lista completa dos pares está no
-  // comentário do `aplicarAcao` (pacote `partida`): botão novo escrito só com
-  // `legal(tipo)` acende onde o domínio recusa.
+  // `resolverEspiada`), o `carta.tipo === 'raca' || carta.tipo === 'classe'` que
+  // decide se "Jogar" existe (gêmeo fiel do reducer: `jogarCarta` aceita as duas
+  // desde a Task 7), e o `decisao !== …` de "Atacar"/"Esquivar". A lista completa
+  // dos pares está no comentário do `aplicarAcao` (pacote `partida`): botão novo
+  // escrito só com `legal(tipo)` acende onde o domínio recusa.
   const legal = (tipo: AcaoDaMesa['tipo']): boolean =>
     podeAgir && acaoEhLegal(vista.fase, vista.queima !== null, tipo);
 
@@ -195,6 +194,10 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
                 estaria aqui sem nunca ter sido exercitado. */}
             <strong>{j.nome}</strong>{j.ehBot && <span aria-label="controlado pelo computador"> (bot)</span>} — patente {j.patente} · {j.derrotas} derrota(s)
             {j.emJogo.raca !== null && ` · ${nomeDaRaca(j.emJogo.raca.racaId)}`}
+            {/* A classe é renderizada SEMPRE, inclusive ausente — ao contrário da
+                raça, que só aparece quando existe. O motivo: o Aprendiz TEM efeito
+                visível (mochila 6 em vez de 5), e "nada escrito" não comunica isso. */}
+            {' · '}{j.emJogo.classe === null ? 'Aprendiz' : nomeDaClasse(j.emJogo.classe.classeId)}
             {' · '}força {j.combatente.forca} · vida {j.combatente.vida} · habilidade {j.combatente.habilidade} · agilidade {j.combatente.agilidade}
             {' · '}{j.cartasNaMao}/{j.limiteDeMao} cartas
             {/* A mochila é zona ABERTA (spec §11): esconder a de quem não é você
@@ -439,12 +442,9 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
             <li key={carta.id}>
               {descreverCarta(carta, nomeDaRaca, nomeDoMonstro, nomeDoItem, nomeDaClasse)}
               {carta.tipo === 'equipamento' && rotuloDe(carta.itemId)}{' '}
-              {/* O domínio aceita raça OU classe desde a Task 7 (`jogarCarta`,
-                  `mesa.ts`) — este botão continua SÓ raça de propósito, deferido
-                  para a Task 11 (tela rica da carta de classe). O gap é
-                  inalcançável hoje: nenhuma classe chega à mão antes da Task 10
-                  pôr classe no baralho de produção. */}
-              {carta.tipo === 'raca' && (
+              {/* Gêmeo fiel do reducer: `jogarCarta` aceita raça OU classe desde a
+                  Task 7 (`mesa.ts`). */}
+              {(carta.tipo === 'raca' || carta.tipo === 'classe') && (
                 <button
                   type="button"
                   disabled={!legal('jogarCarta')}

@@ -66,6 +66,12 @@ const ITENS_PADRAO: Catalogo['itens'] = [
   { id: 'elmo-de-couro', nome: 'Elmo de Couro', slot: 'capacete', duasMaos: false, modificadores: { vida: 2 }, exclusivo: null },
 ];
 
+// Mesma ideia, para a carta de classe (Task 11): sem o catálogo o nome cairia
+// no fallback `?? id` e a tela mostraria "guerreiro" em vez de "Guerreiro".
+const CLASSES_PADRAO: Catalogo['classes'] = [
+  { id: 'guerreiro', nome: 'Guerreiro', texto: '…' },
+];
+
 /** Uma carta de Tesouro na mão (ou já no corpo). */
 const tesouro = (id: string, itemId = 'espada-curta') =>
   ({ id, tipo: 'equipamento' as const, itemId });
@@ -135,9 +141,10 @@ const abrirMesa = async (
   racas: Catalogo['racas'] = RACAS_PADRAO,
   monstros: Catalogo['monstros'] = MONSTROS_PADRAO,
   itens: Catalogo['itens'] = ITENS_PADRAO,
+  classes: Catalogo['classes'] = CLASSES_PADRAO,
 ) => {
   vi.spyOn(api, 'criarPartida').mockResolvedValue({ status: 200, body: vista } as never);
-  render(<TelaMesa racas={racas} monstros={monstros} itens={itens} />);
+  render(<TelaMesa racas={racas} monstros={monstros} itens={itens} classes={classes} />);
   await userEvent.click(screen.getByRole('button', { name: /nova partida/i }));
 };
 
@@ -591,6 +598,79 @@ describe('TelaMesa — a mão', () => {
     });
 
     expect(screen.getByText(/Orc/)).toBeInTheDocument();
+  });
+
+  it('mostra a classe em jogo de cada assento, ao lado da raça', async () => {
+    await abrirMesa({
+      ...vistaBase,
+      jogadores: vistaBase.jogadores.map((j) => (
+        j.id === 'p2'
+          ? { ...j, emJogo: { ...j.emJogo, classe: { id: 'pc-1', tipo: 'classe', classeId: 'guerreiro' } } }
+          : j
+      )),
+    });
+
+    expect(screen.getByText(/Guerreiro/)).toBeInTheDocument();
+  });
+
+  it('quem está sem classe aparece como Aprendiz', async () => {
+    // A ausência precisa ser LEGÍVEL: sem isto, o jogador não descobre que está
+    // sem classe nem por que a mochila dele é maior que a dos outros. Por isso a
+    // classe é renderizada SEMPRE, ao contrário da raça (que só aparece quando há).
+    // `vistaBase` já nasce com `emJogo.classe: null` nos dois assentos.
+    await abrirMesa(vistaBase);
+
+    expect(screen.getAllByText(/Aprendiz/).length).toBeGreaterThan(0);
+  });
+
+  it('o botão "Jogar" existe na carta de CLASSE da mão, como já existe na de raça', async () => {
+    // Gate de EXISTÊNCIA (o par fino de tipo de `jogarCarta`), não `disabled`: um
+    // monstro nunca vai poder ser jogado, em fase nenhuma.
+    await abrirMesa({
+      ...vistaBase,
+      fase: 'recompor',
+      suaMao: [{ id: 'pc-1', tipo: 'classe', classeId: 'guerreiro' }],
+    });
+
+    const linha = screen.getByText(/uma carta de Guerreiro/).closest('li');
+    if (linha === null) throw new Error('a carta de classe não foi renderizada');
+    expect(within(linha).getByRole('button', { name: 'Jogar' })).toBeInTheDocument();
+  });
+
+  it('"Jogar" na carta de classe manda o cartaId DAQUELA linha', async () => {
+    // Os botões têm o MESMO rótulo em várias linhas: `getByRole` genérico pega o
+    // primeiro e o teste passaria com a ação errada. Escopado por linha — é o
+    // defeito que a Task 6 da fatia `escolha do descarte` pegou.
+    const agir = vi.spyOn(api, 'agir').mockResolvedValue({ status: 200, body: vistaBase } as never);
+    await abrirMesa({
+      ...vistaBase,
+      fase: 'recompor',
+      suaMao: [
+        { id: 'pr-1', tipo: 'raca', racaId: 'orc' },
+        { id: 'pc-1', tipo: 'classe', classeId: 'guerreiro' },
+      ],
+    });
+
+    const linha = screen.getByText(/uma carta de Guerreiro/).closest('li');
+    if (linha === null) throw new Error('a carta de classe não foi renderizada');
+    await userEvent.click(within(linha).getByRole('button', { name: 'Jogar' }));
+
+    expect(agir).toHaveBeenCalledWith({
+      params: { id: 'm1' },
+      body: { acao: { tipo: 'jogarCarta', cartaId: 'pc-1' }, versao: 1 },
+    });
+  });
+
+  it('nenhum botão "Jogar" na carta de MONSTRO', async () => {
+    await abrirMesa({
+      ...vistaBase,
+      fase: 'recompor',
+      suaMao: [{ id: 'm1', tipo: 'monstro', monstroId: 'goblin' }],
+    });
+
+    const linha = screen.getByText(/um Goblin/).closest('li');
+    if (linha === null) throw new Error('a carta de monstro não foi renderizada');
+    expect(within(linha).queryByRole('button', { name: 'Jogar' })).not.toBeInTheDocument();
   });
 
   it('partida terminada na vez do humano: jogar carta fica desabilitado', async () => {
