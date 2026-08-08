@@ -89,9 +89,13 @@ terceira, **`classe como carta`** (#60/#61), saiu em **dois planos**: o **A** (m
 2026-08-06) está **mergeado** (PR #33, `main` em `0236b55`); o **B** — a carta no baralho, a passiva
 das classes, a mochila do Aprendiz e a **demolição do topo da tela** — está **construído na branch
 `feat/classe-como-carta-plano-b`**, detalhe na sessão de 2026-08-07/08 no fim deste arquivo.
-🔴 **O gate ocular do Plano B está PENDENTE** (roteiro de **7** itens naquela sessão, nenhum conferido)
-e ⬜ falta o **merge**. **Próxima fatia: `Maldições / Bad Stuff`**, o bloco 2 do §3.1 — a que
-finalmente encara a economia (pergunta 11) com os consumíveis da #40.
+✅ **GATE OCULAR FECHADO PELO PEDRO em 2026-08-08** — ele rodou o roteiro de **7** itens e reportou
+*"está certinho"*. 🔑 **E o gate achou um bug de VERDADE, pelo mesmo mecanismo de sempre** (o código
+faz certo e ninguém consegue ver): *"consigo usar um machado de orc e um escudo, mas não consigo usar
+dois machados"* — ver a sessão de 2026-08-08, no fim deste arquivo. ⚠️ O achado é **pré-existente e
+ortogonal** a esta fatia, então virou **fatia própria** (spec e plano escritos) em vez de fix aqui.
+**Próxima fatia: `empunhadura dupla`**, e só depois `Maldições / Bad Stuff` (bloco 2 do §3.1 — a que
+encara a economia, pergunta 11, com os consumíveis da #40).
 
 O Plano 2 trocou os guards espalhados do reducer por uma **máquina de fases**:
 `EstadoPartida.fase` (então `vasculhar | combate | descartar`; o 3b levou a cinco, o 4b a **seis**)
@@ -1422,7 +1426,7 @@ artefato da posição #0** — isso está medido, não deduzido.
   ⚠️ E ela também não é completa: um construtor que voltasse como grupo de `<radio>` passaria pelas
   quatro.
 
-### 🖐️ O roteiro do gate ocular — **PENDENTE**, com a frequência esperada em CADA linha
+### 🖐️ O roteiro do gate ocular — ✅ **RODADO E APROVADO em 2026-08-08**, com a frequência esperada em CADA linha
 
 🔴 **Item cuja frequência esperada não for quase certa numa sessão de observação é declarado DE SONDA,
 NÃO DE OLHO, na própria linha** — decisões **#70** e **#84**. Um item de gate que reprova código
@@ -1480,8 +1484,17 @@ inteira para aprender isso.
 
 ### O que fica ABERTO ao sair desta fatia
 
-- 🔴 **O gate ocular do Pedro — PENDENTE.** Nenhum dos 7 itens foi conferido. Roda contra a branch
-  (ou contra a `main`, depois do merge) e o que achar vira **fix**, não revert.
+- ✅ **O gate ocular do Pedro — FECHADO em 2026-08-08.** Ele rodou o roteiro de 7 itens e reportou
+  *"está certinho"*. ⚠️ **Escrito assim de propósito:** é o roteiro percorrido e aprovado por ele, e
+  este arquivo distingue *"o Pedro conferiu"* de *"o roteiro passou"* — aqui as duas valem.
+  🔑 **O gate pegou um bug que 661 testes e três revisões amplas não pegaram**, pela **terceira vez
+  seguida** nesta base: *"consigo usar um machado de orc e um escudo, mas não consigo usar dois
+  machados"*. **Causa raiz: `ItemCarta.slot` é um valor ÚNICO** e as três armas do catálogo declaram
+  `maoDireita` — a mão esquerda tem **exatamente um item no jogo inteiro** (o escudo). Não é bug de
+  código, é o modelo; e o mecanismo já estava **previsto na decisão #39** do bible, que ninguém
+  remediu. ➡️ **Pré-existente desde o Plano 3a e ortogonal a esta fatia**, então virou **fatia
+  própria** — spec `2026-08-08-empunhadura-dupla-design.md` e plano `2026-08-08-empunhadura-dupla.md`,
+  na branch `feat/empunhadura-dupla`.
 - 🔴 **A TROCA DE CLASSE É INVISÍVEL DO LADO DA CARTA QUE SAI — achado da revisão da Task 14, e são
   DOIS buracos independentes que se somam:**
   1. **`cartasNoCemiterio` viaja na vista e NUNCA é renderizado.** `projecao.ts:62` o publica; em
