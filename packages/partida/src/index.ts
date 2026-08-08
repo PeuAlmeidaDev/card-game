@@ -1,5 +1,5 @@
 export type {
-  CartaPorta, CartaDeRaca, ReceitaPorta, ReceitaTesouro, CartaTesouro, CartaEquipamento, Carta, Slot, SlotDeItem,
+  CartaPorta, CartaDeRaca, ReceitaPorta, ReceitaTesouro, CartaTesouro, CartaEquipamento, Carta, Slot, SlotDeItem, MaoSlot,
   InfoItem, Afinidade, EixoDeAfinidade,
   Embaralhar, InfoRaca, InfoMonstro, CatalogoDaMesa, JogadorNaMesa,
   JogadorPublico, ZonaEmJogo, PosicaoFinal, EventoDaMesa, AcaoDaMesa, CombateNaMesa, EspiadaPendente, QueimaPendente,

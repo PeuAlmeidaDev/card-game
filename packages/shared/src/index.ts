@@ -20,6 +20,7 @@ import type {
   Fase,
   GrauDeAfinidade,
   JogadorPublico,
+  MaoSlot,
   PosicaoFinal,
   QueimaPendente,
   Slot,
@@ -118,6 +119,28 @@ export type AcaoNoFio = z.infer<typeof acaoDaMesaSchema>;
 type _CoberturaAcao = [AcaoDaMesa['tipo']] extends [AcaoNoFio['tipo']] ? true : never;
 const _coberturaAcao: _CoberturaAcao = true;
 void _coberturaAcao;
+
+/**
+ * O mesmo buraco do `_CoberturaAcao`, um nível abaixo: ele trava a lista de
+ * TIPOS de ação, e nada travava o `mao` DENTRO do `equiparCarta`. O `z.enum`
+ * acima é escrito à mão, e pelo mesmo motivo de covariância um enum mais
+ * ESTREITO que `MaoSlot` passa limpo — uma mão nova no domínio ficaria
+ * inalcançável pelo fio, sem nada acusando. (Um erro de digitação no enum é
+ * pego pela atribuição em `server/src/app.ts`; o domínio CRESCENDO não é.)
+ *
+ * `NonNullable` porque `mao` é opcional na ação: o que interessa comparar é a
+ * união de valores, não a ausência.
+ *
+ * A tupla é obrigatória pelo mesmo motivo do `_CoberturaAcao`: `A | B extends X`
+ * DISTRIBUI sobre a união e a checagem se auto-satisfaz.
+ *
+ * ⚠️ Guard de COMPILAÇÃO. Quem acusa é o `pnpm typecheck`, nunca a suíte.
+ */
+type MaoNoFio = NonNullable<Extract<AcaoNoFio, { tipo: 'equiparCarta' }>['mao']>;
+type _CoberturaMao =
+  [MaoSlot] extends [MaoNoFio] ? ([MaoNoFio] extends [MaoSlot] ? true : never) : never;
+const _coberturaMao: _CoberturaMao = true;
+void _coberturaMao;
 
 /**
  * Trava as duas uniões `Slot` — a de `partida` (a REGRA: o corpo tem 5 encaixes)

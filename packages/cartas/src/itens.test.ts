@@ -2,7 +2,21 @@ import { describe, it, expect } from 'vitest';
 import { ITENS, ITENS_SACAVEIS, obterItem, type SlotDeItem, type ModificadoresDeItem } from './itens';
 import { RACAS_SACAVEIS } from './racas';
 
-const SLOTS_DE_ITEM: readonly SlotDeItem[] = ['capacete', 'armadura', 'mao', 'pes'];
+/**
+ * Os valores que um item pode DECLARAR, como `Record` e não como lista escrita à
+ * mão: a lista aceitava um `SlotDeItem` novo em silêncio, e os dois testes que a
+ * leem ("todo item declara um slot conhecido" e "todo slot tem ao menos um item")
+ * passariam sem nunca olhar para o membro novo. `Record<SlotDeItem, true>` é a
+ * convenção do repo para isto (`NOME_DO_SLOT`, `FASES_PARADAS`) — membro novo é
+ * erro de compilação, não teste verde.
+ *
+ * ⚠️ Guard de COMPILAÇÃO: o `vitest` transpila sem checar tipo, então quem acusa
+ * é o `pnpm typecheck`.
+ */
+const TODO_SLOT_DE_ITEM: Record<SlotDeItem, true> = {
+  capacete: true, armadura: true, mao: true, pes: true,
+};
+const SLOTS_DE_ITEM = Object.keys(TODO_SLOT_DE_ITEM) as readonly SlotDeItem[];
 
 describe('catálogo de itens', () => {
   it('nenhum id se repete', () => {
