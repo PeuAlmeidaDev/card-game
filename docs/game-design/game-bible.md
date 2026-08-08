@@ -105,8 +105,8 @@ de ~40–60 min contra 3 pessoas, sabota e negocia com elas, e sai com posição
 |---|---|---|---|
 | 0 | ✅ **Corte da `salaVazia`** — **CONSTRUÍDO em 2026-07-30 e MERGEADO** | removeu a `salaVazia` (#42) e fixou a composição `2×monstro + 1×raça` = 14/jogador, 56 na mesa (#52/#54) | Fatia própria **antes** do 4b (#51): as duas mudanças prometiam ressuscitar a **mesma** métrica (a caridade), e medi-las juntas repetiria o erro das #24/#25. 🔴 **Medido: a caridade de tesouro NÃO voltou** (#55) |
 | 1 | ✅ **Plano 4b — `encrenca`** — **CONSTRUÍDO em 2026-08-01 e MERGEADO** (gate ocular fechado pelo Pedro em 2026-08-02) | `procurarEncrenca` e `saquear`, mais o bot que avalia o combate (#63) | **Última peça estrutural da fatia 8.** Sem ela o §6 tinha uma fase sem verbo, e cartas de Porta morriam na mão. ✅ **Medido: 72,1%–74,7% dos monstros da mão inicial passaram a virar combate** (N=480) — o primeiro número desta fatia que cumpre a promessa com que a fatia foi pedida (#65) |
-| — | ✅ **`afinidade`** (2026-08-02) · ✅ **`escolha do descarte`** (2026-08-06) · ⬜ **`classe como carta`** (decisões #56–#61, nesta ordem) | itens exclusivos com valor cheio × reduzido; o jogo perguntando o que queimar com a mochila cheia; a classe entrando pelo baralho com o **Aprendiz** como ausência | Entraram em 2026-07-31, **depois** do bloco 1 e **antes** do bloco 2 (#61). **Duas das três estão MERGEADAS.** A que falta é o que mata o construtor e a rota `/duelo` — a tela só para de mentir ali. 📌 Ela nasce com uma dívida: a receita-alvo do §11 pede **3 cartas de classe por jogador** e o catálogo tem **2 classes**, então com "1 cópia por classe sacável" (#60) dá **2** — a receita-alvo **não é construível** com o catálogo de hoje |
-| 2 | **Maldições / Bad Stuff** | maldição (2 caminhos, #31), **morte/evacuação** do §10 | É a **1ª carta que mira outro jogador** e o **conserto da economia** — sem ela o baralho de Itens seca em 20/20 partidas (#46). ⚠️ **Adiado por três fatias** pela #61 — a `afinidade` **alivia** o mesmo sintoma (50% mais carta de Item), mas alívio não é conserto |
+| — | ✅ **`afinidade`** (2026-08-02) · ✅ **`escolha do descarte`** (2026-08-06) · ✅ **`classe como carta`** (2026-08-06/08) — decisões #56–#61, nesta ordem | itens exclusivos com valor cheio × reduzido; o jogo perguntando o que queimar com a mochila cheia; a classe entrando pelo baralho com o **Aprendiz** como ausência | Entraram em 2026-07-31, **depois** do bloco 1 e **antes** do bloco 2 (#61). ✅ **As TRÊS estão construídas.** A última matou o construtor e a rota `/duelo` — a tela deixou de mentir ali (#94). ✅ **E a dívida com que ela nasceu está PAGA:** a receita-alvo do §11 pede **3 cartas de classe por jogador** e o catálogo tinha **2 classes**; o **Mago de Fogo** (#91) fez a terceira, e `copiasPorClasse = 1` passou a entregar exatamente **3** (#93) |
+| 2 | ⏭️ **Maldições / Bad Stuff** — **A PRÓXIMA** | maldição (2 caminhos, #31), **morte/evacuação** do §10 | É a **1ª carta que mira outro jogador** e o **conserto da economia** — sem ela o baralho de Itens seca em 20/20 partidas (#46). ⚠️ **Adiado por três fatias** pela #61 — a `afinidade` **alivia** o mesmo sintoma (50% mais carta de Item), mas alívio não é conserto, e as três fatias acabaram |
 | 3 | **Frontend animado** | mesa desenhada, playback do turno alheio 1x/2x (#35) | Torna o jogo demonstrável, e a interferência **exige** enxergar bem o combate alheio |
 | 4 | **Online** | socket.io, salas, humanos no lugar dos bots | *"Fila ranqueada"* pressupõe gente. **O domínio não muda** — só o transporte |
 | 5 | **Interferência** | janelas A/B, contratos no server, **motor para N** (#33), `carta de combate`, `instantâneo` | §12: *"requisito estrutural do MVP, **não item adiável**"*. É a mecânica anti-tempo-morto |
@@ -116,7 +116,7 @@ de ~40–60 min contra 3 pessoas, sabota e negocia com elas, e sai com posição
 
 | Cortado | Por quê |
 |---|---|
-| **Habilidade ATIVA de classe** (decisão #49) | Classe entra como carta com **modificadores + passiva** — a máquina de passiva **já existe e está provada** (as raças a usam); a de habilidade ativa não existe. E a razão principal dela — *"dar decisão ao combate"* — foi resolvida pela #44, o instantâneo nas pausas do motor |
+| **Habilidade ATIVA de classe** (decisão #49) | Classe entra como carta com **modificadores + passiva** — ✅ **construído em 2026-08-08** (#88, #91, #92); a máquina de habilidade ativa não existe. E a razão principal dela — *"dar decisão ao combate"* — foi resolvida pela #44, o instantâneo nas pausas do motor. ⚠️ **A #49 segue intacta:** a fatia `classe como carta` entregou a metade que o bloco 6 do §17 prometia com passiva, e **não** antecipou a ativa |
 | **Mesa de 6 jogadores** | §3: futuro, primeiro como lobby privado |
 | **Todo o meta-jogo de §15** | Skins, clãs, conquistas, amigos, passe — *"segunda montanha do tamanho do jogo"* |
 | **Mochila → mão** | Adiado para a fatia da interferência (§6) |
@@ -126,10 +126,10 @@ de ~40–60 min contra 3 pessoas, sabota e negocia com elas, e sai com posição
 
 | | Alvo | Fonte |
 |---|---|---|
-| Baralho na mesa de 4 | 🎚️ **168** (96 Portas + 72 Itens) | #41 |
-| Consumíveis nos Itens | **≥ 50%** — regra **estrutural**, não dial | #40 |
-| Catálogo (pisos 🎚️) | 11 monstros · 5 raças · 15 equipamentos · classes ⬜ | #39 |
-| Limite de mão / mochila | 7 (+1 sem raça) / 5 | §11, travados |
+| Baralho na mesa de 4 | 🎚️ **168** (96 Portas + 72 Itens) — **hoje 116** (68 + 48) | #41, #93 |
+| Consumíveis nos Itens | **≥ 50%** — regra **estrutural**, não dial. **Hoje 0%** | #40 |
+| Catálogo (pisos 🎚️) | 11 monstros · 5 raças · 15 equipamentos · classes ⬜. **Hoje: 5 monstros · 5 raças (4 sacáveis) · 12 equipamentos · 4 classes (3 sacáveis)** | #39 |
+| Limite de mão / mochila | 7 (**+1 sem raça**) / 5 (**+1 sem classe**) | §11, travados |
 | Patente-alvo | 🎚️ 10 ranked · 4–5 dev | §3 |
 
 ### ⚠️ Honestidade sobre o tamanho
@@ -152,6 +152,11 @@ seria cobrado.
 
 - **Portais** (≈ Portas): raças, classes, monstros, **modificadores de monstro**,
   maldições/Bad Stuff.
+  - ✅ **A CLASSE é carta de Portais EM CÓDIGO desde 2026-08-08** (fatia `classe como carta`,
+    decisão **#88**) — antes ela vinha do construtor, por `classeId`. Composição em produção:
+    `2× monstro + 1× raça sacável + 1× classe sacável` = **17/jogador, 68 na mesa de 4**
+    (**58,8% monstro · 23,5% raça · 17,6% classe** — #93). ⬜ **Modificadores de monstro e
+    maldições continuam sem existir em código**; as maldições nascem no **bloco 2** do §17.
 - **Itens** (≈ Tesouros): o loot. **Três** tipos, separados por **quando são jogados**
   (decisão #43):
 
@@ -198,7 +203,20 @@ guarda-chuva é onde promessa não construída se esconde.
 |---|---|---|---|
 | **Mão** | **Oculta** | **7**, **+1 para quem não tem raça em jogo** (→ 8) · descarte no fim do turno | Onde mora a surpresa: **carta de combate** inesperada, maldição |
 | **Em jogo** (raça, classe, 5 slots de equipamento) | **Aberta** | por slot (§5) | O `Combatente` — recalculado sempre que a zona muda |
-| **Mochila** | **Aberta** | ✅ **5** itens (dial travado no Plano 4a) · **não conta no limite de mão** | **Reserva de valor negociável** — a moeda do jogo |
+| **Mochila** | **Aberta** | ✅ **5** itens, **+1 para quem não tem CLASSE em jogo** (→ **6**, o Aprendiz) · **não conta no limite de mão** | **Reserva de valor negociável** — a moeda do jogo |
+
+⚠️ **Os dois `+1` são de EIXOS diferentes de propósito** (decisão **#89**): a ausência de **raça**
+paga `+1` de **mão** (o Humano), a ausência de **classe** paga `+1` de **mochila** (o Aprendiz).
+Empilhar os dois na mesma zona apagaria a diferença entre as duas ausências. E os dois tetos são
+**calculados a cada consulta** (`limiteDeMao`/`limiteDeMochila`), nunca guardados — é o §5
+(*"capacidades são estado mutável, não constantes"*) valendo nas duas pontas.
+
+🔥 **Teto de mochila que ENCOLHE não apara: ele ABRE A QUEIMA** (decisão **#90**). Jogar a carta de
+classe leva o teto de **6 para 5 na mesma ação**; se a mochila estava em 6, a carta excedente entra
+na fila de deslocados (`motivo: 'mochilaEncolheu'`) e o jogo **pergunta** o que sai, com o mesmo menu
+de seis cartas e o mesmo verbo `queimarCarta` da #59/#80. **O jogo não escolhe por você** — e aparar
+automático reabriria em silêncio a decisão que a fatia `escolha do descarte` inteira existiu para
+fechar. 📊 Responde por **26,0%** das aberturas de queima em produção (#95).
 
 **Por que a mochila é aberta:** negociação online precisa de **bens verificáveis**. Com mochila
 fechada, "tenho uma armadura ótima aqui" é blefe grátis — online não existe a vergonha da mesa
@@ -222,18 +240,40 @@ Composto pela zona **em jogo**, que é **persistente entre turnos**:
 - **1 raça** + **1 classe** (padrão).
   - Raça = **uma passiva, não stats** (corrigido 2026-07-24 — ver `docs/game-design/mecanica-cartas.md` §5). Stats vêm dos **itens**. Isso mantém o **Humano** (sem carta de raça) jogável: jogar uma raça é **trocar generalismo por especialização**, não ganhar poder bruto de graça.
   - 🎭 **A carta não é a raça — é um ARTEFATO DE TRANSFORMAÇÃO, consumido no uso** (decisão #38): *"Pergaminho do Elfo"*, *"Pergaminho do Anão"*. Usá-lo transforma você naquela raça e **gasta o pergaminho**. **Por que isso importa e não é só nome:** o tom do jogo é **sério** (§1), e *"trocar de raça no meio da masmorra"* é incoerente numa ficção séria de um jeito que numa satírica não seria. O artefato conserta a troca **sem mexer na mecânica** — e explica de graça por que a carta anterior vai para o cemitério: ela foi **gasta**. ➡️ Sustenta a #37: uma mão com vários pergaminhos é **inventário**, não palha. ⚠️ **Nome de trabalho** — nomenclatura é a pergunta 1 do §18. ⚠️ **Modelagem a resolver quando for construída:** hoje a carta **fica** em `emJogo.raca`; no modelo do artefato ela é consumida e o que permanece em jogo é a **raça resultante** (mesma informação pública, modelo diferente).
-  - Classe = modificadores + **1 habilidade ativa + 1 passiva**.
-  - ⚙️ ✅ **O MOTOR JÁ SEGURA a passiva de classe — construído em 2026-08-06 (fatia `classe como
-    carta`, Plano A, decisão #87).** `criarCombate`/`proximoPasso` recebem `readonly
-    PassivaCombate[]` (N, não mais uma), compostas numa ordem **declarada**:
-    `aoCausarDano`/`aoSofrerDano` em cadeia, `aoFalharEsquiva` por curto-circuito. ⚠️ **Isto NÃO é a
-    classe virando carta** — nenhuma classe do catálogo declara passiva ainda (`passivasDoLutador`
-    monta o array só com a raça), e a ordem `raça → classe` continua **inexercitável** por carta
-    real até o **Plano B**. O motor está pronto para receber; a classe segue sendo `classeId`
-    resolvido do catálogo, não uma carta na mão.
-  - 🎓 **Quem está sem carta de classe em jogo é o APRENDIZ** (decisão #60) — o análogo exato do
-    Humano no eixo da raça. Não é um buraco nem um caso especial: é o estado nomeado de "não me
-    especializei", e a #56 é o que o paga.
+  - Classe = modificadores + **1 habilidade ativa + 1 passiva**. ✅ **Modificadores e passiva
+    CONSTRUÍDOS em 2026-08-08**; ⬜ a **habilidade ATIVA** continua fora do MVP (decisão #49).
+  - 🃏 ✅ **A CLASSE É CARTA DE PORTAIS desde 2026-08-08** (fatia `classe como carta`, Plano B,
+    decisões **#88–#94**) — ela é comprada no `vasculhar`, vai para a mão, e `jogarCarta` a põe em
+    `emJogo.classe` na fase `recompor`, mandando a classe anterior ao **cemitério de Portas**.
+    Gêmea exata da raça. 💀 Morreram com ela o `classeId`, o `escolhasSchema` e o construtor no
+    `web` (#94). **Três classes sacáveis** (o Aprendiz fica de fora pelo mesmo motivo do Humano):
+
+    | Classe | Modificadores | Passiva (#92) |
+    |---|---|---|
+    | **Guerreiro** | `forca +1`, `vida +5` | **Impacto** — quando **ele** ataca, o empate de esquiva não salva o defensor (gancho `aoEmpatarEsquiva`, novo) |
+    | **Ladino** | `habilidade +2`, `agilidade +1` | **Golpe Certeiro** — rolagem de ataque **≤ 2** (🎚️ dial) dobra o dano |
+    | **Mago de Fogo** | `forca +3`, **`vida −3`** | **Explosão** — o primeiro golpe do combate que conecta sai dobrado |
+
+    ⚠️ **O Mago é o primeiro modificador NEGATIVO do catálogo** (#91) — nasceu para pagar a dívida
+    de a receita-alvo do §11 pedir 3 classes/jogador com o catálogo tendo 2. **Ele NÃO exercita o
+    piso de stat**: a vida base é 10, e `10 − 3 = 7`.
+  - ⚙️ ✅ **O motor segura N passivas por combatente** (Plano A, decisão #87): `aoCausarDano`/
+    `aoSofrerDano` compõem em **cadeia**, `aoFalharEsquiva` e `aoEmpatarEsquiva` por
+    **curto-circuito**. A ordem é **`raça → classe`**, fixada por `passivasDoLutador`
+    (`packages/partida/src/mesa.ts`), não pelo motor. ✅ **Desde 2026-08-08 ela é EXERCITÁVEL por
+    carta real** — um Anão Guerreiro tem duas passivas —, e a dívida *"regra declarada sem
+    cobertura"* está **paga** (#92). ⚠️ A ordem em si continua **arbitrária**: o valor está em ser
+    determinada e testada, não em qual vem antes.
+  - 🎓 ✅ **Quem está sem carta de classe em jogo é o APRENDIZ** (decisão #60, **construído em
+    2026-08-08**) — o análogo exato do Humano no eixo da raça. Não é um buraco nem um caso
+    especial: é o estado nomeado de "não me especializei". **A compensação dele é `+1` de MOCHILA**
+    (6 em vez de 5, decisão **#89**, o que a #56 pedia) — eixo diferente do `+1` de mão do Humano,
+    de propósito. ⚠️ **Todo jogador NASCE Aprendiz**, então o teto 6 é o estado inicial da mesa; e
+    jogar a primeira carta de classe encolhe a mochila para 5, o que **abre a queima** se ela
+    estiver cheia (#90, regra no §4). 📊 **Medido: o Aprendiz é quase só o primeiro turno** —
+    **6,51%** dos assentos terminam a partida sem classe, e em 3 de cada 4 partidas ninguém termina
+    Aprendiz (N=480, #96). O bot que fica sem classe termina **~1,3 de força abaixo** do que se
+    especializa.
 - **5 slots de equipamento:** **Capacete · Armadura · Mão direita · Mão esquerda · Pés**.
   - Arma de **duas mãos** ocupa **os dois slots de mão**.
   - 🗡️ ✅ **CONSTRUÍDO em 2026-08-02 (fatia `afinidade`, decisões #71–#74). Itens podem ser
@@ -255,10 +295,14 @@ Composto pela zona **em jogo**, que é **persistente entre turnos**:
     `motivo` (`perdeuAfinidade`) **viaja na pendência** até a escolha, para o log dizer a razão
     certa. 📊 Este é o caminho que produz **12 de 12** das filas com ≥2 deslocados (#86) — trocar de
     raça pode derrubar vários exclusivos de uma vez, e cada um vira **sua própria pergunta**.
-  - ⬜ **O eixo `classe` existe no TIPO e nenhum item o declara** (#74). Não é buraco: é a metade da
-    mecânica que a fatia `classe como carta` herda pronta, e a promessa é travada por **teste
-    vermelho** (*"nenhum item do catálogo declara exclusividade de CLASSE"*), não por comentário —
-    o dia em que o primeiro nascer, o teste cai e obriga a decisão.
+  - ⬜ **O eixo `classe` existe no TIPO e nenhum item o declara** (#74) — **continua assim depois da
+    fatia `classe como carta`**, que estava fora do escopo dela por escrito. A promessa é travada
+    por **teste vermelho** (*"nenhum item do catálogo declara exclusividade de CLASSE"*), não por
+    comentário — o dia em que o primeiro nascer, o teste cai e obriga a decisão.
+    🔴 **E ele tem uma segunda cobrança agora:** é esta ausência que torna a fila de queima com ≥2
+    deslocados por `mochilaEncolheu` um **zero ESTRUTURAL** e não uma raridade medida (#96) — com
+    todos os 4 exclusivos sendo `eixo: 'raca'`, jogar classe **não pode** derrubar item por
+    afinidade. Quem criar o primeiro exclusivo por classe **abre esse caminho** e precisa testá-lo.
 
 ✅ **Implementado** (fatia 8, Plano 3a "Tesouros e o corpo"; ampliado pela fatia `afinidade` em
 2026-08-02): **12 itens** cobrindo os 5 slots (`packages/cartas/src/itens.ts`) — **8 comuns + 4
@@ -337,10 +381,16 @@ e a prova é esta linha: bastou **uma** fatia para a contagem de ontem virar men
     ⚠️ **São duas medidas com DENOMINADORES diferentes** — *"dos monstros iniciais, quantos são
     jogados?"* × *"dos usos do verbo, quantos gastam carta inicial?"*. Trocá-las já aconteceu duas
     vezes no relatório; não colapse as duas em *"~72%"* nem em *"~96%"*.
-  - ⬜ **O que ela NÃO desentupiu:** a carta de **raça** continua morrendo na mão em
-    **30,8%–36,1%** dos casos (N=480). Ela nunca esteve morta (sempre teve `jogarCarta`) e
-    `procurarEncrenca` recusa carta que não seja monstro — este é o resíduo que sobrou, e ele
-    **não reabre a pergunta 10 do §18**, fechada pelas #36/#37.
+  - ⬜ **O que ela NÃO desentupiu:** a carta de **raça** morre na mão. Ela nunca esteve morta
+    (sempre teve `jogarCarta`) e `procurarEncrenca` recusa carta que não seja monstro — este é o
+    resíduo que sobrou, e ele **não reabre a pergunta 10 do §18**, fechada pelas #36/#37.
+    🔴 **O número de 2026-08-01 (30,8%–36,1%, N=480) NÃO SE REPRODUZ** e não deve ser citado como
+    o valor de hoje: remedido em 2026-08-08 **na mesma rodada** que mediu a classe, deu **16,34%**
+    (294/1.799) para a raça e **14,09%** (195/1.384) para a classe (N=480, decisão **#96**).
+    ⚠️ **A divergência é sobre o BASELINE, não sobre a classe** — o harness de 2026-08-01 sumiu
+    (`.superpowers/sdd/` é gitignored) e não há como conferir se a definição era a mesma; o gêmeo
+    utilizável é o **controle interno**, nunca o número histórico. ⚠️ E **não** se escreve *"a
+    classe morre menos que a raça"*: z = 1,75, p ≈ 0,081, amostras **pareadas**.
   - ⚖️ **Escolher entre as duas é escolha de verdade, não formalidade:** o bot desta fatia
     procura encrenca em **86,1%–89,2%** das entradas na fase (14 amostras, 728 partidas) —
     `saquear` é a minoria, não a rota default.
@@ -553,8 +603,16 @@ do zero e ainda pegar o 2º lugar é exatamente o tipo de história que §14 que
   `MAO_INICIAL_PADRAO = 4`, `MAO_INICIAL_TESOUROS = 4`. Os 4 Tesouros existem para o jogador
   ter o que equipar já no primeiro turno — e a mesa nasce **exatamente no teto** (4+4=8 = limite
   do Humano); quem devolve a folga é equipar, não a caridade.
-- **Mochila: 5 itens**, aberta, fora do limite de mão. ✅ **Dial travado** (Plano 4a):
-  `LIMITE_MOCHILA = 5`. Item deslocado do corpo vai para a mochila se houver vaga; **com a mochila
+- **Mochila: 5 itens, +1 para quem não tem CLASSE em jogo** (→ **6**, o Aprendiz — decisão **#89**),
+  aberta, fora do limite de mão. ✅ **Dial travado** (Plano 4a): `LIMITE_BASE_DE_MOCHILA = 5`.
+  ⚠️ **A constante global `LIMITE_MOCHILA` MORREU em 2026-08-08** e virou `limiteDeMochila(jogador)`,
+  publicado em `JogadorPublico.limiteDeMochila` — o export saiu dos **dois** barris (`partida` e
+  `shared`), então o cliente **lê** o teto em vez de copiar a regra. É a gêmea exata de
+  `limiteDeMao`.
+  🔥 **Teto que ENCOLHE não apara — abre a queima** (decisão **#90**): jogar a carta de classe leva o
+  teto de 6 para 5 **na mesma ação**, e a carta excedente vira pergunta (`motivo:
+  'mochilaEncolheu'`), não lixo. Regra completa no §4.
+  Item deslocado do corpo vai para a mochila se houver vaga; **com a mochila
   cheia o jogo PERGUNTA** o que queimar — um menu de **seis** cartas (o deslocado + as cinco da
   mochila) resolvido pelo verbo `queimarCarta`, e a escolhida vai ao cemitério de Tesouros.
   ✅ **CONSTRUÍDO em 2026-08-03/06** (fatia `escolha do descarte`, #59 e #80–#84); revoga a
@@ -581,16 +639,31 @@ do zero e ainda pegar o 2º lugar é exatamente o tipo de história que §14 que
   escolheu (⚠️ a #36 escreveu *"38 / 38 / 23"*; a contagem certa é a da **#54**).
   ✅ **A `salaVazia` foi REMOVIDA DO CÓDIGO em 2026-07-30** — a nota antiga deste bullet
   (*"sai do jogo pela #42, mas ainda está em código"*) deixou de ser verdade.
-- ✅ **Composição de Portas em produção desde 2026-07-30** (decisão #52, números corrigidos pela
-  #54): `2× monstro + 1× raça` por jogador = **14 cartas/jogador**, **56 na mesa de 4** (antes:
-  **12 / 48**). Densidade **71,4% monstro / 28,6% raça** (antes: 41,7% monstro / 25% vazia /
-  **33,3% raça**). 🎚️ É **interina** porque a receita-alvo do #41 só é aplicável quando as quatro
+- ✅ **Composição de Portas em produção — TERCEIRO TERMO desde 2026-08-08** (decisão **#93**):
+  `2× monstro (5) + 1× raça sacável (4) + 1× classe sacável (3)` por jogador = **17 cartas/jogador**,
+  **68 na mesa de 4**. Densidade **58,8% monstro · 23,5% raça · 17,6% classe**.
+  ⚠️ **A queda da densidade de monstro (71,4% → 58,8%) NÃO foi compensada, de propósito**, e o
+  argumento é a **contagem ABSOLUTA** contra a receita-alvo abaixo, não a porcentagem: o alvo é
+  escrito **por jogador** (monstros 11 · classes 3 · pergaminhos de raça 3), a porcentagem caiu
+  porque o **denominador** cresceu, e o numerador de monstro (10/jogador) continua onde estava —
+  **abaixo** do alvo. Girar `copiasPorMonstro` para "consertar os 58,8%" afastaria do alvo a família
+  que já está mais perto dele. ✅ **E a dívida de entrada da fatia está PAGA:** com a terceira classe
+  (#91), `copiasPorClasse = 1` entrega exatamente os **3** que a receita-alvo pede.
+  ⚠️ **Composição ANTERIOR, para quem citar medição velha:** `2× monstro + 1× raça` = 14/jogador,
+  **56** na mesa (decisão #52/#54), densidade **71,4% / 28,6%** — e antes disso 41,7% monstro /
+  25% vazia / **33,3% raça**. 🎚️ É **interina** porque a receita-alvo do #41 só é aplicável quando as quatro
   famílias que faltam existirem em código. ✅ Efeito colateral bom, medido no código antes de
   decidir: o cemitério de Portas é alimentado por `monstro` e (antes) `salaVazia`, nunca por
   `raca` (que vai para a mão) — a alimentação subiu de **66,7% para 71,4%** das portas compradas,
   então o baralho de Portas recicla **mais**, e o colapso que secou o de Itens **não tem análogo
   aqui**. 📊 Medido depois do corte, 80 partidas com dials de produção: monte **e** cemitério de
   Portas ambos vazios = **zero em 80 partidas** (não *"não acontece"* — ver #55 e #53).
+  🔴 **Os 71,4% de alimentação CAÍRAM para 58,8% em 2026-08-08** (#93): a carta de classe, como a de
+  raça, vai para a **mão** e não alimenta o cemitério. O argumento do bullet **não cai** — 58,8%
+  ainda é muito acima de zero, e a decisão **#62** (o baralho de Portas nunca acaba) continua sendo
+  regra. ⚠️ **Mas o "zero em 604 partidas" de beco sem saída (#66) NÃO foi remedido nesta fatia** —
+  nenhum predicado de baralho foi avaliado por ação no soak de 2026-08-08. O que existe é evidência
+  **indireta** (o `Error` cru de `tirarDoTopo` daria 500 e deu **zero em 960 partidas**).
 - 🔴 **A caridade de TESOURO NÃO voltou com o corte da `salaVazia`: zero em 80 partidas**
   (decisão #55). A justificativa **(2)** da #42 (*"devolve pressão de mão, e isso ressuscita a
   caridade"*) **não se cumpriu na métrica que nomeou** — o número continua onde o Plano 4a já o
@@ -634,8 +707,8 @@ do zero e ainda pegar o 2º lugar é exatamente o tipo de história que §14 que
   número de cartas efetivamente pagas por `loot` **dobrou** (≈815 → ≈1642 por 80 partidas).
   🔴 **Alívio não é conserto, e esta linha existe para não deixar confundir os dois.**
 - ✅ **RECEITA-ALVO DO MVP: 168 cartas na mesa de 4** (decisão #41) — ancorada no Munchkin base,
-  que tem 168 (95 Portas + 73 Tesouros). **Hoje temos 104: 56 Portas + 48 Tesouros** (recontado a
-  partir do código em 2026-08-02). 🎚️ Dial, e **ainda não aplicável**: cita quatro famílias que não
+  que tem 168 (95 Portas + 73 Tesouros). **Hoje temos 116: 68 Portas + 48 Tesouros** (recontado a
+  partir do código em 2026-08-08; era 104 = 56 + 48 até a fatia `classe como carta`). 🎚️ Dial, e **ainda não aplicável**: cita quatro famílias que não
   existem em código. Cada fatia que construir uma família move a receita real na direção dela.
   ⚠️ **Esta linha dizia "84" e o número não fecha com nenhuma composição que ele poderia estar
   descrevendo:** quando foi escrito (2026-07-29) o baralho era 48 Portas + 32 Tesouros = **80**, e
@@ -654,14 +727,22 @@ do zero e ainda pegar o 2º lugar é exatamente o tipo de história que §14 que
   | Maldições | 4 | Carta de combate | 5 |
   | Modificadores de monstro | 3 | Instantâneo | 4 |
   | Pergaminhos de raça | 3 | **consumível** | **50%** ✅ |
-  | Classes | 3 | | |
+  | **Classes** | **3** ✅ **ATINGIDA em 2026-08-08** (#93) | | |
 
-  Split **57,1% / 42,9%** (Munchkin: 56,5/43,5). 🎯 **Raça cai dos 28,6% de hoje** (composição
-  interina pós-corte da `salaVazia`, decisões #52/#54 — a base foi citada como 38% por erro
-  aritmético, corrigido pela decisão #54) **para os 12,5% desta receita-alvo do baralho de
-  Portas** — é a pergunta 10 se resolvendo numa linha de receita.
+  Split **57,1% / 42,9%** (Munchkin: 56,5/43,5). 🎯 **Raça cai dos 23,5% de hoje para os 12,5% desta
+  receita-alvo do baralho de Portas** — é a pergunta 10 se resolvendo numa linha de receita.
+  ⚠️ Este número já foi **28,6%** (composição interina pós-corte da `salaVazia`, #52/#54) e antes
+  disso foi citado como 38% por erro aritmético, corrigido pela #54.
+  ✅ **A classe é a PRIMEIRA família a bater o número dela** — 3 por jogador, exatamente. As outras
+  duas construídas seguem fora: monstro **10** contra 11, pergaminho de raça **4** contra 3.
 - ✅ **Pisos de variedade do catálogo, 🎚️ dials** (decisão #39): monstros **11**, raças **5**,
-  equipamento **15**, classes ⬜ (dependem de habilidades entrarem no MVP).
+  equipamento **15**, classes ⬜.
+  ⚠️ **O piso de CLASSES continua ⬜ mesmo com a classe construída** — a #39 o condicionava a
+  *"habilidades entrarem no MVP"*, e a **habilidade ATIVA continua fora** (#49). O que a fatia
+  `classe como carta` fixou foi a **receita** (3 cartas/jogador, #93), não o **piso de catálogo**:
+  hoje são **3 classes sacáveis** + o Aprendiz, e nada diz que 3 é suficiente. 🔑 São duas perguntas
+  diferentes — *quantas cartas no baralho* × *quantas classes distintas existem* —, e a #39 nasceu
+  justamente para separá-las.
 
 ---
 
@@ -840,8 +921,8 @@ Copiamos a *ideia mecânica*, nunca a *expressão*.
 | 1 | ✅ **Plano 4b — `encrenca`** — **CONSTRUÍDO em 2026-08-01 e MERGEADO** (gate ocular fechado pelo Pedro em 2026-08-02) | os verbos `procurarEncrenca` e `saquear`, e o bot que avalia o combate (#63). **Última peça ESTRUTURAL da fatia 8** — o §6 do bible e o `Fase` do código passam a ter as **mesmas seis fases**. Medido nas decisões #65–#68 | ✅ |
 | — | ✅ **`afinidade`** (desenho: #56–#58, #61) — **CONSTRUÍDA em 2026-08-02** | itens **exclusivos** com valor cheio × reduzido, o guard do equipar, e o item caindo quando a troca de raça o proíbe. **12 itens no catálogo** (8 comuns + 4 exclusivos) e o baralho de Tesouros de 32 → 48. Spec: `2026-07-31-afinidade-de-itens-design.md`. Medida e registrada nas decisões **#71–#79** | ✅ |
 | — | ✅ **`escolha do descarte`** (decisão #59) — **CONSTRUÍDA em 2026-08-03/06** (spec `2026-08-03-escolha-do-descarte-design.md`; a forma nas **#80–#84**, os números medidos nas **#85–#86**) | com a mochila cheia o jogo **pergunta** o que queimar, em **todo** desequipamento — um menu de **seis** cartas resolvido pelo verbo `queimarCarta` (#80). **Revoga a decisão #8 do spec da fatia 8.** Traz a **3ª pendência** do jogo — estado novo, verbo novo, e o bot que sabe respondê-la (#83). ✅ **Gate ocular fechado pelo Pedro em 2026-08-06**, com o escopo do que ele cobriu escrito no `CLAUDE.md` — conferência do núcleo em partida real, **não** o roteiro de 5 itens um a um | ✅ |
-| — | **`classe como carta`** (decisão #60) | a classe entra pelo baralho, o **Aprendiz** é a ausência, e morrem `classeId`, o `escolhasSchema`, a rota `/duelo` e o construtor no `web` | ✅ |
-| 2 | **Maldições / Bad Stuff** | a 1ª carta que **mira outro jogador**, + a **morte/evacuação** do §10 — que é o **conserto da economia** (#46) | ✅ |
+| — | ✅ **`classe como carta`** (decisão #60) — **CONSTRUÍDA em dois planos: A em 2026-08-06 (#87) e B em 2026-08-08 (#88–#97)** | a classe entra pelo baralho (17/jogador, 68 na mesa), o **Aprendiz** é a ausência com `+1` de mochila, as três classes ganham **passiva de combate**, e morreram `classeId`, o `escolhasSchema`, a rota `/duelo` e o construtor no `web`. 🔴 **Gate ocular do Pedro PENDENTE** — roteiro de 6 itens no `CLAUDE.md`, nenhum conferido ainda | ✅ |
+| 2 | ⏭️ **Maldições / Bad Stuff** — **A PRÓXIMA** | a 1ª carta que **mira outro jogador**, + a **morte/evacuação** do §10 — que é o **conserto da economia** (#46). 📌 É ela que finalmente encara a **pergunta 11**: nenhum consumível existe em código, e eles nascem aqui | ✅ |
 | 3 | **Frontend animado** | a mesa desenhada + playback do turno alheio, 1x/2x (#35) | ✅ |
 | 4 | **Online** | socket.io, salas, humanos no lugar dos bots. **O domínio não muda** | ✅ |
 | 5 | **Interferência** | janelas A/B + contratos no server + **motor para N** (#33) + `carta de combate` e `instantâneo` | ✅ §12: *"requisito estrutural, não item adiável"* |
@@ -943,7 +1024,7 @@ e a **12** (a contradição da #21 → #29). A **13** (onde entra o frontend ani
 
 | # | Pergunta | Seção |
 |---|---|---|
-| 1 | Título do jogo e nomes próprios (guilda, patentes, monstros, cartas) | §1, §2, §16 |
+| 1 | Título do jogo e nomes próprios (guilda, patentes, monstros, cartas). 📌 **Nota de ficção acrescentada em 2026-08-08, ao nascer o Mago de Fogo (#91):** `forca` é o stat de **DANO** (`dano = level + forca`), não "musculatura" — mas o **nome** carrega a leitura física, e *"Mago com +3 de força"* lê estranho num jogo de tom **sério** (§1). A mecânica está certa (o feitiço é o dano do mago); é o **vocabulário** que aperta, e ele não foi trocado agora de propósito — renomear um stat do `Combatente` toca motor, cartas, `shared` e tela, e nomenclatura tem sessão própria. ➡️ Candidatos óbvios: `poder`, `potencia`, `dano`. **Decidir junto com o resto dos nomes, não isolado** | §1, §2, §16 |
 | 2 | ✅ **Resolvido:** cadeia de desempate definida (§3). ⬜ Falta só como exibi-la na UI | §3 |
 | 5 | ⬜ **Parcialmente resolvido:** o **modificador de monstro** existe e é família de Portas (decisão #30). Continua aberto se há uma categoria-lixeira de "outras Portas" (no Munchkin: Intervenção Divina, Monstro Errante, Ilusão…) | §4, §6 |
 | 6 | Vocabulário exato da oferta de contrato (fatias de loot, item à escolha) | §8 |
@@ -952,9 +1033,9 @@ e a **12** (a contradição da #21 → #29). A **13** (onde entra o frontend ani
 | 9 | Todo o meta-jogo off-game (ranking, skins, perfil, clãs, conquistas, amigos) | §15 |
 | 16 | ⬜ **Como a concorrência da maldição resolve na fase `jogar`?** A decisão #47 permite amaldiçoar na `jogar` de **qualquer** jogador — a **primeira concorrência** de um jogo que hoje é estritamente por turnos. Ou a fase espera todo mundo decidir (custo de ritmo, §12), ou quem não clicou a tempo **perde a janela** (custo de justiça, e reabre a pergunta 14). Não decidido — vai para a fatia de Maldições/Bad Stuff | §6, §12 |
 | 15 | ⬜ **Um `instantâneo` que dá +vida no meio do combate CURA, ou só levanta o teto?** §5 diz *"vida reseta a cada combate"*, e a decisão #44 põe a carta a ser jogada **com o combate em curso** — o que torna a pergunta inevitável e não respondida. São dois jogos diferentes: curar transforma o instantâneo em plano de sobrevivência; levantar o teto o torna quase inútil depois do primeiro golpe | §5, §7 |
-| 17 | 🔴 **A ORDEM DO ASSENTO decide a partida hoje, e ninguém decidiu isso.** Medido em 2026-08-01 com os **quatro assentos rodando exatamente a mesma política**: **#0 vence 40,6% · #1 26,6% · #2 20,0% · #3 12,8%** (n=320; χ² = 53,78 com df=3, p < 10⁻¹⁰; tendência z = −7,20; #0 × #3 z = 7,36). Num jogo **competitivo ranqueado** (§1, §3), *"quem senta primeiro vence 3× mais que quem senta por último"* é problema de produto, não curiosidade. ⚠️ **O que está estabelecido é a ponta, não a escada:** os degraus do **meio** **não** são individualmente significativos (**#1−#2** z = 1,73; **#2−#3** z = 2,26, marginal); só o **#0−#1** é (z = 3,12). Uma das 4 rodadas ainda inverteu #1 e #2 — não cite "41/27/20/13" como escada medida. ⚠️ **NÃO se sabe se esta fatia causou ou piorou isso:** não existe medição de gradiente anterior a esta (a sonda é nova), e a fatia mudou duas coisas juntas (`encrenca` + o bot da #63). É **hipótese**, não achado causal — ver #68. **O que fecharia:** rodar o mesmo script contra o commit anterior à fatia num `git worktree`, comparando **distribuições por assento**, não taxas agregadas | §3, §9, §12 |
-| 18 | 🎚️ **A `MARGEM_DE_ENCRENCA` (1,2) está FROUXA — está MEDIDO, e o Pedro decidiu NÃO girá-la agora (decisão #69).** Três números independentes sustentam a leitura, todos do fechamento do gate do Plano 4b (5 rodadas de 80 partidas, dials de produção, dado e embaralho reais): **(a) ela quase não morde** — reprova **5,5%–7,4%** dos candidatos individuais e produz recusa em **~1,1% das entradas** com monstro na mão (**7/707** e **8/672**, R4/R5); **(b) o ganho ex-post é modesto** — o bot perde **8,69%** das lutas que ele mesmo ESCOLHEU (**236/2717**) contra **11,46%** das FORÇADAS pelo `vasculhar` (**919/8019**, grupo de controle, empoçado **R2–R5, N=320 partidas**): a diferença é real (**z = 4,03**) mas vale só **1,32×**, e ele ainda perde **1 em cada 12** lutas que julgou favoráveis; **(c) a curva do dial põe 1,2 no fundo plano da escala** — % das entradas com monstro na mão que virariam recusa, **R4/R5 (N=160)**: **1,2 → 0,99% / 1,19%** · **1,5 → 4,81% / 4,46%** · **2,0 → 15,42% / 14,58%** · **3,0 → 36,92% / 35,42%**. Ir a **1,5** multiplicaria a recusa por ~4 sem tornar o bot medroso. ⚠️ **O que NÃO está quebrado, e precisa ser lido junto:** **ex-ante deu zero em 3.421 aceites** com desvantagem (N=400) — o bot **nunca** aceita luta que a própria fórmula diz que perde, e a menor razão observada num aceite foi **1,33**. O que a margem paga é a fórmula ser otimista **de propósito** (ignora esquiva e passivas de raça — #63), e **1,2 paga pouco**. 📌 **Nota de método:** as **recusas** saem da `escolherAcao` real; os itens (a) e (c) usam uma **cópia** da fórmula (ela é privada em `bot.ts`), **verificada** contra a política real (a curva previu 7 e 8 recusas em duas rodadas e a política produziu 7 e 8); o item (b) **não usa fórmula nenhuma**. **O que fecharia:** girar a margem numa fatia em que ela seja a **única** variável, remedindo força final dos bots, taxa de vitória e derrota ex-post nas lutas escolhidas — hoje isso é impossível de ler, porque a `encrenca` e o bot da #63 entraram **juntos** (ressalva-mãe da sessão de 2026-08-01) | §6, §13 |
-| 19 | 🔴 **CARTA PROIBIDA GUARDADA NA MOCHILA FICA PRESA ATÉ O FIM DA PARTIDA, e ninguém decidiu se isso é aceitável.** Medido em 2026-08-02 (fatia `afinidade`): **8,0–8,1 cartas presas por mesa de 4** no fim da partida (dispersão real por rodada **7,8–8,2**; **N=480** no baralho de produção; **zero em 480** no controle de 8 ids, que é zero **estrutural** — não há exclusivo lá). São ~2 por jogador contra um `LIMITE_MOCHILA` de **5**: ≈**40% da capacidade de mochila da mesa** ocupada por carta que nunca vai sair. ⚠️ **NÃO é bug, e a distinção é o ponto:** `guardarCarta` **corretamente não tem guard de afinidade** — guardar um exclusivo de outra raça é jogada legítima para quem pretende trocar de raça depois. O que fecha a armadilha é a soma de **duas** coisas: (1) o fallback de guardar do bot (`bot.ts:251`, `vista.suaMao.find((c) => c.tipo === 'equipamento')`) **não olha afinidade**, e (2) **mochila → mão não existe** nesta fatia. Para um bot, uma vez presa, presa para sempre. 🔴 **NÃO foi corrigido de propósito:** girar a política do bot no fechamento desta fatia seria a **TERCEIRA** variável dela, que é literalmente o erro catalogado pelas #24/#25 e repetido pela #51 — e recusado pela #69 uma fatia atrás. **A leitura é do Pedro.** As saídas candidatas são de famílias diferentes e não se substituem: **(a)** ensinar o bot a não guardar proibido (política, barato, não muda regra); **(b)** o verbo **mochila → mão**, que já está adiado para a fatia da interferência (regra nova); **(c)** aceitar como custo de desenho — a mochila entulhada É a punição por guardar o que não se pode vestir | §5, §11, §13 |
+| 17 | 🔴 **A ORDEM DO ASSENTO decide a partida hoje, e ninguém decidiu isso.** Medido em 2026-08-01 com os **quatro assentos rodando exatamente a mesma política**: **#0 vence 40,6% · #1 26,6% · #2 20,0% · #3 12,8%** (n=320; χ² = 53,78 com df=3, p < 10⁻¹⁰; tendência z = −7,20; #0 × #3 z = 7,36). Num jogo **competitivo ranqueado** (§1, §3), *"quem senta primeiro vence 3× mais que quem senta por último"* é problema de produto, não curiosidade. ⚠️ **O que está estabelecido é a ponta, não a escada:** os degraus do **meio** **não** são individualmente significativos (**#1−#2** z = 1,73; **#2−#3** z = 2,26, marginal); só o **#0−#1** é (z = 3,12). Uma das 4 rodadas ainda inverteu #1 e #2 — não cite "41/27/20/13" como escada medida. ⚠️ **NÃO se sabe se esta fatia causou ou piorou isso:** não existe medição de gradiente anterior a esta (a sonda é nova), e a fatia mudou duas coisas juntas (`encrenca` + o bot da #63). É **hipótese**, não achado causal — ver #68. **O que fecharia:** rodar o mesmo script contra o commit anterior à fatia num `git worktree`, comparando **distribuições por assento**, não taxas agregadas. 📊 **REMEDIDO em 2026-08-08** (decisão **#97**, N=480, mesa e dials de produção): **#0 30,6% · #1 27,1% · #2 22,9% · #3 19,4%** (χ² = 13,82, df=3, **p = 0,0032**). ⚠️ **E o recorte por política desarma o cherry-pick antes que alguém o faça:** dentro da política `bot` isolada (N=240) a distribuição **NÃO é significativa** (χ² = 4,60, **p = 0,20**) e o **#1 fica ACIMA do #0**. 🔴 **Nada nessa medição diz que a fatia `classe como carta` causou, aumentou ou DIMINUIU o gradiente** — não há medição pareada contra o commit pré-fatia, e comparar 2026-08-01 com 2026-08-08 move **cinco** mudanças de mesa e os quatro assentos juntos. A pergunta segue **aberta e sem decisão do Pedro** | §3, §9, §12 |
+| 18 | 🎚️ **A `MARGEM_DE_ENCRENCA` (1,2) está FROUXA — está MEDIDO, e o Pedro decidiu NÃO girá-la agora (decisão #69).** Três números independentes sustentam a leitura, todos do fechamento do gate do Plano 4b (5 rodadas de 80 partidas, dials de produção, dado e embaralho reais): **(a) ela quase não morde** — reprova **5,5%–7,4%** dos candidatos individuais e produz recusa em **~1,1% das entradas** com monstro na mão (**7/707** e **8/672**, R4/R5); **(b) o ganho ex-post é modesto** — o bot perde **8,69%** das lutas que ele mesmo ESCOLHEU (**236/2717**) contra **11,46%** das FORÇADAS pelo `vasculhar` (**919/8019**, grupo de controle, empoçado **R2–R5, N=320 partidas**): a diferença é real (**z = 4,03**) mas vale só **1,32×**, e ele ainda perde **1 em cada 12** lutas que julgou favoráveis; **(c) a curva do dial põe 1,2 no fundo plano da escala** — % das entradas com monstro na mão que virariam recusa, **R4/R5 (N=160)**: **1,2 → 0,99% / 1,19%** · **1,5 → 4,81% / 4,46%** · **2,0 → 15,42% / 14,58%** · **3,0 → 36,92% / 35,42%**. Ir a **1,5** multiplicaria a recusa por ~4 sem tornar o bot medroso. ⚠️ **O que NÃO está quebrado, e precisa ser lido junto:** **ex-ante deu zero em 3.421 aceites** com desvantagem (N=400) — o bot **nunca** aceita luta que a própria fórmula diz que perde, e a menor razão observada num aceite foi **1,33**. O que a margem paga é a fórmula ser otimista **de propósito** (ignora esquiva e passivas de raça — #63), e **1,2 paga pouco**. 📌 **Nota de método:** as **recusas** saem da `escolherAcao` real; os itens (a) e (c) usam uma **cópia** da fórmula (ela é privada em `bot.ts`), **verificada** contra a política real (a curva previu 7 e 8 recusas em duas rodadas e a política produziu 7 e 8); o item (b) **não usa fórmula nenhuma**. **O que fecharia:** girar a margem numa fatia em que ela seja a **única** variável, remedindo força final dos bots, taxa de vitória e derrota ex-post nas lutas escolhidas — hoje isso é impossível de ler, porque a `encrenca` e o bot da #63 entraram **juntos** (ressalva-mãe da sessão de 2026-08-01). 🔴 **ATUALIZAÇÃO 2026-08-08 — a margem ficou MAIS FROUXA, e por dedução do código, não por medição nova.** A #63 declara que `rodadasParaMatar` é **otimista de propósito**: ela ignora esquiva **e passivas**, e a `MARGEM_DE_ENCRENCA` existe para pagar esse otimismo. A fatia `classe como carta` acrescentou **uma segunda passiva por combatente** (#92) — o lutador agora pode ter raça **e** classe —, então há **mais** efeito de combate fora da fórmula e a mesma margem de 1,2 paga **menos** do que já pagava pouco. ⚠️ **Isto NÃO foi medido:** o soak de 2026-08-08 não instrumentou recusas nem derrota ex-post, e `rodadasParaMatar`/`MARGEM_DE_ENCRENCA` continuam **privados** de `bot.ts`. É consequência lida no código, e o que fecharia o dial continua sendo o que já estava escrito acima — com **uma variável a mais** para isolar agora | §6, §13 |
+| 19 | 🔴 **CARTA PROIBIDA GUARDADA NA MOCHILA FICA PRESA ATÉ O FIM DA PARTIDA, e ninguém decidiu se isso é aceitável.** Medido em 2026-08-02 (fatia `afinidade`): **8,0–8,1 cartas presas por mesa de 4** no fim da partida (dispersão real por rodada **7,8–8,2**; **N=480** no baralho de produção; **zero em 480** no controle de 8 ids, que é zero **estrutural** — não há exclusivo lá). São ~2 por jogador contra um `LIMITE_MOCHILA` de **5**: ≈**40% da capacidade de mochila da mesa** ocupada por carta que nunca vai sair. ⚠️ **NÃO é bug, e a distinção é o ponto:** `guardarCarta` **corretamente não tem guard de afinidade** — guardar um exclusivo de outra raça é jogada legítima para quem pretende trocar de raça depois. O que fecha a armadilha é a soma de **duas** coisas: (1) o fallback de guardar do bot (`bot.ts:251`, `vista.suaMao.find((c) => c.tipo === 'equipamento')`) **não olha afinidade**, e (2) **mochila → mão não existe** nesta fatia. Para um bot, uma vez presa, presa para sempre. 🔴 **NÃO foi corrigido de propósito:** girar a política do bot no fechamento desta fatia seria a **TERCEIRA** variável dela, que é literalmente o erro catalogado pelas #24/#25 e repetido pela #51 — e recusado pela #69 uma fatia atrás. **A leitura é do Pedro.** As saídas candidatas são de famílias diferentes e não se substituem: **(a)** ensinar o bot a não guardar proibido (política, barato, não muda regra); **(b)** o verbo **mochila → mão**, que já está adiado para a fatia da interferência (regra nova); **(c)** aceitar como custo de desenho — a mochila entulhada É a punição por guardar o que não se pode vestir. ⚠️ **NÃO tocada na fatia `classe como carta` (2026-08-08), e nem remedida** — mas **uma premissa do texto acima envelheceu**: o `LIMITE_MOCHILA` constante **não existe mais** (virou `limiteDeMochila(jogador)`, #89), então o denominador *"~2 presas por jogador contra um teto de 5"* passa a ser **5 ou 6** conforme a classe esteja em jogo. Como **93,5% dos assentos terminam com classe** (#96), o **5** continua sendo o teto do fim de partida na esmagadora maioria dos casos, e a leitura *"≈40% da capacidade"* **não muda materialmente** — mas quem for remedir tem que ler o teto do estado, nunca de uma constante | §5, §11, §13 |
 | 14 | ⚠️ **O playback pode virar vantagem competitiva por preferência de UI.** Se a janela de interferência tiver timer e o playback atrasar a janela, quem assiste a **1x reage com menos tempo** que quem assiste a **2x** — num jogo **ranqueado**. A regra candidata é *"playback nunca atrasa janela interativa: ela abre em tempo real para todos, e quem está atrás no replay é cortado para o presente"*, mas ela **não foi decidida** — foi adiada junto com a #35 | §7, §12 |
 
 ### ✅ Pergunta 10 — RESOLVIDA em 2026-07-29 (decisões #36 e #37). Registro do raciocínio
@@ -1272,3 +1353,80 @@ por **mutação dirigida nos TRÊS ganchos** de `PassivaCombate` (`aoCausarDano`
   sessão com duas mutações extras, direto nos ganchos: as duas falharam como esperado, com diff
   completo no evento afetado — os 3 ganchos que `PassivaCombate` tem hoje ficaram, todos, com
   mutação dirigida e falha confirmada.
+
+### Sessão de 2026-08-07/08 — o Plano B: a classe entra pelo baralho, e o topo da tela SAIU
+
+**O Plano B está construído** (branch `feat/classe-como-carta-plano-b`, 14 tasks — 12 de código, uma
+de soak e esta de documentação —, **659 testes verdes** (motor 56 · cartas 50 · personagem 11 ·
+partida 332 · shared 22 · server 29 · web 159), typecheck 7/7, lint limpo). Com ele a fatia
+`classe como carta` (**#60/#61**) **fecha**: o **Plano A** (#87) pôs o motor para segurar N passivas;
+o Plano B põe a carta no baralho, dá passiva às três classes sacáveis, compensa o Aprendiz e demole
+o construtor da fatia 2. É o pedido do Pedro de **2026-07-31**, três fatias depois.
+
+🔴 **O gate ocular do Pedro NÃO foi rodado quando estas linhas foram escritas.** O roteiro (6 itens,
+cada um com a frequência esperada declarada) está no `CLAUDE.md`, e **nenhum item foi conferido**.
+Esta seção descreve o que foi **construído e medido**, não o que foi observado por um humano na tela.
+
+| # | Decisão | Porquê |
+|---|---|---|
+| 88 | **A CLASSE VIRA CARTA DE PORTAIS, e quem está sem classe em jogo é o APRENDIZ** — a #60 executada. `ZonaEmJogo.classe` nasce como gêmea de `ZonaEmJogo.raca`; `jogarCarta` passa a aceitar `'raca'` **ou** `'classe'` em `recompor`, e a classe anterior vai ao **cemitério de Portas**, como a raça. 💀 **Morreram junto:** `JogadorNaMesa.classeId`, `EntradaJogador.classeId` e o `escolhasSchema` (que ficou **vazio** — `POST /api/partida` recebe `{}`) | O `classeId` era a última coisa que obrigava a tela a ter um construtor, e a #60 já tinha decidido o destino. 🔑 **O modelo mental que resolveu quase toda a task de refactor:** *onde o código diz `raca`, pergunte se a `classe` precisa da mesma linha* — a simetria com a raça é o que fez o caminho da carta (vasculhar → mão → `jogarCarta` → zona → cemitério) nascer sem regra nova. ⚠️ **Uma assimetria FICOU, de propósito:** a tela renderiza a classe **sempre**, inclusive ausente (*"Aprendiz"*), enquanto a raça só aparece quando existe — porque o Aprendiz **tem efeito visível** (a #89) e *"nada escrito"* não comunicaria isso |
+| 89 | **A compensação do Aprendiz é `+1` DE MOCHILA (6 em vez de 5)** — eixo **diferente** do Humano, de propósito. `LIMITE_MOCHILA` (constante global, lida pelo cliente via `shared`) morreu e virou `limiteDeMochila(jogador)`, publicado em `JogadorPublico.limiteDeMochila` | O Humano (ausência de raça) já paga `+1` de **mão** (§11). Repetir o mesmo bônus no eixo da classe empilharia dois `+1` na mesma zona e apagaria a diferença entre as duas ausências. Mochila é o eixo natural da classe porque a especialização é o que faz o corpo valer mais que o estoque: *"sem escola, carrega mais do que veste"*. 🔑 **Efeito estrutural que vale além do dial:** o teto deixou de ser constante e virou **função do estado**, que é o que o §5 sempre exigiu (*"capacidades são estado mutável, não constantes"*) — e o export sumiu dos **dois** barris, então nenhuma cópia da regra sobreviveu no cliente |
+| 90 | 🔴 **O TETO DA MOCHILA QUE ENCOLHE ABRE A QUEIMA — o jogador escolhe o que sai, o jogo não apara.** Jogar a carta de classe leva o teto de **6 para 5 na mesma ação**; se a mochila estava em 6, a última carta dela entra na fila de deslocados (`motivo: 'mochilaEncolheu'`, novo) e a **pendência de queima** abre, com o mesmo menu de seis e o mesmo verbo `queimarCarta` | Achado por revisão durante a execução (a task tornou o teto **reversível para baixo** sem querer) e fechado como **ruling do Pedro**, com três argumentos: **(1)** o jogo **já** responde teto que encolhe forçando a largar — `limiteDeMao` encolhe **8→7** quando uma raça entra, e a fase `descartar` é o mecanismo desse aperto; a mochila passa a se comportar como a mão; **(2)** aparar automático seria **o jogo escolhendo por você**; **(3)** a **#59** já proíbe o descarte automático com a mochila cheia, e aparar aqui seria a mesma coisa com outro nome — reabriria em silêncio uma decisão que custou uma fatia inteira para fechar. ⚠️ **NÃO é caso de borda:** em produção **todo jogador nasce Aprendiz**, então a primeira carta de classe jogada é o caminho **normal**. 🔴 **Invariante que o conserto não podia quebrar:** `QueimaPendente.deslocados` é **tupla NÃO-VAZIA** de propósito, para que *"pendência aberta sem carta a resolver"* seja irrepresentável — a mochila só pode exceder por **exatamente 1**, e a aritmética disso foi conferida em revisão, não lida. 📊 **E a regra NÃO é morta:** `mochilaEncolheu` responde por **26,0%** das aberturas de queima (232 de 893, N=480 — ver #95) |
+| 91 | **Nasce o MAGO DE FOGO — a terceira classe sacável, e o PRIMEIRO modificador NEGATIVO do catálogo** (`{ forca: +3, vida: −3 }`) | O catálogo tinha **2** classes (Guerreiro, Ladino) e a receita-alvo do §11 pede **3 cartas de classe por jogador**: com *"1 cópia por classe sacável"* (#60) a receita-alvo **não era construível** — dívida que a fatia já nascia carregando (ver §17). A terceira classe a paga (ver #93). 🔑 **O valor extra é o sinal negativo:** todo modificador do catálogo era `≥ 0`, então *"o que acontece quando um stat é empurrado para baixo?"* nunca tinha sido exercitado por carta real. ⚠️ **NÃO escreva que ele exercita o `PISO = 1` de `montarCombatente`** — a vida base é **10** e `10 − 3 = 7`, longe do piso; quem exercita o piso continua sendo **dublê de teste**, e confundir os dois é afirmar cobertura que não existe |
+| 92 | **AS TRÊS CLASSES SACÁVEIS TRAZEM PASSIVA DE COMBATE, e nasce o gancho `aoEmpatarEsquiva`** — Impacto (Guerreiro: quando **ele** ataca, o empate de esquiva não salva o defensor) · Golpe Certeiro (Ladino: rolagem de ataque **≤ 2** dobra o dano) · Explosão (Mago de Fogo: o primeiro golpe que conecta sai dobrado). O gancho novo compõe por **curto-circuito** — a primeira passiva que diz *"o empate não salva"* vence | 🔑 **É esta decisão que torna a #87 real:** a ordem `raça → classe` era regra **declarada e SEM COBERTURA POSSÍVEL** (`passivasDoLutador` devolvia no máximo um elemento, então qualquer teste dela seria vazio). Agora um jogador pode ter **duas** passivas por carta de verdade, e o teste que prende a ordem usa dublês **não comutativos** (a raça SOMA, a classe DOBRA), com trava dupla: o orçamento de dados esgota na ordem invertida **e** a asserção de dano distingue os dois resultados. ⚠️ **`aoEmpatarEsquiva` é gancho, não regra nova de combate:** o empate continua favorecendo o defensor por padrão (§ Combate) — o que a passiva faz é **anular esse favorecimento**, e só para quem a carrega. ⚠️ A ordem `raça → classe` continua **arbitrária** (#87): o valor está em ser determinada e testada |
+| 93 | **A composição de Portas ganha o TERCEIRO termo: `1× por classe sacável`.** `2× monstro (5) + 1× raça sacável (4) + 1× classe sacável (3)` = **17 cartas por jogador**, **68 na mesa de 4** (antes: 14 / 56). Densidade **58,8% monstro · 23,5% raça · 17,6% classe** (antes: 71,4% / 28,6%). Com os 48 Tesouros, a mesa conserva **116 cartas** | ✅ **A dívida de entrada da fatia está PAGA:** a receita-alvo do §11 pede **3 classes por jogador**, e com a terceira classe (#91) o `copiasPorClasse = 1` entrega exatamente **3**. 🔑 **A densidade NÃO foi compensada de propósito, e o argumento é a contagem ABSOLUTA, não a porcentagem:** a receita-alvo do #41 é escrita **por jogador** (monstros 11 · classes 3 · pergaminhos de raça 3), então a pergunta certa é *"quantas cartas de cada família?"*, e não *"que fração do baralho?"* — a porcentagem de monstro cai porque o **denominador** cresceu, e o numerador (10/jogador) continua onde estava, **abaixo** dos 11 do alvo. Girar `copiasPorMonstro` para "consertar os 58,8%" moveria a família que já está mais perto do alvo para longe dele. ⚠️ **A conta sai de `MONSTROS_SACAVEIS.length`/`RACAS_SACAVEIS.length`/`CLASSES_SACAVEIS.length`**, nunca de "quantas o §5 lista" — é a **#54** aplicada antes de errar. `classeIds`/`copiasPorClasse` são **obrigatórios** no tipo da receita de propósito: campo opcional é a porta por onde uma proporção assinada vira default silencioso |
+| 94 | **O CONSTRUTOR E A ROTA `/duelo` MORREM — a fatia 2 sai do jogo por inteiro.** Somem o `<select>` de classe, o preview de stats, o botão "Duelar", a rota `POST /api/duelo`, o `Catalogo.base` e a cauda de órfãos que os alimentava. A tela abre **direto na mesa** | A fatia 2 era o último lugar em que o jogo se comportava como um spike de duelo 1v1, e o `Catalogo.base` era o resto de um personagem que a mesa não monta mais. ⚠️ **Custo já conhecido e aceito:** teste de ausência **vira vácuo** quando o alvo é renomeado — as três superfícies de string que o plano pediu (`/Personagem:/`, `/Stats:/`, `/Duelar/`) deixavam um construtor **renomeado** passar `2 passed`, e uma delas (`/Personagem:/`) **já não existia no merge-base**, ou seja nunca poderia ter reprovado. O conserto foi **acrescentar** uma superfície **estrutural** (`queryByRole('combobox')`), não trocar as de string — e ela também não é completa: um construtor que voltasse como grupo de `<radio>` passaria pelas quatro. ⚠️ **A varredura de órfãos tem que sair de `src`:** o último órfão desta fatia foi `packages/web/index.html`, com `<title>card-dungeon — spike do duelo</title>` — fora de `packages/*/src`, nenhum grep, teste ou typecheck o alcançava |
+| 95 | 📊 **A ABERTURA DE QUEIMA SUBIU DE 1,29 PARA 1,86 POR PARTIDA (+44%), e o motivo NOVO da #90 responde por ~85% do aumento.** Medido (N=480 partidas): **893 aberturas** = **1,86 por partida** · **0,465 por jogador**, mediana **2** por partida; **86,9%** das partidas com ≥1 na mesa e **36,3%** com ≥1 no assento **#0**. Por motivo: `trocaDeSlot` **540 (60,5%)** · **`mochilaEncolheu` 232 (26,0%)** · `perdeuAfinidade` **121 (13,5%)**. Regressão: `AcaoInvalida` (bot e humano), `Error` cru e teto de 30.000 ações deram **zero em 960 partidas**; o **censo de conservação id-a-id depois de CADA ação** deu **zero falhas em 177.856 censos**, com **N=480** | ⚠️ **O `+44%` atravessa fatias e isso está LICENCIADO por um CONTROLE DE INSTRUMENTO, não por confiança:** os dois baselines vêm de harness extintos, e o que decide é haver uma sub-medida que esta fatia **não mexeu** e que os dois contam do mesmo jeito — `trocaDeSlot` deu **1,125 por partida** contra **1,142** do #86, **−1,5%**. Sem esse controle o delta não seria interpretável (e é exatamente por isso que a comparação do #96 **não** pode ser feita). ➡️ Isto **licencia a comparação, não a atribuição de causa**. ⚠️ **O headline agrega DUAS políticas** — `bot` **1,83** × `equipando` **1,89** (N=240 cada) —, e a `equipando` **não tem série histórica** (a definição se perdeu com o script do Plano 4b e foi reescrita nesta task): as duas **concordam**, e é isso que deixa o número viajar; a leitura conservadora é **1,83**. 🔴 **O N do CENSO é 480 e é MENOR que o das outras linhas de regressão de propósito:** ele vale só para a rodada cujo **smoke test** (que prova que o censo enxerga a zona nova `emJogo.classe`) foi transcrito; as demais são contadores puros de exceção, iguais nas duas rodadas. **Não empreste o 960 para o censo.** 🔑 O smoke existe porque foi `emJogo.raca` que o script do Plano 4a esqueceu — **um zero de conservação sem essa prova não vale nada** |
+| 96 | 📊 **A FILA COM ≥2 DESLOCADOS POR `mochilaEncolheu` É ZERO *ESTRUTURAL*, NÃO RARIDADE EMPÍRICA — e o baseline da raça do Plano 4b NÃO SE REPRODUZ.** (a) Fila ≥2 em **19 de 893 aberturas (2,1%)**, e as 19 vêm de `perdeuAfinidade`; `trocaDeSlot` deu **zero em 540** e `mochilaEncolheu` **zero em 232**. (b) **Cartas de CLASSE da mão inicial que morrem na mão: 14,09%** (195/1.384) — com o **controle de RAÇA medido na MESMA rodada em 16,34%** (294/1.799), contra os **30,8%–36,1%** publicados no 4b. (c) **Assentos que terminam Aprendiz: 6,51%** (125/1.920); **24,2%** das partidas têm ≥1. (d) Força final de bot: **Aprendiz 5,54–6,05 (n=99)** × **com classe 6,88–7,10 (n=1.341)**. N=480 | 🔴 **(a) A palavra é ESTRUTURAL e a distinção é o ponto:** os **4** itens exclusivos do catálogo são todos `eixo: 'raca'`, então jogar uma carta de **classe** nunca tira afinidade de nada ⇒ `motivo === 'mochilaEncolheu'` **implica** `deslocados.length === 1`, **sempre**, por construção. ➡️ **Vira medida real no dia em que nascer o primeiro item exclusivo por CLASSE** (a #74) — e é exatamente esse leitor futuro que um *"raríssimo"* faria pular o teste do único caminho em que a fila mista importa. ⚠️ **Os dois zeros vizinhos são EMPÍRICOS e não herdam essa ressalva.** 🔴 **(b) A divergência NÃO é sobre a classe:** o controle interno de raça também veio muito abaixo da faixa histórica, logo **o número do 4b não é comparável a esta mesa/definição** — e aqui **não existe** o controle de instrumento que licenciou o #95. ⚠️ **NÃO escreva "a classe morre menos que a raça"**: z = 1,75, p ≈ 0,081, amostras **pareadas** (mesmas 480 partidas), faixas por rodada sobrepostas. O que está afirmado é *"mesma ordem de grandeza"*. ✅ **(c) responde a pergunta que a #89 abriu** — o Aprendiz é **quase só o primeiro turno**: em ~93,5% dos assentos a classe entra em jogo antes do fim, e em 3 de 4 partidas ninguém termina Aprendiz. ⚠️ **Não** está medido *por quantos turnos* alguém fica Aprendiz, só o estado final |
+| 97 | 📊 **O gradiente de assento, REMEDIDO e SEM CAUSA ATRIBUÍDA:** **#0 30,6% · #1 27,1% · #2 22,9% · #3 19,4%** (147·130·110·93; χ² = 13,82, df=3, **p = 0,0032**; N=480). ⚠️ **Dentro da política `bot` isolada a distribuição NÃO é significativa** (27,9% · 28,8% · 22,9% · 20,4%; χ² = 4,60, **p = 0,20**, N=240) — e ali o **#1 fica ACIMA do #0** | Registro para a **pergunta 17 do §18**, que é **medição, não decisão** desta fatia. 🔴 **O que NÃO está afirmado, e não pode ser escrito: que esta fatia causou, aumentou ou DIMINUIU o gradiente.** Não há medição pareada contra o commit pré-fatia, e essa conclusão já foi escrita e **derrubada em revisão** numa fatia anterior, por **cherry-pick de baseline**. 🔑 **O soak desarmou o cherry-pick antes que alguém o fizesse**, publicando o recorte por política: quem citasse só o agregado teria uma escada aparentemente limpa que o recorte `bot` **não sustenta**. Escreva *"o último assento vence menos"*, **não** "30,6/27,1/22,9/19,4" como escada estabelecida |
+
+🔴 **RESSALVA-MÃE, válida para TODOS os números das #95–#97:** esta fatia mudou **cinco coisas ao
+mesmo tempo** — motor (gancho novo + a rolagem de ataque no contexto), carta de classe nova, passiva
+nas três classes, mochila do Aprendiz e a demolição — e os 3 bots rodam a **mesma** `escolherAcao` do
+humano. **Nenhum número isola nenhuma delas**, e toda comparação com fatias anteriores move **os
+quatro assentos juntos**. É a **#51**, que era a **#24/#25**, que a **#69** recusou repetir.
+⚠️ **"zero em N partidas", nunca "não acontece"** — é checagem depois de cada ação nas condições
+medidas (mesa de 4, patente-alvo 10, mão inicial 4+4, dials de produção), não prova de
+impossibilidade. ⚠️ **Cada linha carrega o SEU N; não empreste o N de uma linha para outra.**
+🔴 **O relatório do soak e o harness moram em `.superpowers/sdd/`, que é GITIGNORED — estes números
+só existem aqui e no `CLAUDE.md`.** Os `soak.ts` do Plano 4b, da `afinidade` e da `escolha do
+descarte` **já sumiram**; quem for remedir escreve o dele.
+
+### 🔬 O que a execução pegou, e que vale além das decisões
+
+- 🔴 **O TEXTO DO PLANO foi a fonte mais provável de achado — 8 vezes**, contra os implementadores.
+  Dois docstrings que afirmavam o presente errado; um nome de teste que prometia provar a ordem
+  `raça → classe` e **não provava nada** (os dois caminhos davam o mesmo número, porque o portador
+  estava com vida cheia e a passiva do Orc não disparava); um snippet com assinatura errada; um
+  helper que **já existia** com outro contrato; e um brief inteiro que descrevia trabalho que duas
+  tasks anteriores já tinham feito (o diff final teve **2** arquivos contra os **5** listados).
+  ➡️ **A conferência do controlador contra o código real, ANTES do dispatch, é o que pagou** — na
+  demolição ela impediu **duas remoções que quebrariam o combate** (`MAX_TURNOS` e `montarCombatente`
+  estavam na tabela de candidatos a órfão e são **código vivo**).
+- 🔴 **"Mutação verde = o dublê não produz o cenário" apareceu MAIS 4 vezes** (as ocorrências 6ª a 9ª
+  catalogadas). Em nenhuma delas a causa foi guard redundante, e o conserto foi **sempre dublê novo
+  no catálogo de teste**, nunca mais atenção. Uma delas é instrutiva por si: um teste do bot cuja
+  **única razão de existir** era o guard `classe === null` estava sustentado por **leitura de
+  código** — passava antes da task e a única mutação prescrita não o tocava.
+- ⚠️ **Estreitar uma projeção pública deixa a UI COMPILANDO E MENTINDO.** Tirar `modificadores` de
+  `Catalogo.classes` não deu erro de tipo — o campo de fallback tinha a **mesma forma** —, e o preview
+  do construtor seguiu renderizando um número plausível e **errado**. ➡️ Ao estreitar um contrato,
+  pergunte **quem RENDERIZAVA** o campo removido, não quem o compilava.
+- ⚠️ **A 15ª ocorrência do vício nº 1 saiu desta fatia, e a causa raiz é estrutural:** alargar um
+  **par fino** do reducer é alargar **DOIS lados** — o domínio passou a aceitar carta de classe e os
+  comentários da tela continuaram afirmando *"só raça entra em jogo"*. A tabela de pares finos existe
+  para lembrar disso e **não lembrou**, porque só o lado do domínio foi editado. 🔑 E a **duas** tasks
+  seguidas o defeito veio por **TÍTULO** (de teste, e de um `it` cujo nome afirmava o que a asserção
+  não checava) — a varredura de órfãos tem que cobrir **nomes de teste**, não só comentários.
+- 📌 **Uma dependência aritmética NÃO DECLARADA quebrou 3 testes ao ligar o baralho — e o comentário
+  que a previa ACERTOU.** O fixture dependia de `RACAS_SACAVEIS.length × 4 assentos` bater
+  **exatamente** com `MAO_INICIAL_PADRAO × 4`; a família não-monstro ganhou a classe e a igualdade
+  acidental caiu. O comentário prometia que a mudança de dial *"falharia ALTO, não em silêncio"*, e
+  falhou exatamente assim.
+- 🔴 **A #54 entrando por OUTRA PORTA:** o baralho ganhou classe com asserção de **contagem** e sem
+  asserção de **presença**, enquanto o título do teste afirmava a decomposição. A mutação que ficava
+  **verde**: trocar `classeIds` por três **ids de RAÇA** — mesmo total, monte igual, dois testes
+  passando, e o baralho de produção carregando 12 "cartas de classe" chamadas `elfo`/`anao`. 🔑 O
+  mesmo arquivo **já tinha aprendido isso para a raça, dez linhas acima**; a classe entrou sem o
+  gêmeo. ⚠️ Consertado, e a asserção nova **ainda não é exaustiva** (um `.find` confere só a primeira
+  carta de classe: uma substituição **parcial** passaria).
