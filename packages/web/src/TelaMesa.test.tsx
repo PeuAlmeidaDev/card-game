@@ -1204,9 +1204,12 @@ describe('TelaMesa — afinidade de itens', () => {
 });
 
 describe('TelaMesa — a queima pendente', () => {
-  // A vista é FORJADA direto (a `queima` não nasce daqui passando pelo reducer),
-  // então o tamanho não precisa bater com o `limiteDeMochila` de p1 — só precisa
-  // ser um número fixo e conhecido para as asserções abaixo contarem os botões.
+  // A vista é FORJADA direto (a `queima` não nasce daqui passando pelo reducer).
+  // O TAMANHO só precisa ser fixo e conhecido para as asserções contarem os
+  // botões — mas o valor publicado de `limiteDeMochila` para p1 é sobrescrito
+  // abaixo para BATER com ele (5): sem isso a vista afirma "mochila com 5 de
+  // 6" com uma queima aberta, um estado que o domínio nunca produziria (com
+  // vaga sobrando não haveria pendência nenhuma).
   const mochilaCheia: readonly CartaTesouro[] = Array.from(
     { length: 5 }, (_, i) => tesouro(`t-mochila-${String(i)}`, 'elmo-de-couro'),
   );
@@ -1215,7 +1218,9 @@ describe('TelaMesa — a queima pendente', () => {
   const comQueima = (dono: string): VistaDaPartida => ({
     ...vistaBase,
     fase: 'recompor',
-    jogadores: vistaBase.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: mochilaCheia } : j)),
+    jogadores: vistaBase.jogadores.map((j) => (
+      j.id === 'p1' ? { ...j, mochila: mochilaCheia, limiteDeMochila: 5 } : j
+    )),
     queima: {
       jogadorId: dono,
       deslocados: [tesouro('t-saiu', 'espada-curta')],

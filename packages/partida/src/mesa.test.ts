@@ -1507,6 +1507,14 @@ describe('jogar carta de CLASSE', () => {
     // cheia..."): `destinoDoDesequipado` é o MESMO ponto único para as duas
     // trocas, mas até esta task só o caminho da raça tinha teste cobrindo a
     // mochila CHEIA (achado cross-task da revisão da Task 7).
+    //
+    // ⚠️ A mochila NÃO nasce cheia aqui: o jogador começa Aprendiz (classe:
+    // null, teto 6) com 5 cartas — ainda sobra 1 vaga. É a PRÓPRIA ação que a
+    // enche: jogar a classe derruba o teto para 5 (a compensação do Aprendiz
+    // some), e só ENTÃO a mochila fica cheia — no mesmo instante em que o item
+    // perdido por afinidade precisa de uma vaga que não sobrou mais. "Mochila
+    // cheia" no nome do teste é o estado NO MOMENTO da pendência, não a
+    // pré-condição do fixture.
     const cheia = Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
     const semClasse = nascida();
     const jogadores = semClasse.jogadores.map((j) => (j.id === 'p1'
@@ -1529,6 +1537,55 @@ describe('jogar carta de CLASSE', () => {
     expect(r.estado.queima?.deslocados.map((c) => c.id)).toEqual(['t-x']);
     expect(r.estado.queima?.motivo).toBe('perdeuAfinidade');
     expect(r.estado.tesouros.cemiterio).toEqual([]);
+  });
+
+  it('jogar CLASSE com o Aprendiz no teto (6) ENCOLHE a mochila e abre a queima', () => {
+    // Ruling do Pedro (Fix round 1, Task 8): a mochila não tem para onde mandar
+    // o excedente (mochila → mão não existe), então ele vira pendência — o
+    // jogador ESCOLHE o que sai, como qualquer outro deslocado (decisão #59).
+    // Nunca um auto-trim silencioso.
+    const cheiaParaAprendiz = Array.from(
+      { length: LIMITE_BASE_DE_MOCHILA + 1 }, (_, i) => equipamento(`t-c${String(i)}`),
+    );
+    const p0 = nascida();
+    const jogadores = p0.jogadores.map((j) => (j.id === 'p1'
+      ? {
+          ...j,
+          mao: [nova] as readonly Carta[],
+          mochila: cheiaParaAprendiz,
+          emJogo: { ...j.emJogo, classe: null },
+        }
+      : j));
+    const p: EstadoPartida = { ...p0, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...p0, jogadores }, 'p1')) };
+    // Pré-condição: o Aprendiz está EXATAMENTE no teto dele (6), não acima.
+    expect(jogadorDe(p, 'p1').mochila).toHaveLength(LIMITE_BASE_DE_MOCHILA + 1);
+
+    const r = aplicarAcao(p, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'pc-nova' }, deps([]));
+
+    // A última carta da mochila é a que vira pendência — a escolha de QUAL sai
+    // continua sendo do jogador entre as seis (queimar ela ou uma das 5 que
+    // ficaram), então QUAL carta é movida para a fila é arbitrário.
+    expect(r.estado.queima?.deslocados.map((c) => c.id)).toEqual(['t-c5']);
+    expect(r.estado.queima?.motivo).toBe('mochilaEncolheu');
+    expect(jogadorDe(r.estado, 'p1').mochila).toHaveLength(LIMITE_BASE_DE_MOCHILA);
+    expect(jogadorDe(r.estado, 'p1').mochila.map((c) => c.id)).not.toContain('t-c5');
+  });
+
+  it('jogar CLASSE com quem JÁ TEM classe e a mochila em 5 não abre queima — o teto não mudou', () => {
+    // O gêmeo obrigatório: sem ele, uma implementação que abrisse queima toda
+    // vez que `jogarCarta` de classe encontrasse a mochila em 5 (em vez de só
+    // quando o teto de fato cai) passaria no teste de cima e erraria aqui.
+    const cheiaPara5 = Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-c${String(i)}`));
+    const p0 = nascida(); // `criar` já carimba `CARTA_DE_CLASSE_DE_TESTE` — classe já em jogo
+    const jogadores = p0.jogadores.map((j) => (j.id === 'p1'
+      ? { ...j, mao: [nova] as readonly Carta[], mochila: cheiaPara5 }
+      : j));
+    const p: EstadoPartida = { ...p0, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...p0, jogadores }, 'p1')) };
+
+    const r = aplicarAcao(p, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'pc-nova' }, deps([]));
+
+    expect(r.estado.queima).toBeNull();
+    expect(jogadorDe(r.estado, 'p1').mochila).toHaveLength(LIMITE_BASE_DE_MOCHILA);
   });
 
   it('`jogarCarta` continua recusando o que não é raça nem classe', () => {

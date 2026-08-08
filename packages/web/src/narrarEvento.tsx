@@ -115,13 +115,30 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
         </small>
       );
     // Motivo × destino como PREFIXO × SUFIXO: as duas dimensões variam
-    // independentes, e quatro frases à mão seriam quatro lugares para divergir.
+    // independentes, e quatro (agora seis) frases à mão seriam lugares para divergir.
     case 'desequipou': {
       const quem = evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId);
       const item = descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem, ctx.nomeDaClasse);
-      const porque = evento.motivo === 'trocaDeSlot'
-        ? `${quem} tira ${item} do corpo`
-        : `${item} não serve à nova especialização de ${quem === 'Você' ? 'você' : quem} e sai do corpo`;
+      const quemMinusculo = quem === 'Você' ? 'você' : quem;
+      // `switch` com `never`, não ternário: um ternário de dois braços não dá
+      // pressão de compilador nenhuma quando `motivo` ganha um terceiro valor —
+      // ele cairia mudo no braço errado, narrando a causa trocada.
+      let porque: string;
+      switch (evento.motivo) {
+        case 'trocaDeSlot':
+          porque = `${quem} tira ${item} do corpo`;
+          break;
+        case 'perdeuAfinidade':
+          porque = `${item} não serve à nova especialização de ${quemMinusculo} e sai do corpo`;
+          break;
+        case 'mochilaEncolheu':
+          porque = `${item} não cabe mais na mochila de ${quemMinusculo} — a especialização reduziu o teto`;
+          break;
+        default: {
+          const naoTratado: never = evento.motivo;
+          throw new Error(`narrarEvento: motivo de desequipou não tratado: ${String(naoTratado)}`);
+        }
+      }
       // NOMEIA o destino: sem saber qual dos dois foi, o jogador não descobre que
       // trocar de item com a mochila cheia DESTRÓI uma carta.
       return evento.destino === 'mochila'

@@ -894,16 +894,43 @@ function jogarCarta(
     emJogo: { ...comEspecializacaoNova, slots: tirarDosSlots(comEspecializacaoNova.slots, perdidos) },
   };
 
+  // Jogar CLASSE pode ENCOLHER `limiteDeMochila` (Aprendiz 6 → 5, a compensação
+  // some ao especializar). Mochila → mão não existe, então quem já estava no
+  // teto antigo não tem para onde a carta excedente ir — ela vira pendência de
+  // queima, como qualquer outro deslocado (decisão #59): o jogador ESCOLHE o
+  // que sai entre as seis, nunca um auto-trim silencioso. O teto só varia em
+  // ±1 (a compensação inteira do Aprendiz), então o excedente NUNCA passa de
+  // uma carta — é o que garante que a fila continua cabendo na tupla não-vazia
+  // de `QueimaPendente`.
+  const tetoNovo = limiteDeMochila(atualizado);
+  const excedeu = atualizado.mochila.length > tetoNovo;
+  const cartaExcedente: CartaEquipamento | undefined = excedeu
+    ? atualizado.mochila[atualizado.mochila.length - 1]
+    : undefined;
+  const comMochilaCerta: JogadorNaMesa = cartaExcedente === undefined
+    ? atualizado
+    : { ...atualizado, mochila: atualizado.mochila.slice(0, -1) };
+
   const comJogador: EstadoPartida = {
     ...estado,
-    jogadores: estado.jogadores.map((j) => (j.id === atualizado.id ? atualizado : j)),
+    jogadores: estado.jogadores.map((j) => (j.id === comMochilaCerta.id ? comMochilaCerta : j)),
     portas: {
       ...estado.portas,
       cemiterio: anterior === null ? estado.portas.cemiterio : [...estado.portas.cemiterio, anterior],
     },
   };
+  // ⚠️ Se as duas causas coincidirem na MESMA jogada (um item perde afinidade
+  // E a mochila encolhe), elas viajam JUNTAS numa pendência SÓ —
+  // `QueimaPendente.motivo` é um valor ÚNICO para toda a fila (fatia `escolha
+  // do descarte`) — com o motivo `mochilaEncolheu`: é a mochila que impede
+  // QUALQUER um dos dois de achar vaga, então ela é a causa que domina o log
+  // nesse cenário raríssimo (exige um item exclusivo de OUTRA classe equipado
+  // como Aprendiz bem no teto da mochila). Sem coincidência, o motivo antigo
+  // (`perdeuAfinidade`, sem excedente) continua exatamente como antes.
+  const deslocados = cartaExcedente === undefined ? perdidos : [...perdidos, cartaExcedente];
+  const motivo = cartaExcedente === undefined ? 'perdeuAfinidade' : 'mochilaEncolheu';
   const { estado: base, eventos: doDeslocado, queima } =
-    destinoDoDesequipado(comJogador, perdidos, acao.jogadorId, 'perdeuAfinidade');
+    destinoDoDesequipado(comJogador, deslocados, acao.jogadorId, motivo);
   const eventos: readonly EventoDaMesa[] = [
     carta.tipo === 'raca'
       ? { tipo: 'racaEmJogo', jogadorId: acao.jogadorId, carta }

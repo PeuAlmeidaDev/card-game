@@ -164,8 +164,8 @@ export interface JogadorNaMesa {
    */
   readonly mao: readonly Carta[];
   /**
-   * Zona ABERTA, teto `LIMITE_MOCHILA`, **fora** do limite de mão. Viaja inteira
-   * na projeção — ao contrário da mão, que publica só a contagem.
+   * Zona ABERTA, teto `limiteDeMochila(jogador)`, **fora** do limite de mão.
+   * Viaja inteira na projeção — ao contrário da mão, que publica só a contagem.
    *
    * `CartaTesouro` e não `Carta`: só tesouro se guarda. Uma Porta na mochila não
    * teria como sair (mochila → mão não existe nesta fatia) nem como ser jogada,
@@ -394,10 +394,16 @@ export type EventoDaMesa =
    * resolve: um montante por cima de duas armas de uma mão desloca DOIS itens e a
    * mochila pode caber só um, então um evento para o lote não conseguiria nomear
    * os dois destinos.
+   *
+   * `motivo` ganhou `'mochilaEncolheu'` na fatia `classe como carta` (Fix round
+   * 1 da Task 8): jogar uma carta de CLASSE pode encolher `limiteDeMochila`
+   * (Aprendiz 6 → 5), e quem já estava no teto antigo perde uma vaga na hora —
+   * mesmo tratamento dos outros dois motivos, o jogador escolhe o que sai
+   * (decisão #59), nunca um auto-trim silencioso.
    */
   | { readonly tipo: 'desequipou'; readonly jogadorId: string;
       readonly carta: CartaEquipamento; readonly destino: 'mochila' | 'cemiterio';
-      readonly motivo: 'trocaDeSlot' | 'perdeuAfinidade' }
+      readonly motivo: 'trocaDeSlot' | 'perdeuAfinidade' | 'mochilaEncolheu' }
   /**
    * A carta da MOCHILA que o jogador escolheu destruir para abrir vaga ao item
    * deslocado (decisão #59). CARREGA a carta: a mochila e o cemitério de Tesouros

@@ -114,6 +114,20 @@ describe('narrarEvento — linhas de texto puro', () => {
     expect(linha.container.textContent).toContain('descartada');
   });
 
+  it('o desequipou por MOCHILA ENCOLHIDA liga o item ao teto que a classe derrubou', () => {
+    // Terceiro motivo (Fix round 1 da Task 8): jogar uma carta de CLASSE pode
+    // encolher `limiteDeMochila` (Aprendiz 6 → 5). Sem esta narração, o jogador
+    // veria uma carta sumir da mochila sem nenhuma explicação — mesma família do
+    // teste de cima, motivo novo.
+    const linha = render(<>{narrarEvento(
+      { tipo: 'desequipou', jogadorId: 'p1', carta: { id: 't-1', tipo: 'equipamento', itemId: 'espada-curta' },
+        destino: 'cemiterio', motivo: 'mochilaEncolheu' },
+      ctx,
+    )}</>);
+    expect(linha.container.textContent).toContain('não cabe mais na mochila');
+    expect(linha.container.textContent).toContain('descartada');
+  });
+
   it('a carta queimada é NOMEADA, e a pessoa muda com o dono', () => {
     // A mochila e o cemitério de Tesouros são zonas ABERTAS, então esconder aqui
     // seria teatro — mesma regra do `guardou`.
