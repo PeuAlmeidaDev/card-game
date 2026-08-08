@@ -76,9 +76,11 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
     monstroIds: monstros.map((m) => m.id),
     // 🎚️ Decisão #52 do game bible (2026-07-30): 2 monstros para 1 raça.
     // Com o catálogo de hoje (5 monstros, 4 raças sacáveis — Humano fica de fora,
-    // ver `RACAS_SACAVEIS`) dá 14 cartas por jogador antes da classe. Densidade
-    // ~71% monstro / ~29% raça — a #41 mira raça em ~12,5%, e este é o passo
-    // possível na direção dela com o catálogo de hoje.
+    // ver `RACAS_SACAVEIS` — e as 3 classes sacáveis que a #60 acrescenta logo
+    // abaixo) o total é 17 cartas por jogador: densidade 58,8% monstro / 23,5%
+    // raça / 17,6% classe. A #41 mira raça em ~12,5%; a fatia de raça já caiu
+    // (de ~29% para 23,5%) só por a classe ter entrado na mesma "torta" — efeito
+    // colateral desta task, não um passo deliberado na direção da #41.
     // ⚠️ NÃO derive estes números do tamanho do catálogo: foi exatamente isso que
     // a #36 proibiu.
     copiasPorMonstro: 2,
@@ -87,7 +89,7 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
     classeIds: CLASSES_SACAVEIS.map((c) => c.id),
     // 🎚️ Decisão #60/§6.2 do spec: 1 cópia por classe sacável = 3 cartas por
     // jogador, que é EXATAMENTE o que a receita-alvo do §11 pede em cartas
-    // ABSOLUTAS. Os 17,6% de densidade só parecem altos porque faltam as 7 cartas
+    // ABSOLUTAS (densidade acima). Ela só parece alta porque faltam as 7 cartas
     // de famílias que ainda não existem em código (maldições 4 + modificadores 3).
     // ⚠️ NÃO gire `copiasPorMonstro` para "consertar" a porcentagem.
     copiasPorClasse: 1,

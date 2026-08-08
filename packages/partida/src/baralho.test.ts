@@ -71,9 +71,10 @@ describe('montarComposicao', () => {
 
   it('a densidade de PRODUÇÃO é 2 monstros para 1 raça (decisão #52 do game bible)', () => {
     // 5 e 5 aqui é um catálogo SINTÉTICO, escolhido para o teste — não é o
-    // catálogo de produção (que hoje tem 5 monstros sacáveis e 4 raças sacáveis,
-    // 14 por jogador; ver `packages/server/src/app.ts`). O que este teste trava
-    // não é o tamanho do catálogo — é a PROPORÇÃO que a #52 escolheu.
+    // catálogo de produção (que hoje tem 5 monstros sacáveis, 4 raças sacáveis e
+    // 3 classes sacáveis, 17 por jogador; ver `packages/server/src/app.ts`). O
+    // que este teste trava não é o tamanho do catálogo — é a PROPORÇÃO que a
+    // #52 escolheu.
     const cinco = (p: string) => Array.from({ length: 5 }, (_, i) => `${p}${String(i)}`);
     const c = montarComposicao({
       monstroIds: cinco('m'), copiasPorMonstro: 2, racaIds: cinco('r'), copiasPorRaca: 1,

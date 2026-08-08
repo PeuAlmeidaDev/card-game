@@ -3,7 +3,7 @@ import type { RolarD12 } from '@card-dungeon/motor';
 import type { ResultadoDuelo, Catalogo, VistaDaPartida } from '@card-dungeon/shared';
 import type { Embaralhar } from '@card-dungeon/partida';
 import { MAO_INICIAL_PADRAO, MAO_INICIAL_TESOUROS } from '@card-dungeon/partida';
-import { obterMonstro, ITENS_SACAVEIS } from '@card-dungeon/cartas';
+import { obterMonstro, ITENS_SACAVEIS, CLASSES_SACAVEIS } from '@card-dungeon/cartas';
 import { buildApp } from './app';
 
 function filaDeDados(rolagens: readonly number[]): RolarD12 {
@@ -137,6 +137,16 @@ describe('mesa', () => {
   const racasNoTopo: Embaralhar = (itens) => [
     ...itens.filter((i) => ehRaca(i)),
     ...itens.filter((i) => !ehRaca(i)),
+  ];
+  // Gêmea de `racasNoTopo`, para a classe: sobe as cartas de classe para o topo,
+  // então a mão inicial do humano nasce com uma. É o fixture que a asserção de
+  // CONTEÚDO logo abaixo (não só a contagem) precisa para provar que a classe
+  // que entrou no baralho é uma classe de verdade.
+  const ehClasse = (x: unknown): boolean =>
+    typeof x === 'object' && x !== null && (x as { tipo?: unknown }).tipo === 'classe';
+  const classesNoTopo: Embaralhar = (itens) => [
+    ...itens.filter((i) => ehClasse(i)),
+    ...itens.filter((i) => !ehClasse(i)),
   ];
   // Embaralhamento DIRIGIDO oposto: garante que a mão inicial nasça só de
   // Portas que não são monstro (raça e/ou classe) e que o monte, logo depois,
@@ -335,6 +345,25 @@ describe('mesa', () => {
     const app = buildApp({ embaralhar: semEmbaralhar });
     const vista = await criar(app);
     expect(vista.cartasNoMonte).toBe(52);
+    await app.close();
+  });
+
+  it('o baralho de produção TEM carta de classe — e é uma classe SACÁVEL de verdade', async () => {
+    // Gêmea do teste de raça acima, e pelo MESMO motivo (achado do review final
+    // desta task): a CONTAGEM sozinha não prova nada — trocar `classeIds` por
+    // `RACAS_SACAVEIS.slice(0, 3).map((r) => r.id)` mantém 3 entradas, 17/jogador
+    // e monte 52 IDÊNTICOS, com o baralho carregando cartas `{ tipo: 'classe',
+    // classeId: 'elfo' }` (e afins) — um id que `CLASSES_SACAVEIS` não conhece.
+    // Por isso esta asserção confere o CONTEÚDO: o `classeId` que a mão inicial
+    // recebe tem que estar em `CLASSES_SACAVEIS`, não só ter `tipo === 'classe'`.
+    const app = buildApp({ embaralhar: classesNoTopo });
+    const vista = await criar(app);
+    expect(vista.cartasNoMonte).toBe(52);
+    const classeNaMao = vista.suaMao.find((c) => c.tipo === 'classe');
+    if (classeNaMao === undefined || classeNaMao.tipo !== 'classe') {
+      throw new Error('a mão inicial não trouxe carta de classe');
+    }
+    expect(CLASSES_SACAVEIS.map((c) => c.id)).toContain(classeNaMao.classeId);
     await app.close();
   });
 
