@@ -85,10 +85,17 @@ ESTRUTURAL: o §6 do bible e o `Fase` do código passam a ter as mesmas **seis**
 **Depois do 4b vieram as três fatias de 2026-07-31 (decisão #61 do bible), e as TRÊS estão
 construídas.** A **`afinidade`** (sessão de 2026-08-02/03) e a **`escolha do descarte`** (#59/#61,
 sessão de 2026-08-03/06 — a **terceira pendência do jogo**) estão **mergeadas na `main`**. A
-terceira, **`classe como carta`** (#60/#61), saiu em **dois planos**: o **A** (motor com N passivas,
-2026-08-06) está **mergeado** (PR #33, `main` em `0236b55`); o **B** — a carta no baralho, a passiva
-das classes, a mochila do Aprendiz e a **demolição do topo da tela** — está **construído na branch
-`feat/classe-como-carta-plano-b`**, detalhe na sessão de 2026-08-07/08 no fim deste arquivo.
+terceira, **`classe como carta`** (#60/#61), saiu em **dois planos**, e os **dois estão MERGEADOS na
+`main`**: o **A** (motor com N passivas, 2026-08-06) pelo **PR #33** (`main` em `0236b55`); o **B** —
+a carta no baralho, a passiva das classes, a mochila do Aprendiz e a **demolição do topo da tela** —
+pelo **PR #34** (`main` em `cd11ae4`, que é o **merge-base desta branch**). Detalhe na sessão de
+2026-08-07/08 no fim deste arquivo.
+✏️ **CORREÇÃO MARCADA (2026-08-08):** esta frase dizia que o Plano B *"está construído na branch
+`feat/classe-como-carta-plano-b`"*, e isso **deixou de ser verdade quando o PR #34 mergeou**.
+🔴 **É o vício nº 1 cometido dentro do documento que o cataloga**, e a forma dele aqui é instrutiva:
+o parágrafo foi **editado duas vezes na mesma sessão** (contagem de testes e nome de branch, duas
+linhas acima) **sem que ninguém relesse a frase seguinte** — atualizar um fato ao lado de outro
+**não** é conferir o outro.
 ✅ **GATE OCULAR FECHADO PELO PEDRO em 2026-08-08** — ele rodou o roteiro de **7** itens e reportou
 *"está certinho"*. 🔑 **E o gate achou um bug de VERDADE, pelo mesmo mecanismo de sempre** (o código
 faz certo e ninguém consegue ver): *"consigo usar um machado de orc e um escudo, mas não consigo usar
@@ -2001,23 +2008,40 @@ sempre, inclusive vazios** (`Mão direita: … · Mão esquerda: …`, ou *vazio
 evento `equipou` narra *"Você equipa Espada Curta."* e **nunca diz em qual mão** — não peça isso a
 ninguém.
 
-1. Em `recompor` ou `jogar`, **equipe um item de mão; depois equipe OUTRO item de mão**. Em **"Seu
-   corpo"**, `Mão direita` e `Mão esquerda` ficam com **itens DIFERENTES**, e **os dois ficam** — era
-   isto que não dava antes. *(🎚️ **quase certo ao longo de uma partida**, e há número: as duas mãos
-   terminam ocupadas em **87,3%–89,1% dos assentos**. ⚠️ **NÃO é certo na mão inicial de 4 Tesouros** —
-   itens de mão são **4 dos 12** do catálogo; se não vier, siga jogando.)*
+🔴 **"Item de UMA mão" em todo item abaixo significa `duasMaos: false`** — **Espada Curta**, **Escudo
+Redondo** ou **Machado do Orc**. **O Montante NÃO serve**, e a distinção não é pedantismo: ele é
+**item de mão** também (1 dos 4 do catálogo), e com ele o item 1 mostraria **a mesma carta nas duas
+mãos** e o item 2 mostraria **UM** botão — porque `precisaEscolherMao` exige `!info.duasMaos`
+(`TelaMesa.tsx:174`). ➡️ **Os dois reprovariam contra código CORRETO**, que é o modo de falha da #70
+que este roteiro existe para evitar. O Montante tem os itens **4 e 5**, que são dele.
+
+1. Em `recompor` ou `jogar`, **equipe um item de UMA mão; depois equipe OUTRO item de UMA mão**. Em
+   **"Seu corpo"**, `Mão direita` e `Mão esquerda` ficam com **itens DIFERENTES**, e **os dois
+   ficam** — era isto que não dava antes. *(🎚️ **quase certo ao longo de uma partida**, e o número é
+   **51,7%–54,5% dos assentos**, que é a coluna "duas cartas DISTINTAS nas mãos". ⚠️ **NÃO use os
+   87,3%–89,1%**: aquela é a coluna "duas mãos ocupadas", que é a **UNIÃO** — ela inclui os
+   **34,2%–36,4%** de assentos em que o Montante preenche as duas com a **mesma** carta, e a
+   checagem interna do soak (`distintas + Montante = ocupadas`) torna a diferença exata. ⚠️ E **NÃO é
+   certo na mão inicial de 4 Tesouros** — itens de mão são 4 dos 12 do catálogo; se não vier, siga
+   jogando.)*
    💡 **Se conseguir duas Espadas Curtas ou dois Machados, melhor** — é literalmente a queixa que
    abriu a fatia. ⚠️ **Não faça disso um requisito:** o baralho tem 4 cópias de cada item, e ter duas
    da MESMA na mão não é garantido.
-2. **Com as duas mãos ocupadas, clique em equipar um TERCEIRO item de mão: aparecem DOIS botões** —
-   **"Equipar na direita"** e **"Equipar na esquerda"** — no lugar do "Equipar" único.
-   ✅ **Confira nas DUAS listas: "Sua mão" E "Sua mochila"** (guarde um item de mão para ver a
+2. **Com as duas mãos ocupadas, clique em equipar um TERCEIRO item de UMA mão: aparecem DOIS
+   botões** — **"Equipar na direita"** e **"Equipar na esquerda"** — no lugar do "Equipar" único.
+   ✅ **Confira nas DUAS listas: "Sua mão" E "Sua mochila"** (guarde um item de uma mão para ver a
    segunda). As duas usam o mesmo helper, então divergir ali seria bug de verdade. *(**100%**,
    condicionado ao item 1.)*
 3. **Escolha uma das duas e confira que SÓ aquele item saiu:** em "Seu corpo", a mão escolhida tem o
    item novo e **a outra está INTACTA**. No log, **uma** linha *"… tira X do corpo — vai para a
-   mochila"* (ou *"para o cemitério"*, se a mochila estiver cheia). *(**100%**, condicionado ao
-   item 2.)*
+   mochila."* *(**100%**, condicionado ao item 2, **com a mochila tendo vaga**.)*
+   ⚠️ **Faça este item com VAGA na mochila.** Com ela **cheia** o jogo não manda a carta ao cemitério
+   calado: `destinoDoDesequipado` **para e devolve a fila**, a **pendência de queima ABRE**, e a linha
+   só aparece **depois** de você resolver o `queimarCarta` — aí com o texto *"— a mochila está cheia,
+   e a carta é descartada."*, ao lado de uma linha de `queimou`. ✏️ **Esta linha estava escrita como
+   *"(ou 'para o cemitério', se a mochila estiver cheia)"*, e era falsa duas vezes** — o texto não é
+   esse e o caminho não é direto. É a mesma forma do item do cemitério da fatia anterior: **frase
+   sobre a tela escrita sem abrir o `narrarEvento.tsx`.**
 4. **CENÁRIO FORÇADO — o Montante toma as duas.** Com as duas mãos ocupadas por itens de uma mão,
    equipe o **Montante**: "Seu corpo" passa a mostrar **Montante nas DUAS mãos**, e **os dois** itens
    anteriores saem (**duas** linhas de `desequipou` no log). *(cenário forçado. 📊 Ter o Montante
@@ -2109,11 +2133,20 @@ reescrever calado.
   a coluna de condição **desalinhada** (corre mais larga que as outras). Soma-se ao desalinhamento
   **pré-existente** de `mesa.ts:238`, que o `CLAUDE.md` já listava. ✏️ *(o ledger citava `:241-242`,
   que são as duas linhas da **afinidade**, não as novas)*
-- `packages/partida/src/mesa.ts:345-350` — o **bloco HISTÓRICO** da contagem de pares ganhou mais um
+- 🔴 **`packages/partida/src/mesa.ts:311-312` — o PREÂMBULO do bloco HISTÓRICO afirma uma contagem
+  FALSA:** *"os números abaixo são de planos passados, NÃO a contagem de hoje **(que é dezesseis)**"*.
+  A Task 2 desta fatia levou a contagem a **DEZOITO**, e o próprio bloco diz isso oito linhas abaixo —
+  **o preâmbulo contradiz o parágrafo que ele apresenta**. ⚠️ **É código, não doc, e NÃO foi
+  consertado aqui** (a Task 6 não toca `packages/*`); fica registrado porque **o ledger que o
+  carregaria vai ser apagado** e este arquivo é o último lugar onde ele pode existir. 🔑 **A ironia é
+  o achado:** é o vício nº 1 dentro do comentário que existe para ensinar a recontar — a Task 2
+  atualizou a **narrativa** da contagem e não o **número** no cabeçalho dela.
+- `packages/partida/src/mesa.ts:346-350` — o **bloco HISTÓRICO** da contagem de pares ganhou mais um
   parágrafo. Segue a convenção do arquivo (nunca reescrever entrada antiga), mas o `CLAUDE.md` lista
   esse bloco como candidato a **deleção** pela política de comentário enxuto — *"o `git log` já
   guarda"*. As duas regras puxam em direções opostas; não era desta fatia resolver. ✏️ *(o ledger
-  citava `:353-358`, que hoje é o `throw new AcaoInvalida` do gate, não narração)*
+  citava `:353-358`, que hoje é o `throw new AcaoInvalida` do gate, não narração; e a minha primeira
+  correção disse `:345-350`, **off by one** — a 345 é um `//` vazio, o parágrafo começa na 346)*
 - `packages/partida/src/bot.ts:272-277` — **seis linhas** de comentário justificando o cast
   `SlotDeItem` → `Slot`; caberia em duas sob a política de comentário enxuto. **Auto-declarado pelo
   implementador**, não achado de revisor.
