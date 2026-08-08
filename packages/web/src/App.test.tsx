@@ -42,8 +42,13 @@ describe('App', () => {
     mockFetch();
     render(<App />);
     await screen.findByRole('button', { name: 'Nova partida' });
+    // Teste de ausência, e por isso as asserções são de DOIS tipos. As três de
+    // STRING prendem os rótulos que o construtor tinha; sozinhas elas viram
+    // vácuo, porque um construtor de volta com outro nome passa por todas. A de
+    // ESTRUTURA é a que resiste ao rename: a mesa não tem `<select>` nenhum.
     expect(screen.queryByLabelText(/Classe/i)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Duelar' })).not.toBeInTheDocument();
     expect(screen.queryByText(/Personagem:/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
   });
 });
