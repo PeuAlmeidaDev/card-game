@@ -115,10 +115,13 @@ a sessão de 2026-08-08 no fim deste arquivo foi escrita com o merge e o gate co
 releu o cabeçalho**. ➡️ **Atualizar o corpo do documento não é conferir o resumo dele.**
 
 **Próxima fatia: `Maldições / Bad Stuff`** (bloco 2 do §3.1 — a que encara a economia, pergunta 11,
-com os consumíveis da #40). ⚠️ **Mas a ordem tem uma pendência aberta desde 2026-08-08:** as decisões
-**#106/#107** (esquiva pela agilidade + teto por raça/classe) eram para pegar **carona** nas Maldições
-quando ainda eram uma linha de código, e **deixaram de caber lá** — ver o bloco de combate na seção
-"Combate", mais abaixo. **O Pedro não escolheu a ordem.**
+com os consumíveis da #40). ✅ **E ela vai SOZINHA (decisão #109, 2026-08-08):** as #105/#106/#107
+(esquiva pela agilidade + teto por raça/classe) eram para pegar **carona** aqui quando ainda eram uma
+linha de código, e **ficam na gaveta** — decididas, **não** construídas, e **desacopladas** desta
+fatia. Duas razões: as Maldições são a fatia da **economia**, e cinco variáveis novas na mesma
+medição não isolariam nada (#24/#25/#51/#69); e o `grill-me` que produziu a #106/#107 foi
+**interrompido com três perguntas na mesa**. 💰 **Custo:** a esquiva segue ignorando o defensor por
+mais uma fatia.
 
 O Plano 2 trocou os guards espalhados do reducer por uma **máquina de fases**:
 `EstadoPartida.fase` (então `vasculhar | combate | descartar`; o 3b levou a cinco, o 4b a **seis**)

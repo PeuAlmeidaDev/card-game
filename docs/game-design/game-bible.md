@@ -1662,4 +1662,8 @@ fatia **Maldições / Bad Stuff**. A #106 + #107 são: trocar o stat da esquiva 
 teto em **5 raças + 4 classes** **mais** aplicar o teto em `montarCombatente` **mais** reprecificar
 os 12 itens **mais** rever a statline dos 5 monstros. ➡️ **Isto é fatia própria**, e continuar
 chamando de carona faz a fatia da economia carregar cinco variáveis novas — a **#51** elevada ao
-cubo. ⬜ **Não decidido: o Pedro ainda não escolheu a ordem.**
+cubo.
+
+| # | Decisão | Por quê |
+|---|---|---|
+| 109 | 🛑 **A ESQUIVA FICA COMO ESTÁ. As #105/#106/#107 são DECIDIDAS e ficam NA GAVETA — desacopladas da fatia das Maldições.** O código segue com `esquivou = rolagem <= rolagemAtaque` (`packages/motor/src/ataque.ts:29`), a Decisão 9 do spec original **continua sendo o presente**, e o *"vai junto com as Maldições"* escrito na #105 está **revogado**. ⬜ **Quando elas viram fatia: não decidido** — e agora isso é uma pergunta de ROTEIRO (§17), não uma dependência da fatia seguinte | Pedido do Pedro em 2026-08-08: *"vamos deixar a esquiva como está por enquanto, vamos focar somente na próxima fatia"*. ✅ **É a #24/#25/#51/#69 sendo aplicada em vez de repetida:** as Maldições são a fatia da **economia** (pergunta 11), e embarcar esquiva + teto nela poria **cinco** variáveis novas na mesma medição — nenhum número isolaria economia de duração de combate, que é exatamente o custo que a #105 tinha aceitado por escrito e que esta decisão **deixa de pagar**. 🔑 **E há uma segunda razão, mais forte que a de método:** o `grill-me` que produziu a #106/#107 foi **interrompido com três perguntas na mesa** (21a, 21b e 23 do §18) — construir com o desenho pela metade é o oposto de *"spec antes do plano, plano antes do código"*. 💰 **Custo aceito e nomeado:** a base fica mais uma fatia com a esquiva que **ignora o defensor**, e com os cinco monstros **defensivamente idênticos** (todos 29,2%) |
