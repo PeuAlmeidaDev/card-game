@@ -30,6 +30,12 @@ const NOME_DO_SLOT: Record<Slot, string> = {
 };
 
 /**
+ * As duas mãos, mesmo par que `MAOS` em `packages/partida/src/equipar.ts` —
+ * duplicado aqui porque `web` só depende de `shared`, não de `partida`.
+ */
+const MAOS: readonly ['maoDireita', 'maoEsquerda'] = ['maoDireita', 'maoEsquerda'];
+
+/**
  * O nome humano de cada fase. `Record<Fase, string>` é o que obriga a fase nova a
  * chegar com nome — um objeto solto a deixaria renderizar `undefined` justamente
  * na linha que existe para o jogador saber onde está.
@@ -152,6 +158,61 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
   // escrito só com `legal(tipo)` acende onde o domínio recusa.
   const legal = (tipo: AcaoDaMesa['tipo']): boolean =>
     podeAgir && acaoEhLegal(vista.fase, vista.queima !== null, tipo);
+
+  // O par fino novo da fatia `empunhadura dupla` (Task 2, tabela do `aplicarAcao`
+  // em `packages/partida/src/mesa.ts`): item de mão, sem `duasMaos`, com as DUAS
+  // ocupadas — a mesma condição que o reducer cobra para exigir `mao` na ação.
+  const precisaEscolherMao = (itemId: string): boolean => {
+    const info = infoDoItem(itemId);
+    if (info === undefined || minhaZona === null) return false;
+    const zona = minhaZona;
+    return info.slot === 'mao' && !info.duasMaos && MAOS.every((m) => zona.slots[m] !== null);
+  };
+
+  /**
+   * O botão "Equipar" — um, ou dois (um por mão) quando `precisaEscolherMao`
+   * vale. Reusada pelas DUAS listas que equipam, mão e mochila: a decisão de
+   * quantos botões renderizar não pode divergir entre elas.
+   *
+   * O SLOT nunca viaja na ação — quem decide onde o item encaixa é o catálogo
+   * do servidor, pelo item; deixar o cliente escolher seria deixá-lo pôr o
+   * capacete no pé. A MÃO é diferente (spec §4): com as duas ocupadas ela é a
+   * única escolha real que o corpo oferece, e por isso viaja quando o par
+   * fino acima vale. A afinidade (`euNaoPossoVestir`) continua no `disabled`,
+   * como sempre — o que muda aqui é só a quantidade de botões.
+   */
+  const botaoEquipar = (cartaId: string, itemId: string) => {
+    const desabilitado = !legal('equiparCarta') || euNaoPossoVestir(itemId);
+    if (!precisaEscolherMao(itemId)) {
+      return (
+        <button
+          type="button"
+          disabled={desabilitado}
+          onClick={() => void agir({ tipo: 'equiparCarta', cartaId })}
+        >
+          Equipar
+        </button>
+      );
+    }
+    return (
+      <>
+        <button
+          type="button"
+          disabled={desabilitado}
+          onClick={() => void agir({ tipo: 'equiparCarta', cartaId, mao: 'maoDireita' })}
+        >
+          Equipar na direita
+        </button>
+        <button
+          type="button"
+          disabled={desabilitado}
+          onClick={() => void agir({ tipo: 'equiparCarta', cartaId, mao: 'maoEsquerda' })}
+        >
+          Equipar na esquerda
+        </button>
+      </>
+    );
+  };
 
   return (
     <section>
@@ -396,13 +457,7 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
           {minhaMochila.map((carta) => (
             <li key={carta.id}>
               {nomeDoItem(carta.itemId)}{rotuloDe(carta.itemId)}{' '}
-              <button
-                type="button"
-                disabled={!legal('equiparCarta') || euNaoPossoVestir(carta.itemId)}
-                onClick={() => void agir({ tipo: 'equiparCarta', cartaId: carta.id })}
-              >
-                Equipar
-              </button>
+              {botaoEquipar(carta.id, carta.itemId)}
             </li>
           ))}
         </ul>
@@ -471,22 +526,11 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
                   Procurar encrenca
                 </button>
               )}
-              {/* Os DOIS pares finos de `equiparCarta` que `legal()` (gate grosso)
-                  não conhece: `carta.tipo === 'equipamento'` decide se o botão
-                  EXISTE; `euNaoPossoVestir` (afinidade `proibida`), no
-                  `disabled` abaixo, é o outro. O SLOT não vai na ação: quem
-                  decide onde encaixa é o item, pelo catálogo do servidor —
-                  deixar o cliente escolher seria deixá-lo pôr o capacete no
-                  pé. */}
-              {carta.tipo === 'equipamento' && (
-                <button
-                  type="button"
-                  disabled={!legal('equiparCarta') || euNaoPossoVestir(carta.itemId)}
-                  onClick={() => void agir({ tipo: 'equiparCarta', cartaId: carta.id })}
-                >
-                  Equipar
-                </button>
-              )}
+              {/* `carta.tipo === 'equipamento'` decide se "Equipar" EXISTE — par
+                  fino que `legal()` não conhece. Os outros dois pares (afinidade
+                  e a escolha de mão) vivem em `botaoEquipar`, reusada pela
+                  mochila logo acima. */}
+              {carta.tipo === 'equipamento' && botaoEquipar(carta.id, carta.itemId)}
               {/* Os pares finos de `guardarCarta` (ver a tabela no `aplicarAcao`).
                   UM gate de existência e o resto em `disabled`:
                   - `carta.tipo === 'equipamento'` → EXISTÊNCIA, mesmo tratamento
