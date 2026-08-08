@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { criarCombate, proximoPasso } from '@card-dungeon/motor';
-import type { Combatente } from '@card-dungeon/motor';
+import type { Combatente, PassivaCombate } from '@card-dungeon/motor';
 import { filaDeDados } from './testes/filaDeDados';
-import { cascaDePedra, escorregadio, sangueDeGuerra } from './passivas';
+import { cascaDePedra, escorregadio, sangueDeGuerra, golpeCerteiro, impacto, explosao } from './passivas';
 import { RACAS, obterRaca } from './racas';
 
 const jogador: Combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 9, level: 1 };
@@ -43,6 +43,146 @@ describe('Sangue de Guerra (Orc)', () => {
     // dado 1: ataque seguinte do monstro acerta e pede esquiva
     const golpe = proximoPasso(feridoPasso.estado, { tipo: 'atacar' }, filaDeDados([2, 12, 1]), [sangueDeGuerra]);
     expect(golpe.estado.monstro.vida).toBe(93);
+  });
+});
+
+describe('Golpe Certeiro (Ladino)', () => {
+  const ladino: Combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 9, level: 1 };
+  const alvo: Combatente = { forca: 2, vida: 100, habilidade: 6, agilidade: 4, level: 1 };
+
+  it('rolagem de ataque ≤ 2 dobra o dano', () => {
+    const inicio = criarCombate(ladino, alvo, filaDeDados([]), [golpeCerteiro]);
+    // ataque 2 (≤ 2, crítico) acerta; esquiva 9 > 2 falha; dano base 1+3=4, dobrado 8
+    // 12 > habilidade 6: o alvo erra o contra-ataque e devolve a vez
+    const passo = proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([2, 9, 12]), [golpeCerteiro]);
+    expect(passo.estado.monstro.vida).toBe(92);
+  });
+
+  it('rolagem 3 já não é crítico — o dial é o 2', () => {
+    const inicio = criarCombate(ladino, alvo, filaDeDados([]), [golpeCerteiro]);
+    const passo = proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([3, 9, 12]), [golpeCerteiro]);
+    expect(passo.estado.monstro.vida).toBe(96);
+  });
+
+  it('não dobra o dano SOFRIDO — o crítico é do golpe do portador', () => {
+    // `golpeCerteiro` só hooka `aoCausarDano`; o dano que o Ladino SOFRE nunca passa
+    // por ele, então não há como dobrar aqui. (A prova de que `rolagemDeAtaque`
+    // chega `null` aos ganchos que `esquivar()` compõe é o dublê em
+    // `motor/src/combate.test.ts` — este teste não a faz.)
+    const veloz: Combatente = { ...alvo, agilidade: 12, forca: 5, habilidade: 12 };
+    const inicio = criarCombate(ladino, veloz, filaDeDados([1]), [golpeCerteiro]); // ataque 1 do monstro acerta
+    const passo = proximoPasso(inicio.estado, { tipo: 'esquivar' }, filaDeDados([12]), [golpeCerteiro]);
+    // dano sofrido = level 1 + forca 5 = 6, NÃO dobrado; 20 - 6 = 14
+    expect(passo.estado.jogador.vida).toBe(14);
+  });
+});
+
+describe('Impacto (Guerreiro)', () => {
+  const guerreiro: Combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 9, level: 1 };
+  const alvo: Combatente = { forca: 2, vida: 100, habilidade: 6, agilidade: 4, level: 1 };
+
+  it('quando ELE ataca, o empate não salva o defensor', () => {
+    const inicio = criarCombate(guerreiro, alvo, filaDeDados([]), [impacto]);
+    // ataque 5 acerta; esquiva 5 EMPATA (que normalmente salva); Impacto anula.
+    // dano 1+3 = 4; 100 - 4 = 96. Depois 12 > 6: o alvo erra e devolve a vez.
+    const passo = proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([5, 5, 12]), [impacto]);
+    expect(passo.estado.monstro.vida).toBe(96);
+    expect(passo.eventos).toContainEqual({ tipo: 'esquiva', defensor: 'b', rolagem: 5, esquivou: false });
+  });
+
+  it('sem o Impacto, o mesmo empate SALVA o defensor', () => {
+    // O gêmeo é obrigatório: sem ele o teste acima passaria se o empate nunca salvasse.
+    const inicio = criarCombate(guerreiro, alvo, filaDeDados([]));
+    const passo = proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([5, 5, 12]));
+    expect(passo.estado.monstro.vida).toBe(100);
+    expect(passo.eventos).toContainEqual({ tipo: 'esquiva', defensor: 'b', rolagem: 5, esquivou: true });
+  });
+
+  it('não é consultado quando NÃO houve empate', () => {
+    let consultas = 0;
+    const espiao: PassivaCombate = {
+      id: 'espiao',
+      aoEmpatarEsquiva: (ctx) => { consultas += 1; return { empateSalva: false, estado: ctx.estado }; },
+    };
+    const inicio = criarCombate(guerreiro, alvo, filaDeDados([]), [espiao]);
+    proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([5, 9, 12]), [espiao]);
+    expect(consultas).toBe(0);
+  });
+
+  it('uma esquiva legítima (sem empate) não é anulada pelo Impacto', () => {
+    // Distingue "esquivou" de "empatou": só o empate é ponto de extensão.
+    const inicio = criarCombate(guerreiro, alvo, filaDeDados([]), [impacto]);
+    // ataque 6 acerta; esquiva 3 <= 6 esquiva de verdade (3 !== 6, não é empate).
+    // 12 > 6: o alvo erra o contra-ataque e devolve a vez.
+    const passo = proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([6, 3, 12]), [impacto]);
+    expect(passo.estado.monstro.vida).toBe(100);
+    expect(passo.eventos).toContainEqual({ tipo: 'esquiva', defensor: 'b', rolagem: 3, esquivou: true });
+  });
+
+  it('quando ELE defende, o empate continua sendo dele', () => {
+    // A passiva vale só com o portador atacando. Defendendo, o empate já o salva.
+    const veloz: Combatente = { ...alvo, agilidade: 12, habilidade: 12, forca: 5 };
+    const inicio = criarCombate(guerreiro, veloz, filaDeDados([7]), [impacto]); // monstro ataca com 7
+    const passo = proximoPasso(inicio.estado, { tipo: 'esquivar' }, filaDeDados([7]), [impacto]); // empate
+    expect(passo.estado.jogador.vida).toBe(20);
+  });
+});
+
+describe('Explosão (Mago de Fogo)', () => {
+  const mago: Combatente = { forca: 6, vida: 7, habilidade: 6, agilidade: 9, level: 1 };
+  const alvo: Combatente = { forca: 2, vida: 100, habilidade: 6, agilidade: 4, level: 1 };
+
+  it('dobra o PRIMEIRO golpe que conecta, uma vez por combate', () => {
+    const inicio = criarCombate(mago, alvo, filaDeDados([]), [explosao]);
+    // golpe 1: ataque 4 <= 6 acerta; esquiva 9 > 4 falha; dano 1+6=7, dobrado 14 => 86
+    const g1 = proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([4, 9, 12]), [explosao]);
+    expect(g1.estado.monstro.vida).toBe(86);
+    expect(g1.estado.passivas).toEqual([{ id: 'explosao', usos: 1 }]);
+    // golpe 2: mesmo padrão, dano 7 sem dobrar => 79
+    const g2 = proximoPasso(g1.estado, { tipo: 'atacar' }, filaDeDados([4, 9, 12]), [explosao]);
+    expect(g2.estado.monstro.vida).toBe(79);
+  });
+
+  it('o golpe que ERRA não gasta a Explosão — ela é do primeiro que CONECTA', () => {
+    const inicio = criarCombate(mago, alvo, filaDeDados([]), [explosao]);
+    // ataque 12 > habilidade 6: erra. `aoCausarDano` nem é chamado (base = 0).
+    const errou = proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([12, 12]), [explosao]);
+    expect(errou.estado.passivas).toEqual([{ id: 'explosao', usos: 0 }]);
+    const conectou = proximoPasso(errou.estado, { tipo: 'atacar' }, filaDeDados([4, 9, 12]), [explosao]);
+    expect(conectou.estado.monstro.vida).toBe(86);
+  });
+
+  it('o golpe ESQUIVADO também não gasta a Explosão', () => {
+    const inicio = criarCombate(mago, alvo, filaDeDados([]), [explosao]);
+    // ataque 4 acerta; esquiva 4 empata e SALVA (o Mago não tem Impacto) => dano 0
+    const esquivado = proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([4, 4, 12]), [explosao]);
+    expect(esquivado.estado.monstro.vida).toBe(100);
+    expect(esquivado.estado.passivas).toEqual([{ id: 'explosao', usos: 0 }]);
+  });
+});
+
+describe('composição raça + classe no mesmo gancho', () => {
+  it('Sangue de Guerra e Explosão compõem em CADEIA, na ordem raça → classe', () => {
+    // Para a ORDEM importar, o portador precisa estar FERIDO (fúria ativa) no
+    // PRIMEIRO golpe que ele conecta — senão a Explosão já queimou e as duas
+    // ordens dariam o mesmo número. O alvo, mais ágil, ataca primeiro e fere o
+    // orcMago antes do turno de ataque dele; só então o orcMago ataca por vez
+    // com fúria E Explosão as duas frescas no mesmo golpe.
+    const orcMago: Combatente = { forca: 6, vida: 10, habilidade: 8, agilidade: 4, level: 1 };
+    const alvo: Combatente = { forca: 5, vida: 200, habilidade: 12, agilidade: 12, level: 1 };
+
+    const inicio = criarCombate(orcMago, alvo, filaDeDados([1]), [sangueDeGuerra, explosao]);
+    // alvo ataca primeiro (mais ágil): 1 <= 12 acerta.
+    const ferido = proximoPasso(inicio.estado, { tipo: 'esquivar' }, filaDeDados([12]), [sangueDeGuerra, explosao]);
+    // esquiva 12 > 1 falha; dano = level 1 + força 5 = 6; vida 10 - 6 = 4 (<= 5, ferido)
+    expect(ferido.estado.jogador.vida).toBe(4);
+
+    // primeiro ataque do orcMago: ataque 2 <= 8 acerta; esquiva 12 > 2 falha;
+    // base = level 1 + força 6 = 7. Em cadeia, na ordem raça → classe:
+    // (7 + 3) * 2 = 20. A ordem inversa daria (7 * 2) + 3 = 17 — é ela que este
+    // teste separa, e é a ordem que `passivasDoLutador` (partida) declara.
+    const golpe = proximoPasso(ferido.estado, { tipo: 'atacar' }, filaDeDados([2, 12, 1]), [sangueDeGuerra, explosao]);
+    expect(golpe.estado.monstro.vida).toBe(180);
   });
 });
 

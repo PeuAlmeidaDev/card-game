@@ -6,7 +6,7 @@ import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/compo
 import { AcaoInvalida } from './erros';
 import { filaDeDados } from './testes/dados';
 import { raca, equipamento } from './testes/cartas';
-import { catalogoDeTeste, ID_DA_CLASSE_DE_TESTE } from './testes/catalogo';
+import { catalogoDeTeste, comClasseDeTeste } from './testes/catalogo';
 import type { EntradaJogador, CartaTesouro, EstadoPartida } from './tipos';
 
 /**
@@ -17,12 +17,16 @@ import type { EntradaJogador, CartaTesouro, EstadoPartida } from './tipos';
 const catalogoPadrao = catalogoDeTeste();
 const semEmbaralhar = <T,>(itens: readonly T[]): T[] => [...itens];
 const entradas: readonly EntradaJogador[] = [
-  { id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE },
-  { id: 'p2', nome: 'Bot 1', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
+  { id: 'p1', nome: 'Você', ehBot: false },
+  { id: 'p2', nome: 'Bot 1', ehBot: true },
 ];
 
+/** `criarPartida` mais o stamp da classe de teste na zona — ver `comClasseDeTeste`. */
+const criar = (...args: Parameters<typeof criarPartida>): EstadoPartida =>
+  comClasseDeTeste(criarPartida(...args));
+
 describe('projetarPara', () => {
-  const partida = criarPartida(
+  const partida = criar(
     'm1', entradas,
     { patenteAlvo: 10, composicaoPorJogador: COMPOSICAO_DE_TESTE, composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
     { embaralhar: semEmbaralhar },
@@ -152,10 +156,10 @@ describe('projetarPara', () => {
   });
 
   it('publica os stats CALCULADOS de cada um, não a classe crua', () => {
-    // O contrário — publicar `classeId` e deixar o cliente somar classe + itens —
-    // é reimplementar regra de jogo na UI, com uma segunda soma para divergir da
-    // do domínio. E é público porque a zona que o produz já é aberta: esconder o
-    // total seria teatro.
+    // O contrário — a vista carregar um `classeId` e o cliente somar classe +
+    // itens — é reimplementar regra de jogo na UI, com uma segunda soma para
+    // divergir da do domínio. E é público porque a zona que o produz já é aberta:
+    // esconder o total seria teatro.
     const vista = projetarPara('p1', partida, catalogoPadrao);
 
     expect(vista.jogadores.every((j) => !('classeId' in j))).toBe(true);
@@ -179,7 +183,7 @@ describe('projetarPara', () => {
   it('a fase é pública — é dela que o cliente tira quais botões acendem', () => {
     // Não é segredo: a fase descreve o turno de quem está jogando, e o cliente
     // que não a tivesse voltaria a reimplementar a regra para acender botão.
-    const p = criarPartida(
+    const p = criar(
       'm1', entradas,
       { patenteAlvo: 10, composicaoPorJogador: COMPOSICAO_DE_TESTE, composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
       { embaralhar: semEmbaralhar },
@@ -188,20 +192,34 @@ describe('projetarPara', () => {
     expect(projetarPara('p1', p, catalogoPadrao).fase).toBe('vasculhar');
     expect(projetarPara('p2', p, catalogoPadrao).fase).toBe('vasculhar');
   });
+
+  it('publica `limiteDeMochila` por jogador — o cliente não guarda cópia da regra', () => {
+    // ⚠️ SEM `comClasseDeTeste`: `partida` (acima) já vem com a classe carimbada e
+    // devolveria 5 para os dois — este teste quer o Aprendiz de verdade, que é o
+    // estado em que a mesa nasce (`criarPartida` não semeia classe nenhuma).
+    const semClasse = criarPartida(
+      'm1', entradas,
+      { patenteAlvo: 10, composicaoPorJogador: COMPOSICAO_DE_TESTE, composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
+      { embaralhar: semEmbaralhar },
+    );
+    const vista = projetarPara('p1', semClasse, catalogoPadrao);
+
+    expect(vista.jogadores.map((j) => j.limiteDeMochila)).toEqual([6, 6]);
+  });
 });
 
 describe('versaoDe — a versão anda quando a espiada abre', () => {
   const semEmbaralhar = <T,>(itens: readonly T[]): T[] => [...itens];
   const entradas = [
-    { id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE },
-    { id: 'p2', nome: 'Bot 1', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
+    { id: 'p1', nome: 'Você', ehBot: false },
+    { id: 'p2', nome: 'Bot 1', ehBot: true },
   ];
   const depsVidente = {
     rolar: () => 1,
     embaralhar: semEmbaralhar,
     catalogo: catalogoDeTeste({ raca: () => ({ passivaCombate: null, espiaTopo: true }) }),
   };
-  const criar = () => criarPartida('m1', entradas,
+  const mesaDoVidente = () => criar('m1', entradas,
     {
       patenteAlvo: 10,
       composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }],
@@ -210,7 +228,7 @@ describe('versaoDe — a versão anda quando a espiada abre', () => {
     { embaralhar: semEmbaralhar });
 
   it('sem espiada pendente, a versão É o tamanho do log', () => {
-    const p = criar();
+    const p = mesaDoVidente();
     expect(versaoDe(p)).toBe(p.log.length);
   });
 
@@ -218,7 +236,7 @@ describe('versaoDe — a versão anda quando a espiada abre', () => {
     // Espiar não emite evento (o topo é segredo). Sem este +1 a versão fica
     // PARADA: um retry do vasculhar passaria pelo guard de 409 e morreria como
     // 400 no reducer — o único ponto da mesa que erra onde o resto ressincroniza.
-    const p = criar();
+    const p = mesaDoVidente();
     const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente).estado;
 
     expect(comEspiada.log.length).toBe(p.log.length);   // nenhum evento público
@@ -229,7 +247,7 @@ describe('versaoDe — a versão anda quando a espiada abre', () => {
     // A invariante que o 409 depende: dois estados distintos nunca compartilham
     // versão. Encarar emite 2 eventos (porta + vez/combate), então o log salta de
     // N para N+2 e a versão de N+1 para N+2 — nunca repete.
-    const p = criar();
+    const p = mesaDoVidente();
     const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente).estado;
     const resolvido = aplicarAcao(comEspiada, { tipo: 'manterCarta', jogadorId: 'p1' }, depsVidente).estado;
 
@@ -238,7 +256,7 @@ describe('versaoDe — a versão anda quando a espiada abre', () => {
   });
 
   it('a vista publica a mesma versão derivada', () => {
-    const p = criar();
+    const p = mesaDoVidente();
     const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsVidente).estado;
     expect(projetarPara('p1', comEspiada, catalogoPadrao).versao).toBe(versaoDe(comEspiada));
     expect(projetarPara('p2', comEspiada, catalogoPadrao).versao).toBe(versaoDe(comEspiada));

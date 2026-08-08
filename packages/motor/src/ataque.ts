@@ -24,10 +24,11 @@ export function rolarEsquivaContra(
   rolagemAtaque: number,
   ladoDefensor: Lado,
   rolar: RolarD12,
-): { readonly esquivou: boolean; readonly evento: EventoCombate } {
+): { readonly rolagem: number; readonly esquivou: boolean; readonly evento: EventoCombate } {
   const rolagem = rolar();
   const esquivou = rolagem <= rolagemAtaque;
   return {
+    rolagem,
     esquivou,
     evento: { tipo: 'esquiva', defensor: ladoDefensor, rolagem, esquivou },
   };
@@ -36,27 +37,4 @@ export function rolarEsquivaContra(
 /** Dano de um golpe que conectou. */
 export function danoDe(atacante: Combatente): number {
   return atacante.level + atacante.forca;
-}
-
-/**
- * Resolve um ataque completo: acerto → (se acertou) esquiva → (se não esquivou) dano.
- * Composição das primitivas acima. Não toca na Vida — quem aplica é o chamador.
- */
-export function resolverAtaque(
-  atacante: Combatente,
-  ladoAtacante: Lado,
-  ladoDefensor: Lado,
-  rolar: RolarD12,
-): { readonly dano: number; readonly eventos: readonly EventoCombate[] } {
-  const ataque = rolarAtaqueDe(atacante, ladoAtacante, rolar);
-  if (!ataque.acertou) {
-    return { dano: 0, eventos: [ataque.evento] };
-  }
-
-  const esquiva = rolarEsquivaContra(ataque.rolagem, ladoDefensor, rolar);
-  if (esquiva.esquivou) {
-    return { dano: 0, eventos: [ataque.evento, esquiva.evento] };
-  }
-
-  return { dano: danoDe(atacante), eventos: [ataque.evento, esquiva.evento] };
 }

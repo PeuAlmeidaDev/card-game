@@ -3,7 +3,7 @@ import { render, screen, waitFor, cleanup, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event';
 import { TelaMesa } from './TelaMesa';
 import { api } from './api';
-import { SLOTS_VAZIOS, LIMITE_MOCHILA } from '@card-dungeon/shared';
+import { SLOTS_VAZIOS } from '@card-dungeon/shared';
 import type { Catalogo, CartaTesouro, VistaDaPartida } from '@card-dungeon/shared';
 
 const combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
@@ -13,13 +13,18 @@ const combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 }
 // Adaptável do Humano. Depois do giro do dial da task 8, 7 e 8 são os ÚNICOS
 // valores que o domínio emite — um fixture com 5 (o que estava aqui) ou 0 afirma
 // sobre um jogo que não existe, e passa verde justamente por isso.
+//
+// Mesma lógica para `limiteDeMochila: 6`: os dois assentos também entram SEM
+// classe em jogo (Aprendiz), e `limiteDeMochila()` devolve o base (5) + 1 pela
+// compensação dele — o giro do dial desta task torna 5 e 6 os ÚNICOS valores que
+// o domínio emite.
 const vistaBase: VistaDaPartida = {
   id: 'm1',
   voce: 'p1',
   versao: 1,
   jogadores: [
-    { id: 'p1', nome: 'Você', ehBot: false, patente: 1, derrotas: 0, combatente, emJogo: { raca: null, slots: SLOTS_VAZIOS }, cartasNaMao: 0, limiteDeMao: 8, mochila: [] },
-    { id: 'p2', nome: 'Bot 1', ehBot: true, patente: 2, derrotas: 1, combatente, emJogo: { raca: null, slots: SLOTS_VAZIOS }, cartasNaMao: 0, limiteDeMao: 8, mochila: [] },
+    { id: 'p1', nome: 'Você', ehBot: false, patente: 1, derrotas: 0, combatente, emJogo: { raca: null, classe: null, slots: SLOTS_VAZIOS }, cartasNaMao: 0, limiteDeMao: 8, mochila: [], limiteDeMochila: 6 },
+    { id: 'p2', nome: 'Bot 1', ehBot: true, patente: 2, derrotas: 1, combatente, emJogo: { raca: null, classe: null, slots: SLOTS_VAZIOS }, cartasNaMao: 0, limiteDeMao: 8, mochila: [], limiteDeMochila: 6 },
   ],
   vezDe: 'p1',
   patenteAlvo: 10,
@@ -59,6 +64,12 @@ const MONSTROS_PADRAO: Catalogo['monstros'] = [
 const ITENS_PADRAO: Catalogo['itens'] = [
   { id: 'espada-curta', nome: 'Espada Curta', slot: 'maoDireita', duasMaos: false, modificadores: { forca: 2 }, exclusivo: null },
   { id: 'elmo-de-couro', nome: 'Elmo de Couro', slot: 'capacete', duasMaos: false, modificadores: { vida: 2 }, exclusivo: null },
+];
+
+// Mesma ideia, para a carta de classe (Task 11): sem o catálogo o nome cairia
+// no fallback `?? id` e a tela mostraria "guerreiro" em vez de "Guerreiro".
+const CLASSES_PADRAO: Catalogo['classes'] = [
+  { id: 'guerreiro', nome: 'Guerreiro', texto: '…' },
 ];
 
 /** Uma carta de Tesouro na mão (ou já no corpo). */
@@ -130,9 +141,10 @@ const abrirMesa = async (
   racas: Catalogo['racas'] = RACAS_PADRAO,
   monstros: Catalogo['monstros'] = MONSTROS_PADRAO,
   itens: Catalogo['itens'] = ITENS_PADRAO,
+  classes: Catalogo['classes'] = CLASSES_PADRAO,
 ) => {
   vi.spyOn(api, 'criarPartida').mockResolvedValue({ status: 200, body: vista } as never);
-  render(<TelaMesa racas={racas} monstros={monstros} itens={itens} />);
+  render(<TelaMesa racas={racas} monstros={monstros} itens={itens} classes={classes} />);
   await userEvent.click(screen.getByRole('button', { name: /nova partida/i }));
 };
 
@@ -458,16 +470,23 @@ describe('TelaMesa — a mão', () => {
     expect(screen.getByText(/uma carta de Orc/)).toBeInTheDocument();
   });
 
-  it('só carta de raça tem botão de jogar', async () => {
-    // `fase: 'recompor'` porque é a única em que jogar raça é legal: uma vista de
-    // `vasculhar` com "Jogar" na tela seria uma vista que nunca aceita o clique.
+  it('a carta de PORTA jogável (raça e classe) tem botão de jogar; o monstro não', async () => {
+    // O título dizia *"só carta de raça"*, e a Task 11 derrubou a exclusividade —
+    // a asserção não quebrou porque a fixture não tinha classe. A fixture passou a
+    // ter: quem prova a exclusão agora é o `toHaveLength(2)` sobre TRÊS cartas.
+    // `fase: 'recompor'` porque é a única em que jogar raça ou classe é legal: uma
+    // vista de `vasculhar` com "Jogar" na tela seria uma vista que nunca aceita o clique.
     await abrirMesa({
       ...vistaBase,
       fase: 'recompor',
-      suaMao: [{ id: 'p-1', tipo: 'monstro', monstroId: 'goblin' }, { id: 'p-2', tipo: 'raca', racaId: 'orc' }],
+      suaMao: [
+        { id: 'p-1', tipo: 'monstro', monstroId: 'goblin' },
+        { id: 'p-2', tipo: 'raca', racaId: 'orc' },
+        { id: 'pc-1', tipo: 'classe', classeId: 'guerreiro' },
+      ],
     });
 
-    expect(screen.getAllByRole('button', { name: 'Jogar' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Jogar' })).toHaveLength(2);
   });
 
   it('dentro do limite, entregar fica desabilitado', async () => {
@@ -588,6 +607,79 @@ describe('TelaMesa — a mão', () => {
     expect(screen.getByText(/Orc/)).toBeInTheDocument();
   });
 
+  it('mostra a classe em jogo de cada assento, ao lado da raça', async () => {
+    await abrirMesa({
+      ...vistaBase,
+      jogadores: vistaBase.jogadores.map((j) => (
+        j.id === 'p2'
+          ? { ...j, emJogo: { ...j.emJogo, classe: { id: 'pc-1', tipo: 'classe', classeId: 'guerreiro' } } }
+          : j
+      )),
+    });
+
+    expect(screen.getByText(/Guerreiro/)).toBeInTheDocument();
+  });
+
+  it('quem está sem classe aparece como Aprendiz', async () => {
+    // A ausência precisa ser LEGÍVEL: sem isto, o jogador não descobre que está
+    // sem classe nem por que a mochila dele é maior que a dos outros. Por isso a
+    // classe é renderizada SEMPRE, ao contrário da raça (que só aparece quando há).
+    // `vistaBase` já nasce com `emJogo.classe: null` nos dois assentos.
+    await abrirMesa(vistaBase);
+
+    expect(screen.getAllByText(/Aprendiz/).length).toBeGreaterThan(0);
+  });
+
+  it('o botão "Jogar" existe na carta de CLASSE da mão, como já existe na de raça', async () => {
+    // Gate de EXISTÊNCIA (o par fino de tipo de `jogarCarta`), não `disabled`: um
+    // monstro nunca vai poder ser jogado, em fase nenhuma.
+    await abrirMesa({
+      ...vistaBase,
+      fase: 'recompor',
+      suaMao: [{ id: 'pc-1', tipo: 'classe', classeId: 'guerreiro' }],
+    });
+
+    const linha = screen.getByText(/uma carta de Guerreiro/).closest('li');
+    if (linha === null) throw new Error('a carta de classe não foi renderizada');
+    expect(within(linha).getByRole('button', { name: 'Jogar' })).toBeInTheDocument();
+  });
+
+  it('"Jogar" na carta de classe manda o cartaId DAQUELA linha', async () => {
+    // Os botões têm o MESMO rótulo em várias linhas: `getByRole` genérico pega o
+    // primeiro e o teste passaria com a ação errada. Escopado por linha — é o
+    // defeito que a Task 6 da fatia `escolha do descarte` pegou.
+    const agir = vi.spyOn(api, 'agir').mockResolvedValue({ status: 200, body: vistaBase } as never);
+    await abrirMesa({
+      ...vistaBase,
+      fase: 'recompor',
+      suaMao: [
+        { id: 'pr-1', tipo: 'raca', racaId: 'orc' },
+        { id: 'pc-1', tipo: 'classe', classeId: 'guerreiro' },
+      ],
+    });
+
+    const linha = screen.getByText(/uma carta de Guerreiro/).closest('li');
+    if (linha === null) throw new Error('a carta de classe não foi renderizada');
+    await userEvent.click(within(linha).getByRole('button', { name: 'Jogar' }));
+
+    expect(agir).toHaveBeenCalledWith({
+      params: { id: 'm1' },
+      body: { acao: { tipo: 'jogarCarta', cartaId: 'pc-1' }, versao: 1 },
+    });
+  });
+
+  it('nenhum botão "Jogar" na carta de MONSTRO', async () => {
+    await abrirMesa({
+      ...vistaBase,
+      fase: 'recompor',
+      suaMao: [{ id: 'm1', tipo: 'monstro', monstroId: 'goblin' }],
+    });
+
+    const linha = screen.getByText(/um Goblin/).closest('li');
+    if (linha === null) throw new Error('a carta de monstro não foi renderizada');
+    expect(within(linha).queryByRole('button', { name: 'Jogar' })).not.toBeInTheDocument();
+  });
+
   it('partida terminada na vez do humano: jogar carta fica desabilitado', async () => {
     // Achado do review: `fecharCombate` termina a partida sem passar a vez, então
     // `vezDe` continua no vencedor — se a guarda da mão não olhar o desfecho, o
@@ -647,7 +739,7 @@ describe('TelaMesa — o corpo', () => {
   const comCorpo = (slots: VistaDaPartida['jogadores'][number]['emJogo']['slots']): VistaDaPartida => ({
     ...vistaBase,
     jogadores: vistaBase.jogadores.map((j) => (
-      j.id === 'p1' ? { ...j, emJogo: { raca: null, slots } } : j
+      j.id === 'p1' ? { ...j, emJogo: { raca: null, classe: null, slots } } : j
     )),
   });
 
@@ -717,7 +809,7 @@ describe('TelaMesa — os stats na lista', () => {
               // o justifica. Mexer num sem o outro seria uma vista que o domínio
               // não consegue produzir.
               combatente: { ...combatente, forca: 5 },
-              emJogo: { raca: null, slots: { ...SLOTS_VAZIOS, maoDireita: tesouro('t-1') } },
+              emJogo: { raca: null, classe: null, slots: { ...SLOTS_VAZIOS, maoDireita: tesouro('t-1') } },
             }
           : j
       )),
@@ -756,7 +848,7 @@ describe('TelaMesa — os stats na lista', () => {
               // `level: 2` porque o level É a patente (`combatenteDe`), e o p2
               // está na patente 2 — um level 1 aqui seria vista impossível.
               combatente: { ...combatente, forca: 5, level: 2 },
-              emJogo: { raca: null, slots: { ...SLOTS_VAZIOS, maoDireita: tesouro('t-2') } },
+              emJogo: { raca: null, classe: null, slots: { ...SLOTS_VAZIOS, maoDireita: tesouro('t-2') } },
             }
           : j
       )),
@@ -1046,6 +1138,22 @@ describe('TelaMesa — a mochila', () => {
     )),
   });
 
+  it('o cabeçalho mostra o teto que veio da VISTA, não um número cravado', async () => {
+    // A tela lê `eu?.limiteDeMochila` — nunca uma constante local. `vistaBase`
+    // já publica 6 por default (o Aprendiz); forçar 5 aqui (quem TEM classe em
+    // jogo) prova que o número exibido segue a vista em vez de um valor fixo no
+    // componente — um `6` cravado no lugar do antigo `LIMITE_MOCHILA` passaria
+    // este teste por acaso, mas não o de baixo.
+    const vista: VistaDaPartida = {
+      ...vistaBase,
+      jogadores: vistaBase.jogadores.map((j) => (j.id === 'p1' ? { ...j, limiteDeMochila: 5 } : j)),
+    };
+
+    await abrirMesa(vista);
+
+    expect(await screen.findByText(/Sua mochila — 0 de 5/)).toBeInTheDocument();
+  });
+
   it('a mochila de TODOS aparece na tela, com o item nomeado', async () => {
     // Zona aberta: esconder a do adversário seria teatro, e é dela que sai a
     // leitura de quem está estocando o quê para vestir depois.
@@ -1070,11 +1178,29 @@ describe('TelaMesa — a mochila', () => {
   it('"Guardar" APAGA com a mochila cheia — gêmeo do guard do reducer', async () => {
     // Par fino da tabela do `aplicarAcao`: o gate de FASE deixa passar, e quem
     // recusa é o guard de teto. Botão aceso aqui vira 400 na cara do jogador.
-    const cheia = Array.from({ length: LIMITE_MOCHILA }, (_, i) => tesouro(`t-c${String(i)}`));
+    // 6, não 5: p1 (`vistaBase`) é Aprendiz — `limiteDeMochila` publica o +1.
+    const cheia = Array.from({ length: 6 }, (_, i) => tesouro(`t-c${String(i)}`));
 
     await abrirMesa(emParada('recompor', [tesouro('t-1')], cheia));
 
     expect(await screen.findByRole('button', { name: /guardar/i })).toBeDisabled();
+  });
+
+  it('"Guardar" ACESO com 5 na mochila e teto 6 — o `disabled` segue o teto DA VISTA', async () => {
+    // O fixture DISCRIMINANTE que faltava: o gêmeo de cima usa 6 (`6 >= 5` e
+    // `6 >= 6` dão o mesmo) e o de "aceso" usa mochila vazia, então nenhum
+    // distinguia 5 de 6. Uma regressão do cliente para a constante global que a
+    // Task 8 matou (`>= 5`) apagaria "Guardar" para o Aprendiz com 5 na mochila —
+    // numa ação que o domínio ACEITA. É a cópia da regra no cliente, o vício que
+    // o teto POR JOGADOR existe para matar.
+    const cinco = Array.from({ length: 5 }, (_, i) => tesouro(`t-c${String(i)}`));
+    const vista = emParada('recompor', [tesouro('t-1')], cinco);
+    // Pré-condição explícita: p1 é Aprendiz, e o teto que a VISTA publica é 6.
+    expect(vista.jogadores.find((j) => j.id === 'p1')?.limiteDeMochila).toBe(6);
+
+    await abrirMesa(vista);
+
+    expect(await screen.findByRole('button', { name: /guardar/i })).toBeEnabled();
   });
 
   it('carta de PORTA na mão não tem "Guardar" — o outro par fino', async () => {
@@ -1129,7 +1255,7 @@ describe('TelaMesa — afinidade de itens', () => {
         fase: 'recompor',
         jogadores: vistaBase.jogadores.map((j) => (
           j.id === 'p1'
-            ? { ...j, emJogo: { raca: { id: 'r1', tipo: 'raca', racaId: 'anao' }, slots: SLOTS_VAZIOS }, limiteDeMao: 7 }
+            ? { ...j, emJogo: { raca: { id: 'r1', tipo: 'raca', racaId: 'anao' }, classe: null, slots: SLOTS_VAZIOS }, limiteDeMao: 7 }
             : j
         )),
         suaMao: [tesouro('t-1', 'machado')],
@@ -1155,7 +1281,7 @@ describe('TelaMesa — afinidade de itens', () => {
           j.id === 'p1'
             ? {
               ...j,
-              emJogo: { raca: { id: 'r1', tipo: 'raca', racaId: 'anao' }, slots: SLOTS_VAZIOS },
+              emJogo: { raca: { id: 'r1', tipo: 'raca', racaId: 'anao' }, classe: null, slots: SLOTS_VAZIOS },
               limiteDeMao: 7,
               mochila: [tesouro('t-1', 'machado')],
             }
@@ -1182,15 +1308,23 @@ describe('TelaMesa — afinidade de itens', () => {
 });
 
 describe('TelaMesa — a queima pendente', () => {
+  // A vista é FORJADA direto (a `queima` não nasce daqui passando pelo reducer).
+  // O TAMANHO só precisa ser fixo e conhecido para as asserções contarem os
+  // botões — mas o valor publicado de `limiteDeMochila` para p1 é sobrescrito
+  // abaixo para BATER com ele (5): sem isso a vista afirma "mochila com 5 de
+  // 6" com uma queima aberta, um estado que o domínio nunca produziria (com
+  // vaga sobrando não haveria pendência nenhuma).
   const mochilaCheia: readonly CartaTesouro[] = Array.from(
-    { length: LIMITE_MOCHILA }, (_, i) => tesouro(`t-mochila-${String(i)}`, 'elmo-de-couro'),
+    { length: 5 }, (_, i) => tesouro(`t-mochila-${String(i)}`, 'elmo-de-couro'),
   );
 
   /** A vista com a queima aberta para `dono`, e a mochila de p1 no teto. */
   const comQueima = (dono: string): VistaDaPartida => ({
     ...vistaBase,
     fase: 'recompor',
-    jogadores: vistaBase.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: mochilaCheia } : j)),
+    jogadores: vistaBase.jogadores.map((j) => (
+      j.id === 'p1' ? { ...j, mochila: mochilaCheia, limiteDeMochila: 5 } : j
+    )),
     queima: {
       jogadorId: dono,
       deslocados: [tesouro('t-saiu', 'espada-curta')],
@@ -1201,7 +1335,7 @@ describe('TelaMesa — a queima pendente', () => {
   it('lista as SEIS cartas: o deslocado e as cinco da mochila', async () => {
     await abrirMesa(comQueima('p1'));
 
-    expect(screen.getAllByRole('button', { name: 'Queimar' })).toHaveLength(1 + LIMITE_MOCHILA);
+    expect(screen.getAllByRole('button', { name: 'Queimar' })).toHaveLength(1 + mochilaCheia.length);
     const bloco = screen.getByLabelText('queima pendente');
     expect(within(bloco).getByText(/Espada Curta/)).toBeInTheDocument();
   });

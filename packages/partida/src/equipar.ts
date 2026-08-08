@@ -1,7 +1,7 @@
 import type {
   CartaEquipamento, EstadoPartida, EventoDaMesa, InfoItem, QueimaPendente, Slot, ZonaEmJogo,
 } from './tipos';
-import { LIMITE_MOCHILA } from './mao';
+import { limiteDeMochila } from './mao';
 
 /**
  * As duas mãos, na ordem dos slots. Nomeado porque a regra de duas mãos o lê duas
@@ -88,10 +88,11 @@ export function destinoDoDesequipado(
   }
 
   const mochila = [...jogador.mochila];
+  const teto = limiteDeMochila(jogador);
   const eventos: EventoDaMesa[] = [];
   let pendentes: readonly CartaEquipamento[] = [];
   for (const [i, carta] of deslocados.entries()) {
-    if (mochila.length >= LIMITE_MOCHILA) {
+    if (mochila.length >= teto) {
       pendentes = deslocados.slice(i);
       break;
     }

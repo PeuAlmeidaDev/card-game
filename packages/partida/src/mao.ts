@@ -29,7 +29,7 @@ export const MAO_INICIAL_PADRAO = 4;
 export const MAO_INICIAL_TESOUROS = 4;
 
 /**
- * Teto da MOCHILA (spec §7.1, bible §4/§11). 🎚️ **5**.
+ * Teto BASE da mochila (spec §7.1, bible §4/§11). 🎚️ **5**.
  *
  * Vive ao lado de `LIMITE_BASE_DE_MAO` porque as duas respondem à mesma pergunta
  * — quanta carta um jogador carrega — e girar uma sem olhar a outra é como o
@@ -37,7 +37,12 @@ export const MAO_INICIAL_TESOUROS = 4;
  * FORA do limite de mão, e é essa isenção que dá preço a ela (decisão #3 do spec:
  * dos três destinos do loot, a mochila é a que compra folga).
  */
-export const LIMITE_MOCHILA = 5;
+export const LIMITE_BASE_DE_MOCHILA = 5;
+
+/** Capacidade da mochila AGORA. O `+1` de quem está sem classe é a compensação do Aprendiz. */
+export function limiteDeMochila(jogador: JogadorNaMesa): number {
+  return LIMITE_BASE_DE_MOCHILA + (jogador.emJogo.classe === null ? 1 : 0);
+}
 
 /**
  * Capacidade da mão: CALCULADA a cada consulta, nunca guardada. O bible §5 exige

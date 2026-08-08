@@ -4,6 +4,7 @@ import { AcaoIlegal } from './erros';
 import { MAX_TURNOS } from './limites';
 import { filaDeDados } from './testes/filaDeDados';
 import type { Combatente, EstadoCombate } from './tipos';
+import type { PassivaCombate } from './passiva';
 
 const jogador: Combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 9, level: 1 };
 const monstro: Combatente = { forca: 2, vida: 10, habilidade: 6, agilidade: 4, level: 1 };
@@ -175,6 +176,70 @@ describe('classe das recusas do proximoPasso', () => {
     const inicio = criarCombate(jogador, rapido, filaDeDados([5]));
     expect(() => proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([])))
       .toThrow(Error);
+  });
+});
+
+describe('rolagemDeAtaque nos ganchos de defesa — dublê', () => {
+  it('aoFalharEsquiva e aoSofrerDano recebem null, nunca a rolagem do ataque do monstro', () => {
+    // `golpeCerteiro` (packages/cartas) não hooka nenhum dos dois — ele só lê
+    // `rolagemDeAtaque` em `aoCausarDano`. Sem um dublê que hooka os dois ganchos
+    // que `esquivar()` compõe, os `null` escritos à mão em `combate.ts` são código
+    // morto para qualquer mutação: nenhuma passiva do catálogo os consultaria.
+    const observadas: Array<{ gancho: string; rolagemDeAtaque: number | null }> = [];
+    const espiaRolagem: PassivaCombate = {
+      id: 'espia-rolagem',
+      aoFalharEsquiva: (ctx) => {
+        observadas.push({ gancho: 'aoFalharEsquiva', rolagemDeAtaque: ctx.rolagemDeAtaque });
+        return { reRolar: false, estado: ctx.estado };
+      },
+      aoSofrerDano: (danoBase, ctx) => {
+        observadas.push({ gancho: 'aoSofrerDano', rolagemDeAtaque: ctx.rolagemDeAtaque });
+        return { dano: danoBase, estado: ctx.estado };
+      },
+    };
+    const rapido: Combatente = { ...monstro, agilidade: 12 };
+    const inicio = criarCombate(jogador, rapido, filaDeDados([5]), [espiaRolagem]); // ataque do monstro 5 acerta
+    proximoPasso(inicio.estado, { tipo: 'esquivar' }, filaDeDados([6]), [espiaRolagem]); // esquiva 6 > 5 falha
+
+    expect(observadas).toEqual([
+      { gancho: 'aoFalharEsquiva', rolagemDeAtaque: null },
+      { gancho: 'aoSofrerDano', rolagemDeAtaque: null },
+    ]);
+  });
+});
+
+describe('atacar() — o scratch do empate sobrevive nos dois braços do composto', () => {
+  it('empate consultado e RESPEITADO (dano zero) não perde o uso gasto em aoEmpatarEsquiva', () => {
+    // Se o ramo de dano zero devolvesse `estado.passivas` (o scratch de ANTES da
+    // consulta) em vez do `scratches` local, este uso se perderia em silêncio.
+    const respeitaEGasta: PassivaCombate = {
+      id: 'respeita-e-gasta',
+      aoEmpatarEsquiva: (ctx) => ({ empateSalva: true, estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } }),
+    };
+    const inicio = criarCombate(jogador, monstro, filaDeDados([]), [respeitaEGasta]);
+    // ataque 5 acerta; esquiva 5 EMPATA; a passiva respeita o empate (dano fica 0).
+    // 12 > habilidade 6: o monstro erra o contra-ataque e devolve a vez.
+    const passo = proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([5, 5, 12]), [respeitaEGasta]);
+
+    expect(passo.estado.monstro.vida).toBe(10);
+    expect(passo.estado.passivas).toEqual([{ id: 'respeita-e-gasta', usos: 1 }]);
+  });
+
+  it('empate consultado e ANULADO (dano > 0) também não perde o uso — atravessa comporCausarDano', () => {
+    // Gêmeo do teste acima para o braço `base > 0`: se ele propagasse `estado.passivas`
+    // (o scratch de ANTES da consulta) em vez do `scratches` local, o uso gasto no
+    // empate se perderia do mesmo jeito — só que aqui o golpe CONECTA.
+    const anulaEGasta: PassivaCombate = {
+      id: 'anula-e-gasta',
+      aoEmpatarEsquiva: (ctx) => ({ empateSalva: false, estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } }),
+    };
+    const inicio = criarCombate(jogador, monstro, filaDeDados([]), [anulaEGasta]);
+    // ataque 5 acerta; esquiva 5 EMPATA; a passiva anula o empate: dano = 1+3 = 4.
+    // 12 > habilidade 6: o monstro erra o contra-ataque e devolve a vez.
+    const passo = proximoPasso(inicio.estado, { tipo: 'atacar' }, filaDeDados([5, 5, 12]), [anulaEGasta]);
+
+    expect(passo.estado.monstro.vida).toBe(6);
+    expect(passo.estado.passivas).toEqual([{ id: 'anula-e-gasta', usos: 1 }]);
   });
 });
 

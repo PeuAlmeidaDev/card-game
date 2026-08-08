@@ -3,17 +3,17 @@ import { colocarNoSlot, destinoDoDesequipado } from './equipar';
 import { SLOTS_VAZIOS } from './corpo';
 import { criarPartida } from './montagem';
 import { faseDoTurnoDe } from './fase';
-import { LIMITE_MOCHILA } from './mao';
+import { LIMITE_BASE_DE_MOCHILA } from './mao';
 import { equipamento } from './testes/cartas';
-import { ID_DA_CLASSE_DE_TESTE } from './testes/catalogo';
+import { comClasseDeTeste } from './testes/catalogo';
 import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import type { CartaEquipamento, EntradaJogador, EstadoPartida, InfoItem, JogadorNaMesa } from './tipos';
 
 const carta = (id: string, itemId: string): CartaEquipamento => ({ id, tipo: 'equipamento', itemId });
 
 const entradas: readonly EntradaJogador[] = [
-  { id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE },
-  { id: 'p2', nome: 'Bot 1', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
+  { id: 'p1', nome: 'Você', ehBot: false },
+  { id: 'p2', nome: 'Bot 1', ehBot: true },
 ];
 
 const config = {
@@ -23,6 +23,10 @@ const config = {
 };
 
 const semEmbaralhar = <T,>(itens: readonly T[]): T[] => [...itens];
+
+/** `criarPartida` mais o stamp da classe de teste na zona — ver `comClasseDeTeste`. */
+const criar = (...args: Parameters<typeof criarPartida>): EstadoPartida =>
+  comClasseDeTeste(criarPartida(...args));
 
 /** O jogador por id. Lança em vez de devolver `undefined`: id errado tem que falhar alto. */
 const jogadorDe = (estado: EstadoPartida, id: string): JogadorNaMesa => {
@@ -37,7 +41,7 @@ const jogadorDe = (estado: EstadoPartida, id: string): JogadorNaMesa => {
  * houve três fixtures nesta fatia errados por computar a fase cedo demais.
  */
 const comMochilaDe = (jogadorId: string, mochila: readonly CartaEquipamento[]): EstadoPartida => {
-  const base = criarPartida('m1', entradas, config, { embaralhar: semEmbaralhar });
+  const base = criar('m1', entradas, config, { embaralhar: semEmbaralhar });
   const jogadores = base.jogadores.map((j) => (j.id === jogadorId ? { ...j, mochila } : j));
   const daVez = jogadores.find((j) => j.id === base.vezDe);
   if (daVez === undefined) throw new Error('comMochilaDe: vezDe não está na mesa');
@@ -118,8 +122,8 @@ describe('colocarNoSlot', () => {
 });
 
 describe('destinoDoDesequipado — o ramo da mochila', () => {
-  const cheia = Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
-  const umaVaga = cheia.slice(0, LIMITE_MOCHILA - 1);
+  const cheia = Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
+  const umaVaga = cheia.slice(0, LIMITE_BASE_DE_MOCHILA - 1);
 
   it('com vaga na mochila, nada muda: o deslocado entra e não há pendência', () => {
     // Spec §7.3. O jogador NÃO escolhe (decisão #8) enquanto houver vaga: a

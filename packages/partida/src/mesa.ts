@@ -6,7 +6,7 @@ import type {
   ZonaEmJogo,
 } from './tipos';
 import { tirarDoTopo } from './baralho';
-import { LIMITE_MOCHILA } from './mao';
+import { limiteDeMochila } from './mao';
 import { destinoDaCaridade } from './caridade';
 import { afinidadeCom, combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
 import { colocarNoSlot, destinoDoDesequipado } from './equipar';
@@ -30,9 +30,15 @@ function racaDoLutador(deps: DepsMesa, jogador: JogadorNaMesa | undefined): Info
   return deps.catalogo.raca(jogador?.emJogo.raca?.racaId);
 }
 
+/** As passivas do lutador, na ordem de composição declarada: raça primeiro, classe depois (spec §3.3). */
 function passivasDoLutador(deps: DepsMesa, jogador: JogadorNaMesa | undefined): readonly PassivaCombate[] {
   const daRaca = racaDoLutador(deps, jogador)?.passivaCombate ?? null;
-  return daRaca === null ? [] : [daRaca];
+  const classeId = jogador?.emJogo.classe?.classeId;
+  // O `?? null` engole o `undefined` do catálogo de propósito: aqui a pergunta é
+  // "que passiva ele tem", e id órfão já é `Error` cru em `combatenteDe`, que roda
+  // antes no mesmo caminho.
+  const daClasse = classeId === undefined ? null : deps.catalogo.classe(classeId)?.passivaCombate ?? null;
+  return [daRaca, daClasse].filter((p): p is PassivaCombate => p !== null);
 }
 
 export interface ResultadoAcao {
@@ -229,7 +235,7 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   //   vasculhar            manterCarta    espiada !== null             `resolverEspiada`
   //   vasculhar            empurrarCarta  espiada !== null             `resolverEspiada`
   //   vasculhar            empurrarCarta  monte+cemitério não vazios   `resolverEspiada`
-  //   recompor             jogarCarta     carta.tipo === 'raca'        `jogarCarta`
+  //   recompor             jogarCarta     carta.tipo é 'raca' ou 'classe' `jogarCarta`
   //   recompor             equiparCarta   carta.tipo === 'equipamento' `equiparCarta`
   //   jogar                equiparCarta   carta.tipo === 'equipamento' `equiparCarta`
   //   recompor             equiparCarta   afinidade !== 'proibida'     `equiparCarta`
@@ -329,6 +335,11 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // estrutural. Recontagem feita a partir do reducer, `AcaoInvalida` por
   // `AcaoInvalida` — par que não cresce também se declara, senão a próxima
   // recontagem não sabe se alguém olhou.
+  //
+  // A Task 7 do Plano B (`classe como carta`) manteve DEZESSEIS pares em
+  // DEZENOVE linhas: `jogarCarta` ALARGOU o guard existente (`carta.tipo` passa a
+  // aceitar 'raca' OU 'classe'), não ganhou um `AcaoInvalida` novo — a linha do
+  // par é a mesma, só o texto da condição mudou.
   if (!acaoEhLegal(estado.fase, estado.queima !== null, acao.tipo)) {
     throw new AcaoInvalida(
       estado.queima === null
@@ -401,11 +412,11 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
 
 /**
  * Resolve uma carta JÁ comprada (o baralho em `base` já reflete a compra) e é
- * dona do seu DESTINO: `monstro` abre combate; `raca` (indo para a mão de quem
- * a revelou) entrega o turno à fase `encrenca`, que cobra `procurarEncrenca` ou
- * `saquear` — ela não se auto-pula e não aceita `passar` (decisão #62 do game
- * bible). É o núcleo compartilhado dos TRÊS chamadores: o vasculhar atômico, a
- * resolução da espiada e `procurarEncrenca`.
+ * dona do seu DESTINO: `monstro` abre combate; `raca` e `classe` (indo para a mão
+ * de quem as revelou) entregam o turno à fase `encrenca`, que cobra
+ * `procurarEncrenca` ou `saquear` — ela não se auto-pula e não aceita `passar`
+ * (decisão #62 do game bible). É o núcleo compartilhado dos TRÊS chamadores: o
+ * vasculhar atômico, a resolução da espiada e `procurarEncrenca`.
  *
  * O EVENTO sai por ramo, não antes do `switch`, porque quem decide se a carta
  * pode ser anunciada é o DESTINO dela — e é este `switch` que o conhece. Um
@@ -430,7 +441,10 @@ function resolverCarta(
   };
 
   switch (carta.tipo) {
-    case 'raca': {
+    // Raça e classe compartilham o ramo porque a carta que não é monstro vai para
+    // a mão e cobra a `encrenca` — o TIPO dela não muda esse destino.
+    case 'raca':
+    case 'classe': {
       // A carta sacada NÃO vai ao cemitério: ela fica com quem vasculhou. Por isso
       // o estado usado aqui é `base` (sem a carta), e não `revelada`.
       const jogadores = base.jogadores.map((j) => (
@@ -722,8 +736,8 @@ function cartaEquipavelDe(
 /**
  * Manda a carta para o cemitério do baralho A QUE ELA PERTENCE. Ponto único, e
  * exaustivo por construção: o `switch` sobre a união fecha em `never`, então a
- * terceira família de carta (maldição, classe — spec §4) não consegue nascer sem
- * alguém decidir para onde ela é descartada.
+ * próxima família de carta (maldição — spec §4) não consegue nascer sem alguém
+ * decidir para onde ela é descartada.
  *
  * Sem isto, um tesouro descartado pela caridade entraria no baralho de PORTAS e
  * voltaria como Porta na compra seguinte, onde `resolverCarta` lança `Error` cru
@@ -734,6 +748,7 @@ function descartarNoBaralhoCerto(estado: EstadoPartida, carta: Carta): EstadoPar
   switch (carta.tipo) {
     case 'monstro':
     case 'raca':
+    case 'classe':
       return { ...estado, portas: { ...estado.portas, cemiterio: [...estado.portas.cemiterio, carta] } };
     case 'equipamento':
       return { ...estado, tesouros: { ...estado.tesouros, cemiterio: [...estado.tesouros.cemiterio, carta] } };
@@ -828,18 +843,18 @@ function tirarDosSlots(
 }
 
 /**
- * Põe uma carta de raça da mão na zona em jogo. A anterior vai para o cemitério:
- * a zona é ABERTA, então trocar de raça é jogada pública.
+ * Põe uma carta de raça OU DE CLASSE da mão na zona em jogo. A anterior vai para
+ * o cemitério: a zona é ABERTA, então trocar de especialização é jogada pública.
  *
- * A vez NÃO passa — jogar raça é decisão do próprio turno, e o turno segue para a
- * fase 2 (ou fica em `recompor`, se ainda houver o que vestir).
+ * A vez NÃO passa — jogar raça ou classe é decisão do próprio turno, e o turno
+ * segue para a fase 2 (ou fica em `recompor`, se ainda houver o que vestir).
  *
  * DEIXOU de ser saída do excedente (decisão #7 do spec): só é legal em
  * `recompor`, e `faseDoTurnoDe` manda quem abre o turno estourado direto para
  * `descartar`. Não é perda — nunca foi saída de verdade quando o jogador estava
  * sem raça em jogo: ali a jogada é NET-ZERO, porque o limite era
  * `LIMITE_BASE_DE_MAO + 1` (hoje 8) e cai para o base junto com a mão, já que a
- * especialização derruba o próprio bônus que ela substitui (o Adaptável do
+ * raça derruba o próprio bônus que ela substitui (o Adaptável do
  * Humano, em `./mao`). Pelo mesmo cálculo, quem está DENTRO do limite (o único
  * jeito de chegar a `recompor`) nunca estoura ao jogar uma raça.
  *
@@ -851,7 +866,8 @@ function tirarDosSlots(
  * Em `descartar` sobra só `entregarCarta`: `equiparCarta` saiu junto, para as duas
  * fases paradas que acontecem ANTES da cobrança do excedente.
  *
- * Trocar de raça DERRUBA o item que ficou proibido, por `destinoDoDesequipado`.
+ * Trocar de raça OU DE CLASSE DERRUBA o item que ficou proibido, por
+ * `destinoDoDesequipado`.
  */
 function jogarCarta(
   estado: EstadoPartida,
@@ -863,31 +879,63 @@ function jogarCarta(
   // pendência deixou de ser alcançável nesta função — era exatamente o que o
   // comentário antigo previa para quando `recompor` nascesse.
   const { jogador, carta } = cartaDaMao(estado, acao);
-  if (carta.tipo !== 'raca') {
-    throw new AcaoInvalida('aplicarAcao: só carta de raça entra em jogo nesta fatia');
+  if (carta.tipo !== 'raca' && carta.tipo !== 'classe') {
+    throw new AcaoInvalida('aplicarAcao: só carta de raça ou de classe entra em jogo');
   }
 
-  const anterior = jogador.emJogo.raca;
-  const comRacaNova: ZonaEmJogo = { ...jogador.emJogo, raca: carta };
-  const perdidos = itensSemAfinidade(comRacaNova, deps.catalogo);
+  const anterior = carta.tipo === 'raca' ? jogador.emJogo.raca : jogador.emJogo.classe;
+  const comEspecializacaoNova: ZonaEmJogo = carta.tipo === 'raca'
+    ? { ...jogador.emJogo, raca: carta }
+    : { ...jogador.emJogo, classe: carta };
+  const perdidos = itensSemAfinidade(comEspecializacaoNova, deps.catalogo);
   const atualizado: JogadorNaMesa = {
     ...jogador,
     mao: jogador.mao.filter((c) => c.id !== carta.id),
-    emJogo: { ...comRacaNova, slots: tirarDosSlots(comRacaNova.slots, perdidos) },
+    emJogo: { ...comEspecializacaoNova, slots: tirarDosSlots(comEspecializacaoNova.slots, perdidos) },
   };
+
+  // Jogar CLASSE pode ENCOLHER `limiteDeMochila` (Aprendiz 6 → 5, a compensação
+  // some ao especializar). Mochila → mão não existe, então quem já estava no
+  // teto antigo não tem para onde a carta excedente ir — ela vira pendência de
+  // queima, como qualquer outro deslocado (decisão #59): o jogador ESCOLHE o
+  // que sai entre as seis, nunca um auto-trim silencioso. O teto só varia em
+  // ±1 (a compensação inteira do Aprendiz), então o excedente NUNCA passa de
+  // uma carta — é o que garante que a fila continua cabendo na tupla não-vazia
+  // de `QueimaPendente`.
+  const tetoNovo = limiteDeMochila(atualizado);
+  const excedeu = atualizado.mochila.length > tetoNovo;
+  const cartaExcedente: CartaEquipamento | undefined = excedeu
+    ? atualizado.mochila[atualizado.mochila.length - 1]
+    : undefined;
+  const comMochilaCerta: JogadorNaMesa = cartaExcedente === undefined
+    ? atualizado
+    : { ...atualizado, mochila: atualizado.mochila.slice(0, -1) };
 
   const comJogador: EstadoPartida = {
     ...estado,
-    jogadores: estado.jogadores.map((j) => (j.id === atualizado.id ? atualizado : j)),
+    jogadores: estado.jogadores.map((j) => (j.id === comMochilaCerta.id ? comMochilaCerta : j)),
     portas: {
       ...estado.portas,
       cemiterio: anterior === null ? estado.portas.cemiterio : [...estado.portas.cemiterio, anterior],
     },
   };
+  // ⚠️ Se as duas causas coincidirem na MESMA jogada (um item perde afinidade
+  // E a mochila encolhe), elas viajam JUNTAS numa pendência SÓ —
+  // `QueimaPendente.motivo` é um valor ÚNICO para toda a fila (fatia `escolha
+  // do descarte`) — com o motivo `mochilaEncolheu`: é a mochila que impede
+  // QUALQUER um dos dois de achar vaga. Em produção o cenário é ZERO
+  // ESTRUTURAL (nenhum item exclusivo por CLASSE existe no catálogo), e vira
+  // alcançável quando o primeiro nascer; até lá quem o exercita é o teste da
+  // fila composta em `mesa.test.ts`.
+  const deslocados = cartaExcedente === undefined ? perdidos : [...perdidos, cartaExcedente];
+  const motivo = cartaExcedente === undefined ? 'perdeuAfinidade' : 'mochilaEncolheu';
   const { estado: base, eventos: doDeslocado, queima } =
-    destinoDoDesequipado(comJogador, perdidos, acao.jogadorId, 'perdeuAfinidade');
+    destinoDoDesequipado(comJogador, deslocados, acao.jogadorId, motivo);
   const eventos: readonly EventoDaMesa[] = [
-    { tipo: 'racaEmJogo', jogadorId: acao.jogadorId, carta }, ...doDeslocado,
+    carta.tipo === 'raca'
+      ? { tipo: 'racaEmJogo', jogadorId: acao.jogadorId, carta }
+      : { tipo: 'classeEmJogo', jogadorId: acao.jogadorId, carta },
+    ...doDeslocado,
   ];
 
   // Este `return` carrega a `queima` para o estado registrado, sem passar por
@@ -1008,7 +1056,7 @@ function guardarCarta(
   if (carta.tipo !== 'equipamento') {
     throw new AcaoInvalida('aplicarAcao: só carta de tesouro vai para a mochila');
   }
-  if (jogador.mochila.length >= LIMITE_MOCHILA) {
+  if (jogador.mochila.length >= limiteDeMochila(jogador)) {
     // Pedido do cliente que a regra recusa => 400. A vista dele pode ser de um
     // instante em que ainda havia vaga.
     throw new AcaoInvalida('aplicarAcao: a mochila está cheia');

@@ -1,7 +1,7 @@
 import type { CatalogoDaMesa, EstadoPartida, VistaDaPartida } from './tipos';
 import { combatenteDe } from './corpo';
 import { AcaoInvalida } from './erros';
-import { limiteDeMao } from './mao';
+import { limiteDeMao, limiteDeMochila } from './mao';
 
 /**
  * Versão do estado que o cliente devolve na ação e que o servidor usa no guard de
@@ -54,6 +54,7 @@ export function projetarPara(
       mochila: j.mochila,
       cartasNaMao: j.mao.length,
       limiteDeMao: limiteDeMao(j),
+      limiteDeMochila: limiteDeMochila(j),
     })),
     vezDe: estado.vezDe,
     patenteAlvo: estado.patenteAlvo,

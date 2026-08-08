@@ -5,17 +5,18 @@ import type { CartaPorta } from '@card-dungeon/shared';
 const nomeDaRaca = (id: string): string => (id === 'elfo' ? 'Elfo' : id);
 const nomeDoMonstro = (id: string): string => (id === 'goblin' ? 'Goblin' : id);
 const nomeDoItem = (id: string): string => (id === 'espada-curta' ? 'Espada Curta' : id);
+const nomeDaClasse = (id: string): string => (id === 'guerreiro' ? 'Guerreiro' : id);
 
 describe('descreverCarta', () => {
   it('nomeia a raça da carta', () => {
     // "uma carta de raça" era informação zero num baralho cheio de raças: o vidente
     // pressente o QUÊ, e é isso que faz a Presciência valer a decisão.
-    expect(descreverCarta({ id: 'c', tipo: 'raca', racaId: 'elfo' }, nomeDaRaca, nomeDoMonstro, nomeDoItem)).toBe('uma carta de Elfo');
+    expect(descreverCarta({ id: 'c', tipo: 'raca', racaId: 'elfo' }, nomeDaRaca, nomeDoMonstro, nomeDoItem, nomeDaClasse)).toBe('uma carta de Elfo');
   });
 
   it('cai no id quando a raça não está no catálogo', () => {
     // Skew de versão (bundle antigo, raça nova no server) não pode derrubar a tela.
-    expect(descreverCarta({ id: 'c', tipo: 'raca', racaId: 'grifo' }, nomeDaRaca, nomeDoMonstro, nomeDoItem)).toBe('uma carta de grifo');
+    expect(descreverCarta({ id: 'c', tipo: 'raca', racaId: 'grifo' }, nomeDaRaca, nomeDoMonstro, nomeDoItem, nomeDaClasse)).toBe('uma carta de grifo');
   });
 
   it('degrada para um texto neutro em vez de lançar quando o tipo é desconhecido', () => {
@@ -24,7 +25,7 @@ describe('descreverCarta', () => {
     // este literal se passado sem ele, que é exatamente a guarda que queremos manter.
     const cartaDesconhecida = { id: 'x', tipo: 'maldicao' } as unknown as CartaPorta;
 
-    expect(descreverCarta(cartaDesconhecida, nomeDaRaca, nomeDoMonstro, nomeDoItem)).toBe('uma carta desconhecida');
+    expect(descreverCarta(cartaDesconhecida, nomeDaRaca, nomeDoMonstro, nomeDoItem, nomeDaClasse)).toBe('uma carta desconhecida');
   });
 
   it('descreve uma carta de equipamento pelo NOME do item', () => {
@@ -33,7 +34,7 @@ describe('descreverCarta', () => {
     // mão para decidir se equipa agora ou guarda.
     expect(descreverCarta(
       { id: 't-1', tipo: 'equipamento', itemId: 'espada-curta' },
-      nomeDaRaca, nomeDoMonstro, nomeDoItem,
+      nomeDaRaca, nomeDoMonstro, nomeDoItem, nomeDaClasse,
     )).toBe('Espada Curta');
   });
 
@@ -42,7 +43,7 @@ describe('descreverCarta', () => {
     // exceção que apaga a mão inteira.
     expect(descreverCarta(
       { id: 't-2', tipo: 'equipamento', itemId: 'alabarda-nova' },
-      nomeDaRaca, nomeDoMonstro, nomeDoItem,
+      nomeDaRaca, nomeDoMonstro, nomeDoItem, nomeDaClasse,
     )).toBe('alabarda-nova');
   });
 
@@ -52,6 +53,7 @@ describe('descreverCarta', () => {
       () => 'Elfo',
       (id) => (id === 'lobo-sombrio' ? 'Lobo Sombrio' : '???'),
       nomeDoItem,
+      nomeDaClasse,
     )).toBe('um Lobo Sombrio');
   });
 });

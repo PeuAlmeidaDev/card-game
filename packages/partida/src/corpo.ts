@@ -2,7 +2,7 @@ import type { Combatente } from '@card-dungeon/motor';
 import { montarCombatente } from '@card-dungeon/personagem';
 import type { Equipamento } from '@card-dungeon/personagem';
 import type {
-  CartaEquipamento, CatalogoDaMesa, EixoDeAfinidade, InfoItem, JogadorNaMesa, Slot, ZonaEmJogo,
+  CartaEquipamento, CatalogoDaMesa, EixoDeAfinidade, InfoClasse, InfoItem, JogadorNaMesa, Slot, ZonaEmJogo,
 } from './tipos';
 
 /**
@@ -40,7 +40,7 @@ function idNoEixo(eixo: EixoDeAfinidade, emJogo: ZonaEmJogo): string | null {
     case 'raca':
       return emJogo.raca?.racaId ?? null;
     case 'classe':
-      return null;
+      return emJogo.classe?.classeId ?? null;
     default: {
       const naoTratado: never = eixo;
       throw new Error(`idNoEixo: eixo não tratado: ${JSON.stringify(naoTratado)}`);
@@ -90,11 +90,19 @@ export function contribuicaoDe(info: InfoItem, emJogo: ZonaEmJogo): Equipamento 
  * inválido — o `classeId`/`itemId` só chegou ao estado passando pela validação
  * da borda. Sai como `Error` cru (500 sem vazar), nunca `AcaoInvalida`. Mesma
  * cadeia que a fatia 5 firmou.
+ *
+ * Sem carta de classe na zona, `montarCombatente` recebe `null` e o resultado é o
+ * Aprendiz — a linha BASE crua, do mesmo jeito que a zona sem raça é o Humano.
  */
 export function combatenteDe(jogador: JogadorNaMesa, catalogo: CatalogoDaMesa): Combatente {
-  const classe = catalogo.classe(jogador.classeId);
-  if (classe === undefined) {
-    throw new Error(`combatenteDe: classe ${jogador.classeId} não está no catálogo`);
+  const cartaDeClasse = jogador.emJogo.classe;
+  let classe: InfoClasse | null = null;
+  if (cartaDeClasse !== null) {
+    const info = catalogo.classe(cartaDeClasse.classeId);
+    if (info === undefined) {
+      throw new Error(`combatenteDe: classe ${cartaDeClasse.classeId} não está no catálogo`);
+    }
+    classe = info;
   }
   const itens = itensEquipados(jogador.emJogo.slots).map((carta) => {
     const info = catalogo.item(carta.itemId);

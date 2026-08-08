@@ -20,10 +20,6 @@ export type EventoCombate =
   | { readonly tipo: 'esquiva'; readonly defensor: Lado; readonly rolagem: number; readonly esquivou: boolean }
   | { readonly tipo: 'dano'; readonly alvo: Lado; readonly quantidade: number; readonly vidaRestante: number };
 
-export type ResultadoDuelo =
-  | { readonly tipo: 'vitoria'; readonly vencedor: Lado; readonly turnos: number; readonly log: readonly EventoCombate[] }
-  | { readonly tipo: 'impasse'; readonly turnos: number; readonly log: readonly EventoCombate[] };
-
 /** O que o jogador precisa decidir agora. `null` = combate acabou. */
 export type DecisaoPendente = 'ataque' | 'esquiva' | null;
 
@@ -40,7 +36,7 @@ export interface EstadoCombate {
   /**
    * Contagem de TURNOS, não de rodadas: cada lado que age incrementa uma vez.
    * Uma rodada completa (jogador + monstro) vale 2, e o teto de `MAX_TURNOS`
-   * equivale a ~500 rodadas. Mesma unidade do `turnos` de `ResultadoDuelo`.
+   * equivale a ~500 rodadas.
    */
   readonly turno: number;
   /**

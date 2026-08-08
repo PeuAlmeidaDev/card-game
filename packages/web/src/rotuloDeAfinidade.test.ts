@@ -6,7 +6,7 @@ import type { ItemCarta, ZonaEmJogo } from '@card-dungeon/shared';
 const nomeDaRaca = (id: string): string => (id === 'orc' ? 'Orc' : id);
 const zona = (racaId: string | null): ZonaEmJogo => ({
   raca: racaId === null ? null : { id: 'p-1', tipo: 'raca', racaId },
-  slots: { ...SLOTS_VAZIOS },
+  classe: null, slots: { ...SLOTS_VAZIOS },
 });
 
 const comum: ItemCarta = {

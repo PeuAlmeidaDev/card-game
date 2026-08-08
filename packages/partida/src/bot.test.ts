@@ -5,30 +5,35 @@ import { avancarBots } from './automacao';
 import { criarPartida } from './montagem';
 import { projetarPara } from './projecao';
 import { filaDeDados } from './testes/dados';
-import { equipamento, monstro as cartaMonstro, monstros, raca } from './testes/cartas';
-import { LIMITE_BASE_DE_MAO, LIMITE_MOCHILA } from './mao';
+import { classe, equipamento, monstro as cartaMonstro, monstros, raca } from './testes/cartas';
+import { LIMITE_BASE_DE_MAO, LIMITE_BASE_DE_MOCHILA } from './mao';
 import {
-  catalogoDeTeste, ID_DA_CLASSE_DE_TESTE, ID_DA_RACA_DONA, ID_DA_RACA_OUTRA, ID_DO_ITEM_DE_CAPACETE,
-  ID_DO_ITEM_DUAS_MAOS, ID_DO_ITEM_EXCLUSIVO, ID_DO_ITEM_FORTE, ID_DO_ITEM_FRACO, ID_DO_ITEM_LASTRO,
-  ID_DO_MONSTRO_FORTE,
+  CARTA_DE_CLASSE_DE_TESTE, catalogoDeTeste, comClasseDeTeste, ID_DA_CLASSE_DE_TESTE, ID_DA_RACA_DONA,
+  ID_DA_RACA_OUTRA, ID_DO_ITEM_DE_CAPACETE, ID_DO_ITEM_DUAS_MAOS, ID_DO_ITEM_EXCLUSIVO, ID_DO_ITEM_FORTE,
+  ID_DO_ITEM_FRACO, ID_DO_ITEM_LASTRO, ID_DO_MONSTRO_FORTE,
 } from './testes/catalogo';
 import { COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import type {
-  Carta, CartaDeRaca, CartaEquipamento, CartaTesouro, EntradaJogador, EstadoPartida, Fase, Slot, VistaDaPartida,
+  Carta, CartaDeRaca, CartaDeClasse, CartaEquipamento, CartaTesouro, EntradaJogador, EstadoPartida, Fase, Slot,
+  VistaDaPartida,
 } from './tipos';
 
 /** A projeção calcula `combatente`, então precisa do catálogo. Um só para o arquivo. */
 const catalogoPadrao = catalogoDeTeste();
 const semEmbaralhar = <T,>(itens: readonly T[]): T[] => [...itens];
 const entradas: readonly EntradaJogador[] = [
-  { id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE },
-  { id: 'p2', nome: 'Bot 1', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
+  { id: 'p1', nome: 'Você', ehBot: false },
+  { id: 'p2', nome: 'Bot 1', ehBot: true },
 ];
 const soMonstro = {
   patenteAlvo: 5,
   composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }],
   composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE,
 };
+
+/** `criarPartida` mais o stamp da classe de teste na zona — ver `comClasseDeTeste`. */
+const criar = (...args: Parameters<typeof criarPartida>): EstadoPartida =>
+  comClasseDeTeste(criarPartida(...args));
 
 /**
  * Mão que estoura o teto de quem TEM raça em jogo (limite = `LIMITE_BASE_DE_MAO`).
@@ -59,12 +64,14 @@ function vistaEm(
   overrides: {
     readonly suaMao?: readonly Carta[];
     readonly racaEmJogo?: CartaDeRaca | null;
+    /** `null` = Aprendiz. Ausente = herda o carimbo de `criar` (`comClasseDeTeste`). */
+    readonly classeEmJogo?: CartaDeClasse | null;
     readonly limiteDeMao?: number;
     readonly mochila?: readonly CartaTesouro[];
     readonly slots?: Partial<Record<Slot, CartaEquipamento | null>>;
   } = {},
 ): VistaDaPartida {
-  const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+  const p = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
   const forjado: EstadoPartida = {
     ...p,
     fase,
@@ -77,6 +84,7 @@ function vistaEm(
             emJogo: {
               ...j.emJogo,
               raca: overrides.racaEmJogo !== undefined ? overrides.racaEmJogo : j.emJogo.raca,
+              classe: overrides.classeEmJogo !== undefined ? overrides.classeEmJogo : j.emJogo.classe,
               slots: overrides.slots !== undefined ? { ...j.emJogo.slots, ...overrides.slots } : j.emJogo.slots,
             },
           }
@@ -93,13 +101,13 @@ function vistaEm(
 
 describe('escolherAcao', () => {
   it('sem combate em curso, chuta a porta', () => {
-    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const p = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     expect(escolherAcao(projetarPara('p1', p, catalogoPadrao), 'p1', catalogoPadrao))
       .toEqual({ tipo: 'vasculhar', jogadorId: 'p1' });
   });
 
   it('com decisão de ataque pendente, ataca', () => {
-    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const p = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const comCombate = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' },
       { rolar: filaDeDados([]), embaralhar: semEmbaralhar, catalogo: catalogoDeTeste() }).estado;
 
@@ -110,7 +118,7 @@ describe('escolherAcao', () => {
   it('com esquiva pendente, esquiva', () => {
     // monstro mais ágil ataca primeiro e acerta => a máquina para pedindo a esquiva
     const rapido = { nome: 'Veloz', forca: 2, vida: 10, habilidade: 6, agilidade: 12, level: 1, tesouros: 1 };
-    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const p = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const pedindoEsquiva = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' },
       { rolar: filaDeDados([1]), embaralhar: semEmbaralhar,
         catalogo: catalogoDeTeste({ monstro: () => rapido }) }).estado;
@@ -125,7 +133,7 @@ describe('escolherAcao', () => {
     // espiada pendente, a vez não passa, e a próxima escolha seria `vasculhar`
     // de novo — que o reducer recusa ("há uma espiada pendente"). Bot burro não
     // blefa: mantém sempre, igual já faz com atacar/esquivar.
-    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const p = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const comEspiada = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, {
       rolar: filaDeDados([]), embaralhar: semEmbaralhar,
       catalogo: catalogoDeTeste({ raca: () => ({ passivaCombate: null, espiaTopo: true }) }),
@@ -140,7 +148,7 @@ describe('escolherAcao', () => {
     // O bot joga pela MESMA projeção que um humano. Se ele pudesse ver o monte,
     // a projeção viraria decoração: bastaria um bot esperto para provar que o
     // segredo não é segredo. Esta asserção é o que torna a projeção verificável.
-    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const p = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const vista = projetarPara('p1', p, catalogoPadrao);
     expect('monte' in vista).toBe(false);
   });
@@ -149,7 +157,7 @@ describe('escolherAcao', () => {
     // Sem esta regra o bot trava a mesa: a vez não passa (o limite a segura), ele
     // tentaria vasculhar, o reducer recusaria, e `avancarBots` mataria a jogada do
     // humano com um 400. Mesmo modo de falha do bot vidente que ignorava a espiada.
-    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const p = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const estourado: EstadoPartida = {
       ...p,
       vezDe: 'p2',
@@ -171,7 +179,7 @@ describe('escolherAcao', () => {
   });
 
   it('dentro do limite, ignora a mão e joga normalmente', () => {
-    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const p = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const comMao: EstadoPartida = {
       ...p,
       jogadores: p.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao: [cartaMonstro('c1')] } : j)),
@@ -184,7 +192,7 @@ describe('escolherAcao', () => {
   it('em `recompor`, sem raça em jogo e com raça na mão, joga a raça', () => {
     // Fecha o ciclo do spec §7 regra 2: os bots passam a ser Elfo/Anão/Orc por
     // terem SACADO a carta, nunca por ela ter sido colada na criação da mesa.
-    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const p = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const comRacaNaMao: EstadoPartida = {
       ...p,
       jogadores: p.jogadores.map((j) => (
@@ -207,7 +215,7 @@ describe('escolherAcao', () => {
   it('com raça JÁ em jogo, ignora a raça da mão e vasculha', () => {
     // Trocar de raça é decisão de jogo; bot burro não decide, só executa a jogada
     // legal óbvia. Trocar por trocar ainda mandaria a raça anterior pro cemitério.
-    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const p = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const jaEspecializado: EstadoPartida = {
       ...p,
       jogadores: p.jogadores.map((j) => (
@@ -223,7 +231,7 @@ describe('escolherAcao', () => {
     // Sem raça em jogo, jogar a raça é net-zero: a mão cai 1 e o limite cai 1
     // junto (a especialização derruba o bônus do Adaptável). Entregar primeiro
     // resolve o excedente de verdade; a raça entra no turno seguinte.
-    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const p = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const estourado: EstadoPartida = {
       ...p,
       jogadores: p.jogadores.map((j) => (
@@ -242,6 +250,47 @@ describe('escolherAcao', () => {
 
     expect(escolherAcao(projetarPara('p1', estourado, catalogoPadrao), 'p1', catalogoPadrao).tipo)
       .toBe('entregarCarta');
+  });
+
+  it('em `recompor`, joga a carta de CLASSE quando está Aprendiz', () => {
+    // Espelha a raça (spec §8): a especialização entra no ramo que precede
+    // `vestirOuGuardar`. A raça vem preenchida de propósito — sem ela o ramo da
+    // raça responderia primeiro e este teste passaria sem nunca visitar o ramo
+    // da classe.
+    const vista = vistaEm('recompor', {
+      suaMao: [classe('pc-1', ID_DA_CLASSE_DE_TESTE)],
+      racaEmJogo: raca('pr-0', ID_DA_RACA_DONA),
+      classeEmJogo: null,
+    });
+
+    expect(escolherAcao(vista, 'p1', catalogoPadrao))
+      .toEqual({ tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'pc-1' });
+  });
+
+  it('NÃO troca de classe quando já tem uma em jogo — a segunda morre na mão', () => {
+    // É esperado, e é medido no soak (§7.2 do brief): gêmeo do 30,8%–36,1% da
+    // raça. A raça vem preenchida de propósito, pelo mesmo motivo do teste acima.
+    const vista = vistaEm('recompor', {
+      suaMao: [classe('pc-1', ID_DA_CLASSE_DE_TESTE)],
+      racaEmJogo: raca('pr-0', ID_DA_RACA_DONA),
+      classeEmJogo: CARTA_DE_CLASSE_DE_TESTE,
+    });
+
+    expect(escolherAcao(vista, 'p1', catalogoPadrao))
+      .not.toEqual(expect.objectContaining({ tipo: 'jogarCarta' }));
+  });
+
+  it('a RAÇA tem precedência sobre a classe quando faltam as duas', () => {
+    // Ordem arbitrária, mas OBSERVÁVEL: sem esta asserção, trocá-la mudaria a
+    // primeira jogada de todo bot sem nada acusar.
+    const vista = vistaEm('recompor', {
+      suaMao: [classe('pc-1', ID_DA_CLASSE_DE_TESTE), raca('pr-1', ID_DA_RACA_DONA)],
+      racaEmJogo: null,
+      classeEmJogo: null,
+    });
+
+    expect(escolherAcao(vista, 'p1', catalogoPadrao))
+      .toEqual({ tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'pr-1' });
   });
 
   /**
@@ -279,13 +328,13 @@ describe('escolherAcao', () => {
     // isso a mão também carrega um equipamento (pior que o do slot ocupado) e
     // a mochila está cheia: `temEquipamento` fica `true` (a fase legitimamente
     // para), e ainda assim não há nem o que equipar (perde para o slot
-    // ocupado) nem onde guardar (mochila em `LIMITE_MOCHILA`) — só `passar`
+    // ocupado) nem onde guardar (mochila em `LIMITE_BASE_DE_MOCHILA`) — só `passar`
     // sobra, e é o `jogarCarta` da raça que este teste prova que o bot não
     // escolhe no lugar.
     const vista = vistaEm('jogar', {
       suaMao: [raca('r7', 'orc'), equipamento('t-fraco', ID_DO_ITEM_FRACO)],
       slots: { maoDireita: equipamento('t-forte', ID_DO_ITEM_FORTE) },
-      mochila: Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-c${String(i)}`)),
+      mochila: Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-c${String(i)}`)),
     });
 
     expect(escolherAcao(vista, 'p1', catalogoDeTeste())).toEqual({ tipo: 'passar', jogadorId: 'p1' });
@@ -314,13 +363,13 @@ describe('escolherAcao', () => {
       composicaoPorJogador: Array.from({ length: 9 }, () => ({ tipo: 'monstro' as const, monstroId: 'm-teste' })),
       // 6 por jogador, e não os 2 de `COMPOSICAO_TESOURO_DE_TESTE`: a mão
       // inicial sozinha precisa segurar os 5 que sobrevivem até `jogar` (1 para
-      // ocupar `maoDireita`, `LIMITE_MOCHILA` para encher a mochila), e ainda
+      // ocupar `maoDireita`, `LIMITE_BASE_DE_MOCHILA` para encher a mochila), e ainda
       // sobrar 1 no monte para o loot do combate ter o que sacar.
       composicaoTesouros: Array.from({ length: 6 }, () => ({ tipo: 'equipamento' as const, itemId: 'i-teste' })),
       maoInicial: 3,
       maoInicialTesouros: 5,
     };
-    const p = criarPartida('m1', entradas, soMonstros, { embaralhar: semEmbaralhar });
+    const p = criar('m1', entradas, soMonstros, { embaralhar: semEmbaralhar });
     const naFase2 = aplicarAcao(p, { tipo: 'passar', jogadorId: 'p1' }, deps()).estado;
     const emCombate = aplicarAcao(naFase2, { tipo: 'vasculhar', jogadorId: 'p1' }, deps()).estado;
     expect(emCombate.fase).toBe('combate');
@@ -340,7 +389,7 @@ describe('escolherAcao', () => {
 
     // Consome os 6 tesouros por AÇÃO real (nunca forjando `fase`): equipa o
     // primeiro (ocupa `maoDireita`) e guarda os 5 seguintes (enche a mochila até
-    // `LIMITE_MOCHILA`) — exatamente o "corpo cheio + mochila cheia" que torna
+    // `LIMITE_BASE_DE_MOCHILA`) — exatamente o "corpo cheio + mochila cheia" que torna
     // `passar` a ÚNICA resposta legal que sobra, em vez de uma entre várias que
     // só não é `entregarCarta`. `entrarOuPular` mantém a fase em `jogar` a cada
     // passo porque sempre sobra equipamento (na mão ou na mochila) até o laço
@@ -349,12 +398,12 @@ describe('escolherAcao', () => {
     let corpoPronto = aplicarAcao(
       venceu, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: primeiroEquipamento.id }, deps(),
     ).estado;
-    for (let i = 0; i < LIMITE_MOCHILA; i += 1) {
+    for (let i = 0; i < LIMITE_BASE_DE_MOCHILA; i += 1) {
       const alvo = corpoPronto.jogadores[0]!.mao.find((c) => c.tipo === 'equipamento')!;
       corpoPronto = aplicarAcao(corpoPronto, { tipo: 'guardarCarta', jogadorId: 'p1', cartaId: alvo.id }, deps()).estado;
     }
     expect(corpoPronto.fase).toBe('jogar');                                    // nunca saiu da fase
-    expect(corpoPronto.jogadores[0]!.mochila).toHaveLength(LIMITE_MOCHILA);    // mochila CHEIA
+    expect(corpoPronto.jogadores[0]!.mochila).toHaveLength(LIMITE_BASE_DE_MOCHILA);    // mochila CHEIA
     expect(corpoPronto.jogadores[0]!.mao.some((c) => c.tipo === 'equipamento')).toBe(false); // mão sem mais tesouro
 
     // Com o corpo ocupado, a mochila cheia e nenhum tesouro sobrando na mão, o
@@ -367,7 +416,7 @@ describe('escolherAcao', () => {
 
   it('uma mesa de bots com a mão estourada não trava `avancarBots`', () => {
     // O teste de ponta: é o laço automático que a regra existe para proteger.
-    const p = criarPartida('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const p = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const estourado: EstadoPartida = {
       ...p,
       vezDe: 'p2',
@@ -556,10 +605,26 @@ describe('escolherAcao', () => {
     const vista = vistaEm('recompor', {
       suaMao: [equipamento('t-fraco', ID_DO_ITEM_FRACO)],
       slots: { maoDireita: equipamento('t-forte', ID_DO_ITEM_FORTE) },
-      mochila: Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-c${String(i)}`)),
+      mochila: Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-c${String(i)}`)),
     });
 
     expect(escolherAcao(vista, 'p1', catalogoDeTeste())).toEqual({ tipo: 'passar', jogadorId: 'p1' });
+  });
+
+  it('o Aprendiz ainda guarda com a mochila em 5 — a 6ª vaga é dele', () => {
+    // Gêmeo do teste acima: o mesmo tamanho de mochila (5) é "cheia" para quem
+    // tem classe em jogo e ainda tem vaga para o Aprendiz — sem ler
+    // `eu.limiteDeMochila` (e não um `5` cravado), o bot pediria `guardarCarta`
+    // numa mochila que ele acha cheia e nunca guardaria a 6ª carta.
+    const vista = vistaEm('recompor', {
+      classeEmJogo: null,
+      suaMao: [equipamento('t-fraco', ID_DO_ITEM_FRACO)],
+      slots: { maoDireita: equipamento('t-forte', ID_DO_ITEM_FORTE) },
+      mochila: Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-c${String(i)}`)),
+    });
+
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
+      .toEqual({ tipo: 'guardarCarta', jogadorId: 'p1', cartaId: 't-fraco' });
   });
 
   it('em `jogar`, veste o loot que acabou de cair', () => {

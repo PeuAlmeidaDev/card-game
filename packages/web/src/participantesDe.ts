@@ -33,6 +33,7 @@ export function participantesDe(evento: EventoDaMesa): readonly string[] {
     case 'derrota':
     case 'vez':
     case 'racaEmJogo':
+    case 'classeEmJogo':
     case 'descarte':
     case 'loot':
     case 'equipou':

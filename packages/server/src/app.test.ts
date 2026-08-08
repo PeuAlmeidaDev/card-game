@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import type { RolarD12 } from '@card-dungeon/motor';
-import type { ResultadoDuelo, Catalogo, VistaDaPartida } from '@card-dungeon/shared';
+import type { Catalogo, VistaDaPartida } from '@card-dungeon/shared';
 import type { Embaralhar } from '@card-dungeon/partida';
-import { MAO_INICIAL_TESOUROS } from '@card-dungeon/partida';
-import { obterMonstro, ITENS_SACAVEIS } from '@card-dungeon/cartas';
+import { MAO_INICIAL_PADRAO, MAO_INICIAL_TESOUROS } from '@card-dungeon/partida';
+import { obterMonstro, ITENS_SACAVEIS, CLASSES_SACAVEIS } from '@card-dungeon/cartas';
 import { buildApp } from './app';
 
 function filaDeDados(rolagens: readonly number[]): RolarD12 {
@@ -24,7 +24,6 @@ describe('GET /catalogo', () => {
     const catalogo = res.json<Catalogo>();
     expect(catalogo.racas.map((r) => r.id)).toContain('elfo');
     expect(catalogo.classes.map((c) => c.id)).toContain('guerreiro');
-    expect(catalogo.base.level).toBe(1);
     expect(catalogo.monstros.map((m) => m.id)).toContain('goblin');
     await app.close();
   });
@@ -36,77 +35,6 @@ describe('GET /catalogo', () => {
     expect(body.racas.find((r) => r.id === 'orc')).toBeTruthy();
     expect(body.racas[0]).toHaveProperty('texto');
     expect(body.racas[0]).not.toHaveProperty('modificadores');
-    await app.close();
-  });
-});
-
-describe('POST /duelo', () => {
-  it('monta o personagem das escolhas e duela (dado determinístico)', async () => {
-    // Monstro FIXO injetado (desacopla do MONSTRO_PADRAO de produção, que pode ser tunado à vontade).
-    const monstro = { forca: 4, vida: 18, habilidade: 7, agilidade: 4, level: 2 };
-    // Guerreiro SEM item => {forca:4, vida:15, hab:6, agi:5, level:1}, dano 5.
-    // O duelo é a rota da fatia 2 e nunca teve corpo: desde a fatia 8 o item é
-    // carta de Tesouro, que só existe DENTRO de uma partida — aqui o personagem
-    // é a classe pura, e por isso o combate leva dois turnos a mais que antes.
-    // Monstro {vida:18}. Jogador (a) tem +Agilidade (5 > 4) => começa, sem rolagem
-    // de iniciativa.
-    // T1 a: ataque 3 (<=6 acerto), esquiva 12 (não) -> 18-5=13
-    // T2 b: ataque 8 (>7 erro)
-    // T3 a: 3 (acerto), 12 -> 13-5=8
-    // T4 b: 8 (erro)
-    // T5 a: 3 (acerto), 12 -> 8-5=3
-    // T6 b: 8 (erro)
-    // T7 a: 3 (acerto), 12 -> 3-5=-2 -> vitória de a, 7 turnos
-    const app = buildApp({ rolar: filaDeDados([3, 12, 8, 3, 12, 8, 3, 12, 8, 3, 12]), monstro });
-    const res = await app.inject({
-      method: 'POST',
-      url: '/api/duelo',
-      payload: { classeId: 'guerreiro' },
-    });
-    expect(res.statusCode).toBe(200);
-    const body = res.json<ResultadoDuelo>();
-    expect(body.tipo).toBe('vitoria');
-    if (body.tipo === 'vitoria') {
-      expect(body.vencedor).toBe('a');
-      expect(body.turnos).toBe(7);
-    }
-    await app.close();
-  });
-
-  it('o itemIds que o cliente mandar é descartado no schema', async () => {
-    // Mesma garantia do `jogadorId` na ação: o campo saiu do fio, então um cliente
-    // velho (ou hostil) que insista em mandá-lo não muda os stats do duelo. Se ele
-    // ainda valesse, o resultado abaixo seria vitória em 5 turnos, não em 7.
-    const monstro = { forca: 4, vida: 18, habilidade: 7, agilidade: 4, level: 2 };
-    const app = buildApp({ rolar: filaDeDados([3, 12, 8, 3, 12, 8, 3, 12, 8, 3, 12]), monstro });
-    const res = await app.inject({
-      method: 'POST',
-      url: '/api/duelo',
-      payload: { classeId: 'guerreiro', itemIds: ['espada-curta'] },
-    });
-
-    expect(res.statusCode).toBe(200);
-    const body = res.json<ResultadoDuelo>();
-    if (body.tipo !== 'vitoria') throw new Error('o duelo não terminou em vitória');
-    expect(body.turnos).toBe(7);
-    await app.close();
-  });
-
-  it('rejeita corpo inválido com 400', async () => {
-    const app = buildApp();
-    const res = await app.inject({ method: 'POST', url: '/api/duelo', payload: { racaId: 'elfo' } });
-    expect(res.statusCode).toBe(400);
-    await app.close();
-  });
-
-  it('rejeita id inexistente com 400', async () => {
-    const app = buildApp();
-    const res = await app.inject({
-      method: 'POST',
-      url: '/api/duelo',
-      payload: { classeId: 'dragao' },
-    });
-    expect(res.statusCode).toBe(400);
     await app.close();
   });
 });
@@ -123,10 +51,11 @@ function criarDadoCiclico(valores: readonly number[]): RolarD12 {
 }
 
 describe('mesa', () => {
-  // Todo mundo nasce Humano (o baseline, sem passiva): a raça é carta sacável, não
-  // escolha de menu. Quem precisa de uma raça na zona faz o que o jogador faz —
-  // ver `comRacaEmJogo`.
-  const escolhas = { classeId: 'guerreiro' };
+  // Todo mundo nasce Humano e Aprendiz (o baseline, sem passiva e sem modificador
+  // de stat): raça e classe são carta sacável, não escolha de menu. Quem precisa
+  // de uma delas na zona faz o que o jogador faz — ver `comRacaEmJogo`.
+  //
+  // Por isso o `POST /api/partida` deixou de ter corpo: não há escolha a mandar.
   const semEmbaralhar: Embaralhar = (itens) => [...itens];
   // Embaralhamento DIRIGIDO: sobe as cartas de raça para o topo, então a mão
   // inicial do humano nasce com uma de cada. É assim que um teste de borda
@@ -137,37 +66,58 @@ describe('mesa', () => {
     ...itens.filter((i) => ehRaca(i)),
     ...itens.filter((i) => !ehRaca(i)),
   ];
-  // Embaralhamento DIRIGIDO oposto: sobe as cartas de RAÇA para a mão inicial
-  // (esvaziando-as do baralho) e deixa só monstro no monte — então o primeiro
-  // `vasculhar` de qualquer assento revela monstro, não raça. Precisa desde que
-  // a composição de Portas deixou de ter `salaVazia` (decisão #42): sem ela, o
-  // topo do monte depois da mão inicial já não cai automaticamente num monstro.
+  // Gêmea de `racasNoTopo`, para a classe: sobe as cartas de classe para o topo,
+  // então a mão inicial do humano nasce com uma. É o fixture que a asserção de
+  // CONTEÚDO logo abaixo (não só a contagem) precisa para provar que a classe
+  // que entrou no baralho é uma classe de verdade.
+  const ehClasse = (x: unknown): boolean =>
+    typeof x === 'object' && x !== null && (x as { tipo?: unknown }).tipo === 'classe';
+  const classesNoTopo: Embaralhar = (itens) => [
+    ...itens.filter((i) => ehClasse(i)),
+    ...itens.filter((i) => !ehClasse(i)),
+  ];
+  // Embaralhamento DIRIGIDO oposto: garante que a mão inicial nasça só de
+  // Portas que não são monstro (raça e/ou classe) e que o monte, logo depois,
+  // resolva monstro — então o primeiro `vasculhar` de qualquer assento revela
+  // monstro, não raça/classe. Precisa desde que a composição de Portas deixou
+  // de ter `salaVazia` (decisão #42): sem ela, o topo do monte depois da mão
+  // inicial já não cai automaticamente num monstro.
   //
-  // ⚠️ DEPENDÊNCIA NÃO DECLARADA em código, só aqui: isto só produz um monte
-  // PURO de monstro porque `RACAS_SACAVEIS.length` (4) × 4 assentos = 16 cartas
-  // de raça no baralho inteiro, e é exatamente igual a `MAO_INICIAL_PADRAO` (4)
-  // × 4 assentos = 16 vagas de mão inicial — as 16 raças cabem TODAS na mão
-  // inicial e nada mais sobra delas no monte. Se qualquer um dos dois dials
-  // mudar (mais/menos raças sacáveis, ou mão inicial maior/menor), o monte para
-  // de ser puro e o teste que depende disto falha ALTO, não em silêncio: o
-  // `vasculhar` revelaria uma raça (que não chama `rolar`), e a asserção de
-  // `res.statusCode` (500) reprovaria — não há caminho em que a mudança de dial
-  // passa despercebida.
+  // ⚠️ Task 10 (classe como carta) quebrou a versão anterior deste fixture, que
+  // dependia de `RACAS_SACAVEIS.length` (4) × 4 assentos bater EXATAMENTE com
+  // `MAO_INICIAL_PADRAO` (4) × 4 assentos — a igualdade acidental que fazia a
+  // raça sozinha esvaziar antes do monstro. Com a classe entrando na mesma
+  // família "não-monstro", a não-raça passou a somar 7 por jogador (28 na
+  // mesa) contra 16 vagas de mão inicial, e a igualdade quebrou — o monte
+  // parou de ser puro e os dois testes que dependiam disso (sem declarar)
+  // falharam. A construção abaixo não depende mais de nenhuma igualdade: ela
+  // separa as primeiras `MAO_INICIAL_PADRAO * NUM_JOGADORES_DE_PRODUCAO` cartas
+  // não-monstro (o que a mão inicial vai consumir) do resto, e põe TODO
+  // monstro entre as duas fatias — o monte sempre revela monstro primeiro,
+  // qualquer que seja o tamanho da família não-monstro.
   const ehMonstro = (x: unknown): boolean =>
     typeof x === 'object' && x !== null && (x as { tipo?: unknown }).tipo === 'monstro';
-  const monstroNoMonte: Embaralhar = (itens) => [
-    ...itens.filter((i) => !ehMonstro(i)),
-    ...itens.filter((i) => ehMonstro(i)),
-  ];
+  const NUM_JOGADORES_DE_PRODUCAO = 4;
+  const monstroNoMonte: Embaralhar = (itens) => {
+    const naoMonstro = itens.filter((i) => !ehMonstro(i));
+    const monstro = itens.filter((i) => ehMonstro(i));
+    const vagas = MAO_INICIAL_PADRAO * NUM_JOGADORES_DE_PRODUCAO;
+    return [...naoMonstro.slice(0, vagas), ...monstro, ...naoMonstro.slice(vagas)];
+  };
   // `[4, 12]` faz o combate progredir: o atacante acerta e o defensor falha a
   // esquiva. Com o dado sempre 1 o defensor SEMPRE esquiva (empate favorece o
   // defensor), ninguém toma dano e o combate só para no teto de MAX_TURNOS —
   // ~2000 rolagens dentro de uma requisição.
   const appDeJogo = () => buildApp({ rolar: criarDadoCiclico([4, 12]), embaralhar: semEmbaralhar });
   const appDeJogoComRacas = () => buildApp({ rolar: criarDadoCiclico([4, 12]), embaralhar: racasNoTopo });
+  // Mesma dado cíclico, embaralhamento que garante monstro no topo do monte
+  // depois da mão inicial (ver `monstroNoMonte` acima) — para testes que
+  // afirmam o resultado de um `vasculhar` sem forjar fase (o evento `porta` só
+  // existe no ramo monstro de `resolverCarta`; raça/classe emitem `achado`).
+  const appDeJogoComMonstro = () => buildApp({ rolar: criarDadoCiclico([4, 12]), embaralhar: monstroNoMonte });
 
-  const criar = async (app: ReturnType<typeof buildApp>, payload: typeof escolhas = escolhas) => {
-    const res = await app.inject({ method: 'POST', url: '/api/partida', payload });
+  const criar = async (app: ReturnType<typeof buildApp>) => {
+    const res = await app.inject({ method: 'POST', url: '/api/partida', payload: {} });
     return res.json<VistaDaPartida>();
   };
 
@@ -242,7 +192,7 @@ describe('mesa', () => {
 
   it('cria a partida com 4 jogadores e devolve a vista do humano', async () => {
     const app = buildApp({ embaralhar: semEmbaralhar });
-    const res = await app.inject({ method: 'POST', url: '/api/partida', payload: escolhas });
+    const res = await app.inject({ method: 'POST', url: '/api/partida', payload: {} });
 
     expect(res.statusCode).toBe(200);
     const vista = res.json<VistaDaPartida>();
@@ -264,7 +214,7 @@ describe('mesa', () => {
     // das constantes faria a asserção repetir a conta da borda e ela passaria
     // qualquer que fosse o dial.
     const app = buildApp({ embaralhar: semEmbaralhar });
-    const res = await app.inject({ method: 'POST', url: '/api/partida', payload: escolhas });
+    const res = await app.inject({ method: 'POST', url: '/api/partida', payload: {} });
     const vista = res.json<VistaDaPartida>();
 
     expect(vista.suaMao).toHaveLength(8);
@@ -308,10 +258,40 @@ describe('mesa', () => {
     const app = buildApp({ embaralhar: racasNoTopo });
     const vista = await criar(app);
 
-    // 14 cartas por jogador (10 monstro + 4 raça sacável, decisão #52) × 4
-    // assentos, menos as 4 da mão inicial de cada um.
-    expect(vista.cartasNoMonte).toBe(14 * 4 - 4 * 4);
+    // 17 cartas por jogador (10 monstro + 4 raça + 3 classe sacável, decisões
+    // #52/#60) × 4 assentos, menos as 4 da mão inicial de cada um.
+    expect(vista.cartasNoMonte).toBe(17 * 4 - 4 * 4);
     expect(vista.suaMao.some((c) => c.tipo === 'raca')).toBe(true);
+    await app.close();
+  });
+
+  it('o baralho de produção tem 17 cartas por jogador: 10 monstro + 4 raça + 3 classe', async () => {
+    // ⚠️ A conta sai de MONSTROS_SACAVEIS/RACAS_SACAVEIS/CLASSES_SACAVEIS, nunca
+    // de "quantas classes o §5 do bible lista" — é literalmente a decisão #54.
+    // 5 monstros × 2 + 4 raças × 1 + 3 classes × 1 = 17; mesa de 4 => 68.
+    // Mão inicial: 4 Portas por jogador (16), logo o monte abre em 68 - 16 = 52.
+    const app = buildApp({ embaralhar: semEmbaralhar });
+    const vista = await criar(app);
+    expect(vista.cartasNoMonte).toBe(52);
+    await app.close();
+  });
+
+  it('o baralho de produção TEM carta de classe — e é uma classe SACÁVEL de verdade', async () => {
+    // Gêmea do teste de raça acima, e pelo MESMO motivo (achado do review final
+    // desta task): a CONTAGEM sozinha não prova nada — trocar `classeIds` por
+    // `RACAS_SACAVEIS.slice(0, 3).map((r) => r.id)` mantém 3 entradas, 17/jogador
+    // e monte 52 IDÊNTICOS, com o baralho carregando cartas `{ tipo: 'classe',
+    // classeId: 'elfo' }` (e afins) — um id que `CLASSES_SACAVEIS` não conhece.
+    // Por isso esta asserção confere o CONTEÚDO: o `classeId` que a mão inicial
+    // recebe tem que estar em `CLASSES_SACAVEIS`, não só ter `tipo === 'classe'`.
+    const app = buildApp({ embaralhar: classesNoTopo });
+    const vista = await criar(app);
+    expect(vista.cartasNoMonte).toBe(52);
+    const classeNaMao = vista.suaMao.find((c) => c.tipo === 'classe');
+    if (classeNaMao === undefined || classeNaMao.tipo !== 'classe') {
+      throw new Error('a mão inicial não trouxe carta de classe');
+    }
+    expect(CLASSES_SACAVEIS.map((c) => c.id)).toContain(classeNaMao.classeId);
     await app.close();
   });
 
@@ -370,13 +350,30 @@ describe('mesa', () => {
     expect(() => buildApp({ monstros: [] })).toThrow(/bestiário vazio/);
   });
 
-  it('rejeita escolhas inválidas com 400', async () => {
-    const app = buildApp();
+  it('o classeId que o cliente mandar é DESCARTADO: a mesa nasce Aprendiz', async () => {
+    // Este teste ocupa o lugar do antigo "rejeita escolhas inválidas com 400", que
+    // deixou de fazer sentido: `criarPartida.body` virou `semEscolhasSchema`
+    // (`z.object({})`), então não há escolha a invalidar. Mesma garantia do
+    // `jogadorId` na ação: o campo saiu do fio, e um cliente velho — ou hostil —
+    // que insista em mandá-lo não muda o personagem.
+    //
+    // 🔴 A asserção NÃO é o 200. Um 200 sozinho passaria também se o servidor
+    // tivesse HONRADO o `classeId`; o que prende a regra é o combatente ser a
+    // linha BASE crua. Números cravados de propósito (mesma convenção do teste
+    // das mãos iniciais): derivar de `BASE` faria a asserção repetir a conta da
+    // borda e passar qualquer que fosse o valor.
+    const app = buildApp({ embaralhar: semEmbaralhar });
     const res = await app.inject({
       method: 'POST', url: '/api/partida',
-      payload: { classeId: 'nao-existe' },
+      payload: { classeId: 'guerreiro' },
     });
-    expect(res.statusCode).toBe(400);
+
+    expect(res.statusCode).toBe(200);
+    const vista = res.json<VistaDaPartida>();
+    const voce = vista.jogadores.find((j) => j.id === vista.voce);
+    // O Guerreiro somaria +1 força e +5 vida — 4/15/6/5. A mesa nasce 3/10/6/5.
+    expect(voce?.combatente).toEqual({ forca: 3, vida: 10, habilidade: 6, agilidade: 5, level: 1 });
+    expect(voce?.emJogo.classe).toBeNull();
     await app.close();
   });
 
@@ -435,7 +432,10 @@ describe('mesa', () => {
     // QUEM age vem do servidor, nunca do payload. Se o campo forjado tivesse
     // efeito, um cliente jogaria no lugar de outro jogador. Aqui ele é descartado
     // no schema e a ação sai registrada com o id do humano da mesa.
-    const app = appDeJogo();
+    //
+    // Precisa resolver MONSTRO (não raça/classe) para o evento `porta` existir —
+    // ver `appDeJogoComMonstro`.
+    const app = appDeJogoComMonstro();
     const naFase2 = await passar(app, await criar(app));
     const bot = naFase2.jogadores.find((j) => j.ehBot);
 
@@ -494,8 +494,13 @@ describe('mesa', () => {
     // Monstro rápido e certeiro (agilidade/habilidade máximas) ataca primeiro.
     // dado[0]=1: ataque do monstro acerta (<=12). dado[1]=12: esquiva do humano
     // falha (12 > 1). Dano base = level(1)+forca(5) = 6; a passiva reduz o
-    // PRIMEIRO dano sofrido no combate à metade -> 3. Vida do guerreiro Anão
-    // (base 10 + guerreiro +5 = 15) cai para 12.
+    // PRIMEIRO dano sofrido no combate à metade -> 3.
+    //
+    // 🎚️ Era 12 até esta fatia, e a queda para 7 é a FATIA, não um ajuste de
+    // número: o humano nascia Guerreiro porque o construtor semeava a classe
+    // (base 10 + guerreiro +5 = 15 - 3 = 12). A classe virou carta do baralho e
+    // ninguém a jogou aqui, então ele é APRENDIZ — a linha BASE crua, vida 10, que
+    // cai para 7. O Anão não entra nesta conta: ele dá passiva, não stat.
     const monstros = [{ id: 'goblin', nome: 'Goblin', forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1, tesouros: 1 }];
     const app = buildApp({ rolar: filaDeDados([1, 12]), embaralhar: racasNoTopo, monstros });
 
@@ -515,7 +520,7 @@ describe('mesa', () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json<VistaDaPartida>().combate?.estado.jogador.vida).toBe(12);
+    expect(res.json<VistaDaPartida>().combate?.estado.jogador.vida).toBe(7);
     await app.close();
   });
 
@@ -584,7 +589,10 @@ describe('mesa', () => {
   });
 
   it('raça não-vidente continua resolvendo a porta de uma vez', async () => {
-    const app = appDeJogo();
+    // Precisa resolver MONSTRO (não raça/classe) para o evento `porta` existir —
+    // ver `appDeJogoComMonstro`. O que este teste prova é que o Humano
+    // (`espiaTopo: false`) não gera `espiada`, ao contrário do Elfo acima.
+    const app = appDeJogoComMonstro();
     const naFase2 = await passar(app, await criar(app));  // humano, baseline
 
     const res = await app.inject({

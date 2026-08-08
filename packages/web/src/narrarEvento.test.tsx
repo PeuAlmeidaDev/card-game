@@ -12,6 +12,7 @@ const ctx: ContextoDeNarracao = {
   nomeDaRaca: (id) => (id === 'orc' ? 'Orc' : id === 'elfo' ? 'Elfo' : id),
   nomeDoMonstro: (id) => (id === 'goblin' ? 'Goblin' : id),
   nomeDoItem: (id) => (id === 'espada-curta' ? 'Espada Curta' : id),
+  nomeDaClasse: (id) => (id === 'guerreiro' ? 'Guerreiro' : id),
 };
 
 describe('narrarEvento — linhas de texto puro', () => {
@@ -48,6 +49,13 @@ describe('narrarEvento — linhas de texto puro', () => {
       { tipo: 'racaEmJogo', jogadorId: 'p2', carta: { id: 'r1', tipo: 'raca', racaId: 'orc' } },
       ctx,
     )).toBe('Bot 1 entra em campo como Orc.');
+  });
+
+  it('classeEmJogo nomeia a classe pelo catálogo — gêmeo do racaEmJogo', () => {
+    expect(narrarEvento(
+      { tipo: 'classeEmJogo', jogadorId: 'p2', carta: { id: 'pc1', tipo: 'classe', classeId: 'guerreiro' } },
+      ctx,
+    )).toBe('Bot 1 passa a lutar como Guerreiro.');
   });
 
   it('entrega NÃO diz qual carta foi — o log é público', () => {
@@ -103,6 +111,20 @@ describe('narrarEvento — linhas de texto puro', () => {
       ctx,
     )}</>);
     expect(linha.container.textContent).toContain('nova especialização');
+    expect(linha.container.textContent).toContain('descartada');
+  });
+
+  it('o desequipou por MOCHILA ENCOLHIDA liga o item ao teto que a classe derrubou', () => {
+    // Terceiro motivo (Fix round 1 da Task 8): jogar uma carta de CLASSE pode
+    // encolher `limiteDeMochila` (Aprendiz 6 → 5). Sem esta narração, o jogador
+    // veria uma carta sumir da mochila sem nenhuma explicação — mesma família do
+    // teste de cima, motivo novo.
+    const linha = render(<>{narrarEvento(
+      { tipo: 'desequipou', jogadorId: 'p1', carta: { id: 't-1', tipo: 'equipamento', itemId: 'espada-curta' },
+        destino: 'cemiterio', motivo: 'mochilaEncolheu' },
+      ctx,
+    )}</>);
+    expect(linha.container.textContent).toContain('não cabe mais na mochila');
     expect(linha.container.textContent).toContain('descartada');
   });
 

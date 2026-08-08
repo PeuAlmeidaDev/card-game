@@ -2,13 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { candidatosACaridade, destinoDaCaridade } from './caridade';
 import { SLOTS_VAZIOS } from './corpo';
 import { filaDeDados } from './testes/dados';
-import { ID_DA_CLASSE_DE_TESTE } from './testes/catalogo';
 import type { JogadorNaMesa } from './tipos';
 
 /** Jogador mínimo: nesta regra só a patente importa. */
 const jogador = (id: string, patente: number): JogadorNaMesa => ({
-  id, nome: id, ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE,
-  patente, derrotas: 0, mao: [], mochila: [], emJogo: { raca: null, slots: { ...SLOTS_VAZIOS } },
+  id, nome: id, ehBot: true,
+  patente, derrotas: 0, mao: [], mochila: [], emJogo: { raca: null, classe: null, slots: { ...SLOTS_VAZIOS } },
 });
 
 describe('candidatosACaridade', () => {

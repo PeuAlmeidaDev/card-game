@@ -12,7 +12,8 @@ import type { Classe, Equipamento, ModificadoresDeStat } from '@card-dungeon/per
  */
 export type ReceitaPorta =
   | { readonly tipo: 'monstro'; readonly monstroId: string }
-  | { readonly tipo: 'raca'; readonly racaId: string };
+  | { readonly tipo: 'raca'; readonly racaId: string }
+  | { readonly tipo: 'classe'; readonly classeId: string };
 
 /**
  * Carta como **instância** no jogo: a receita mais uma identidade estável. O id é
@@ -27,6 +28,9 @@ export type CartaPorta = ReceitaPorta & { readonly id: string };
  * e a checagem viraria runtime em vez de compilação.
  */
 export type CartaDeRaca = Extract<CartaPorta, { readonly tipo: 'raca' }>;
+
+/** Gêmea de `CartaDeRaca`, e pelo mesmo motivo: tipar o slot da zona com `CartaPorta` deixaria um monstro entrar em jogo como classe. */
+export type CartaDeClasse = Extract<CartaPorta, { readonly tipo: 'classe' }>;
 
 /**
  * **Receita** de carta do baralho de TESOUROS. Equipamento-only POR DESENHO, não
@@ -101,7 +105,8 @@ export interface InfoItem extends Equipamento {
 
 /**
  * Zona ABERTA do jogador: o que está na mesa, à vista de todos.
- * `raca: null` = Humano baseline — a ausência de especialização É a linha zero.
+ * `raca: null` = Humano baseline; `classe: null` = Aprendiz — nos dois casos a
+ * ausência de especialização É a linha zero.
  *
  * É esta zona que `combatenteDe` (em `./corpo`) lê para montar os stats. Por isso
  * os 5 slots existem desde o nascimento com `null` em vez de serem opcionais: um
@@ -110,6 +115,8 @@ export interface InfoItem extends Equipamento {
  */
 export interface ZonaEmJogo {
   readonly raca: CartaDeRaca | null;
+  /** `null` = Aprendiz — a ausência de especialização É a linha zero, como o Humano. */
+  readonly classe: CartaDeClasse | null;
   /**
    * Os 5 encaixes do corpo (bible §5). `Record<Slot, …>`, e não um array de
    * cartas com o slot dentro: assim "duas armaduras equipadas" não é um estado
@@ -144,14 +151,6 @@ export interface JogadorNaMesa {
   readonly id: string;
   readonly nome: string;
   readonly ehBot: boolean;
-  /**
-   * A classe escolhida na criação. Substitui o `combatenteBase` congelado: os
-   * stats agora são CALCULADOS por `combatenteDe` (em `./corpo`) a partir daqui
-   * mais a zona em jogo. Um campo denormalizado ao lado da zona seria um campo
-   * para dessincronizar — equipar e esquecer de recalcular não quebraria teste
-   * nenhum, só deixaria o combatente mentindo.
-   */
-  readonly classeId: string;
   readonly patente: number;
   readonly derrotas: number;
   /**
@@ -165,8 +164,8 @@ export interface JogadorNaMesa {
    */
   readonly mao: readonly Carta[];
   /**
-   * Zona ABERTA, teto `LIMITE_MOCHILA`, **fora** do limite de mão. Viaja inteira
-   * na projeção — ao contrário da mão, que publica só a contagem.
+   * Zona ABERTA, teto `limiteDeMochila(jogador)`, **fora** do limite de mão.
+   * Viaja inteira na projeção — ao contrário da mão, que publica só a contagem.
    *
    * `CartaTesouro` e não `Carta`: só tesouro se guarda. Uma Porta na mochila não
    * teria como sair (mochila → mão não existe nesta fatia) nem como ser jogada,
@@ -191,10 +190,10 @@ export interface JogadorPublico {
   readonly ehBot: boolean;
   /**
    * Os stats DELE AGORA — calculados por `combatenteDe`, não guardados. Público
-   * porque a zona em jogo (raça e itens equipados) já é aberta: esconder o total
-   * seria teatro, e é dele que sai a decisão de encarar ou não quem está na
-   * frente. Publicar `classeId` cru e deixar o cliente somar seria reimplementar
-   * regra de jogo na UI.
+   * porque a zona em jogo (raça, classe e itens equipados) já é aberta: esconder
+   * o total seria teatro, e é dele que sai a decisão de encarar ou não quem está
+   * na frente. Deixar o cliente somar a zona por conta própria seria
+   * reimplementar regra de jogo na UI.
    */
   readonly combatente: Combatente;
   readonly patente: number;
@@ -212,6 +211,8 @@ export interface JogadorPublico {
   readonly cartasNaMao: number;
   /** A capacidade dele agora (o limite é regra pública, não segredo). */
   readonly limiteDeMao: number;
+  /** A capacidade da MOCHILA agora — mesmo motivo do `limiteDeMao`, gêmeo dela. */
+  readonly limiteDeMochila: number;
 }
 
 /**
@@ -224,6 +225,11 @@ export interface InfoRaca {
   readonly passivaCombate: PassivaCombate | null;
   /** A raça espia o topo do baralho antes de resolver (Presciência do Elfo). */
   readonly espiaTopo: boolean;
+}
+
+/** O que a classe de um jogador confere. `ClasseCarta` (pacote `cartas`) o satisfaz estruturalmente. */
+export interface InfoClasse extends Classe {
+  readonly passivaCombate: PassivaCombate | null;
 }
 
 /**
@@ -260,7 +266,7 @@ export interface CatalogoDaMesa {
   /** `undefined` = id que não existe no catálogo: invariante quebrada, não pedido inválido. */
   readonly monstro: (monstroId: string) => InfoMonstro | undefined;
   /** `undefined` = id que não existe: invariante quebrada, não pedido inválido. */
-  readonly classe: (classeId: string) => Classe | undefined;
+  readonly classe: (classeId: string) => InfoClasse | undefined;
   /** `undefined` = id que não existe: invariante quebrada, não pedido inválido. */
   readonly item: (itemId: string) => InfoItem | undefined;
 }
@@ -305,6 +311,8 @@ export type EventoDaMesa =
   | { readonly tipo: 'vez'; readonly jogadorId: string }
   | { readonly tipo: 'fim'; readonly classificacao: readonly PosicaoFinal[] }
   | { readonly tipo: 'racaEmJogo'; readonly jogadorId: string; readonly carta: CartaDeRaca }
+  /** Gêmeo do `racaEmJogo`, para a carta de CLASSE (spec §3.3). */
+  | { readonly tipo: 'classeEmJogo'; readonly jogadorId: string; readonly carta: CartaDeClasse }
   /**
    * Doação PRIVADA: diz quem deu e a quem, **nunca o quê**. O `log` viaja inteiro
    * para todos na projeção — carregar a carta aqui anunciaria publicamente o que
@@ -386,10 +394,16 @@ export type EventoDaMesa =
    * resolve: um montante por cima de duas armas de uma mão desloca DOIS itens e a
    * mochila pode caber só um, então um evento para o lote não conseguiria nomear
    * os dois destinos.
+   *
+   * `motivo` ganhou `'mochilaEncolheu'` na fatia `classe como carta` (Fix round
+   * 1 da Task 8): jogar uma carta de CLASSE pode encolher `limiteDeMochila`
+   * (Aprendiz 6 → 5), e quem já estava no teto antigo perde uma vaga na hora —
+   * mesmo tratamento dos outros dois motivos, o jogador escolhe o que sai
+   * (decisão #59), nunca um auto-trim silencioso.
    */
   | { readonly tipo: 'desequipou'; readonly jogadorId: string;
       readonly carta: CartaEquipamento; readonly destino: 'mochila' | 'cemiterio';
-      readonly motivo: 'trocaDeSlot' | 'perdeuAfinidade' }
+      readonly motivo: 'trocaDeSlot' | 'perdeuAfinidade' | 'mochilaEncolheu' }
   /**
    * A carta da MOCHILA que o jogador escolheu destruir para abrir vaga ao item
    * deslocado (decisão #59). CARREGA a carta: a mochila e o cemitério de Tesouros
@@ -646,10 +660,4 @@ export interface EntradaJogador {
   readonly id: string;
   readonly nome: string;
   readonly ehBot: boolean;
-  /**
-   * A classe, não a statline pronta. A borda para de montar o combatente: quem
-   * monta é `combatenteDe`, a cada consulta, com a zona da hora. Entregar um
-   * `Combatente` aqui era entregar um retrato tirado antes de o corpo existir.
-   */
-  readonly classeId: string;
 }

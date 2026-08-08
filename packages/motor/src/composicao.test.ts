@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { comporCausarDano, comporSofrerDano, comporFalharEsquiva, type Portador } from './composicao';
+import {
+  comporCausarDano, comporSofrerDano, comporFalharEsquiva, comporEmpatarEsquiva, type Portador,
+} from './composicao';
 import type { Combatente } from './tipos';
 import type { PassivaCombate } from './passiva';
 
@@ -11,6 +13,7 @@ function portadorCom(passivas: readonly PassivaCombate[]): Portador {
     vidaInicial: 20,
     passivas,
     scratches: passivas.map((p) => ({ id: p.id, usos: 0 })),
+    rolagemDeAtaque: null,
   };
 }
 
@@ -83,6 +86,7 @@ describe('invariante: todo id de passiva precisa de scratch semeado', () => {
       vidaInicial: 20,
       passivas: [somaUm],
       scratches: [],
+      rolagemDeAtaque: null,
     };
     expect(() => comporCausarDano(4, semScratch)).toThrow('scratch de soma-um não foi semeado');
   });
@@ -124,5 +128,39 @@ describe('comporFalharEsquiva', () => {
   it('ninguém re-rola: devolve false com os scratches de quem foi consultado', () => {
     const r = comporFalharEsquiva(portadorCom([naoReRolaMasRegistra]));
     expect(r).toEqual({ reRolar: false, scratches: [{ id: 'nao-re-rola', usos: 1 }] });
+  });
+});
+
+const anulaOEmpate: PassivaCombate = {
+  id: 'anula-o-empate',
+  aoEmpatarEsquiva: (ctx) => ({ empateSalva: false, estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } }),
+};
+
+const respeitaOEmpateMasRegistra: PassivaCombate = {
+  id: 'respeita-o-empate',
+  aoEmpatarEsquiva: (ctx) => ({ empateSalva: true, estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } }),
+};
+
+describe('comporEmpatarEsquiva', () => {
+  it('CURTO-CIRCUITO: a primeira que anula o empate vence e as seguintes não são consultadas', () => {
+    const r = comporEmpatarEsquiva(portadorCom([anulaOEmpate, respeitaOEmpateMasRegistra]));
+    expect(r.empateSalva).toBe(false);
+    expect(r.scratches).toEqual([
+      { id: 'anula-o-empate', usos: 1 },
+      { id: 'respeita-o-empate', usos: 0 },
+    ]);
+  });
+
+  it('quem respeita é consultado, o scratch dele persiste, e a seguinte decide', () => {
+    const r = comporEmpatarEsquiva(portadorCom([respeitaOEmpateMasRegistra, anulaOEmpate]));
+    expect(r.empateSalva).toBe(false);
+    expect(r.scratches).toEqual([
+      { id: 'respeita-o-empate', usos: 1 },
+      { id: 'anula-o-empate', usos: 1 },
+    ]);
+  });
+
+  it('sem ninguém para anular, o empate SALVA — é o default do jogo', () => {
+    expect(comporEmpatarEsquiva(portadorCom([]))).toEqual({ empateSalva: true, scratches: [] });
   });
 });

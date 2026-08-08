@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { limiteDeMao, LIMITE_BASE_DE_MAO } from './mao';
+import { limiteDeMao, LIMITE_BASE_DE_MAO, limiteDeMochila, LIMITE_BASE_DE_MOCHILA } from './mao';
 import { SLOTS_VAZIOS } from './corpo';
-import { ID_DA_CLASSE_DE_TESTE } from './testes/catalogo';
+import { CARTA_DE_CLASSE_DE_TESTE } from './testes/catalogo';
 import type { JogadorNaMesa } from './tipos';
 
 const jogador: JogadorNaMesa = {
-  id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE,
-  patente: 1, derrotas: 0, mao: [], mochila: [], emJogo: { raca: null, slots: { ...SLOTS_VAZIOS } },
+  id: 'p1', nome: 'Você', ehBot: false,
+  patente: 1, derrotas: 0, mao: [], mochila: [], emJogo: { raca: null, classe: null, slots: { ...SLOTS_VAZIOS } },
 };
 
 describe('limiteDeMao', () => {
@@ -25,5 +25,33 @@ describe('limiteDeMao', () => {
     };
 
     expect(limiteDeMao(especializado)).toBe(LIMITE_BASE_DE_MAO);
+  });
+});
+
+describe('limiteDeMochila', () => {
+  it('quem tem classe em jogo carrega 5', () => {
+    const comClasse: JogadorNaMesa = {
+      ...jogador,
+      emJogo: { raca: null, classe: CARTA_DE_CLASSE_DE_TESTE, slots: { ...SLOTS_VAZIOS } },
+    };
+
+    expect(limiteDeMochila(comClasse)).toBe(LIMITE_BASE_DE_MOCHILA);
+  });
+
+  it('o APRENDIZ carrega 6 — a compensação de não ter classe', () => {
+    // Eixo DIFERENTE do Humano de propósito: ele paga em MÃO (`limiteDeMao`).
+    // Quem for Humano e Aprendiz não acumula bônus no mesmo lugar.
+    expect(limiteDeMochila(jogador)).toBe(LIMITE_BASE_DE_MOCHILA + 1);
+  });
+
+  it('o bônus é da CLASSE, não da raça', () => {
+    // Sem esta asserção, ler `emJogo.raca` por engano passaria: nos fixtures os
+    // dois campos costumam ser `null` ao mesmo tempo.
+    const humanoComClasse: JogadorNaMesa = {
+      ...jogador,
+      emJogo: { raca: null, classe: CARTA_DE_CLASSE_DE_TESTE, slots: { ...SLOTS_VAZIOS } },
+    };
+
+    expect(limiteDeMochila(humanoComClasse)).toBe(LIMITE_BASE_DE_MOCHILA);
   });
 });

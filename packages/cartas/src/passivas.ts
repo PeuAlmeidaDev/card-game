@@ -33,3 +33,28 @@ export const sangueDeGuerra: PassivaCombate = {
     estado: ctx.estado,
   }),
 };
+
+/** Golpe Certeiro (Ladino): rolagem de ataque baixa é golpe preciso. 🎚️ dial: ≤ 2 (16,7% do d12). */
+const CRITICO_ATE = 2;
+export const golpeCerteiro: PassivaCombate = {
+  id: 'golpe-certeiro',
+  aoCausarDano: (danoBase, ctx) => ({
+    dano: ctx.rolagemDeAtaque !== null && ctx.rolagemDeAtaque <= CRITICO_ATE ? danoBase * 2 : danoBase,
+    estado: ctx.estado,
+  }),
+};
+
+/** Impacto (Guerreiro): quando ELE ataca, o empate de esquiva não salva o defensor. */
+export const impacto: PassivaCombate = {
+  id: 'impacto',
+  aoEmpatarEsquiva: (ctx) => ({ empateSalva: false, estado: ctx.estado }),
+};
+
+/** Explosão (Mago de Fogo): o primeiro golpe do combate que conecta causa dano dobrado. */
+export const explosao: PassivaCombate = {
+  id: 'explosao',
+  aoCausarDano: (danoBase, ctx) => {
+    if (ctx.estado.usos >= 1) return { dano: danoBase, estado: ctx.estado };
+    return { dano: danoBase * 2, estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } };
+  },
+};

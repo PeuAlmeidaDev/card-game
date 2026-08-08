@@ -2,7 +2,6 @@ import type { Combatente } from '@card-dungeon/motor';
 import type {
   AcaoDaMesa, CartaEquipamento, CatalogoDaMesa, JogadorPublico, Slot, VistaDaPartida, ZonaEmJogo,
 } from './tipos';
-import { LIMITE_MOCHILA } from './mao';
 // O par de mãos vem do MESMO lugar que `colocarNoSlot` usa: o custo que o bot
 // calcula tem que ser o custo que o reducer vai cobrar, e duas listas escritas à
 // mão divergem em silêncio (o slot que nascer não entra na cópia).
@@ -54,11 +53,15 @@ export function escolherAcao(vista: VistaDaPartida, jogadorId: string, catalogo:
 
   switch (vista.fase) {
     case 'recompor': {
-      // O ramo da raça vem ANTES: trocar de raça continua sendo só para quem não
-      // tem nenhuma em jogo, e é a única coisa que `jogar` não pode fazer.
+      // O ramo da raça vem ANTES do de classe: as duas só entram em jogo aqui, e
+      // é a única coisa que `jogar` não pode fazer. Mesma regra para as duas —
+      // só troca quem ainda não tem nenhuma em jogo; a ordem entre elas é
+      // arbitrária, mas OBSERVÁVEL (ver o teste de precedência em `bot.test.ts`).
       const raca = eu?.emJogo.raca === null ? vista.suaMao.find((c) => c.tipo === 'raca') : undefined;
-      if (raca !== undefined) {
-        return { tipo: 'jogarCarta', jogadorId, cartaId: raca.id };
+      const classeCarta = eu?.emJogo.classe === null ? vista.suaMao.find((c) => c.tipo === 'classe') : undefined;
+      const especializacao = raca ?? classeCarta;
+      if (especializacao !== undefined) {
+        return { tipo: 'jogarCarta', jogadorId, cartaId: especializacao.id };
       }
       if (eu === undefined) return { tipo: 'passar', jogadorId };
       return vestirOuGuardar(vista, jogadorId, eu, catalogo);
@@ -260,7 +263,7 @@ function vestirOuGuardar(
   // `AcaoInvalida` subiria por `avancarBots` e viraria 400 na jogada do HUMANO —
   // o Critical que matou 28 de 30 mesas no Plano 3b.
   const naMao = vista.suaMao.find((c) => c.tipo === 'equipamento');
-  if (naMao !== undefined && eu.mochila.length < LIMITE_MOCHILA) {
+  if (naMao !== undefined && eu.mochila.length < eu.limiteDeMochila) {
     return { tipo: 'guardarCarta', jogadorId, cartaId: naMao.id };
   }
 

@@ -11,6 +11,7 @@ export interface ContextoDeNarracao {
   readonly nomeDaRaca: (racaId: string) => string;
   readonly nomeDoMonstro: (monstroId: string) => string;
   readonly nomeDoItem: (itemId: string) => string;
+  readonly nomeDaClasse: (classeId: string) => string;
 }
 
 /**
@@ -33,6 +34,7 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
         evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId),
         ctx.nomeDaRaca,
         ctx.nomeDoMonstro,
+        ctx.nomeDaClasse,
       );
     // Porta FECHADA: o evento não carrega a carta, e a narração não pode inventar
     // o que ele não diz. Vale inclusive para quem sacou — ele descobre o quê pela
@@ -51,6 +53,8 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
       return 'A partida terminou.';
     case 'racaEmJogo':
       return `${ctx.nomeDe(evento.jogadorId)} entra em campo como ${ctx.nomeDaRaca(evento.carta.racaId)}.`;
+    case 'classeEmJogo':
+      return `${ctx.nomeDe(evento.jogadorId)} passa a lutar como ${ctx.nomeDaClasse(evento.carta.classeId)}.`;
     // A entrega é PRIVADA: o evento não carrega a carta (spec §5) e a apresentação
     // não pode inventar o que ele não diz. Só o destinatário descobre o quê, pela
     // própria mão. A rolagem aparece quando houve empate a desempatar.
@@ -71,7 +75,7 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
     // adversário ficou mais perigoso, que é a única razão de a zona ser aberta.
     case 'equipou':
       return `${evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId)} equipa `
-        + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem)}.`;
+        + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem, ctx.nomeDaClasse)}.`;
     // A mochila é zona ABERTA, então o evento carrega a carta e a narração pode
     // nomeá-la — mesma regra do `equipou`, e a mesma assimetria com o `loot`.
     // Passa por `descreverCarta` e não por `nomeDoItem` direto: hoje o resultado é
@@ -81,11 +85,11 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
     // continuaria compilando, calado.
     case 'guardou':
       return `${evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId)} guarda `
-        + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem)} na mochila.`;
+        + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem, ctx.nomeDaClasse)} na mochila.`;
     // O descarte é PÚBLICO: o cemitério já é zona aberta, esconder aqui seria teatro.
     case 'descarte':
       return `${ctx.nomeDe(evento.jogadorId)} descartou `
-        + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem)}.`;
+        + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem, ctx.nomeDaClasse)}.`;
     case 'combate':
       return (
         <>
@@ -111,13 +115,30 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
         </small>
       );
     // Motivo × destino como PREFIXO × SUFIXO: as duas dimensões variam
-    // independentes, e quatro frases à mão seriam quatro lugares para divergir.
+    // independentes, e quatro (agora seis) frases à mão seriam lugares para divergir.
     case 'desequipou': {
       const quem = evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId);
-      const item = descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem);
-      const porque = evento.motivo === 'trocaDeSlot'
-        ? `${quem} tira ${item} do corpo`
-        : `${item} não serve à nova especialização de ${quem === 'Você' ? 'você' : quem} e sai do corpo`;
+      const item = descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem, ctx.nomeDaClasse);
+      const quemMinusculo = quem === 'Você' ? 'você' : quem;
+      // `switch` com `never`, não ternário: um ternário de dois braços não dá
+      // pressão de compilador nenhuma quando `motivo` ganha um terceiro valor —
+      // ele cairia mudo no braço errado, narrando a causa trocada.
+      let porque: string;
+      switch (evento.motivo) {
+        case 'trocaDeSlot':
+          porque = `${quem} tira ${item} do corpo`;
+          break;
+        case 'perdeuAfinidade':
+          porque = `${item} não serve à nova especialização de ${quemMinusculo} e sai do corpo`;
+          break;
+        case 'mochilaEncolheu':
+          porque = `${item} não cabe mais na mochila de ${quemMinusculo} — a especialização reduziu o teto`;
+          break;
+        default: {
+          const naoTratado: never = evento.motivo;
+          throw new Error(`narrarEvento: motivo de desequipou não tratado: ${String(naoTratado)}`);
+        }
+      }
       // NOMEIA o destino: sem saber qual dos dois foi, o jogador não descobre que
       // trocar de item com a mochila cheia DESTRÓI uma carta.
       return evento.destino === 'mochila'
@@ -128,7 +149,7 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
     // carrega a carta e a narração pode nomeá-la — mesma regra do `guardou`.
     case 'queimou':
       return `${evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId)} queima `
-        + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem)} para abrir vaga na mochila.`;
+        + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem, ctx.nomeDaClasse)} para abrir vaga na mochila.`;
     // A única pista que o jogador tem de que a economia da mesa secou. NOMEIA o
     // baralho em vez de dizer só "não ganhou nada": sem isso ele lê a própria
     // vitória como bug — foi exatamente o que aconteceu no gate ocular do 4a.

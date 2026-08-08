@@ -18,20 +18,23 @@ import type { Carta } from '@card-dungeon/shared';
  * `nomeDaRaca` é injetado porque o catálogo é dado do servidor e esta função é
  * pura: ela não busca nada, só formata. Obrigatório (e não opcional com default)
  * para o compilador cobrar cada call-site — um default silencioso que caísse no
- * id faria a tela dizer "uma carta de anao" sem ninguém perceber. `nomeDoMonstro`
- * e `nomeDoItem` entram pela mesma porta e pelo mesmo motivo.
+ * id faria a tela dizer "uma carta de anao" sem ninguém perceber. `nomeDoMonstro`,
+ * `nomeDoItem` e `nomeDaClasse` entram pela mesma porta e pelo mesmo motivo.
  */
 export function descreverCarta(
   carta: Carta,
   nomeDaRaca: (racaId: string) => string,
   nomeDoMonstro: (monstroId: string) => string,
   nomeDoItem: (itemId: string) => string,
+  nomeDaClasse: (classeId: string) => string,
 ): string {
   switch (carta.tipo) {
     case 'monstro':
       return `um ${nomeDoMonstro(carta.monstroId)}`;
     case 'raca':
       return `uma carta de ${nomeDaRaca(carta.racaId)}`;
+    case 'classe':
+      return `uma carta de ${nomeDaClasse(carta.classeId)}`;
     // O NOME, sem artigo — e é o único caso aqui que não tem um. Os outros dois
     // descrevem uma CATEGORIA ("um monstro", "uma carta de X") e o artigo faz
     // parte da frase; o item tem nome próprio, e um artigo fixo erraria o gênero

@@ -1,88 +1,28 @@
 import { useEffect, useState } from 'react';
 import { api } from './api';
 import { TelaMesa } from './TelaMesa';
-import { montarCombatente } from '@card-dungeon/shared';
-import type { Catalogo, ResultadoDuelo } from '@card-dungeon/shared';
-
-function descrever(r: ResultadoDuelo): string {
-  if (r.tipo === 'vitoria') return `Vitória de '${r.vencedor}' em ${r.turnos} turnos`;
-  return `Impasse após ${r.turnos} turnos`;
-}
+import type { Catalogo } from '@card-dungeon/shared';
 
 export function App() {
   const [catalogo, setCatalogo] = useState<Catalogo | null>(null);
-  const [classeId, setClasseId] = useState('');
-  const [texto, setTexto] = useState('');
 
   useEffect(() => {
     void (async () => {
       const resposta = await api.catalogo();
-      if (resposta.status !== 200) return;
-      const c = resposta.body;
-      setCatalogo(c);
-      setClasseId(c.classes[0]?.id ?? '');
+      if (resposta.status === 200) setCatalogo(resposta.body);
     })();
   }, []);
 
   if (!catalogo) return <p>Carregando catálogo…</p>;
 
-  const classe = catalogo.classes.find((c) => c.id === classeId);
-  // Só a CLASSE soma no preview. O item saiu do construtor na fatia 8 (virou
-  // carta de Tesouro, sacada em jogo) e a raça saiu na 7 (é passiva, não stat) —
-  // somar aqui algo que o servidor não monta seria a tela prometendo um
-  // personagem que não vai existir.
-  //
-  // ⚠️ Quem soma é o DOMÍNIO (`montarCombatente`, via `shared`), nunca este
-  // arquivo. Havia aqui um `calcularPreview` que refazia a conta à mão e já tinha
-  // divergido: ele não aplicava o `PISO = 1` do `montar.ts`, então a tela
-  // mostrava `Agilidade -5` num personagem que o servidor montaria com `1`. Sem
-  // classe (catálogo vazio), o preview é a própria `base` — ela já vem pronta do
-  // domínio, e não há o que somar.
-  const stats = classe ? montarCombatente(classe, []) : catalogo.base;
-
-  async function duelar(): Promise<void> {
-    setTexto('Rolando os dados…');
-    const resposta = await api.duelo({ body: { classeId } });
-    if (resposta.status === 200) {
-      setTexto(descrever(resposta.body));
-    } else {
-      setTexto('Não foi possível duelar. Revise suas escolhas.');
-    }
-  }
-
   return (
     <main>
-      <h1>card-dungeon — monte seu personagem</h1>
-
-      <label>
-        Classe{' '}
-        <select value={classeId} onChange={(e) => setClasseId(e.target.value)}>
-          {catalogo.classes.map((c) => (
-            <option key={c.id} value={c.id}>{c.nome}</option>
-          ))}
-        </select>
-      </label>
-
-      <p>
-        Personagem: Força {stats.forca} · Vida {stats.vida} · Habilidade {stats.habilidade} · Agilidade{' '}
-        {stats.agilidade}
-      </p>
-
-      <button onClick={() => void duelar()}>Duelar</button>
-      <p>{texto}</p>
-
-      {/* A mesa recebe as MESMAS escolhas do construtor acima — o servidor monta
-          o combatente a partir delas, como já faz no duelo. Passar as escolhas
-          em vez de um personagem fixo é o que liga esta tela ao resto do jogo.
-
-          `racas` continua vindo do catálogo: não para ESCOLHER, e sim para a mesa
-          nomear as cartas de raça que aparecem na mão e no log. `monstros` faz o
-          mesmo papel para o bestiário, e `itens` para o baralho de Tesouros — é
-          dele que sai o nome de cada peça e o slot onde ela encaixa, que é o que
-          a mesa precisa para desenhar o corpo. */}
+      <h1>card-dungeon</h1>
+      {/* O catálogo não é mais menu de construção: ele NOMEIA as cartas que a
+          mesa mostra na mão, nos slots e no log. */}
       <TelaMesa
-        escolhas={{ classeId }}
         racas={catalogo.racas}
+        classes={catalogo.classes}
         monstros={catalogo.monstros}
         itens={catalogo.itens}
       />

@@ -2,9 +2,11 @@ import type {
   Combatente, RolarD12, EventoCombate, EstadoCombate, AcaoCombate, Passo,
 } from './tipos';
 import type { PassivaCombate, EstadoPassiva } from './passiva';
-import { comporCausarDano, comporSofrerDano, comporFalharEsquiva, type Portador } from './composicao';
+import {
+  comporCausarDano, comporSofrerDano, comporFalharEsquiva, comporEmpatarEsquiva, type Portador,
+} from './composicao';
 import { decidirIniciativa } from './iniciativa';
-import { rolarAtaqueDe, rolarEsquivaContra, danoDe, resolverAtaque } from './ataque';
+import { rolarAtaqueDe, rolarEsquivaContra, danoDe } from './ataque';
 import { MAX_TURNOS } from './limites';
 import { AcaoIlegal } from './erros';
 
@@ -12,12 +14,14 @@ function portadorDe(
   estado: EstadoCombate,
   passivas: readonly PassivaCombate[],
   scratches: readonly EstadoPassiva[],
+  rolagemDeAtaque: number | null,
 ): Portador {
   return {
     combatente: estado.jogador,
     vidaInicial: estado.vidaInicialJogador,
     passivas,
     scratches,
+    rolagemDeAtaque,
   };
 }
 
@@ -131,18 +135,37 @@ export function proximoPasso(
 }
 
 /**
- * O jogador ataca; se acertar, o monstro rola a esquiva dele NA MESMA chamada —
- * dado de monstro não é clique de ninguém (D3 do spec). Por isso aqui vale o
- * composto `resolverAtaque`, enquanto `esquivar` usa as primitivas: lá o ataque
- * já foi rolado num passo anterior, esperando o clique do jogador.
+ * O jogador ataca; se acertar, o monstro rola a esquiva NA MESMA chamada — dado de
+ * monstro não é clique de ninguém (D3 do spec). Usa as primitivas, como `esquivar`:
+ * o empate da esquiva é ponto de extensão de passiva (`aoEmpatarEsquiva`), e um
+ * ataque composto não teria como consultá-la sem virar um segundo ponto de
+ * composição.
  */
 function atacar(estado: EstadoCombate, rolar: RolarD12, passivas: readonly PassivaCombate[]): Passo {
-  const { dano: base, eventos } = resolverAtaque(estado.jogador, 'a', 'b', rolar);
-  const log: EventoCombate[] = [...eventos];
+  const log: EventoCombate[] = [];
+  let scratches = estado.passivas;
+
+  const ataque = rolarAtaqueDe(estado.jogador, 'a', rolar);
+  log.push(ataque.evento);
+
+  let base = 0;
+  if (ataque.acertou) {
+    const esquiva = rolarEsquivaContra(ataque.rolagem, 'b', rolar);
+    let esquivou = esquiva.esquivou;
+    if (esquivou && esquiva.rolagem === ataque.rolagem) {
+      const r = comporEmpatarEsquiva(portadorDe(estado, passivas, scratches, ataque.rolagem));
+      scratches = r.scratches;
+      esquivou = r.empateSalva;
+    }
+    // O evento sai DEPOIS da decisão: com o Impacto em jogo, `esquiva.evento`
+    // anunciaria uma esquiva que não aconteceu.
+    log.push({ tipo: 'esquiva', defensor: 'b', rolagem: esquiva.rolagem, esquivou });
+    if (!esquivou) base = danoDe(estado.jogador);
+  }
 
   const composto = base > 0
-    ? comporCausarDano(base, portadorDe(estado, passivas, estado.passivas))
-    : { dano: base, scratches: estado.passivas };
+    ? comporCausarDano(base, portadorDe(estado, passivas, scratches, ataque.rolagem))
+    : { dano: base, scratches };
 
   let monstro = estado.monstro;
   if (composto.dano > 0) {
@@ -175,7 +198,7 @@ function esquivar(
   log.push(esquiva.evento);
 
   if (!esquiva.esquivou) {
-    const r = comporFalharEsquiva(portadorDe(estado, passivas, scratches));
+    const r = comporFalharEsquiva(portadorDe(estado, passivas, scratches, null));
     scratches = r.scratches;
     if (r.reRolar) {
       esquiva = rolarEsquivaContra(rolagemAtaque, 'a', rolar);
@@ -185,7 +208,7 @@ function esquivar(
 
   let jogador = estado.jogador;
   if (!esquiva.esquivou) {
-    const sofrido = comporSofrerDano(danoDe(estado.monstro), portadorDe(estado, passivas, scratches));
+    const sofrido = comporSofrerDano(danoDe(estado.monstro), portadorDe(estado, passivas, scratches, null));
     scratches = sofrido.scratches;
     jogador = { ...jogador, vida: jogador.vida - sofrido.dano };
     log.push({ tipo: 'dano', alvo: 'a', quantidade: sofrido.dano, vidaRestante: jogador.vida });

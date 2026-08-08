@@ -14,11 +14,14 @@ export interface ReceitaDeBaralho {
   readonly copiasPorMonstro: number;
   readonly racaIds: readonly string[];
   readonly copiasPorRaca: number;
+  readonly classeIds: readonly string[];
+  readonly copiasPorClasse: number;
 }
 
 /**
  * Composição de um baralho de Portas: `copiasPorMonstro` cartas para cada id de
- * monstro, depois `copiasPorRaca` cartas para cada id de raça.
+ * monstro, depois `copiasPorRaca` cartas para cada id de raça, depois
+ * `copiasPorClasse` cartas para cada id de classe.
  *
  * Os ids entram por parâmetro porque `partida` não conhece o catálogo — quem sabe
  * quais monstros e raças existem é o pacote `cartas`, e quem os injeta é a borda.
@@ -36,7 +39,7 @@ export interface ReceitaDeBaralho {
  * composição pelo número de jogadores — exemplo ABSTRATO, não o baralho de
  * produção: 3 por jogador viram 12 numa mesa de 4. O tamanho de produção depende
  * do catálogo (que este módulo não conhece) e mora na borda —
- * `packages/server/src/app.ts`, hoje 14 por jogador / 56 na mesa de 4.
+ * `packages/server/src/app.ts`, hoje 17 por jogador / 68 na mesa de 4.
  *
  * ⚠️ **Não existe `salaVazia`** desde 2026-07-30 (decisão #42): porta que não é
  * monstro vai para a mão.
@@ -47,6 +50,8 @@ export function montarComposicao(receita: ReceitaDeBaralho): ReceitaPorta[] {
       Array.from({ length: receita.copiasPorMonstro }, (): ReceitaPorta => ({ tipo: 'monstro', monstroId }))),
     ...receita.racaIds.flatMap((racaId): ReceitaPorta[] =>
       Array.from({ length: receita.copiasPorRaca }, (): ReceitaPorta => ({ tipo: 'raca', racaId }))),
+    ...receita.classeIds.flatMap((classeId): ReceitaPorta[] =>
+      Array.from({ length: receita.copiasPorClasse }, (): ReceitaPorta => ({ tipo: 'classe', classeId }))),
   ];
 }
 

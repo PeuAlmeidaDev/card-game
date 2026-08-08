@@ -1,3 +1,5 @@
+import type { ModificadoresDeStat } from './stats';
+
 /**
  * Onde uma peça de equipamento se encaixa no corpo. Cinco slots (bible §5).
  *
@@ -12,19 +14,8 @@
  */
 export type Slot = 'capacete' | 'armadura' | 'maoDireita' | 'maoEsquerda' | 'pes';
 
-/**
- * Modificadores parciais dos 4 stats. Escrito aqui em vez de importado de
- * `personagem` porque a direção de dependência é `cartas ← personagem`: importar
- * de lá inverteria a seta. `ItemCarta` satisfaz `Equipamento` (do `personagem`)
- * **estruturalmente**, que é o que permite entregá-lo ao `montarCombatente` sem
- * tradução nenhuma.
- */
-export interface ModificadoresDeItem {
-  readonly forca?: number;
-  readonly vida?: number;
-  readonly habilidade?: number;
-  readonly agilidade?: number;
-}
+/** Nome antigo, mantido porque `ItemCarta` e o `shared` o publicam. */
+export type ModificadoresDeItem = ModificadoresDeStat;
 
 /**
  * ⚠️ Gêmea da união em `partida/src/tipos.ts`, pelo mesmo motivo do `Slot`; o

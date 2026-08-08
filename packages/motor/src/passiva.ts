@@ -15,6 +15,8 @@ export interface ContextoPassiva {
   readonly vidaInicial: number;
   /** Scratch atual da passiva. */
   readonly estado: EstadoPassiva;
+  /** A rolagem do golpe que o PORTADOR acabou de dar. `null` fora de um ataque dele. */
+  readonly rolagemDeAtaque: number | null;
 }
 
 /**
@@ -38,4 +40,11 @@ export interface PassivaCombate {
   readonly aoFalharEsquiva?: (
     ctx: ContextoPassiva,
   ) => { readonly reRolar: boolean; readonly estado: EstadoPassiva };
+  /**
+   * O alvo EMPATOU a esquiva contra um golpe do portador. O empate ainda salva?
+   * Só é consultado no empate — fora dele nenhum uso é gasto.
+   */
+  readonly aoEmpatarEsquiva?: (
+    ctx: ContextoPassiva,
+  ) => { readonly empateSalva: boolean; readonly estado: EstadoPassiva };
 }

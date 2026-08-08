@@ -2,17 +2,9 @@ import { useState } from 'react';
 import { api } from './api';
 import { PainelLog } from './PainelLog';
 import { descreverCarta } from './descreverCarta';
-import { acaoEhLegal, afinidadeCom, LIMITE_MOCHILA } from '@card-dungeon/shared';
-import type { AcaoDaMesa, AcaoNoFio, Catalogo, Escolhas, Fase, ItemCarta, Slot, VistaDaPartida } from '@card-dungeon/shared';
+import { acaoEhLegal, afinidadeCom } from '@card-dungeon/shared';
+import type { AcaoDaMesa, AcaoNoFio, Catalogo, Fase, ItemCarta, Slot, VistaDaPartida } from '@card-dungeon/shared';
 import { rotuloDeAfinidade } from './rotuloDeAfinidade';
-
-/**
- * Usado quando a tela roda sozinha; o `App` passa as escolhas reais do construtor.
- *
- * O tipo é `Escolhas` (inferido do schema Zod), não `EscolhasPersonagem` (o do
- * domínio): quem manda no corpo da rota é o tipo da borda.
- */
-const ESCOLHAS_PADRAO: Escolhas = { classeId: 'guerreiro' };
 
 /**
  * Os cinco encaixes na ordem em que o corpo se lê, da cabeça aos pés. É ordem de
@@ -51,18 +43,19 @@ const NOME_DA_FASE: Record<Fase, string> = {
   descartar: 'Descartar — sua mão está acima do limite',
 };
 
-export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = [], itens = [] }: {
-  readonly escolhas?: Escolhas;
+export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }: {
   readonly racas?: Catalogo['racas'];
   readonly monstros?: Catalogo['monstros'];
   readonly itens?: Catalogo['itens'];
+  readonly classes?: Catalogo['classes'];
 }) {
   const [vista, definirVista] = useState<VistaDaPartida | null>(null);
   const [erro, definirErro] = useState<string | null>(null);
 
   const novaPartida = async (): Promise<void> => {
     definirErro(null);
-    const resposta = await api.criarPartida({ body: escolhas });
+    // Corpo VAZIO: a classe virou carta do baralho e não há mais escolha a mandar.
+    const resposta = await api.criarPartida({ body: {} });
     if (resposta.status === 200) {
       definirVista(resposta.body);
       return;
@@ -115,6 +108,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
   // item novo no server) tem que virar um rótulo feio, nunca uma exceção que
   // apaga a mesa inteira por causa de um nome.
   const nomeDoItem = (id: string): string => itens.find((i) => i.id === id)?.nome ?? id;
+  const nomeDaClasse = (id: string): string => classes.find((c) => c.id === id)?.nome ?? id;
   // A vida máxima do jogador vem PRONTA da vista: `combatente` já é o total
   // calculado pelo domínio (classe + itens equipados), com a patente no `level`.
   // A patente muda o dano, não a vida. Do monstro só temos o valor corrente: a
@@ -151,10 +145,11 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
   // condições que a tabela não conhece, e cada uma precisa de gêmeo aqui — os TRÊS
   // pares de espiada (`vasculhar` com `espiada === null`, "Encarar"/`manterCarta`
   // e "Empurrar"/`empurrarCarta` com `espiada !== null`, os dois cobrados por
-  // `resolverEspiada`), o `carta.tipo === 'raca'` que decide se "Jogar" existe, e
-  // o `decisao !== …` de "Atacar"/"Esquivar". A lista completa dos pares está no
-  // comentário do `aplicarAcao` (pacote `partida`): botão novo escrito só com
-  // `legal(tipo)` acende onde o domínio recusa.
+  // `resolverEspiada`), o `carta.tipo === 'raca' || carta.tipo === 'classe'` que
+  // decide se "Jogar" existe (gêmeo fiel do reducer: `jogarCarta` aceita as duas
+  // desde a Task 7), e o `decisao !== …` de "Atacar"/"Esquivar". A lista completa
+  // dos pares está no comentário do `aplicarAcao` (pacote `partida`): botão novo
+  // escrito só com `legal(tipo)` acende onde o domínio recusa.
   const legal = (tipo: AcaoDaMesa['tipo']): boolean =>
     podeAgir && acaoEhLegal(vista.fase, vista.queima !== null, tipo);
 
@@ -199,6 +194,10 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
                 estaria aqui sem nunca ter sido exercitado. */}
             <strong>{j.nome}</strong>{j.ehBot && <span aria-label="controlado pelo computador"> (bot)</span>} — patente {j.patente} · {j.derrotas} derrota(s)
             {j.emJogo.raca !== null && ` · ${nomeDaRaca(j.emJogo.raca.racaId)}`}
+            {/* A classe é renderizada SEMPRE, inclusive ausente — ao contrário da
+                raça, que só aparece quando existe. O motivo: o Aprendiz TEM efeito
+                visível (mochila 6 em vez de 5), e "nada escrito" não comunica isso. */}
+            {' · '}{j.emJogo.classe === null ? 'Aprendiz' : nomeDaClasse(j.emJogo.classe.classeId)}
             {' · '}força {j.combatente.forca} · vida {j.combatente.vida} · habilidade {j.combatente.habilidade} · agilidade {j.combatente.agilidade}
             {' · '}{j.cartasNaMao}/{j.limiteDeMao} cartas
             {/* A mochila é zona ABERTA (spec §11): esconder a de quem não é você
@@ -286,7 +285,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
           )}
 
           {espiada !== null && (
-            <p>Você pressente {descreverCarta(espiada.carta, nomeDaRaca, nomeDoMonstro, nomeDoItem)} adiante.</p>
+            <p>Você pressente {descreverCarta(espiada.carta, nomeDaRaca, nomeDoMonstro, nomeDoItem, nomeDaClasse)} adiante.</p>
           )}
 
           <div>
@@ -392,7 +391,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
           lista e não na da mão. Só a SUA aparece aqui com ação; a dos outros já
           está visível na linha do assento, acima. */}
       <section>
-        <h3>Sua mochila — {minhaMochila.length} de {LIMITE_MOCHILA}</h3>
+        <h3>Sua mochila — {minhaMochila.length} de {eu?.limiteDeMochila ?? 0}</h3>
         <ul>
           {minhaMochila.map((carta) => (
             <li key={carta.id}>
@@ -441,11 +440,11 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
         <ul>
           {vista.suaMao.map((carta) => (
             <li key={carta.id}>
-              {descreverCarta(carta, nomeDaRaca, nomeDoMonstro, nomeDoItem)}
+              {descreverCarta(carta, nomeDaRaca, nomeDoMonstro, nomeDoItem, nomeDaClasse)}
               {carta.tipo === 'equipamento' && rotuloDe(carta.itemId)}{' '}
-              {/* Só raça entra em jogo nesta fatia — o domínio recusa o resto, e um
-                  botão que só serve para levar 400 ensina o jogador a errar. */}
-              {carta.tipo === 'raca' && (
+              {/* Gêmeo fiel do reducer: `jogarCarta` aceita raça OU classe desde a
+                  Task 7 (`mesa.ts`). */}
+              {(carta.tipo === 'raca' || carta.tipo === 'classe') && (
                 <button
                   type="button"
                   disabled={!legal('jogarCarta')}
@@ -507,7 +506,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
               {carta.tipo === 'equipamento' && (
                 <button
                   type="button"
-                  disabled={!legal('guardarCarta') || minhaMochila.length >= LIMITE_MOCHILA}
+                  disabled={!legal('guardarCarta') || minhaMochila.length >= (eu?.limiteDeMochila ?? 0)}
                   onClick={() => void agir({ tipo: 'guardarCarta', cartaId: carta.id })}
                 >
                   Guardar
@@ -532,6 +531,7 @@ export function TelaMesa({ escolhas = ESCOLHAS_PADRAO, racas = [], monstros = []
         racas={racas}
         monstros={monstros}
         itens={itens}
+        classes={classes}
       />
 
       {erro !== null && <p role="alert">{erro}</p>}

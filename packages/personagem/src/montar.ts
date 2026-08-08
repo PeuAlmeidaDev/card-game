@@ -12,9 +12,12 @@ function somaComPiso(stat: StatDeCombate, fontes: readonly ModificadoresDeStat[]
   return Math.max(PISO, total);
 }
 
-/** Reduz classe + itens a um Combatente. Raça não dá stats (dá passiva — ver `cartas`). */
-export function montarCombatente(classe: Classe, itens: readonly Equipamento[]): Combatente {
-  const fontes: ModificadoresDeStat[] = [classe.modificadores, ...itens.map((i) => i.modificadores)];
+/** Reduz classe + itens a um Combatente. `classe: null` = Aprendiz. Raça não dá stats (dá passiva). */
+export function montarCombatente(classe: Classe | null, itens: readonly Equipamento[]): Combatente {
+  const fontes: ModificadoresDeStat[] = [
+    ...(classe === null ? [] : [classe.modificadores]),
+    ...itens.map((i) => i.modificadores),
+  ];
   return {
     forca: somaComPiso('forca', fontes),
     vida: somaComPiso('vida', fontes),

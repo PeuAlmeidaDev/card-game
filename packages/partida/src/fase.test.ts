@@ -4,22 +4,26 @@ import { criarPartida } from './montagem';
 import { aplicarAcao } from './mesa';
 import { escolherAcao } from './bot';
 import { projetarPara } from './projecao';
-import { limiteDeMao, LIMITE_BASE_DE_MAO, LIMITE_MOCHILA } from './mao';
+import { limiteDeMao, LIMITE_BASE_DE_MAO, LIMITE_BASE_DE_MOCHILA } from './mao';
 import { montarComposicao } from './baralho';
 import { criarDadoCiclico } from './testes/dados';
-import { catalogoDeTeste, ID_DA_CLASSE_DE_TESTE } from './testes/catalogo';
+import { CARTA_DE_CLASSE_DE_TESTE, catalogoDeTeste, comClasseDeTeste } from './testes/catalogo';
 import { COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
-import { equipamento, monstro, monstros, raca } from './testes/cartas';
+import { classe, equipamento, monstro, monstros, raca } from './testes/cartas';
 import { SLOTS_VAZIOS } from './corpo';
 import type { AcaoDaMesa, JogadorNaMesa, EntradaJogador, EstadoPartida, Fase } from './tipos';
 
 /** A projeção calcula `combatente`, então precisa do catálogo. Um só para o arquivo. */
 const catalogoPadrao = catalogoDeTeste();
 const jogador = (mao: JogadorNaMesa['mao'], comRaca: boolean): JogadorNaMesa => ({
-  id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE,
+  id: 'p1', nome: 'Você', ehBot: false,
   patente: 1, derrotas: 0, mao, mochila: [],
-  emJogo: { raca: comRaca ? raca('r1', 'anao') : null, slots: { ...SLOTS_VAZIOS } },
+  emJogo: { raca: comRaca ? raca('r1', 'anao') : null, classe: CARTA_DE_CLASSE_DE_TESTE, slots: { ...SLOTS_VAZIOS } },
 });
+
+/** `criarPartida` mais o stamp da classe de teste na zona — ver `comClasseDeTeste`. */
+const criar = (...args: Parameters<typeof criarPartida>): EstadoPartida =>
+  comClasseDeTeste(criarPartida(...args));
 
 describe('acaoEhLegalNaFase', () => {
   it('em `recompor` valem jogar raça, equipar e passar', () => {
@@ -156,6 +160,20 @@ describe('faseSeAutoPula (spec §6.1)', () => {
     expect(faseSeAutoPula('recompor', comMao([raca('r1', 'elfo')]))).toBe(false);
   });
 
+  it('`recompor` NÃO se auto-pula com uma carta de classe na mão', () => {
+    // Sem isto, quem saca uma classe é pulado por cima da única fase em que pode
+    // jogá-la — e a carta morre na mão sem nunca ter tido janela.
+    const comClasseNaMao = comMao([classe('pc-1', 'c-teste')]);
+    expect(faseSeAutoPula('recompor', comClasseNaMao)).toBe(false);
+  });
+
+  it('`jogar` continua se auto-pulando com classe na mão — ela só entra em `recompor`', () => {
+    // Mesma regra da raça (decisão #7 do spec da fatia 8): trocar depois de ver a
+    // porta seria reagir ao monstro.
+    const comClasseNaMao = comMao([classe('pc-1', 'c-teste')]);
+    expect(faseSeAutoPula('jogar', comClasseNaMao)).toBe(true);
+  });
+
   it('`recompor` NÃO se pula com um equipamento na mão', () => {
     expect(faseSeAutoPula('recompor', comMao([equipamento('t-1')]))).toBe(false);
   });
@@ -187,10 +205,10 @@ describe('faseSeAutoPula (spec §6.1)', () => {
   });
 
   it('com a mochila NO TETO, nenhuma das duas se pula — é o que torna o auto-pulo impossível com queima pendente', () => {
-    // A `queima` só abre quando a mochila já está em `LIMITE_MOCHILA`
+    // A `queima` só abre quando a mochila já está em `LIMITE_BASE_DE_MOCHILA`
     // (`destinoDoDesequipado`), e é este teste que prende a outra ponta: nesse
     // mesmo estado, `faseSeAutoPula` já devolve `false` nas duas fases paradas.
-    const cheia = Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-${String(i)}`));
+    const cheia = Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-${String(i)}`));
     expect(faseSeAutoPula('recompor', { ...comMao([]), mochila: cheia })).toBe(false);
     expect(faseSeAutoPula('jogar', { ...comMao([]), mochila: cheia })).toBe(false);
   });
@@ -352,10 +370,10 @@ describe('a fase nunca mente sobre o estado', () => {
 
   it('vale em todo estado de uma partida inteira, e as seis fases aparecem', () => {
     const quatro: readonly EntradaJogador[] = [
-      { id: 'p1', nome: 'Você', ehBot: false, classeId: ID_DA_CLASSE_DE_TESTE },
-      { id: 'p2', nome: 'Bot 1', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
-      { id: 'p3', nome: 'Bot 2', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
-      { id: 'p4', nome: 'Bot 3', ehBot: true, classeId: ID_DA_CLASSE_DE_TESTE },
+      { id: 'p1', nome: 'Você', ehBot: false },
+      { id: 'p2', nome: 'Bot 1', ehBot: true },
+      { id: 'p3', nome: 'Bot 2', ehBot: true },
+      { id: 'p4', nome: 'Bot 3', ehBot: true },
     ];
     const semEmbaralhar = <T,>(itens: readonly T[]): T[] => [...itens];
     const depsPartida = {
@@ -424,6 +442,7 @@ describe('a fase nunca mente sobre o estado', () => {
       copiasPorMonstro: 1,
       racaIds: Array.from({ length: 9 }, (_, i) => (i % 2 === 0 ? 'elfo' : 'anao')),
       copiasPorRaca: 1,
+      classeIds: [], copiasPorClasse: 0,
     });
     // 🎚️ Dial LOCAL girado de novo nesta fatia: `LIMITE_BASE_DE_MAO` subiu de 4
     // para 7, e com 5 cartas a mão parou de estourar — `descartar` deixou de ser
@@ -440,7 +459,7 @@ describe('a fase nunca mente sobre o estado', () => {
     // 🎚️ O tamanho da composição (10 por jogador) é preservado do fixture
     // anterior — a proporção monstro/raça mudou (ver o comentário acima), o
     // TOTAL não.
-    let estado = criarPartida('m1', quatro,
+    let estado = criar('m1', quatro,
       {
         patenteAlvo: 4,
         composicaoPorJogador: composicao,

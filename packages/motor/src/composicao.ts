@@ -14,6 +14,7 @@ export interface Portador {
   readonly vidaInicial: number;
   readonly passivas: readonly PassivaCombate[];
   readonly scratches: readonly EstadoPassiva[];
+  readonly rolagemDeAtaque: number | null;
 }
 
 /**
@@ -32,6 +33,7 @@ function contextoDe(portador: Portador, scratches: readonly EstadoPassiva[], id:
     portador: portador.combatente,
     vidaInicial: portador.vidaInicial,
     estado,
+    rolagemDeAtaque: portador.rolagemDeAtaque,
   };
 }
 
@@ -96,4 +98,22 @@ export function comporFalharEsquiva(
     if (r.reRolar) return { reRolar: true, scratches };
   }
   return { reRolar: false, scratches };
+}
+
+/**
+ * A PRIMEIRA passiva que anula o empate vence e as seguintes não são consultadas.
+ * Mesmo curto-circuito de `comporFalharEsquiva`, pela mesma razão: duas passivas
+ * gastariam uso pelo MESMO efeito, e uma delas cobraria sem produzir nada.
+ */
+export function comporEmpatarEsquiva(
+  portador: Portador,
+): { readonly empateSalva: boolean; readonly scratches: readonly EstadoPassiva[] } {
+  let scratches = portador.scratches;
+  for (const passiva of portador.passivas) {
+    if (passiva.aoEmpatarEsquiva === undefined) continue;
+    const r = passiva.aoEmpatarEsquiva(contextoDe(portador, scratches, passiva.id));
+    scratches = comScratch(scratches, r.estado);
+    if (!r.empateSalva) return { empateSalva: false, scratches };
+  }
+  return { empateSalva: true, scratches };
 }

@@ -26,9 +26,9 @@ export interface MonstroCarta {
 
 /**
  * 🎚️ Cinco monstros em três faixas de perigo, em ordem de perigo crescente. O
- * **Goblin é idêntico ao `MONSTRO_PADRAO`** da fatia 2: é a linha de base do
- * balanceamento medido na fatia 5, preservada de propósito para que a dificuldade
- * que mudar seja atribuível às cartas novas.
+ * **Goblin carrega a statline 4/20/2/4/1 do monstro fixo da fatia 2**: é a linha
+ * de base do balanceamento medido na fatia 5, preservada de propósito para que a
+ * dificuldade que mudar seja atribuível às cartas novas.
  *
  * Lembrete da regra: o atacante ACERTA quando a rolagem de 1d12 é ≤ habilidade.
  * Habilidade 2 é 2/12; habilidade alta transforma o monstro em máquina de acerto.
