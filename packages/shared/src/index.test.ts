@@ -1,7 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { escolhasSchema, semEscolhasSchema, contrato, acaoDaMesaSchema, acaoRequisicaoSchema } from './index';
-
-const valido = { classeId: 'ladino' };
+import { semEscolhasSchema, contrato, acaoDaMesaSchema, acaoRequisicaoSchema } from './index';
 
 describe('contrato', () => {
   it('expõe o catálogo como GET /api/catalogo', () => {
@@ -9,33 +7,12 @@ describe('contrato', () => {
     expect(contrato.catalogo.path).toBe('/api/catalogo');
   });
 
-  it('expõe o duelo como POST /api/duelo com o escolhasSchema no body', () => {
-    expect(contrato.duelo.method).toBe('POST');
-    expect(contrato.duelo.path).toBe('/api/duelo');
-    expect(contrato.duelo.body).toBe(escolhasSchema);
-  });
-});
-
-describe('escolhasSchema', () => {
-  it('valida escolhas só com a classe', () => {
-    expect(escolhasSchema.safeParse(valido).success).toBe(true);
+  it('o contrato não tem mais a rota do duelo — a fatia 2 saiu do jogo', () => {
+    expect('duelo' in contrato).toBe(false);
   });
 
-  it('escolhasSchema não pede mais racaId — a raça virou carta sacável', () => {
-    expect(escolhasSchema.safeParse({ classeId: 'guerreiro' }).success).toBe(true);
-  });
-
-  it('rejeita quando falta a classe', () => {
-    expect(escolhasSchema.safeParse({}).success).toBe(false);
-  });
-
-  it('escolhasSchema não aceita mais itemIds', () => {
-    // O item deixou de ser escolha de menu e virou carta que se saca — a mesma
-    // jogada que a raça sofreu na fatia 7. Manter o campo deixaria um dado que o
-    // cliente é obrigado a mandar e o servidor ignora: um tipo que mente no fio.
-    const r = escolhasSchema.safeParse({ classeId: 'guerreiro', itemIds: ['espada'] });
-    expect(r.success).toBe(true);
-    expect(r.data).toEqual({ classeId: 'guerreiro' });
+  it('criar partida não pede escolha nenhuma: a classe é carta do baralho', () => {
+    expect(contrato.criarPartida.body.safeParse({}).success).toBe(true);
   });
 });
 
@@ -45,9 +22,8 @@ describe('rotas da mesa', () => {
     expect(contrato.criarPartida.path).toBe('/api/partida');
     // A classe virou carta do baralho: não sobrou escolha a mandar, e continuar
     // exigindo `classeId` deixaria um dado que o servidor ignora — o tipo que
-    // mente no fio. O `/duelo` fica com o `escolhasSchema`, que ele usa de verdade.
+    // mente no fio.
     expect(contrato.criarPartida.body).toBe(semEscolhasSchema);
-    expect(contrato.criarPartida.body).not.toBe(escolhasSchema);
     expect(semEscolhasSchema.safeParse({}).success).toBe(true);
   });
 

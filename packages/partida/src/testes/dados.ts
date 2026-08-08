@@ -22,7 +22,7 @@ export function filaDeDados(rolagens: readonly number[]): RolarD12 {
  * lado passa a receber sempre o mesmo valor. Se esse valor for um erro para os
  * dois, ninguém acerta e o combate arrasta até `MAX_TURNOS` virar impasse.
  *
- * Confirmado: `criarDadoCiclico([4, 12])` contra o `MONSTRO_PADRAO` produziu
+ * Confirmado: `criarDadoCiclico([4, 12])` contra um monstro 4/20/2/4/1 produziu
  * 9 combates seguidos sem uma única vitória, todos por teto de turnos.
  *
  * Serve para testes de POUCAS ações. Para exercitar uma partida inteira, use

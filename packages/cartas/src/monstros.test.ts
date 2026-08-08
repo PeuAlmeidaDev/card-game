@@ -23,9 +23,9 @@ describe('catálogo de monstros', () => {
     expect(new Set(statlines).size).toBe(statlines.length);
   });
 
-  it('mantém o Goblin idêntico ao MONSTRO_PADRAO da fatia 2 (linha de base do balanceamento)', () => {
-    // `tesouros` é campo novo desta fatia (Tesouros e o Corpo) e não existia no
-    // MONSTRO_PADRAO original — por isso entra aqui em vez de alterar a
+  it('mantém o Goblin na statline do monstro fixo da fatia 2 (linha de base do balanceamento)', () => {
+    // `tesouros` é campo novo da fatia "Tesouros e o Corpo" e não existia no
+    // monstro fixo original — por isso entra aqui em vez de alterar a
     // comparação histórica dos outros 6 stats.
     expect(obterMonstro('goblin')).toEqual({
       id: 'goblin', nome: 'Goblin', forca: 4, vida: 20, habilidade: 2, agilidade: 4, level: 1, tesouros: 1,

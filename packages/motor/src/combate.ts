@@ -137,9 +137,9 @@ export function proximoPasso(
 /**
  * O jogador ataca; se acertar, o monstro rola a esquiva NA MESMA chamada — dado de
  * monstro não é clique de ninguém (D3 do spec). Usa as primitivas, como `esquivar`:
- * o empate da esquiva é ponto de extensão de passiva (`aoEmpatarEsquiva`), e o
- * composto `resolverAtaque` não teria como consultá-la sem virar um segundo ponto
- * de composição.
+ * o empate da esquiva é ponto de extensão de passiva (`aoEmpatarEsquiva`), e um
+ * ataque composto não teria como consultá-la sem virar um segundo ponto de
+ * composição.
  */
 function atacar(estado: EstadoCombate, rolar: RolarD12, passivas: readonly PassivaCombate[]): Passo {
   const log: EventoCombate[] = [];

@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
-import { resolverDuelo, type RolarD12, type Combatente } from '@card-dungeon/motor';
+import type { RolarD12 } from '@card-dungeon/motor';
 import { contrato } from '@card-dungeon/shared';
-import { CATALOGO, MONSTRO_PADRAO, resolverEscolhas, montarCombatente } from '@card-dungeon/personagem';
+import { CATALOGO } from '@card-dungeon/personagem';
 import {
   MONSTROS_SACAVEIS, RACAS_SACAVEIS, CLASSES_SACAVEIS, ITENS_SACAVEIS, obterRaca, obterClasse, obterItem,
   type MonstroCarta,
@@ -32,12 +32,9 @@ function humanoDa(estado: EstadoPartida): string | undefined {
 export interface OpcoesApp {
   /** Fonte de rolagem injetada; default = dado real. Testes injetam um dado determinístico. */
   readonly rolar?: RolarD12;
-  /** Monstro adversário do `/duelo` (lado b); default = MONSTRO_PADRAO. Testes injetam um monstro fixo. */
-  readonly monstro?: Combatente;
   /**
    * Bestiário da mesa; default = catálogo real. Os testes injetam um roster de
-   * um monstro só para forçar o desfecho do combate — o que antes era a opção
-   * `monstro` (que agora serve só à rota `/duelo`, da fatia 2).
+   * um monstro só para forçar o desfecho do combate.
    */
   readonly monstros?: readonly MonstroCarta[];
   /**
@@ -50,7 +47,6 @@ export interface OpcoesApp {
 
 export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
   const rolar = opcoes.rolar ?? criarDadoReal();
-  const monstro = opcoes.monstro ?? MONSTRO_PADRAO;
   const embaralhar = opcoes.embaralhar ?? criarEmbaralhamentoReal();
   const app = Fastify();
   const s = initServer();
@@ -122,27 +118,13 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
   const montarBots = (): readonly EntradaJogador[] =>
     [0, 1, 2].map((i) => ({ id: randomUUID(), nome: `Bot ${String(i + 1)}`, ehBot: true }));
 
-  // Implementa o contrato do `shared`: o adapter valida o `body` do duelo contra
-  // o escolhasSchema antes do handler (corpo inválido → 400). A validação de
-  // domínio (id inexistente) continua explícita no handler.
+  // Implementa o contrato do `shared`: o adapter valida o `body` contra o schema
+  // antes do handler (corpo inválido → 400).
   // Os handlers do ts-rest devem retornar Promise (a API tipa o retorno como
   // assíncrono), por isso são `async` mesmo sem `await` — não é gratuito.
   /* eslint-disable @typescript-eslint/require-await */
   const router = s.router(contrato, {
     catalogo: async () => ({ status: 200 as const, body: CATALOGO }),
-    duelo: async ({ body }) => {
-      const resolvido = resolverEscolhas(body);
-      if (!resolvido) {
-        return { status: 400 as const, body: { erro: 'classe inexistente' } };
-      }
-      // Lista de itens VAZIA, e não um parâmetro que sumiu: o `/duelo` é a rota
-      // da fatia 2 e nunca teve mesa, logo nunca tem corpo equipado — item é
-      // carta de Tesouro, que só existe dentro de uma partida. O `montarCombatente`
-      // continua recebendo itens porque é ele que a mesa usa (via `combatenteDe`)
-      // para somar o que está nos slots.
-      const jogador = montarCombatente(resolvido.classe, []);
-      return { status: 200 as const, body: resolverDuelo(jogador, monstro, rolar) };
-    },
 
     criarPartida: async () => {
       const humano: EntradaJogador = { id: randomUUID(), nome: 'Você', ehBot: false };

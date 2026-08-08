@@ -1,12 +1,11 @@
 import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
-import type { Combatente, ResultadoDuelo, EventoCombate, Lado } from '@card-dungeon/motor';
+import type { Combatente, EventoCombate, Lado } from '@card-dungeon/motor';
 import type {
   ModificadoresDeStat,
   Classe,
   Equipamento,
   Catalogo,
-  EscolhasPersonagem,
 } from '@card-dungeon/personagem';
 import type {
   AcaoDaMesa,
@@ -28,26 +27,6 @@ import type {
   ZonaEmJogo,
 } from '@card-dungeon/partida';
 import type { Slot as SlotDaCarta, ItemCarta, EixoDeAfinidade as EixoDaCarta } from '@card-dungeon/cartas';
-
-/**
- * Corpo do POST /api/duelo: as escolhas do jogador (ids). Restrito ao tipo de
- * domínio via `satisfies` — o `personagem` continua a fonte única do tipo.
- *
- * **Sem `racaId` e sem `itemIds`:** desde a fatia 7 a raça não é escolha de menu,
- * e desde a fatia 8 o item também não — os dois são carta que se saca do baralho
- * e entra em jogo pela mesa. Manter o campo aqui deixaria um dado que o cliente é
- * obrigado a mandar e o servidor ignora: um tipo que mente no fio. E duas fontes
- * para o mesmo stat (nascer equipado + sacar Tesouro) distorceriam uma corrida
- * ranqueada, que é o motivo de jogo por trás do motivo de tipo.
- *
- * ⚠️ Serve SÓ ao `/duelo`, que genuinamente monta um combatente a partir de um
- * `classeId`. A mesa saiu daqui: ver `semEscolhasSchema`.
- */
-export const escolhasSchema = z.object({
-  classeId: z.string(),
-}) satisfies z.ZodType<EscolhasPersonagem>;
-
-export type Escolhas = z.infer<typeof escolhasSchema>;
 
 /**
  * Corpo do POST /api/partida: **vazio**. A classe virou carta do baralho, como a
@@ -187,13 +166,6 @@ export { acaoEhLegal } from '@card-dungeon/partida';
 // cópia escrita à mão no cliente é a que fica para trás quando o sexto nascer.
 export { SLOTS_VAZIOS } from '@card-dungeon/partida';
 
-// Valor, e este chegou tarde: o cliente somava classe + base por conta própria
-// (`calcularPreview`, em `App.tsx`) porque `web` não alcança `personagem`. A
-// cópia JÁ tinha divergido — `montarCombatente` aplica `PISO = 1` e a do cliente
-// não, então a tela mostrava `Agilidade -5` onde o servidor montaria `1`. Custo
-// zero hoje (nenhuma classe do catálogo é tão negativa), bomba amanhã.
-export { montarCombatente } from '@card-dungeon/personagem';
-
 // Valor, pelo mesmo motivo: a afinidade é regra, e mostrar o valor CHEIO na tela
 // de quem veste reduzido é a tela mentindo.
 export { afinidadeCom, contribuicaoDe } from '@card-dungeon/partida';
@@ -206,8 +178,8 @@ const c = initContract();
  * o consome com um cliente tipado — some o `as` da resposta.
  *
  * Respostas são `c.type<T>()`: tipadas em compile-time, **sem** validação em
- * runtime (decisão da fatia 2 preservada — só a entrada é validada, via o
- * `escolhasSchema` no `body`). Validar a resposta com Zod fica para fatia futura.
+ * runtime (decisão da fatia 2 preservada — só a entrada é validada, pelo schema
+ * no `body`). Validar a resposta com Zod fica para fatia futura.
  */
 export const contrato = c.router({
   catalogo: {
@@ -216,17 +188,7 @@ export const contrato = c.router({
     responses: {
       200: c.type<Catalogo>(),
     },
-    summary: 'Tabela de raças/classes/itens + a base, para o preview do cliente.',
-  },
-  duelo: {
-    method: 'POST',
-    path: '/api/duelo',
-    body: escolhasSchema,
-    responses: {
-      200: c.type<ResultadoDuelo>(),
-      400: c.type<{ erro: string }>(),
-    },
-    summary: 'Monta o personagem das escolhas e resolve o duelo contra o monstro.',
+    summary: 'Tabela de raças/classes/monstros/itens, para a mesa nomear as cartas.',
   },
   criarPartida: {
     method: 'POST',
@@ -266,14 +228,12 @@ export const contrato = c.router({
 // Superfície única do contrato: tipos de combate, de personagem e da mesa.
 export type {
   Combatente,
-  ResultadoDuelo,
   EventoCombate,
   Lado,
   ModificadoresDeStat,
   Classe,
   Equipamento,
   Catalogo,
-  EscolhasPersonagem,
   VistaDaPartida,
   AcaoDaMesa,
   JogadorPublico,

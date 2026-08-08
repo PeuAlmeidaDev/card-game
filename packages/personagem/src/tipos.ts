@@ -1,4 +1,3 @@
-import type { Combatente } from '@card-dungeon/motor';
 import type { RacaResumo, ClasseResumo, MonstroCarta, ItemCarta } from '@card-dungeon/cartas';
 
 /** Modificadores parciais dos 4 stats de combate. `level` nunca é modificado. */
@@ -21,9 +20,8 @@ export interface Equipamento {
   readonly modificadores: ModificadoresDeStat;
 }
 
-/** O que o `GET /catalogo` entrega: raças (carta), monstros, classes, itens + a base para o preview. */
+/** O que o `GET /catalogo` entrega: as cartas de raça, monstro, classe e item, para a mesa nomeá-las. */
 export interface Catalogo {
-  readonly base: Combatente;
   readonly racas: readonly RacaResumo[];
   /**
    * O bestiário, INTEIRO. Diferente de `racas`, não há projeção `Resumo`: a carta
@@ -47,13 +45,4 @@ export interface Catalogo {
    * atravessa o JSON inteira.
    */
   readonly itens: readonly ItemCarta[];
-}
-
-/**
- * Escolhas do jogador (corpo do POST). Só o que MONTA os stats — e desde a fatia
- * 8 isso é a classe, e só ela: a raça saiu na fatia 7 e o item sai agora, os dois
- * pelo mesmo motivo (viraram carta que se saca do baralho).
- */
-export interface EscolhasPersonagem {
-  readonly classeId: string;
 }

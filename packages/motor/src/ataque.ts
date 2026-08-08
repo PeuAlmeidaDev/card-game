@@ -38,26 +38,3 @@ export function rolarEsquivaContra(
 export function danoDe(atacante: Combatente): number {
   return atacante.level + atacante.forca;
 }
-
-/**
- * Resolve um ataque completo: acerto → (se acertou) esquiva → (se não esquivou) dano.
- * Composição das primitivas acima. Não toca na Vida — quem aplica é o chamador.
- */
-export function resolverAtaque(
-  atacante: Combatente,
-  ladoAtacante: Lado,
-  ladoDefensor: Lado,
-  rolar: RolarD12,
-): { readonly dano: number; readonly rolagem: number; readonly eventos: readonly EventoCombate[] } {
-  const ataque = rolarAtaqueDe(atacante, ladoAtacante, rolar);
-  if (!ataque.acertou) {
-    return { dano: 0, rolagem: ataque.rolagem, eventos: [ataque.evento] };
-  }
-
-  const esquiva = rolarEsquivaContra(ataque.rolagem, ladoDefensor, rolar);
-  if (esquiva.esquivou) {
-    return { dano: 0, rolagem: ataque.rolagem, eventos: [ataque.evento, esquiva.evento] };
-  }
-
-  return { dano: danoDe(atacante), rolagem: ataque.rolagem, eventos: [ataque.evento, esquiva.evento] };
-}
