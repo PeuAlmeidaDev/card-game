@@ -620,8 +620,13 @@ describe('escolherAcao', () => {
       slots: { maoDireita: equipamento('t-forte', ID_DO_ITEM_FORTE) },
     });
 
+    // `toEqual` da ação INTEIRA — convenção do arquivo, e o que o TÍTULO promete:
+    // com uma vaga livre o bot não aponta mão nenhuma, porque `resolverMao`
+    // prefere a livre sozinha e mandar `mao` aqui seria deslocar de propósito. O
+    // `toMatchObject({ tipo, cartaId })` que estava aqui ficava verde com o bot
+    // apontando `maoDireita`, que é exatamente o "deslocar nada" que ele nega.
     expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
-      .toMatchObject({ tipo: 'equiparCarta', cartaId: 't-fraco' });
+      .toEqual({ tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-fraco' });
   });
 
   it('NUNCA propõe equipar um item proibido, mesmo sendo o de maior valor cheio', () => {

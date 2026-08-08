@@ -2397,22 +2397,43 @@ describe('aplicarAcao — equiparCarta', () => {
       expect(jogadorDe(r.estado, 'p1').emJogo.slots.maoEsquerda?.id).toBe('t-nova');
     });
 
-    it('item que NÃO é de mão dispensa `mao` mesmo com as duas cheias', () => {
+    it('item que NÃO é de mão dispensa `mao` — e a mão apontada é IGNORADA', () => {
       // O guard tem que olhar o SLOT DO ITEM, não só o estado das mãos — senão um
       // elmo com as mãos cheias levaria 400.
+      //
+      // A ação manda `mao` de propósito, apontando para a esquerda: `colocarNoSlot`
+      // só consulta `maoAlvo` no ramo do item de MÃO (spec §8.2 ramo 8), e um
+      // `maoAlvo ?? info.slot` no lugar do ternário poria o elmo numa mão. Sem as
+      // duas asserções abaixo essa mutação fica verde.
       const r = aplicarAcao(estadoComAsDuasMaosCheias, {
-        tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-elmo',
+        tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-elmo', mao: 'maoEsquerda',
       }, deps([]));
       expect(jogadorDe(r.estado, 'p1').emJogo.slots.capacete?.id).toBe('t-elmo');
+      expect(jogadorDe(r.estado, 'p1').emJogo.slots.maoDireita?.id).toBe('t-0');
+      expect(jogadorDe(r.estado, 'p1').emJogo.slots.maoEsquerda?.id).toBe('t-outra-mao');
     });
 
-    it('arma de DUAS MÃOS dispensa `mao` com as duas cheias', () => {
+    it('arma de DUAS MÃOS dispensa `mao` com as duas cheias — e os DOIS deslocados são roteados', () => {
       // Mesma armadilha do anterior: o montante ocupa as duas por definição,
       // então não há escolha a cobrar.
+      //
+      // É o ÚNICO caminho do reducer que produz uma lista de DOIS deslocados, e
+      // até 2026-08-08 nada afirmava o que acontecia com ela: `colocarNoSlot`
+      // devolvendo dois (`equipar.test.ts`) e `destinoDoDesequipado` roteando dois
+      // (idem) estavam provados, mas o FIO entre eles não. Verificado por mutação
+      // (`deslocados.slice(0, 1)` na chamada de `destinoDoDesequipado`): com só a
+      // asserção de slot, 352/352 ficavam VERDES e `t-outra-mao` sumia do jogo —
+      // nem o censo de conservação do soak pegaria, porque a política do bot não
+      // produz este cenário (zero em 3.859).
       const r = aplicarAcao(estadoComAsDuasMaosCheias, {
         tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-montante',
       }, deps([]));
+
       expect(jogadorDe(r.estado, 'p1').emJogo.slots.maoEsquerda?.id).toBe('t-montante');
+      expect(jogadorDe(r.estado, 'p1').emJogo.slots.maoDireita?.id).toBe('t-montante');
+      expect(r.eventos.filter((e) => e.tipo === 'desequipou').map((e) => e.carta.id))
+        .toEqual(['t-0', 't-outra-mao']);
+      expect(jogadorDe(r.estado, 'p1').mochila.map((c) => c.id)).toEqual(['t-0', 't-outra-mao']);
     });
 
     it('a mão ALVO explícita é HONRADA mesmo apontando para a que NÃO é `MAOS[0]`', () => {
