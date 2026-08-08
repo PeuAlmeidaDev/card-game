@@ -23,10 +23,13 @@ import type {
   PosicaoFinal,
   QueimaPendente,
   Slot,
+  SlotDeItem,
   VistaDaPartida,
   ZonaEmJogo,
 } from '@card-dungeon/partida';
-import type { Slot as SlotDaCarta, ItemCarta, EixoDeAfinidade as EixoDaCarta } from '@card-dungeon/cartas';
+import type {
+  Slot as SlotDaCarta, SlotDeItem as SlotDeItemDaCarta, ItemCarta, EixoDeAfinidade as EixoDaCarta,
+} from '@card-dungeon/cartas';
 
 /**
  * Corpo do POST /api/partida: **vazio**. A classe virou carta do baralho, como a
@@ -132,6 +135,17 @@ type _CoberturaSlot =
   [Slot] extends [SlotDaCarta] ? ([SlotDaCarta] extends [Slot] ? true : never) : never;
 const _coberturaSlot: _CoberturaSlot = true;
 void _coberturaSlot;
+
+/**
+ * Trava as duas uniões `SlotDeItem` — a de `partida` (a regra) e a de `cartas`
+ * (o dado). Mesma tupla e mesmo preço do `_CoberturaSlot`, acima.
+ *
+ * ⚠️ Guard de COMPILAÇÃO. Quem acusa é o `pnpm typecheck`, nunca a suíte.
+ */
+type _CoberturaSlotDeItem =
+  [SlotDeItem] extends [SlotDeItemDaCarta] ? ([SlotDeItemDaCarta] extends [SlotDeItem] ? true : never) : never;
+const _coberturaSlotDeItem: _CoberturaSlotDeItem = true;
+void _coberturaSlotDeItem;
 
 /**
  * Trava as duas uniões `EixoDeAfinidade` — a de `partida` (a regra) e a de

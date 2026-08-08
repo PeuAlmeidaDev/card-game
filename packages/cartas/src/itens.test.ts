@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { ITENS, ITENS_SACAVEIS, obterItem, type Slot, type ModificadoresDeItem } from './itens';
+import { ITENS, ITENS_SACAVEIS, obterItem, type SlotDeItem, type ModificadoresDeItem } from './itens';
 import { RACAS_SACAVEIS } from './racas';
 
-const SLOTS: readonly Slot[] = ['capacete', 'armadura', 'maoDireita', 'maoEsquerda', 'pes'];
+const SLOTS_DE_ITEM: readonly SlotDeItem[] = ['capacete', 'armadura', 'mao', 'pes'];
 
 describe('catálogo de itens', () => {
   it('nenhum id se repete', () => {
@@ -14,7 +14,7 @@ describe('catálogo de itens', () => {
 
   it('todo item declara um slot conhecido', () => {
     for (const item of ITENS) {
-      expect(SLOTS).toContain(item.slot);
+      expect(SLOTS_DE_ITEM).toContain(item.slot);
     }
   });
 
@@ -22,14 +22,15 @@ describe('catálogo de itens', () => {
     // Um capacete `duasMaos: true` ocuparia as duas mãos e ficaria na cabeça —
     // estado sem sentido que o tipo sozinho não recusa.
     for (const item of ITENS.filter((i) => i.duasMaos)) {
-      expect(['maoDireita', 'maoEsquerda']).toContain(item.slot);
+      expect(item.slot).toBe('mao');
     }
   });
 
   it('todo slot tem ao menos um item', () => {
-    // Slot sem item é slot que o jogador nunca preenche: os 5 slots do corpo
-    // (bible §5) viram 4 na prática, sem nada denunciar.
-    for (const slot of SLOTS) {
+    // Slot sem item é slot que o jogador nunca preenche: os 4 slots que um item
+    // pode DECLARAR (bible §5, com as duas mãos unificadas em `'mao'`) viram 3 na
+    // prática, sem nada denunciar.
+    for (const slot of SLOTS_DE_ITEM) {
       expect(ITENS.some((i) => i.slot === slot)).toBe(true);
     }
   });
@@ -45,6 +46,26 @@ describe('catálogo de itens', () => {
     for (const item of ITENS_SACAVEIS) {
       expect(ITENS).toContain(item);
     }
+  });
+
+  it('toda arma e o escudo declaram a mão GENÉRICA, não uma mão específica', () => {
+    // Prende o conserto: enquanto as armas declaravam `maoDireita`, duas delas
+    // nunca coexistiam. Confere CONTEÚDO, não contagem — uma lista com o mesmo
+    // tamanho e ids errados passaria por uma asserção de `length`.
+    const deMao = ['espada-curta', 'montante', 'escudo-redondo', 'machado-do-orc'];
+    for (const id of deMao) {
+      const item = obterItem(id);
+      if (item === undefined) throw new Error(`${id} sumiu do catálogo`);
+      expect(item.slot).toBe('mao');
+    }
+  });
+
+  it('nenhum item declara uma mão FÍSICA — esse valor não existe mais no tipo do item', () => {
+    // Teste de ausência com alvo estrutural: se alguém reintroduzir 'maoDireita'
+    // num item, o typecheck pega — mas o typecheck NÃO roda no vitest (o esbuild
+    // apaga as anotações). Esta asserção é a rede em runtime.
+    const proibidos = new Set(['maoDireita', 'maoEsquerda']);
+    expect(ITENS.filter((i) => proibidos.has(i.slot as string))).toEqual([]);
   });
 });
 

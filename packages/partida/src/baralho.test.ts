@@ -12,7 +12,7 @@ const idem = <T,>(itens: readonly T[]): T[] => [...itens];
 const _tesouroEhCarta: Carta = { id: 't-0', tipo: 'equipamento', itemId: 'espada-curta' } satisfies CartaTesouro;
 void _tesouroEhCarta;
 const _itemTemSlot: InfoItem = {
-  id: 'espada-curta', nome: 'Espada Curta', slot: 'maoDireita', duasMaos: false, modificadores: { forca: 2 },
+  id: 'espada-curta', nome: 'Espada Curta', slot: 'mao', duasMaos: false, modificadores: { forca: 2 },
   exclusivo: null,
 };
 void _itemTemSlot;

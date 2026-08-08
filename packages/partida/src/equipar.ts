@@ -1,5 +1,5 @@
 import type {
-  CartaEquipamento, EstadoPartida, EventoDaMesa, InfoItem, QueimaPendente, Slot, ZonaEmJogo,
+  CartaEquipamento, EstadoPartida, EventoDaMesa, InfoItem, MaoSlot, QueimaPendente, Slot, ZonaEmJogo,
 } from './tipos';
 import { limiteDeMochila } from './mao';
 
@@ -9,11 +9,23 @@ import { limiteDeMochila } from './mao';
  * fora deste arquivo: `bot.ts` escrevia o par à mão para calcular o custo de
  * equipar uma arma grande. A cópia não era teórica: uma mutação nela deixou os
  * 240 testes verdes, porque o catálogo de teste não tinha arma de duas mãos.
+ *
+ * Tupla, não array: `resolverMao` e o `?? MAOS[0]` abaixo precisam de um índice
+ * `0` que `noUncheckedIndexedAccess` aceite sem `| undefined`.
  */
-export const MAOS: readonly Slot[] = ['maoDireita', 'maoEsquerda'];
+export const MAOS: readonly [MaoSlot, MaoSlot] = ['maoDireita', 'maoEsquerda'];
+
+/** A vaga de mão que recebe o item: a livre, ou a primeira quando as duas estão cheias. */
+function resolverMao(slots: ZonaEmJogo['slots']): MaoSlot {
+  return MAOS.find((m) => slots[m] === null) ?? MAOS[0];
+}
 
 /**
  * Põe a carta no slot que o item declara e devolve o corpo novo mais o que saiu.
+ *
+ * Item de mão (`slot: 'mao'`) sem `duasMaos` resolve para a vaga LIVRE, ou a
+ * primeira de `MAOS` quando as duas estão ocupadas — `resolverMao`, acima. Sem
+ * escolha do jogador ainda (Task 2 da fatia `empunhadura dupla`).
  *
  * **Duas mãos põe a MESMA instância nos dois slots** (spec §5.1) em vez de
  * inventar um estado de "ocupação parcial": com a mesma referência, a UI lê
@@ -26,8 +38,13 @@ export function colocarNoSlot(
   slots: ZonaEmJogo['slots'],
   carta: CartaEquipamento,
   info: InfoItem,
-): { readonly slots: ZonaEmJogo['slots']; readonly deslocados: readonly CartaEquipamento[] } {
-  const alvos: readonly Slot[] = info.duasMaos ? MAOS : [info.slot];
+): {
+  readonly slots: ZonaEmJogo['slots'];
+  readonly deslocados: readonly CartaEquipamento[];
+  readonly ocupados: readonly [Slot, ...Slot[]];
+} {
+  const alvos: readonly [Slot, ...Slot[]] =
+    info.duasMaos ? MAOS : [info.slot === 'mao' ? resolverMao(slots) : info.slot];
 
   // Dedup por id: o montante ocupando as duas mãos sai UMA vez da lista de
   // deslocados — senão ele iria duas vezes para o cemitério e o baralho de
@@ -51,7 +68,7 @@ export function colocarNoSlot(
   for (const slot of alvos) {
     novos[slot] = carta;
   }
-  return { slots: novos, deslocados: [...deslocados.values()] };
+  return { slots: novos, deslocados: [...deslocados.values()], ocupados: alvos };
 }
 
 /**

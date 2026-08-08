@@ -5,6 +5,14 @@ import type {
 // O par de mãos vem do MESMO lugar que `colocarNoSlot` usa: o custo que o bot
 // calcula tem que ser o custo que o reducer vai cobrar, e duas listas escritas à
 // mão divergem em silêncio (o slot que nascer não entra na cópia).
+//
+// ⚠️ Desde a fatia `empunhadura dupla`, `MAOS[0]` NÃO é mais garantidamente o
+// que `colocarNoSlot` escolhe para um item de mão sem `mao` explícito — o
+// reducer prefere a vaga LIVRE (`resolverMao`), e aqui o custo continua
+// assumindo sempre `MAOS[0]`. Isto é dívida ACEITA e TEMPORÁRIA: a Task 3 desta
+// fatia reescreve `vestirOuGuardar` para avaliar as duas mãos de verdade; até
+// lá o bot só fica um pouco mais conservador (pode achar que desloca um item
+// quando a mão livre estaria disponível de graça), nunca produz `AcaoInvalida`.
 import { MAOS } from './equipar';
 import { afinidadeCom, contribuicaoDe } from './corpo';
 
@@ -238,7 +246,9 @@ function vestirOuGuardar(
     const info = catalogo.item(carta.itemId);
     if (info === undefined) continue;
     // O que ele DESLOCA: os slots que ele vai ocupar. Duas mãos desloca os dois.
-    const alvos: readonly Slot[] = info.duasMaos ? MAOS : [info.slot];
+    // Item de mão sem `duasMaos`: assume `MAOS[0]`, não a vaga livre — ver o
+    // aviso no import de `MAOS`, acima.
+    const alvos: readonly Slot[] = info.duasMaos ? MAOS : [info.slot === 'mao' ? MAOS[0] : info.slot];
     const ocupantes = new Map<string, string>();
     for (const slot of alvos) {
       const atual = eu.emJogo.slots[slot];

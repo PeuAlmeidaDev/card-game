@@ -1896,7 +1896,15 @@ describe('aplicarAcao — equiparCarta', () => {
     expect(comMao(nascida(), monstros(1)).fase).toBe('vasculhar');
   });
 
-  /** Mesa com o corpo de p1 forjado. Espalha `SLOTS_VAZIOS` para não escrever os 5 slots à mão. */
+  /**
+   * Mesa com o corpo de p1 forjado. Espalha `SLOTS_VAZIOS` para não escrever os 5
+   * slots à mão.
+   *
+   * ⚠️ Desde a fatia `empunhadura dupla`, um item de mão só desloca o que está em
+   * `maoDireita` se a `maoEsquerda` TAMBÉM estiver ocupada — com uma vaga livre,
+   * `colocarNoSlot` prefere ela (`resolverMao`), sem escolha do jogador (Task 2).
+   * Os fixtures abaixo que testam DESLOCAMENTO ocupam as DUAS mãos de propósito.
+   */
   const comSlots = (estado: EstadoPartida, slots: Partial<ZonaEmJogo['slots']>): EstadoPartida => ({
     ...estado,
     jogadores: estado.jogadores.map((j) => (
@@ -1927,7 +1935,12 @@ describe('aplicarAcao — equiparCarta', () => {
     // o próprio deslocado; é essa sequência de DUAS ações que este teste afirma
     // agora.
     const cheia = Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
-    const base = comSlots(comMao(nascida(), [equipamento('t-1')]), { maoDireita: equipamento('t-0') });
+    // Ocupa as DUAS mãos: com a esquerda livre, o novo item iria para lá em vez
+    // de deslocar 't-0' — ver o aviso em `comSlots`, acima.
+    const base = comSlots(
+      comMao(nascida(), [equipamento('t-1')]),
+      { maoDireita: equipamento('t-0'), maoEsquerda: equipamento('t-outra-mao') },
+    );
     const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
     const p: EstadoPartida = { ...base, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...base, jogadores }, 'p1')) };
 
@@ -1965,7 +1978,10 @@ describe('aplicarAcao — equiparCarta', () => {
     // emite o `desequipou` na hora — com ela CHEIA a decisão vira pendência, e o
     // evento só nasce quando `queimarCarta` a resolve (ver o teste acima e o
     // describe de `queimarCarta`).
-    const b = comSlots(comMao(nascida(), [equipamento('t-1')]), { maoDireita: equipamento('t-0') });
+    const b = comSlots(
+      comMao(nascida(), [equipamento('t-1')]),
+      { maoDireita: equipamento('t-0'), maoEsquerda: equipamento('t-outra-mao') },
+    );
 
     const { eventos } = aplicarAcao(b, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
 
@@ -1987,7 +2003,10 @@ describe('aplicarAcao — equiparCarta', () => {
     // `return` — a pendência chega ao estado e `vezDe` continua sendo de quem
     // equipou.
     const cheia = Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
-    const base = comSlots(comMao(nascida(), [equipamento('t-novo')]), { maoDireita: equipamento('t-0') });
+    const base = comSlots(
+      comMao(nascida(), [equipamento('t-novo')]),
+      { maoDireita: equipamento('t-0'), maoEsquerda: equipamento('t-outra-mao') },
+    );
     const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
     const p: EstadoPartida = { ...base, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...base, jogadores }, 'p1')) };
 
@@ -2007,7 +2026,10 @@ describe('aplicarAcao — equiparCarta', () => {
     // Somar um termo que nunca sustenta nada seria comentário disfarçado de
     // código — esta asserção é o que segura a propriedade no lugar dele.
     const cheia = Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
-    const base = comSlots(comMao(nascida(), [equipamento('t-novo')]), { maoDireita: equipamento('t-0') });
+    const base = comSlots(
+      comMao(nascida(), [equipamento('t-novo')]),
+      { maoDireita: equipamento('t-0'), maoEsquerda: equipamento('t-outra-mao') },
+    );
     const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
     const p: EstadoPartida = { ...base, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...base, jogadores }, 'p1')) };
     const antes = versaoDe(p);
@@ -2151,7 +2173,10 @@ describe('aplicarAcao — equiparCarta', () => {
     // inversão — o pin gêmeo abaixo e o de `equipar.test.ts` dependem da mesma
     // ordem —, mas é o único deste describe com origem MOCHILA cheia.
     const cheia = [equipamento('t-1'), ...Array.from({ length: LIMITE_BASE_DE_MOCHILA - 1 }, (_, i) => equipamento(`t-cheia-${String(i)}`))];
-    const base = comSlots(comMao(nascida(), []), { maoDireita: equipamento('t-0') });
+    const base = comSlots(
+      comMao(nascida(), []),
+      { maoDireita: equipamento('t-0'), maoEsquerda: equipamento('t-outra-mao') },
+    );
     const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
     const p: EstadoPartida = { ...base, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...base, jogadores }, 'p1')) };
 
@@ -2177,7 +2202,10 @@ describe('aplicarAcao — equiparCarta', () => {
     // O pin de ordem não alcança isto: lá a mochila cheia deixa 4 cartas para trás,
     // então a versão stale ainda responde "tenho equipamento" e o auto-pulo não
     // dispara. É preciso que a mochila stale fique VAZIA.
-    const base = comSlots(comMao(nascida(), []), { maoDireita: equipamento('t-0') });
+    const base = comSlots(
+      comMao(nascida(), []),
+      { maoDireita: equipamento('t-0'), maoEsquerda: equipamento('t-outra-mao') },
+    );
     const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: [equipamento('t-1')] } : j));
     const p: EstadoPartida = { ...base, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...base, jogadores }, 'p1')) };
     expect(p.fase).toBe('recompor');

@@ -72,6 +72,20 @@ export type CartaEquipamento = Extract<CartaTesouro, { readonly tipo: 'equipamen
  */
 export type Slot = 'capacete' | 'armadura' | 'maoDireita' | 'maoEsquerda' | 'pes';
 
+/** As duas vagas de mão, no corpo. Extraído de `Slot` para não repetir os literais. */
+export type MaoSlot = Extract<Slot, 'maoDireita' | 'maoEsquerda'>;
+
+/**
+ * O que um ITEM declara. Diferente de `Slot` (o corpo): as duas mãos são vagas
+ * equivalentes, então o item diz `'mao'` e quem resolve para qual é
+ * `colocarNoSlot`, abaixo.
+ *
+ * ⚠️ Gêmea da união em `cartas/src/itens.ts` — a direção é
+ * `cartas ← personagem ← partida`. Quem impede as duas de divergirem é o guard
+ * `_CoberturaSlotDeItem` em `shared/src/index.ts`.
+ */
+export type SlotDeItem = 'capacete' | 'armadura' | 'mao' | 'pes';
+
 /**
  * ⚠️ Gêmea da união em `cartas/src/itens.ts`, pelo mesmo motivo do `Slot`:
  * `partida` é cego ao catálogo e a direção `cartas ← personagem ← partida` proíbe
@@ -97,7 +111,7 @@ export interface Afinidade {
  * por isso `partida` nunca precisa importar `cartas`.
  */
 export interface InfoItem extends Equipamento {
-  readonly slot: Slot;
+  readonly slot: SlotDeItem;
   readonly duasMaos: boolean;
   /** `null` = item comum. */
   readonly exclusivo: Afinidade | null;

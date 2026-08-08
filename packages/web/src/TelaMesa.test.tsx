@@ -62,7 +62,7 @@ const MONSTROS_PADRAO: Catalogo['monstros'] = [
 // Mesma ideia, para o baralho de Tesouros: sem o catálogo o nome do item cairia
 // no fallback `?? id` e o corpo mostraria `espada-curta` em vez de "Espada Curta".
 const ITENS_PADRAO: Catalogo['itens'] = [
-  { id: 'espada-curta', nome: 'Espada Curta', slot: 'maoDireita', duasMaos: false, modificadores: { forca: 2 }, exclusivo: null },
+  { id: 'espada-curta', nome: 'Espada Curta', slot: 'mao', duasMaos: false, modificadores: { forca: 2 }, exclusivo: null },
   { id: 'elmo-de-couro', nome: 'Elmo de Couro', slot: 'capacete', duasMaos: false, modificadores: { vida: 2 }, exclusivo: null },
 ];
 
@@ -761,7 +761,7 @@ describe('TelaMesa — o corpo', () => {
     await abrirMesa(
       comCorpo({ ...SLOTS_VAZIOS, maoDireita: montante, maoEsquerda: montante }),
       undefined, undefined,
-      [{ id: 'montante', nome: 'Montante', slot: 'maoDireita', duasMaos: true, modificadores: { forca: 4 }, exclusivo: null }],
+      [{ id: 'montante', nome: 'Montante', slot: 'mao', duasMaos: true, modificadores: { forca: 4 }, exclusivo: null }],
     );
 
     expect(await screen.findAllByText(/Montante/)).toHaveLength(2);
@@ -1239,7 +1239,7 @@ describe('TelaMesa — afinidade de itens', () => {
   const ITENS_COM_EXCLUSIVO: Catalogo['itens'] = [
     ...ITENS_PADRAO,
     {
-      id: 'machado', nome: 'Machado', slot: 'maoDireita', duasMaos: false,
+      id: 'machado', nome: 'Machado', slot: 'mao', duasMaos: false,
       modificadores: { forca: 3, habilidade: 1 },
       exclusivo: { eixo: 'raca', donoId: 'orc', semAfinidade: { forca: 2 } },
     },

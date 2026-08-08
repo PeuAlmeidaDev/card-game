@@ -18,7 +18,7 @@ const monstros = [
   { id: 'goblin', nome: 'Goblin', forca: 4, vida: 20, habilidade: 2, agilidade: 4, level: 1, tesouros: 1 },
 ];
 const itens = [
-  { id: 'espada-curta', nome: 'Espada Curta', slot: 'maoDireita' as const, duasMaos: false, modificadores: { forca: 2 }, exclusivo: null },
+  { id: 'espada-curta', nome: 'Espada Curta', slot: 'mao' as const, duasMaos: false, modificadores: { forca: 2 }, exclusivo: null },
 ];
 const classes = [
   { id: 'guerreiro', nome: 'Guerreiro', texto: 'Impacto: quando ele ataca, o empate não salva ninguém.' },

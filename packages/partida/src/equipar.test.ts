@@ -73,7 +73,7 @@ describe('colocarNoSlot', () => {
     // referência nos dois, e `itensEquipados` deduplica por id na hora de somar.
     // É o que faz a UI ler natural — as duas mãos mostram o montante.
     const montante = carta('t-1', 'montante');
-    const r = colocarNoSlot(SLOTS_VAZIOS, montante, info('maoDireita', true));
+    const r = colocarNoSlot(SLOTS_VAZIOS, montante, info('mao', true));
     expect(r.slots.maoDireita).toBe(montante);
     expect(r.slots.maoEsquerda).toBe(montante);
   });
@@ -83,7 +83,7 @@ describe('colocarNoSlot', () => {
     const escudo = carta('t-2', 'escudo-redondo');
     const r = colocarNoSlot(
       { ...SLOTS_VAZIOS, maoDireita: espada, maoEsquerda: escudo },
-      carta('t-1', 'montante'), info('maoDireita', true),
+      carta('t-1', 'montante'), info('mao', true),
     );
     expect(r.deslocados).toEqual([espada, escudo]);
   });
@@ -98,7 +98,7 @@ describe('colocarNoSlot', () => {
     const velho = carta('t-0', 'montante');
     const r = colocarNoSlot(
       { ...SLOTS_VAZIOS, maoDireita: velho, maoEsquerda: velho },
-      carta('t-1', 'machado-de-guerra'), info('maoDireita', true),
+      carta('t-1', 'machado-de-guerra'), info('mao', true),
     );
 
     expect(r.deslocados).toEqual([velho]);
@@ -113,11 +113,73 @@ describe('colocarNoSlot', () => {
     const montante = carta('t-0', 'montante');
     const r = colocarNoSlot(
       { ...SLOTS_VAZIOS, maoDireita: montante, maoEsquerda: montante },
-      carta('t-1', 'espada-curta'), info('maoDireita'),
+      carta('t-1', 'espada-curta'), info('mao'),
     );
     expect(r.slots.maoDireita?.id).toBe('t-1');
     expect(r.slots.maoEsquerda).toBeNull();
     expect(r.deslocados).toEqual([montante]);
+  });
+
+  it('com as DUAS mãos livres, ocupa a primeira de MAOS', () => {
+    const r = colocarNoSlot(SLOTS_VAZIOS, carta('t-1', 'espada'), info('mao'));
+    expect(r.slots.maoDireita?.id).toBe('t-1');
+    expect(r.slots.maoEsquerda).toBeNull();
+    expect(r.ocupados).toEqual(['maoDireita']);
+    expect(r.deslocados).toEqual([]);
+  });
+
+  it('com a direita ocupada, ocupa a ESQUERDA — e não desloca nada', () => {
+    // É o coração da fatia: hoje a segunda arma DESLOCA a primeira, porque as
+    // duas declaram a mesma mão. Com `'mao'` genérico ela vai para a vaga livre.
+    const primeira = carta('t-1', 'espada');
+    const r = colocarNoSlot(
+      { ...SLOTS_VAZIOS, maoDireita: primeira },
+      carta('t-2', 'machado'), info('mao'),
+    );
+    expect(r.slots.maoDireita).toBe(primeira);
+    expect(r.slots.maoEsquerda?.id).toBe('t-2');
+    expect(r.ocupados).toEqual(['maoEsquerda']);
+    expect(r.deslocados).toEqual([]);
+  });
+
+  it('com a ESQUERDA ocupada, ocupa a direita', () => {
+    // O espelho do anterior: sem ele, um `resolverMao` que devolvesse
+    // sempre 'maoEsquerda' passaria no teste de cima.
+    const primeira = carta('t-1', 'escudo');
+    const r = colocarNoSlot(
+      { ...SLOTS_VAZIOS, maoEsquerda: primeira },
+      carta('t-2', 'machado'), info('mao'),
+    );
+    expect(r.slots.maoDireita?.id).toBe('t-2');
+    expect(r.slots.maoEsquerda).toBe(primeira);
+    expect(r.ocupados).toEqual(['maoDireita']);
+  });
+
+  it('com as duas ocupadas e sem alvo, desloca a da PRIMEIRA mão', () => {
+    // Sem escolha do jogador ainda (Task 2). O que este teste prende é que o
+    // fallback é DETERMINÍSTICO e desloca exatamente UM item.
+    const direita = carta('t-1', 'espada');
+    const esquerda = carta('t-2', 'escudo');
+    const r = colocarNoSlot(
+      { ...SLOTS_VAZIOS, maoDireita: direita, maoEsquerda: esquerda },
+      carta('t-3', 'machado'), info('mao'),
+    );
+    expect(r.slots.maoDireita?.id).toBe('t-3');
+    expect(r.slots.maoEsquerda).toBe(esquerda);
+    expect(r.deslocados).toEqual([direita]);
+  });
+
+  it('item que NÃO é de mão ignora as mãos e vai para o slot homônimo', () => {
+    const r = colocarNoSlot(SLOTS_VAZIOS, carta('t-1', 'elmo'), info('capacete'));
+    expect(r.slots.capacete?.id).toBe('t-1');
+    expect(r.ocupados).toEqual(['capacete']);
+  });
+
+  it('duas mãos ocupa AS DUAS e reporta os dois slots', () => {
+    const r = colocarNoSlot(SLOTS_VAZIOS, carta('t-1', 'montante'), info('mao', true));
+    expect(r.slots.maoDireita?.id).toBe('t-1');
+    expect(r.slots.maoEsquerda?.id).toBe('t-1');
+    expect(r.ocupados).toEqual(['maoDireita', 'maoEsquerda']);
   });
 });
 

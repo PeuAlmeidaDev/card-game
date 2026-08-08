@@ -988,7 +988,7 @@ function equiparCarta(
     throw new AcaoInvalida(`aplicarAcao: ${info.nome} é exclusivo de outra especialização`);
   }
 
-  const { slots, deslocados } = colocarNoSlot(jogador.emJogo.slots, carta, info);
+  const { slots, deslocados, ocupados } = colocarNoSlot(jogador.emJogo.slots, carta, info);
   const atualizado: JogadorNaMesa = {
     ...jogador,
     // Remove da zona de ORIGEM, nunca das duas: filtrar a mão quando a carta veio
@@ -1012,8 +1012,13 @@ function equiparCarta(
   // `equipou` primeiro: o log conta a ação que o jogador pediu, e só então o que
   // ela custou. Invertido, a linha "Espada Curta foi para a mochila" apareceria
   // antes de existir motivo para ela.
+  // `ocupados[0]`, não `info.slot`: `info.slot` é `SlotDeItem` (o que o item
+  // DECLARA — pode ser o genérico `'mao'`), e o evento carrega o slot FÍSICO que
+  // `colocarNoSlot` de fato ocupou. Para o montante os dois são `maoDireita`,
+  // idêntico ao comportamento de antes; para uma arma de uma mão passa a
+  // reportar a mão que ela realmente ocupou.
   const eventos: readonly EventoDaMesa[] = [
-    { tipo: 'equipou', jogadorId: acao.jogadorId, slot: info.slot, carta },
+    { tipo: 'equipou', jogadorId: acao.jogadorId, slot: ocupados[0], carta },
     ...doDeslocado,
   ];
 
