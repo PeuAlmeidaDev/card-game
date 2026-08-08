@@ -21,6 +21,7 @@ describe('montarComposicao', () => {
   it('cria `copiasPorMonstro` cartas para cada id de monstro', () => {
     expect(montarComposicao({
       monstroIds: ['goblin', 'ogro'], copiasPorMonstro: 2, racaIds: [], copiasPorRaca: 1,
+      classeIds: [], copiasPorClasse: 0,
     })).toEqual([
       { tipo: 'monstro', monstroId: 'goblin' },
       { tipo: 'monstro', monstroId: 'goblin' },
@@ -32,10 +33,25 @@ describe('montarComposicao', () => {
   it('cria `copiasPorRaca` cartas para cada id de raça, depois dos monstros', () => {
     expect(montarComposicao({
       monstroIds: ['goblin'], copiasPorMonstro: 1, racaIds: ['elfo', 'anao'], copiasPorRaca: 1,
+      classeIds: [], copiasPorClasse: 0,
     })).toEqual([
       { tipo: 'monstro', monstroId: 'goblin' },
       { tipo: 'raca', racaId: 'elfo' },
       { tipo: 'raca', racaId: 'anao' },
+    ]);
+  });
+
+  it('cria `copiasPorClasse` cartas para cada id de classe, depois dos monstros e das raças', () => {
+    const r = montarComposicao({
+      monstroIds: ['m1'], copiasPorMonstro: 1,
+      racaIds: ['r1'], copiasPorRaca: 1,
+      classeIds: ['c1', 'c2'], copiasPorClasse: 2,
+    });
+    expect(r).toEqual([
+      { tipo: 'monstro', monstroId: 'm1' },
+      { tipo: 'raca', racaId: 'r1' },
+      { tipo: 'classe', classeId: 'c1' }, { tipo: 'classe', classeId: 'c1' },
+      { tipo: 'classe', classeId: 'c2' }, { tipo: 'classe', classeId: 'c2' },
     ]);
   });
 
@@ -44,6 +60,7 @@ describe('montarComposicao', () => {
     // `semEmbaralhar` lê esta ordem literalmente.
     expect(montarComposicao({
       monstroIds: ['goblin'], copiasPorMonstro: 1, racaIds: ['elfo'], copiasPorRaca: 3,
+      classeIds: [], copiasPorClasse: 0,
     })).toEqual([
       { tipo: 'monstro', monstroId: 'goblin' },
       { tipo: 'raca', racaId: 'elfo' },
@@ -60,6 +77,7 @@ describe('montarComposicao', () => {
     const cinco = (p: string) => Array.from({ length: 5 }, (_, i) => `${p}${String(i)}`);
     const c = montarComposicao({
       monstroIds: cinco('m'), copiasPorMonstro: 2, racaIds: cinco('r'), copiasPorRaca: 1,
+      classeIds: [], copiasPorClasse: 0,
     });
     expect(c).toHaveLength(15);
     expect(c.filter((r) => r.tipo === 'monstro')).toHaveLength(10);
@@ -69,10 +87,11 @@ describe('montarComposicao', () => {
   it('a repetição do BARALHO vem da mesa, não da composição', () => {
     // A composição é POR JOGADOR e `criarPartida` a multiplica pelo tamanho da
     // mesa: os 3 daqui virariam 12 numa mesa de 4 — exemplo abstrato deste
-    // fixture, não o baralho de produção (que hoje é 14 por jogador / 56 na
+    // fixture, não o baralho de produção (que hoje é 17 por jogador / 68 na
     // mesa; ver `packages/server/src/app.ts`).
     const c = montarComposicao({
       monstroIds: ['goblin'], copiasPorMonstro: 2, racaIds: ['elfo'], copiasPorRaca: 1,
+      classeIds: [], copiasPorClasse: 0,
     });
     expect(c).toHaveLength(3);
   });

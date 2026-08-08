@@ -34,6 +34,11 @@ export const COMPOSICAO_DE_TESTE: readonly ReceitaPorta[] = montarComposicao({
   copiasPorMonstro: 1,
   racaIds: Array.from({ length: 3 }, () => 'r-teste'),
   copiasPorRaca: 1,
+  // Zero: manter o TAMANHO 8 da baseline. `mesa.test.ts` tem um cenário que
+  // depende de "o baseline de 8 não financia uma mão de 9 × 4 assentos" —
+  // somar carta de classe aqui apagaria aquele alarme em silêncio.
+  classeIds: [],
+  copiasPorClasse: 0,
 });
 
 /**

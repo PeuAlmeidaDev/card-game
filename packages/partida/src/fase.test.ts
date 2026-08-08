@@ -442,6 +442,7 @@ describe('a fase nunca mente sobre o estado', () => {
       copiasPorMonstro: 1,
       racaIds: Array.from({ length: 9 }, (_, i) => (i % 2 === 0 ? 'elfo' : 'anao')),
       copiasPorRaca: 1,
+      classeIds: [], copiasPorClasse: 0,
     });
     // 🎚️ Dial LOCAL girado de novo nesta fatia: `LIMITE_BASE_DE_MAO` subiu de 4
     // para 7, e com 5 cartas a mão parou de estourar — `descartar` deixou de ser

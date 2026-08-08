@@ -2902,6 +2902,7 @@ describe('a composição BASELINE não pode nascer travada', () => {
     const soPortas = montarComposicao({
       monstroIds: Array.from({ length: 10 }, () => 'm-teste'),
       copiasPorMonstro: 1, racaIds: [], copiasPorRaca: 1,
+      classeIds: [], copiasPorClasse: 0,
     });
     const p = criar('m1', mesaDeProducao, {
       ...producao,

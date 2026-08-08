@@ -4,7 +4,8 @@ import { resolverDuelo, type RolarD12, type Combatente } from '@card-dungeon/mot
 import { contrato } from '@card-dungeon/shared';
 import { CATALOGO, MONSTRO_PADRAO, resolverEscolhas, montarCombatente } from '@card-dungeon/personagem';
 import {
-  MONSTROS_SACAVEIS, RACAS_SACAVEIS, ITENS_SACAVEIS, obterRaca, obterClasse, obterItem, type MonstroCarta,
+  MONSTROS_SACAVEIS, RACAS_SACAVEIS, CLASSES_SACAVEIS, ITENS_SACAVEIS, obterRaca, obterClasse, obterItem,
+  type MonstroCarta,
 } from '@card-dungeon/cartas';
 import {
   AcaoInvalida, MAO_INICIAL_PADRAO, MAO_INICIAL_TESOUROS, aplicarAcao, avancarBots, criarPartida, montarComposicao,
@@ -65,16 +66,17 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
   const acharMonstro = (id: string) => monstros.find((m) => m.id === id);
 
   /**
-   * Baralho de produção (game bible §3.1/§17, decisão #52): 2 cópias por monstro
-   * do bestiário, 1 cópia por raça sacável — por jogador. Montado no `server`
-   * porque é aqui que catálogo e mesa se encontram: `partida` não conhece
-   * `cartas` de propósito, e as regras não devem conhecer.
+   * Baralho de produção (game bible §3.1/§17, decisão #52/#60): 2 cópias por
+   * monstro do bestiário, 1 cópia por raça sacável, 1 cópia por classe sacável —
+   * por jogador. Montado no `server` porque é aqui que catálogo e mesa se
+   * encontram: `partida` não conhece `cartas` de propósito, e as regras não
+   * devem conhecer.
    */
   const composicaoDeProducao = montarComposicao({
     monstroIds: monstros.map((m) => m.id),
     // 🎚️ Decisão #52 do game bible (2026-07-30): 2 monstros para 1 raça.
     // Com o catálogo de hoje (5 monstros, 4 raças sacáveis — Humano fica de fora,
-    // ver `RACAS_SACAVEIS`) dá 14 cartas por jogador, 56 na mesa de 4. Densidade
+    // ver `RACAS_SACAVEIS`) dá 14 cartas por jogador antes da classe. Densidade
     // ~71% monstro / ~29% raça — a #41 mira raça em ~12,5%, e este é o passo
     // possível na direção dela com o catálogo de hoje.
     // ⚠️ NÃO derive estes números do tamanho do catálogo: foi exatamente isso que
@@ -82,6 +84,13 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
     copiasPorMonstro: 2,
     racaIds: RACAS_SACAVEIS.map((r) => r.id),
     copiasPorRaca: 1,
+    classeIds: CLASSES_SACAVEIS.map((c) => c.id),
+    // 🎚️ Decisão #60/§6.2 do spec: 1 cópia por classe sacável = 3 cartas por
+    // jogador, que é EXATAMENTE o que a receita-alvo do §11 pede em cartas
+    // ABSOLUTAS. Os 17,6% de densidade só parecem altos porque faltam as 7 cartas
+    // de famílias que ainda não existem em código (maldições 4 + modificadores 3).
+    // ⚠️ NÃO gire `copiasPorMonstro` para "consertar" a porcentagem.
+    copiasPorClasse: 1,
   });
 
   /**
