@@ -923,10 +923,10 @@ function jogarCarta(
   // E a mochila encolhe), elas viajam JUNTAS numa pendência SÓ —
   // `QueimaPendente.motivo` é um valor ÚNICO para toda a fila (fatia `escolha
   // do descarte`) — com o motivo `mochilaEncolheu`: é a mochila que impede
-  // QUALQUER um dos dois de achar vaga, então ela é a causa que domina o log
-  // nesse cenário raríssimo (exige um item exclusivo de OUTRA classe equipado
-  // como Aprendiz bem no teto da mochila). Sem coincidência, o motivo antigo
-  // (`perdeuAfinidade`, sem excedente) continua exatamente como antes.
+  // QUALQUER um dos dois de achar vaga. Em produção o cenário é ZERO
+  // ESTRUTURAL (nenhum item exclusivo por CLASSE existe no catálogo), e vira
+  // alcançável quando o primeiro nascer; até lá quem o exercita é o teste da
+  // fila composta em `mesa.test.ts`.
   const deslocados = cartaExcedente === undefined ? perdidos : [...perdidos, cartaExcedente];
   const motivo = cartaExcedente === undefined ? 'perdeuAfinidade' : 'mochilaEncolheu';
   const { estado: base, eventos: doDeslocado, queima } =

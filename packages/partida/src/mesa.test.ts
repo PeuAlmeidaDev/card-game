@@ -1571,6 +1571,38 @@ describe('jogar carta de CLASSE', () => {
     expect(jogadorDe(r.estado, 'p1').mochila.map((c) => c.id)).not.toContain('t-c5');
   });
 
+  it('as DUAS causas na mesma jogada viajam na MESMA fila: o perdido por afinidade E o excedente', () => {
+    // O ramo composto de `mesa.ts` (`[...perdidos, cartaExcedente]`) não tinha um
+    // único visitante: `[cartaExcedente]` sozinho deixava a suíte inteira verde, e
+    // os `perdidos` já saíram dos slots — sem entrar na fila, evaporam (nem mochila,
+    // nem queima, nem cemitério). Este teste é o que prende a fila COMPOSTA e a ORDEM.
+    const cheiaParaAprendiz = Array.from(
+      { length: LIMITE_BASE_DE_MOCHILA + 1 }, (_, i) => equipamento(`t-c${String(i)}`),
+    );
+    const p0 = nascida();
+    const jogadores = p0.jogadores.map((j) => (j.id === 'p1'
+      ? {
+          ...j,
+          mao: [nova] as readonly Carta[],
+          mochila: cheiaParaAprendiz,
+          emJogo: {
+            raca: null, classe: null,
+            slots: { ...SLOTS_VAZIOS, armadura: equipamento('t-x', ID_DO_ITEM_EXCLUSIVO_DE_CLASSE) },
+          },
+        }
+      : j));
+    const p: EstadoPartida = { ...p0, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...p0, jogadores }, 'p1')) };
+
+    const r = aplicarAcao(p, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'pc-nova' }, deps([]));
+
+    // `perdidos` PRIMEIRO, excedente por último — a ordem é a da fila de perguntas.
+    expect(r.estado.queima?.deslocados.map((c) => c.id)).toEqual(['t-x', 't-c5']);
+    // A mochila é a causa que domina o log quando as duas coincidem (ela é o que
+    // impede QUALQUER um dos dois de achar vaga).
+    expect(r.estado.queima?.motivo).toBe('mochilaEncolheu');
+    expect(jogadorDe(r.estado, 'p1').emJogo.slots.armadura).toBeNull();
+  });
+
   it('jogar CLASSE com quem JÁ TEM classe e a mochila em 5 não abre queima — o teto não mudou', () => {
     // O gêmeo obrigatório: sem ele, uma implementação que abrisse queima toda
     // vez que `jogarCarta` de classe encontrasse a mochila em 5 (em vez de só
