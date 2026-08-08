@@ -66,7 +66,11 @@ export interface ItemCarta {
 }
 
 /**
- * 🎚️ Os itens cobrem os 5 slots — comuns, mais um exclusivo por raça sacável.
+ * 🎚️ Os itens cobrem os 5 slots FÍSICOS do corpo (`Slot`) — comuns, mais um
+ * exclusivo por raça sacável. Eles fazem isso declarando os 4 valores de
+ * `SlotDeItem`: as duas mãos, alcançadas as duas pelo genérico `'mao'`, contam
+ * como um valor só do que um item pode DECLARAR (ver o teste "todo slot tem ao
+ * menos um item" em `itens.test.ts`) — não como um slot físico a menos.
  * A calibragem é deliberadamente TÍMIDA: o
  * balanceamento medido na fatia 5 (5 derrotas para 9 vitórias) já era duro, e
  * agora o jogador acumula itens ao longo da partida — o efeito composto é a

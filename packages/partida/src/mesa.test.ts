@@ -1969,6 +1969,22 @@ describe('aplicarAcao — equiparCarta', () => {
     });
   });
 
+  it('o evento `equipou` reporta a mão que ela DE FATO ocupou — não `MAOS[0]` cravado', () => {
+    // Achado do review do Task 1: o teste acima (slots vazios) não morde a
+    // mudança do Step 6, porque com as duas mãos livres `ocupados[0]` e um
+    // `slot: 'maoDireita'` hardcoded dão o MESMO resultado. Aqui a direita
+    // começa OCUPADA e a esquerda livre: `resolverMao` manda o item novo para a
+    // esquerda, e é isso — não a constante — que o evento tem que carregar.
+    const b = comSlots(comMao(nascida(), [equipamento('t-1')]), { maoDireita: equipamento('t-0') });
+
+    const { eventos } = aplicarAcao(b, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+
+    expect(eventos).toContainEqual({
+      tipo: 'equipou', jogadorId: 'p1', slot: 'maoEsquerda',
+      carta: { id: 't-1', tipo: 'equipamento', itemId: 'i-teste' },
+    });
+  });
+
   it('o evento `desequipou` CHEGA ao log pela ação real, com o destino certo', () => {
     // Gêmeo de integração do teste de `equipar.test.ts`: lá a unidade devolve os
     // eventos, aqui se prova que `equiparCarta` os REPASSA. Sem este, a função

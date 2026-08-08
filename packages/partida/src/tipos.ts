@@ -78,7 +78,7 @@ export type MaoSlot = Extract<Slot, 'maoDireita' | 'maoEsquerda'>;
 /**
  * O que um ITEM declara. Diferente de `Slot` (o corpo): as duas mãos são vagas
  * equivalentes, então o item diz `'mao'` e quem resolve para qual é
- * `colocarNoSlot`, abaixo.
+ * `colocarNoSlot`, em `equipar.ts`.
  *
  * ⚠️ Gêmea da união em `cartas/src/itens.ts` — a direção é
  * `cartas ← personagem ← partida`. Quem impede as duas de divergirem é o guard
