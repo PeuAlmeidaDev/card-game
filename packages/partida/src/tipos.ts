@@ -378,9 +378,13 @@ export type EventoDaMesa =
    * inteira passa a ver seria teatro. Assimetria deliberada em relação ao `loot`
    * (zona oculta, só a contagem) — o que decide é a zona de DESTINO.
    *
-   * `slot` é o que o ITEM declara. Uma arma de duas mãos ocupa as duas e mesmo
-   * assim sai um evento só, com o slot declarado: o log conta o que o jogador
-   * fez, e o corpo resultante já viaja aberto na projeção.
+   * `slot` é o encaixe FÍSICO que a carta de fato ocupou — `ocupados[0]`, o que
+   * `colocarNoSlot` devolve —, nunca o que o item DECLARA. Desde a fatia
+   * `empunhadura dupla` os dois são uniões diferentes: o item declara
+   * `SlotDeItem`, e o genérico `'mao'` dele não é membro de `Slot`. Uma arma de
+   * duas mãos ocupa as duas e mesmo assim sai um evento só, com a PRIMEIRA
+   * (`maoDireita`): o log conta o que o jogador fez, e o corpo resultante já
+   * viaja aberto na projeção.
    */
   | { readonly tipo: 'equipou'; readonly jogadorId: string;
       readonly slot: Slot; readonly carta: CartaEquipamento }

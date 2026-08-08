@@ -309,7 +309,8 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // jogador nunca aprende que existe.
   //
   // HISTÓRICO da contagem, que é a lição do parágrafo acima — os números abaixo
-  // são de planos passados, NÃO a contagem de hoje (que é dezesseis):
+  // são de planos passados, NÃO a contagem de hoje (que é DEZOITO, como dizem o
+  // preâmbulo lá em cima e a última entrada deste histórico):
   // no Plano 3b a lista subiu de sete para oito, e ao conferir descobriu-se que a
   // contagem anterior também mentia — as linhas `vasculhar/descartar` escondiam
   // DOIS pares cada uma dentro de uma célula agrupada, então nunca foram nove

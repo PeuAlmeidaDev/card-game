@@ -2056,20 +2056,71 @@ que este roteiro existe para evitar. O Montante tem os itens **4 e 5**, que são
    instância nos dois encaixes. **Isso é esperado, não bug**, e está escrito aqui para o item não
    reprovar código correto.
 
+### 🔬 A revisão ampla do BRANCH e a leva de correção final (2026-08-08) — 4 Important, 6 Minor
+
+**Aconteceu, e é a terceira fatia seguida em que a revisão do branch acha o que as revisões por task
+não podiam achar.** Quatro commits, **693 testes verdes** (contagem inalterada: a leva **fortaleceu
+asserções existentes**, não criou casos novos), typecheck 7/7, lint limpo.
+
+🔑 **O achado que vale mais que os outros três juntos:** o fio entre `colocarNoSlot` devolvendo
+**DOIS** deslocados e `destinoDoDesequipado` roteando os dois **não tinha visitante**. As duas pontas
+estavam provadas em `equipar.test.ts`; o **reducer no meio, não**. Medido: a mutação
+`deslocados.slice(0, 1)` no único call-site de `equiparCarta` deixava **352/352 verdes** e a segunda
+carta **sumia do jogo** — e o censo de conservação do soak **também não pegaria**, porque a política
+do bot não produz o cenário (**zero em 3.859**). ➡️ **A assimetria é o que provava que era buraco
+real e não teoria:** o *outro* call-site de `destinoDoDesequipado` (o de `jogarCarta`) **já era**
+coberto para lista multi-item. O conserto não precisou de dublê novo — **o fixture já produzia o
+cenário**, faltava a asserção.
+
+**O segundo, estrutural:** a `TelaMesa` **reescrevia o par fino inteiro** do reducer, caractere por
+caractere. Cada lado preso aos seus testes, **nada prendendo um ao outro** — a receita para a tela
+renderizar o número velho de botões e cada clique virar 400. Extraído para
+`precisaEscolherMao(info, emJogo)` em `equipar.ts`, re-exportado como **valor** pelo `shared`
+(mesma porta de `afinidadeCom`/`acaoEhLegal`/`SLOTS_VAZIOS`) e **chamado também pelo reducer** —
+extrair e deixar cópia inline em `mesa.ts` recriaria o defeito num lugar novo. **Verificado por
+mutação** (`MAOS.every` → `MAOS.some`): **3 testes de `partida` e 2 de `web` reprovam juntos**.
+
+**Os outros oito, em uma linha cada:** o ramo 8 do §8.2 do spec (`maoAlvo` só vale para item de mão)
+ficava verde sob `maoAlvo ?? info.slot`, porque nenhum teste mandava `mao` com item de **capacete** —
+agora manda · o título *"equipa sem deslocar nada"* não checava o que promete · o `z.enum` do `mao`
+no fio não tinha guard de cobertura (**`_CoberturaMao`**, tupla, mútuo) e o **estreitamento** dele
+não era pego pela atribuição em `app.ts` — medido · `SLOTS_DE_ITEM` em `itens.test.ts` virou
+`Record<SlotDeItem, true>` (com a lista escrita à mão, acrescentar `'cinto'` à união deixava o `tsc`
+**limpo**) · três comentários afirmando presente errado (o `slot` do evento `equipou`, a contagem de
+pares no preâmbulo do histórico, e a garantia que o `readonly Slot[]` de `SLOTS_NA_ORDEM` **não**
+dá — medido: com um 6º slot, o único erro em `TelaMesa.tsx` sai do `Record` abaixo, não da lista).
+
+⚠️ **Uma afirmação da revisão foi DERRUBADA por medição, e ela está corrigida na lista de abertos
+abaixo:** *"a fila de queima com dois deslocados virou alcançável em partida pela primeira vez"* é
+**falso** — antes desta fatia o Escudo Redondo declarava `maoEsquerda`, então espada + escudo com o
+Montante por cima **já deslocava dois** (conferido em `git show main:packages/cartas/src/itens.ts`).
+O que a fatia mudou é o número de caminhos até lá, não a existência dele.
+
 ### O que fica ABERTO ao sair desta fatia
 
 - 🔴 **O gate ocular do Pedro — NÃO RODADO.** Roteiro de 5 itens acima. O que ele achar vira **fix**,
   não revert.
-- ⬜ **A revisão ampla do BRANCH INTEIRO** (`MERGE_BASE..HEAD`), e ela não é opcional: na fatia
-  anterior as revisões por task passaram limpas e foi a revisão do branch que achou **dois ramos que
-  ninguém visitava**. **Alvos nomeados desta vez:** os 8 ramos do §8.2 do spec e **todo caminho em
-  que as DUAS mãos estão envolvidas ao mesmo tempo** (Montante ↔ duas armas de uma mão, **nas duas
-  direções**).
+- ✅ **A revisão ampla do branch — FEITA**, com a leva de correção logo acima. **Não há segunda leva:
+  o que sobrou está nesta lista.**
+- ✅ ~~**A revisão ampla do BRANCH INTEIRO** (`MERGE_BASE..HEAD`)~~ **FEITA em 2026-08-08** — e o
+  prognóstico se cumpriu: como na fatia anterior, as revisões por task passaram limpas e foi a do
+  branch que achou o **ramo sem visitante** (o fio dos DOIS deslocados). Detalhe e evidência de
+  mutação na seção logo acima.
 - 🎚️ **O MONTANTE FICOU DOMINADO e o dial NÃO foi girado** — pergunta **20** do §18, decisão do
   Pedro. Duas Espadas Curtas dão a mesma **força +4** sem o **−1 de agilidade**. ⚠️ **A dominância é
   aritmética e não depende de afinidade.** 💰 Custo aceito: uma variável por vez (#24/#25/#51/#69).
 - ⬜ **O ramo 6 do `colocarNoSlot`** (Montante sobre duas armas de uma mão) **continua sem visitante
   na política do bot** — coberto por **teste**, e é bom que esteja, porque o soak **não** o exercita.
+- ⬜ **A tela mostra só `deslocados[0]` e não avisa que virá outra pergunta quando a fila tem 2+** —
+  buraco **herdado** da fatia `escolha do descarte`, e o ENQUADRAMENTO com que ele foi aceito lá
+  caducou. Ali a decisão se apoiava em `trocaDeSlot` medido em **zero filas ≥2 em 548 aberturas**
+  (#86); esta fatia alarga os caminhos até a fila de dois. 🔴 **NÃO escreva "virou alcançável pela
+  primeira vez"** — antes desta fatia o Escudo Redondo declarava `maoEsquerda` e as armas
+  `maoDireita`, então **espada + escudo com o Montante por cima já deslocava DOIS**. O que mudou é
+  que agora **qualquer** par de itens de mão ocupa as duas (inclusive duas armas), então o cenário
+  deixou de depender do único item de mão esquerda do catálogo. ⚠️ O bot segue sem alcançá-lo
+  (**zero em 3.859 deslocamentos**); **um humano alcança de propósito** — é o item 4 do gate ocular
+  acima, com a mochila cheia. A cópia por escolha continua verdadeira; falta o *"faltam N"*.
 - ⬜ **O que o soak NÃO mediu, declarado:** esgotamento do baralho de Tesouros · caridade (Tesouro e
   Porta) · `procurarEncrenca` × `saquear` e recusas do bot (**continuam inatingíveis sem mexer em
   produção** — `rodadasParaMatar`, `melhorEncrenca` e `MARGEM_DE_ENCRENCA` são privados de `bot.ts`) ·
@@ -2098,10 +2149,15 @@ reescrever calado.
 
 **🧪 Teste que não morde / ramo sem visitante**
 
-- `packages/partida/src/bot.ts:262` — o reset `melhorMao = ocupante === null ? undefined : mao` **não
-  tem teste que morda o ramo `undefined`**: precisaria de uma fixture em que um candidato **de mão**
-  vence primeiro e um de **slot fixo** ultrapassa depois. Inofensivo hoje (o campo é ignorado para
-  slot não-mão), e a mutação inversa está meio-presa por dois `toEqual` com os slots vazios.
+- ✅ **PARCIALMENTE RESOLVIDO na leva de correção final de 2026-08-08** — `packages/partida/src/bot.ts:262`,
+  o reset `melhorMao = ocupante === null ? undefined : mao`. O teste *"com uma mão LIVRE, equipa sem
+  deslocar nada"* tinha TÍTULO afirmando o que a asserção não checava (`toMatchObject({ tipo, cartaId })`
+  ficava verde com o bot apontando `maoDireita`); virou `toEqual` da ação inteira, convenção do
+  arquivo. **Verificado por mutação** (`melhorMao = mao`): passou a reprovar **5** testes em vez de 4,
+  o novo entre eles. ⬜ **O que continua aberto** é o ramo mais estreito que o ledger descrevia: o
+  RESET de `melhorMao` para `undefined` quando um candidato **de mão** vence primeiro e um de **slot
+  fixo** ultrapassa depois — isso ainda precisaria de fixture própria. Inofensivo hoje (o campo é
+  ignorado para slot não-mão).
 - **O ramo 6 do `colocarNoSlot`** (Montante sobre duas armas de uma mão) **nunca é visitado pela
   política do bot** — o soak não o exercita, e a única proteção é o teste unitário.
 - `packages/partida/src/bot.ts` — **a mão LIVRE perde o empate** contra um ocupante de valor efetivo
@@ -2112,15 +2168,17 @@ reescrever calado.
 
 **🧰 Convenção / duplicação**
 
-- 🔴 `packages/web/src/TelaMesa.tsx:32-41` — **`MAOS` está copiado à mão no cliente**, onde a
-  convenção desta base é re-exportar o **valor** do domínio pelo `shared` (que já re-exporta
-  `acaoEhLegal`, `SLOTS_VAZIOS`, `afinidadeCom` e `contribuicaoDe` **como valores**), e `MAOS` já é
-  exportado em `equipar.ts:16`. O docstring afirma um FATO verdadeiro (`web` só depende de `shared`) e
-  tira dele uma INFERÊNCIA falsa (que a duplicação é forçada). ⚠️ **Precedente:** a auditoria de
-  2026-07-31 pegou o `bot.ts` com o par de mãos escrito à mão e a mutação deixando **240/240 verdes**.
-  Aqui a cópia **está presa** (mutá-la para `['maoDireita','maoDireita']` reprova
-  `TelaMesa.test.tsx`), então o risco é menor. **Decisão: re-exportar pelo `shared` ou aceitar a
-  cópia.** ✏️ *(o ledger citava `:32-36`; o docstring vai até `:40` e a const está em `:41`)*
+- ✅ **RESOLVIDO na leva de correção final de 2026-08-08** — `MAOS` estava copiado à mão em
+  `TelaMesa.tsx`, contra a convenção desta base de re-exportar o **valor** do domínio pelo `shared`.
+  🔑 **A revisão do branch achou que o problema era MAIOR do que "uma constante duplicada":** a tela
+  reescrevia o **par fino inteiro** (`info.slot === 'mao' && !info.duasMaos && MAOS.every(…)`),
+  caractere por caractere igual ao guard do reducer. Cada lado estava preso aos **seus** testes e
+  **nada os prendia um ao outro**. A saída foi extrair `precisaEscolherMao(info, emJogo)` para
+  `equipar.ts`, re-exportá-la como **valor** pelo `shared` e fazer o **reducer chamá-la também** —
+  extrair e deixar cópia inline em `mesa.ts` recriaria o defeito num lugar novo. O `MAOS` copiado
+  morreu junto, por redundância. **Verificado por mutação** (`MAOS.every` → `MAOS.some` na função
+  única): **3 testes de `partida` e 2 de `web` reprovam juntos**; antes, a mutação no domínio não
+  tocava um único teste da tela.
 - `packages/partida/src/equipar.ts:52-53` e `:77` — para item de duas mãos, `alvos` **É a constante
   exportada `MAOS` por REFERÊNCIA**, e é ela que sai como `ocupados`. `readonly` em todos os saltos,
   **sem risco vivo**; um call-site futuro que descartasse o `readonly` corromperia a constante
@@ -2133,14 +2191,14 @@ reescrever calado.
   a coluna de condição **desalinhada** (corre mais larga que as outras). Soma-se ao desalinhamento
   **pré-existente** de `mesa.ts:238`, que o `CLAUDE.md` já listava. ✏️ *(o ledger citava `:241-242`,
   que são as duas linhas da **afinidade**, não as novas)*
-- 🔴 **`packages/partida/src/mesa.ts:311-312` — o PREÂMBULO do bloco HISTÓRICO afirma uma contagem
-  FALSA:** *"os números abaixo são de planos passados, NÃO a contagem de hoje **(que é dezesseis)**"*.
-  A Task 2 desta fatia levou a contagem a **DEZOITO**, e o próprio bloco diz isso oito linhas abaixo —
-  **o preâmbulo contradiz o parágrafo que ele apresenta**. ⚠️ **É código, não doc, e NÃO foi
-  consertado aqui** (a Task 6 não toca `packages/*`); fica registrado porque **o ledger que o
-  carregaria vai ser apagado** e este arquivo é o último lugar onde ele pode existir. 🔑 **A ironia é
-  o achado:** é o vício nº 1 dentro do comentário que existe para ensinar a recontar — a Task 2
-  atualizou a **narrativa** da contagem e não o **número** no cabeçalho dela.
+- ✅ **RESOLVIDO na leva de correção final de 2026-08-08** — `packages/partida/src/mesa.ts:311-312`, o
+  PREÂMBULO do bloco HISTÓRICO, afirmava uma contagem FALSA: *"os números abaixo são de planos
+  passados, NÃO a contagem de hoje **(que é dezesseis)**"*. A Task 2 desta fatia levou a contagem a
+  **DEZOITO**, e o próprio bloco dizia isso oito linhas abaixo — **o preâmbulo contradizia o
+  parágrafo que ele apresenta**. 🔑 **A ironia era o achado:** o vício nº 1 dentro do comentário que
+  existe para ensinar a recontar — a Task 2 atualizou a **narrativa** da contagem e não o **número**
+  no cabeçalho dela. Corrigido para **DEZOITO**, com a frase apontando os dois outros lugares do
+  arquivo que já diziam o número certo (o preâmbulo do §216 e a última entrada do histórico).
 - `packages/partida/src/mesa.ts:346-350` — o **bloco HISTÓRICO** da contagem de pares ganhou mais um
   parágrafo. Segue a convenção do arquivo (nunca reescrever entrada antiga), mas o `CLAUDE.md` lista
   esse bloco como candidato a **deleção** pela política de comentário enxuto — *"o `git log` já

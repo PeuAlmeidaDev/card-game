@@ -11,9 +11,12 @@ import { rotuloDeAfinidade } from './rotuloDeAfinidade';
  * APRESENTAÇÃO — o domínio guarda um `Record`, que não tem ordem —, por isso a
  * lista mora aqui e não em `partida`.
  *
- * `readonly Slot[]` (e não `string[]`) para que um slot novo na união quebre esta
- * lista e o rótulo abaixo, em vez de nascer invisível na única tela que mostra o
- * corpo.
+ * `readonly Slot[]` (e não `string[]`) impede um slot INVENTADO de entrar aqui —
+ * mas ⚠️ NÃO obriga a lista a estar completa: uma união maior aceita um array
+ * menor, e um slot novo nasceria invisível nesta linha sem erro nenhum. Quem
+ * força a visita a este arquivo é o `Record<Slot, string>` logo abaixo, que
+ * quebra a compilação com a chave faltando — e é lá, não aqui, que a garantia
+ * mora.
  */
 const SLOTS_NA_ORDEM: readonly Slot[] = ['capacete', 'armadura', 'maoDireita', 'maoEsquerda', 'pes'];
 
