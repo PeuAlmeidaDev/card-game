@@ -921,7 +921,7 @@ Copiamos a *ideia mecânica*, nunca a *expressão*.
 | 1 | ✅ **Plano 4b — `encrenca`** — **CONSTRUÍDO em 2026-08-01 e MERGEADO** (gate ocular fechado pelo Pedro em 2026-08-02) | os verbos `procurarEncrenca` e `saquear`, e o bot que avalia o combate (#63). **Última peça ESTRUTURAL da fatia 8** — o §6 do bible e o `Fase` do código passam a ter as **mesmas seis fases**. Medido nas decisões #65–#68 | ✅ |
 | — | ✅ **`afinidade`** (desenho: #56–#58, #61) — **CONSTRUÍDA em 2026-08-02** | itens **exclusivos** com valor cheio × reduzido, o guard do equipar, e o item caindo quando a troca de raça o proíbe. **12 itens no catálogo** (8 comuns + 4 exclusivos) e o baralho de Tesouros de 32 → 48. Spec: `2026-07-31-afinidade-de-itens-design.md`. Medida e registrada nas decisões **#71–#79** | ✅ |
 | — | ✅ **`escolha do descarte`** (decisão #59) — **CONSTRUÍDA em 2026-08-03/06** (spec `2026-08-03-escolha-do-descarte-design.md`; a forma nas **#80–#84**, os números medidos nas **#85–#86**) | com a mochila cheia o jogo **pergunta** o que queimar, em **todo** desequipamento — um menu de **seis** cartas resolvido pelo verbo `queimarCarta` (#80). **Revoga a decisão #8 do spec da fatia 8.** Traz a **3ª pendência** do jogo — estado novo, verbo novo, e o bot que sabe respondê-la (#83). ✅ **Gate ocular fechado pelo Pedro em 2026-08-06**, com o escopo do que ele cobriu escrito no `CLAUDE.md` — conferência do núcleo em partida real, **não** o roteiro de 5 itens um a um | ✅ |
-| — | ✅ **`classe como carta`** (decisão #60) — **CONSTRUÍDA em dois planos: A em 2026-08-06 (#87) e B em 2026-08-08 (#88–#97)** | a classe entra pelo baralho (17/jogador, 68 na mesa), o **Aprendiz** é a ausência com `+1` de mochila, as três classes ganham **passiva de combate**, e morreram `classeId`, o `escolhasSchema`, a rota `/duelo` e o construtor no `web`. 🔴 **Gate ocular do Pedro PENDENTE** — roteiro de 6 itens no `CLAUDE.md`, nenhum conferido ainda | ✅ |
+| — | ✅ **`classe como carta`** (decisão #60) — **CONSTRUÍDA em dois planos: A em 2026-08-06 (#87) e B em 2026-08-08 (#88–#97)** | a classe entra pelo baralho (17/jogador, 68 na mesa), o **Aprendiz** é a ausência com `+1` de mochila, as três classes ganham **passiva de combate**, e morreram `classeId`, o `escolhasSchema`, a rota `/duelo` e o construtor no `web`. 🔴 **Gate ocular do Pedro PENDENTE** — roteiro de **7** itens no `CLAUDE.md`, nenhum conferido ainda | ✅ |
 | 2 | ⏭️ **Maldições / Bad Stuff** — **A PRÓXIMA** | a 1ª carta que **mira outro jogador**, + a **morte/evacuação** do §10 — que é o **conserto da economia** (#46). 📌 É ela que finalmente encara a **pergunta 11**: nenhum consumível existe em código, e eles nascem aqui | ✅ |
 | 3 | **Frontend animado** | a mesa desenhada + playback do turno alheio, 1x/2x (#35) | ✅ |
 | 4 | **Online** | socket.io, salas, humanos no lugar dos bots. **O domínio não muda** | ✅ |
@@ -1363,7 +1363,7 @@ partida 332 · shared 22 · server 29 · web 159), typecheck 7/7, lint limpo). C
 o Plano B põe a carta no baralho, dá passiva às três classes sacáveis, compensa o Aprendiz e demole
 o construtor da fatia 2. É o pedido do Pedro de **2026-07-31**, três fatias depois.
 
-🔴 **O gate ocular do Pedro NÃO foi rodado quando estas linhas foram escritas.** O roteiro (6 itens,
+🔴 **O gate ocular do Pedro NÃO foi rodado quando estas linhas foram escritas.** O roteiro (**7** itens,
 cada um com a frequência esperada declarada) está no `CLAUDE.md`, e **nenhum item foi conferido**.
 Esta seção descreve o que foi **construído e medido**, não o que foi observado por um humano na tela.
 
@@ -1430,3 +1430,16 @@ descarte` **já sumiram**; quem for remedir escreve o dele.
   mesmo arquivo **já tinha aprendido isso para a raça, dez linhas acima**; a classe entrou sem o
   gêmeo. ⚠️ Consertado, e a asserção nova **ainda não é exaustiva** (um `.find` confere só a primeira
   carta de classe: uma substituição **parcial** passaria).
+- 🔴 **A TROCA DE ESPECIALIZAÇÃO É MUDA DO LADO DA CARTA QUE SAI**, e são **dois** buracos que se
+  somam: `cartasNoCemiterio` **viaja na vista e nunca é renderizado** (a tela imprime só *"Cartas no
+  monte · Tesouros no monte"*; em produção o campo só desabilita um botão) — a **6ª ocorrência** do
+  padrão *"publicado e nunca renderizado"* neste projeto —, e `jogarCarta` empilha a carta anterior
+  no cemitério de Portas **sem emitir evento**, ao contrário do `racaEmJogo`/`classeEmJogo` que
+  anunciam a que **entra**. ⚠️ **Vale para a RAÇA desde sempre** — não é regressão desta fatia.
+  ➡️ É o mesmo vazio que a **#27** fechou para o item deslocado do slot e que a **#28** fechou para o
+  baralho de Tesouros seco: a carta vai ao lugar certo (o censo prova), mas **ninguém é avisado**.
+  🔴 **Não consertado — é código, e a task que o achou era de documentação.** Registrado como pergunta
+  de UI para o Pedro, com as saídas candidatas escritas no `CLAUDE.md`.
+  🔑 **Como apareceu:** um item do roteiro do gate mandava *"confira o contador do cemitério"*, e a
+  revisão foi ler se a tela mostrava isso. **É a #70 pega no rascunho** — um item que teria mandado o
+  Pedro procurar na tela algo que não está lá.

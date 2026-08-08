@@ -89,7 +89,7 @@ terceira, **`classe como carta`** (#60/#61), saiu em **dois planos**: o **A** (m
 2026-08-06) está **mergeado** (PR #33, `main` em `0236b55`); o **B** — a carta no baralho, a passiva
 das classes, a mochila do Aprendiz e a **demolição do topo da tela** — está **construído na branch
 `feat/classe-como-carta-plano-b`**, detalhe na sessão de 2026-08-07/08 no fim deste arquivo.
-🔴 **O gate ocular do Plano B está PENDENTE** (roteiro de 6 itens naquela sessão, nenhum conferido)
+🔴 **O gate ocular do Plano B está PENDENTE** (roteiro de **7** itens naquela sessão, nenhum conferido)
 e ⬜ falta o **merge**. **Próxima fatia: `Maldições / Bad Stuff`**, o bloco 2 do §3.1 — a que
 finalmente encara a economia (pergunta 11) com os consumíveis da #40.
 
@@ -1442,21 +1442,36 @@ inteira para aprender isso.
    ⚠️ **Não peça "a mochila de todo assento diz 0 de 6" — isso NÃO é verificável na tela:** a mochila
    dos outros assentos só é renderizada quando **não está vazia** (`j.mochila.length > 0`). O que a
    tela mostra para os outros é o rótulo **`Aprendiz`**, e é isso que o item pede.
-3. Vasculhe até virar uma **carta de classe**, ou confira a mão inicial. *(🎚️ **estimativa NÃO
-   MEDIDA**: a classe é **17,6%** do baralho de Portas e o humano abre dezenas de portas por partida
-   ⇒ quase certo **ao longo de uma partida**. ⚠️ **NÃO é quase certo na mão inicial de 4** — se ela
-   não vier, siga jogando.)*
+3. Consiga uma **carta de classe na sua mão** — confira a mão inicial, e se não vier, vasculhe até
+   uma cair. Na lista da sua mão ela aparece como **"uma carta de Guerreiro/Ladino/Mago de Fogo"**.
+   *(🎚️ **estimativa NÃO MEDIDA**: a classe é **17,6%** do baralho de Portas e o humano abre dezenas
+   de portas por partida ⇒ quase certo **ao longo de uma partida**. ⚠️ **NÃO é quase certo na mão
+   inicial de 4** — se ela não vier, siga jogando.)*
+   ⚠️ **Confira na MÃO, não no log:** o `achado` do vasculhar diz *"vasculha o local e guarda o que
+   encontrou"* e **nunca diz o quê** — a mão é zona oculta, e isso é deliberado. A carta aparecendo
+   na sua lista é o único sinal.
 4. Jogue a carta de classe em **`recompor`**: o assento troca de `Aprendiz` para o **nome da classe**,
    o log traz a linha da classe entrando em jogo, e o cabeçalho da mochila **cai para `N de 5`**.
    *(**100%**, condicionado ao item 3.)*
-5. **CENÁRIO FORÇADO — a regra nova (#90):** em `recompor`, **guarde equipamentos até a mochila ficar
-   em `6 de 6`**, e só então jogue a carta de classe. A **pergunta de queima tem que abrir** (menu de
-   seis cartas), e o resto da tela tem que ficar **apagado, não sumir** (#26). *(cenário forçado — o
-   estado `6 de 6` não aparece sozinho; e a regra responde por **26,0%** das aberturas em partida
-   real, o que é frequente para a mesa e **não** para uma observação única.)*
-6. **CENÁRIO FORÇADO:** com uma classe em jogo, jogue **outra** carta de classe — a anterior tem que
-   ir ao **cemitério de Portas** (confira o contador) e a nova ficar na zona. *(cenário forçado: o bot
-   **nunca** troca de classe, e o humano só o faz de propósito.)*
+5. **CENÁRIO FORÇADO — a regra nova (#90):** **guarde equipamentos até o cabeçalho dizer
+   `Sua mochila — 6 de 6`**, e só então jogue a carta de classe. Tem que aparecer o painel
+   **"Sua mochila está cheia. Escolha o que queimar"** com **seis** botões "Queimar", e o resto da
+   tela tem que ficar **apagado, não sumir** (#26). *(cenário forçado — o estado `6 de 6` não aparece
+   sozinho; e a regra responde por **26,0%** das aberturas em partida real, o que é frequente para a
+   **mesa** e não para uma observação única.)*
+   ⚠️ **Montar isso leva alguns turnos:** a mão inicial traz **4** Tesouros, então chegar a 6 na
+   mochila exige **loot de combates vencidos** — e **não jogue a carta de classe antes da hora**, ou
+   o teto já cai para 5 e o cenário se perde.
+6. **CENÁRIO FORÇADO:** com uma classe em jogo, jogue **outra** carta de classe — o rótulo do assento
+   tem que trocar para a classe nova, o log tem que trazer a linha *"passa a lutar como …"*, e a
+   carta some da sua mão. *(cenário forçado: o bot **nunca** troca de classe, e o humano só o faz de
+   propósito.)*
+   🔴 **NÃO tente conferir a classe anterior indo para o cemitério — a tela NÃO MOSTRA isso**, e
+   pedir para conferir seria um item que reprova contra código correto (é a #70). Duas razões
+   independentes: `cartasNoCemiterio` **viaja na vista e nunca é renderizado** (a tela imprime só
+   *"Cartas no monte · Tesouros no monte"*), e `jogarCarta` empilha a carta anterior no
+   `portas.cemiterio` **sem emitir evento**, então **também não há linha de log**. ➡️ Ver "o que fica
+   ABERTO".
 7. Entre num combate como **Guerreiro** e procure no log uma esquiva com a **mesma rolagem** do
    ataque marcada como **não-esquivada** (o Impacto anulando o empate).
    🔴 **ITEM DE SONDA, NÃO DE OLHO** — o empate exato é **1/12 por golpe acertado**, e esperar vê-lo
@@ -1467,6 +1482,25 @@ inteira para aprender isso.
 
 - 🔴 **O gate ocular do Pedro — PENDENTE.** Nenhum dos 7 itens foi conferido. Roda contra a branch
   (ou contra a `main`, depois do merge) e o que achar vira **fix**, não revert.
+- 🔴 **A TROCA DE CLASSE É INVISÍVEL DO LADO DA CARTA QUE SAI — achado da revisão da Task 14, e são
+  DOIS buracos independentes que se somam:**
+  1. **`cartasNoCemiterio` viaja na vista e NUNCA é renderizado.** `projecao.ts:62` o publica; em
+     produção ele aparece **uma única vez** (`TelaMesa.tsx:342`) e só para **desabilitar um botão**.
+     A tela imprime apenas *"Cartas no monte · Tesouros no monte"*. ➡️ **É a 6ª ocorrência de
+     "publicado e nunca renderizado"** neste projeto (antes: `combatente` no 3a, `tesourosNoMonte`
+     duas vezes, `ehBot`, a `mochila`) — e o padrão já escondeu a tese de um plano **três** vezes.
+  2. **`jogarCarta` (`mesa.ts:915-921`) manda a especialização anterior ao `portas.cemiterio` SEM
+     EMITIR EVENTO.** Há `racaEmJogo`/`classeEmJogo` para a carta que **entra**; não há nada para a
+     que **sai**. ⚠️ **Vale para a raça também, desde sempre** — não é regressão desta fatia.
+  ➡️ **Somados, o jogador não tem NENHUM sinal de para onde foi a classe/raça anterior**, o que é
+  exatamente o vazio que a **decisão #27** fechou para o item deslocado do slot (*"a ramificação cara
+  acontecia calada"*) e que a **#28** fechou para o baralho de Tesouros seco. 🔑 **Não é bug** — a
+  carta vai ao lugar certo, e o censo de conservação prova isso em 177.856 censos. **É silêncio.**
+  🔴 **Não foi consertado aqui de propósito: seria CÓDIGO, e a Task 14 é de documentação.** As saídas
+  candidatas são de famílias diferentes — **(a)** renderizar o contador do cemitério (barato, e paga
+  as duas ocorrências do padrão de uma vez); **(b)** um evento `saiuDeJogo` com a carta (é a #27
+  aplicada ao eixo da especialização, e o cemitério é zona aberta, então pode carregar a carta);
+  **(c)** aceitar o silêncio. **A leitura é do Pedro.**
 - ⬜ **A revisão ampla do BRANCH INTEIRO** (`MERGE_BASE..HEAD`), e ela não é opcional: no **Plano A**
   as seis revisões por task passaram limpas e foi a revisão do branch que achou que a rede de
   equivalência **não visitava dois ramos** que ela mesma refatorou. Alvos nomeados desta vez: os ramos
