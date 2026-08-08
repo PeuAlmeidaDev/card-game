@@ -70,11 +70,18 @@ export const acaoDaMesaSchema = z.discriminatedUnion('tipo', [
   // borda de verdade.
   z.object({ tipo: z.literal('jogarCarta'), cartaId: z.string().min(1).max(64) }),
   z.object({ tipo: z.literal('entregarCarta'), cartaId: z.string().min(1).max(64) }),
-  // Só o `cartaId`: o SLOT não viaja no fio. Ele sai do item, pelo catálogo do
-  // servidor — deixar o cliente escolher onde encaixar seria deixá-lo pôr o
-  // capacete no pé, e a checagem viraria mais um guard no reducer em vez de ser
-  // impossível por construção. Mesmo teto de 64 e pelo mesmo motivo.
-  z.object({ tipo: z.literal('equiparCarta'), cartaId: z.string().min(1).max(64) }),
+  // O SLOT não viaja no fio: ele sai do item, pelo catálogo do servidor — deixar
+  // o cliente escolher a FAMÍLIA de slot seria deixá-lo pôr o capacete no pé, e
+  // a checagem viraria mais um guard no reducer em vez de ser impossível por
+  // construção. A MÃO é diferente (fatia `empunhadura dupla`, spec §4): com item
+  // de mão e as duas ocupadas, ela é a única escolha real que o corpo oferece —
+  // qual das duas fisicamente equivalentes libera —, e por isso `mao` viaja.
+  // Mesmo teto de 64 no `cartaId`, e pelo mesmo motivo dos outros verbos.
+  z.object({
+    tipo: z.literal('equiparCarta'),
+    cartaId: z.string().min(1).max(64),
+    mao: z.enum(['maoDireita', 'maoEsquerda']).optional(),
+  }),
   // Mesmo teto de 64 e pelo mesmo motivo do `equiparCarta`: o `cartaId` é
   // refletido verbatim no 400 e no log. O DESTINO não viaja — guardar tem um
   // destino só (a mochila), então não há o que o cliente escolher.

@@ -92,14 +92,24 @@ describe('acaoDaMesaSchema', () => {
   });
 
   it('equiparCarta viaja no fio com o mesmo teto de 64 chars', () => {
-    // O `cartaId` é o único campo livre do fio também aqui, e o SLOT não viaja:
-    // ele sai do item, pelo catálogo do servidor. Deixar o cliente escolher onde
-    // encaixar seria deixá-lo pôr o capacete no pé.
+    // O `cartaId` é o único campo livre do fio também aqui, e o SLOT (a família)
+    // não viaja: ele sai do item, pelo catálogo do servidor. Deixar o cliente
+    // escolher a família seria deixá-lo pôr o capacete no pé — o campo `mao`
+    // (fatia `empunhadura dupla`) é outra coisa, testado abaixo.
     expect(acaoDaMesaSchema.safeParse({ tipo: 'equiparCarta', cartaId: 't-1' }).success).toBe(true);
     expect(acaoDaMesaSchema.safeParse({ tipo: 'equiparCarta', cartaId: '' }).success).toBe(false);
     expect(acaoDaMesaSchema.safeParse({ tipo: 'equiparCarta', cartaId: 'x'.repeat(65) }).success).toBe(false);
     expect(acaoDaMesaSchema.parse({ tipo: 'equiparCarta', cartaId: 't-1', slot: 'pes' }))
       .toEqual({ tipo: 'equiparCarta', cartaId: 't-1' });
+  });
+
+  it('a ação de equipar aceita a mão alvo, e só as duas mãos', () => {
+    expect(acaoDaMesaSchema.safeParse(
+      { tipo: 'equiparCarta', cartaId: 't-1', mao: 'maoEsquerda' }).success).toBe(true);
+    expect(acaoDaMesaSchema.safeParse(
+      { tipo: 'equiparCarta', cartaId: 't-1' }).success).toBe(true);
+    expect(acaoDaMesaSchema.safeParse(
+      { tipo: 'equiparCarta', cartaId: 't-1', mao: 'capacete' }).success).toBe(false);
   });
 
   it('guardarCarta atravessa o fio com o mesmo teto de 64 do cartaId', () => {

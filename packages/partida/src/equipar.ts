@@ -15,17 +15,22 @@ import { limiteDeMochila } from './mao';
  */
 export const MAOS: readonly [MaoSlot, MaoSlot] = ['maoDireita', 'maoEsquerda'];
 
-/** A vaga de mão que recebe o item: a livre, ou a primeira quando as duas estão cheias. */
-function resolverMao(slots: ZonaEmJogo['slots']): MaoSlot {
-  return MAOS.find((m) => slots[m] === null) ?? MAOS[0];
+/**
+ * A vaga de mão que recebe o item: `maoAlvo` quando o chamador escolhe, senão a
+ * livre, ou a primeira de `MAOS` quando as duas estão cheias.
+ */
+function resolverMao(slots: ZonaEmJogo['slots'], maoAlvo?: MaoSlot): MaoSlot {
+  return maoAlvo ?? MAOS.find((m) => slots[m] === null) ?? MAOS[0];
 }
 
 /**
  * Põe a carta no slot que o item declara e devolve o corpo novo mais o que saiu.
  *
- * Item de mão (`slot: 'mao'`) sem `duasMaos` resolve para a vaga LIVRE, ou a
- * primeira de `MAOS` quando as duas estão ocupadas — `resolverMao`, acima. Sem
- * escolha do jogador ainda (Task 2 da fatia `empunhadura dupla`).
+ * Item de mão (`slot: 'mao'`) sem `duasMaos` resolve para `maoAlvo` quando a
+ * ação aponta uma; sem ela, a vaga LIVRE, ou a primeira de `MAOS` quando as
+ * duas estão ocupadas — `resolverMao`, acima. O reducer (`equiparCarta`, em
+ * `./mesa`) é quem cobra `maoAlvo` quando ela é obrigatória (spec §4); esta
+ * função só executa a escolha, nunca a exige.
  *
  * **Duas mãos põe a MESMA instância nos dois slots** (spec §5.1) em vez de
  * inventar um estado de "ocupação parcial": com a mesma referência, a UI lê
@@ -38,13 +43,14 @@ export function colocarNoSlot(
   slots: ZonaEmJogo['slots'],
   carta: CartaEquipamento,
   info: InfoItem,
+  maoAlvo?: MaoSlot,
 ): {
   readonly slots: ZonaEmJogo['slots'];
   readonly deslocados: readonly CartaEquipamento[];
   readonly ocupados: readonly [Slot, ...Slot[]];
 } {
   const alvos: readonly [Slot, ...Slot[]] =
-    info.duasMaos ? MAOS : [info.slot === 'mao' ? resolverMao(slots) : info.slot];
+    info.duasMaos ? MAOS : [info.slot === 'mao' ? resolverMao(slots, maoAlvo) : info.slot];
 
   // Dedup por id: o montante ocupando as duas mãos sai UMA vez da lista de
   // deslocados — senão ele iria duas vezes para o cemitério e o baralho de

@@ -156,8 +156,11 @@ describe('colocarNoSlot', () => {
   });
 
   it('com as duas ocupadas e sem alvo, desloca a da PRIMEIRA mão', () => {
-    // Sem escolha do jogador ainda (Task 2). O que este teste prende é que o
-    // fallback é DETERMINÍSTICO e desloca exatamente UM item.
+    // O fallback de `colocarNoSlot` quando `maoAlvo` não vem informado. O
+    // reducer (`equiparCarta`, Task 2) recusa este mesmo cenário com
+    // `AcaoInvalida` antes de chegar aqui — esta função é pura e não sabe disso.
+    // O que este teste prende é que o fallback é DETERMINÍSTICO e desloca
+    // exatamente UM item.
     const direita = carta('t-1', 'espada');
     const esquerda = carta('t-2', 'escudo');
     const r = colocarNoSlot(
@@ -180,6 +183,36 @@ describe('colocarNoSlot', () => {
     expect(r.slots.maoDireita?.id).toBe('t-1');
     expect(r.slots.maoEsquerda?.id).toBe('t-1');
     expect(r.ocupados).toEqual(['maoDireita', 'maoEsquerda']);
+  });
+
+  it('respeita a mão ALVO mesmo havendo a outra livre — trocar aquele item é jogada legítima', () => {
+    // Não escreva um guard exigindo vaga livre: o jogador pode querer trocar
+    // exatamente o item que está na mão ocupada.
+    const direita = carta('t-1', 'espada');
+    const r = colocarNoSlot(
+      { ...SLOTS_VAZIOS, maoDireita: direita }, carta('t-2', 'machado'), info('mao'), 'maoDireita',
+    );
+    expect(r.slots.maoDireita?.id).toBe('t-2');
+    expect(r.slots.maoEsquerda).toBeNull();
+    expect(r.deslocados).toEqual([direita]);
+  });
+
+  it('com as duas ocupadas, o alvo decide QUAL sai', () => {
+    const direita = carta('t-1', 'espada');
+    const esquerda = carta('t-2', 'escudo');
+    const r = colocarNoSlot(
+      { ...SLOTS_VAZIOS, maoDireita: direita, maoEsquerda: esquerda },
+      carta('t-3', 'machado'), info('mao'), 'maoEsquerda',
+    );
+    expect(r.slots.maoDireita).toBe(direita);
+    expect(r.slots.maoEsquerda?.id).toBe('t-3');
+    expect(r.deslocados).toEqual([esquerda]);
+  });
+
+  it('duas mãos IGNORA o alvo — ocupa as duas por definição', () => {
+    const r = colocarNoSlot(SLOTS_VAZIOS, carta('t-1', 'montante'), info('mao', true), 'maoEsquerda');
+    expect(r.slots.maoDireita?.id).toBe('t-1');
+    expect(r.slots.maoEsquerda?.id).toBe('t-1');
   });
 });
 

@@ -451,9 +451,12 @@ export type AcaoDaMesa =
   /**
    * Tira um tesouro da mão OU da mochila e o encaixa no corpo. As duas origens
    * desde o Plano 4a (ver `cartaEquipavelDe`, em `./mesa`); a mão tem precedência
-   * se o id estiver nas duas. O slot vem do ITEM, nunca do cliente.
+   * se o id estiver nas duas. O SLOT vem do ITEM, nunca do cliente — `mao`
+   * escolhe só QUAL das duas mãos fisicamente equivalentes recebe um item de
+   * mão quando as duas já estão ocupadas (spec §4, fatia `empunhadura dupla`);
+   * fora desse caso o campo é ignorado.
    */
-  | { readonly tipo: 'equiparCarta'; readonly jogadorId: string; readonly cartaId: string }
+  | { readonly tipo: 'equiparCarta'; readonly jogadorId: string; readonly cartaId: string; readonly mao?: MaoSlot }
   /**
    * Tira um tesouro da mão e o põe na MOCHILA. Sempre nessa direção: mochila → mão
    * não existe nesta fatia (spec §6/§11), e é essa mão única que faz a mochila ser

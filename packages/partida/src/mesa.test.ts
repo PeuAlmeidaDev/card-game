@@ -15,7 +15,7 @@ import { classe, monstro, monstros, raca, equipamento } from './testes/cartas';
 import {
   catalogoDeTeste, comClasseDeTeste, ID_DA_CLASSE_DE_TESTE, CLASSE_DE_TESTE, MONSTRO_DE_TESTE, ID_DO_ITEM_EXCLUSIVO,
   ID_DA_RACA_OUTRA, ID_DA_RACA_DONA, ID_DO_ITEM_DE_TESTE, ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS, ID_DO_ITEM_EXCLUSIVO_PES,
-  ID_DO_ITEM_EXCLUSIVO_DE_CLASSE,
+  ID_DO_ITEM_EXCLUSIVO_DE_CLASSE, ID_DO_ITEM_DE_CAPACETE, ID_DO_ITEM_DUAS_MAOS,
 } from './testes/catalogo';
 import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import { combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
@@ -1902,8 +1902,9 @@ describe('aplicarAcao — equiparCarta', () => {
    *
    * ⚠️ Desde a fatia `empunhadura dupla`, um item de mão só desloca o que está em
    * `maoDireita` se a `maoEsquerda` TAMBÉM estiver ocupada — com uma vaga livre,
-   * `colocarNoSlot` prefere ela (`resolverMao`), sem escolha do jogador (Task 2).
-   * Os fixtures abaixo que testam DESLOCAMENTO ocupam as DUAS mãos de propósito.
+   * `colocarNoSlot` prefere ela (`resolverMao`) quando a ação não aponta `mao`
+   * explicitamente. Os fixtures abaixo que testam DESLOCAMENTO ocupam as DUAS
+   * mãos de propósito.
    */
   const comSlots = (estado: EstadoPartida, slots: Partial<ZonaEmJogo['slots']>): EstadoPartida => ({
     ...estado,
@@ -1944,7 +1945,12 @@ describe('aplicarAcao — equiparCarta', () => {
     const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
     const p: EstadoPartida = { ...base, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...base, jogadores }, 'p1')) };
 
-    const { estado: naPendencia } = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+    // `mao: 'maoDireita'`: as duas mãos estão cheias, e desde o par fino novo
+    // (Task 2) isso torna o alvo OBRIGATÓRIO — este teste não é sobre qual mão,
+    // então aponta a mesma que o fallback já escolhia.
+    const { estado: naPendencia } = aplicarAcao(
+      p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1', mao: 'maoDireita' }, deps([]),
+    );
     expect(naPendencia.queima?.deslocados.map((c) => c.id)).toEqual(['t-0']);
 
     const { estado: depois } = aplicarAcao(
@@ -1999,7 +2005,11 @@ describe('aplicarAcao — equiparCarta', () => {
       { maoDireita: equipamento('t-0'), maoEsquerda: equipamento('t-outra-mao') },
     );
 
-    const { eventos } = aplicarAcao(b, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+    // `mao: 'maoDireita'`: as duas mãos estão cheias — alvo obrigatório desde a
+    // Task 2, apontando a mesma que o fallback já escolhia.
+    const { eventos } = aplicarAcao(
+      b, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1', mao: 'maoDireita' }, deps([]),
+    );
 
     expect(eventos).toContainEqual({
       tipo: 'desequipou', jogadorId: 'p1', destino: 'mochila', motivo: 'trocaDeSlot',
@@ -2026,7 +2036,11 @@ describe('aplicarAcao — equiparCarta', () => {
     const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
     const p: EstadoPartida = { ...base, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...base, jogadores }, 'p1')) };
 
-    const r = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-novo' }, deps([]));
+    // `mao: 'maoDireita'`: as duas mãos estão cheias — alvo obrigatório desde a
+    // Task 2, apontando a mesma que o fallback já escolhia.
+    const r = aplicarAcao(
+      p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-novo', mao: 'maoDireita' }, deps([]),
+    );
 
     expect(r.estado.queima?.deslocados.map((c) => c.id)).toEqual(['t-0']);
     expect(r.estado.queima?.motivo).toBe('trocaDeSlot');
@@ -2050,7 +2064,11 @@ describe('aplicarAcao — equiparCarta', () => {
     const p: EstadoPartida = { ...base, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...base, jogadores }, 'p1')) };
     const antes = versaoDe(p);
 
-    const r = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-novo' }, deps([]));
+    // `mao: 'maoDireita'`: as duas mãos estão cheias — alvo obrigatório desde a
+    // Task 2, apontando a mesma que o fallback já escolhia.
+    const r = aplicarAcao(
+      p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-novo', mao: 'maoDireita' }, deps([]),
+    );
 
     expect(versaoDe(r.estado)).toBeGreaterThan(antes);
   });
@@ -2196,7 +2214,11 @@ describe('aplicarAcao — equiparCarta', () => {
     const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
     const p: EstadoPartida = { ...base, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...base, jogadores }, 'p1')) };
 
-    const r = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+    // `mao: 'maoDireita'`: as duas mãos estão cheias — alvo obrigatório desde a
+    // Task 2, apontando a mesma que o fallback já escolhia.
+    const r = aplicarAcao(
+      p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1', mao: 'maoDireita' }, deps([]),
+    );
 
     // A mochila continua no teto: perdeu 't-1' (foi para o slot) e ganhou 't-0'
     // (o deslocado) — nunca ficou em 4.
@@ -2226,7 +2248,11 @@ describe('aplicarAcao — equiparCarta', () => {
     const p: EstadoPartida = { ...base, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...base, jogadores }, 'p1')) };
     expect(p.fase).toBe('recompor');
 
-    const r = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+    // `mao: 'maoDireita'`: as duas mãos estão cheias — alvo obrigatório desde a
+    // Task 2, apontando a mesma que o fallback já escolhia.
+    const r = aplicarAcao(
+      p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1', mao: 'maoDireita' }, deps([]),
+    );
 
     // O deslocado achou vaga (a carta equipada acabou de liberar uma)...
     expect(jogadorDe(r.estado, 'p1').mochila.map((c) => c.id)).toEqual(['t-0']);
@@ -2335,6 +2361,59 @@ describe('aplicarAcao — equiparCarta', () => {
     const r = aplicarAcao(estado, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
 
     expect(jogadorDe(r.estado, 'p1').emJogo.raca?.racaId).toBe(ID_DA_RACA_DONA);
+  });
+
+  describe('a mão ALVO — o par fino novo da fatia `empunhadura dupla`', () => {
+    // As duas mãos ocupadas por item de UMA mão cada; a mão em si carrega um
+    // item de mão livre (`t-nova`), um de capacete (`t-elmo`) e um de duas mãos
+    // (`t-montante`) — os três ramos que a regra 1/2/4 do spec §4 precisa cobrir.
+    const estadoComAsDuasMaosCheias = comSlots(
+      comMao(nascida(), [
+        equipamento('t-nova'),
+        equipamento('t-elmo', ID_DO_ITEM_DE_CAPACETE),
+        equipamento('t-montante', ID_DO_ITEM_DUAS_MAOS),
+      ]),
+      { maoDireita: equipamento('t-0'), maoEsquerda: equipamento('t-outra-mao') },
+    );
+
+    const estadoComUmaMaoLivre = comSlots(
+      comMao(nascida(), [equipamento('t-nova')]),
+      { maoDireita: equipamento('t-0') },
+    );
+
+    it('equipar uma arma com AS DUAS mãos cheias e sem `mao` é AcaoInvalida', () => {
+      // A mensagem é fixada porque o gate de fase lança a MESMA classe: sem ela,
+      // um fixture que caísse em outra fase passaria pelo motivo errado — é a
+      // convenção do arquivo.
+      expect(() => aplicarAcao(estadoComAsDuasMaosCheias, {
+        tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-nova',
+      }, deps([]))).toThrow(/as duas mãos estão ocupadas/i);
+    });
+
+    it('com uma mão livre, `mao` é dispensável', () => {
+      const r = aplicarAcao(estadoComUmaMaoLivre, {
+        tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-nova',
+      }, deps([]));
+      expect(jogadorDe(r.estado, 'p1').emJogo.slots.maoEsquerda?.id).toBe('t-nova');
+    });
+
+    it('item que NÃO é de mão dispensa `mao` mesmo com as duas cheias', () => {
+      // O guard tem que olhar o SLOT DO ITEM, não só o estado das mãos — senão um
+      // elmo com as mãos cheias levaria 400.
+      const r = aplicarAcao(estadoComAsDuasMaosCheias, {
+        tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-elmo',
+      }, deps([]));
+      expect(jogadorDe(r.estado, 'p1').emJogo.slots.capacete?.id).toBe('t-elmo');
+    });
+
+    it('arma de DUAS MÃOS dispensa `mao` com as duas cheias', () => {
+      // Mesma armadilha do anterior: o montante ocupa as duas por definição,
+      // então não há escolha a cobrar.
+      const r = aplicarAcao(estadoComAsDuasMaosCheias, {
+        tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-montante',
+      }, deps([]));
+      expect(jogadorDe(r.estado, 'p1').emJogo.slots.maoEsquerda?.id).toBe('t-montante');
+    });
   });
 });
 
