@@ -3,7 +3,7 @@ import { render, screen, waitFor, cleanup, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event';
 import { TelaMesa } from './TelaMesa';
 import { api } from './api';
-import { SLOTS_VAZIOS, LIMITE_MOCHILA } from '@card-dungeon/shared';
+import { SLOTS_VAZIOS } from '@card-dungeon/shared';
 import type { Catalogo, CartaTesouro, VistaDaPartida } from '@card-dungeon/shared';
 
 const combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
@@ -13,13 +13,18 @@ const combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 }
 // Adaptável do Humano. Depois do giro do dial da task 8, 7 e 8 são os ÚNICOS
 // valores que o domínio emite — um fixture com 5 (o que estava aqui) ou 0 afirma
 // sobre um jogo que não existe, e passa verde justamente por isso.
+//
+// Mesma lógica para `limiteDeMochila: 6`: os dois assentos também entram SEM
+// classe em jogo (Aprendiz), e `limiteDeMochila()` devolve o base (5) + 1 pela
+// compensação dele — o giro do dial desta task torna 5 e 6 os ÚNICOS valores que
+// o domínio emite.
 const vistaBase: VistaDaPartida = {
   id: 'm1',
   voce: 'p1',
   versao: 1,
   jogadores: [
-    { id: 'p1', nome: 'Você', ehBot: false, patente: 1, derrotas: 0, combatente, emJogo: { raca: null, classe: null, slots: SLOTS_VAZIOS }, cartasNaMao: 0, limiteDeMao: 8, mochila: [] },
-    { id: 'p2', nome: 'Bot 1', ehBot: true, patente: 2, derrotas: 1, combatente, emJogo: { raca: null, classe: null, slots: SLOTS_VAZIOS }, cartasNaMao: 0, limiteDeMao: 8, mochila: [] },
+    { id: 'p1', nome: 'Você', ehBot: false, patente: 1, derrotas: 0, combatente, emJogo: { raca: null, classe: null, slots: SLOTS_VAZIOS }, cartasNaMao: 0, limiteDeMao: 8, mochila: [], limiteDeMochila: 6 },
+    { id: 'p2', nome: 'Bot 1', ehBot: true, patente: 2, derrotas: 1, combatente, emJogo: { raca: null, classe: null, slots: SLOTS_VAZIOS }, cartasNaMao: 0, limiteDeMao: 8, mochila: [], limiteDeMochila: 6 },
   ],
   vezDe: 'p1',
   patenteAlvo: 10,
@@ -1046,6 +1051,22 @@ describe('TelaMesa — a mochila', () => {
     )),
   });
 
+  it('o cabeçalho mostra o teto que veio da VISTA, não um número cravado', async () => {
+    // A tela lê `eu?.limiteDeMochila` — nunca uma constante local. `vistaBase`
+    // já publica 6 por default (o Aprendiz); forçar 5 aqui (quem TEM classe em
+    // jogo) prova que o número exibido segue a vista em vez de um valor fixo no
+    // componente — um `6` cravado no lugar do antigo `LIMITE_MOCHILA` passaria
+    // este teste por acaso, mas não o de baixo.
+    const vista: VistaDaPartida = {
+      ...vistaBase,
+      jogadores: vistaBase.jogadores.map((j) => (j.id === 'p1' ? { ...j, limiteDeMochila: 5 } : j)),
+    };
+
+    await abrirMesa(vista);
+
+    expect(await screen.findByText(/Sua mochila — 0 de 5/)).toBeInTheDocument();
+  });
+
   it('a mochila de TODOS aparece na tela, com o item nomeado', async () => {
     // Zona aberta: esconder a do adversário seria teatro, e é dela que sai a
     // leitura de quem está estocando o quê para vestir depois.
@@ -1070,7 +1091,8 @@ describe('TelaMesa — a mochila', () => {
   it('"Guardar" APAGA com a mochila cheia — gêmeo do guard do reducer', async () => {
     // Par fino da tabela do `aplicarAcao`: o gate de FASE deixa passar, e quem
     // recusa é o guard de teto. Botão aceso aqui vira 400 na cara do jogador.
-    const cheia = Array.from({ length: LIMITE_MOCHILA }, (_, i) => tesouro(`t-c${String(i)}`));
+    // 6, não 5: p1 (`vistaBase`) é Aprendiz — `limiteDeMochila` publica o +1.
+    const cheia = Array.from({ length: 6 }, (_, i) => tesouro(`t-c${String(i)}`));
 
     await abrirMesa(emParada('recompor', [tesouro('t-1')], cheia));
 
@@ -1182,8 +1204,11 @@ describe('TelaMesa — afinidade de itens', () => {
 });
 
 describe('TelaMesa — a queima pendente', () => {
+  // A vista é FORJADA direto (a `queima` não nasce daqui passando pelo reducer),
+  // então o tamanho não precisa bater com o `limiteDeMochila` de p1 — só precisa
+  // ser um número fixo e conhecido para as asserções abaixo contarem os botões.
   const mochilaCheia: readonly CartaTesouro[] = Array.from(
-    { length: LIMITE_MOCHILA }, (_, i) => tesouro(`t-mochila-${String(i)}`, 'elmo-de-couro'),
+    { length: 5 }, (_, i) => tesouro(`t-mochila-${String(i)}`, 'elmo-de-couro'),
   );
 
   /** A vista com a queima aberta para `dono`, e a mochila de p1 no teto. */
@@ -1201,7 +1226,7 @@ describe('TelaMesa — a queima pendente', () => {
   it('lista as SEIS cartas: o deslocado e as cinco da mochila', async () => {
     await abrirMesa(comQueima('p1'));
 
-    expect(screen.getAllByRole('button', { name: 'Queimar' })).toHaveLength(1 + LIMITE_MOCHILA);
+    expect(screen.getAllByRole('button', { name: 'Queimar' })).toHaveLength(1 + mochilaCheia.length);
     const bloco = screen.getByLabelText('queima pendente');
     expect(within(bloco).getByText(/Espada Curta/)).toBeInTheDocument();
   });

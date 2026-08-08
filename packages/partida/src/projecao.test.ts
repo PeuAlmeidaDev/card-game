@@ -192,6 +192,20 @@ describe('projetarPara', () => {
     expect(projetarPara('p1', p, catalogoPadrao).fase).toBe('vasculhar');
     expect(projetarPara('p2', p, catalogoPadrao).fase).toBe('vasculhar');
   });
+
+  it('publica `limiteDeMochila` por jogador — o cliente não guarda cópia da regra', () => {
+    // ⚠️ SEM `comClasseDeTeste`: `partida` (acima) já vem com a classe carimbada e
+    // devolveria 5 para os dois — este teste quer o Aprendiz de verdade, que é o
+    // estado em que a mesa nasce (`criarPartida` não semeia classe nenhuma).
+    const semClasse = criarPartida(
+      'm1', entradas,
+      { patenteAlvo: 10, composicaoPorJogador: COMPOSICAO_DE_TESTE, composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE },
+      { embaralhar: semEmbaralhar },
+    );
+    const vista = projetarPara('p1', semClasse, catalogoPadrao);
+
+    expect(vista.jogadores.map((j) => j.limiteDeMochila)).toEqual([6, 6]);
+  });
 });
 
 describe('versaoDe — a versão anda quando a espiada abre', () => {

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { criarPartida } from './montagem';
 import { montarComposicaoTesouros } from './baralho';
 import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
-import { MAO_INICIAL_PADRAO, MAO_INICIAL_TESOUROS, LIMITE_MOCHILA } from './mao';
+import { MAO_INICIAL_PADRAO, MAO_INICIAL_TESOUROS, LIMITE_BASE_DE_MOCHILA } from './mao';
 import { SLOTS_VAZIOS } from './corpo';
 import type { EntradaJogador } from './tipos';
 
@@ -204,11 +204,11 @@ describe('criarPartida', () => {
     expect(p.jogadores.map((j) => j.mochila)).toEqual([[], []]);
   });
 
-  it('LIMITE_MOCHILA é 5 — o dial do spec §7.1', () => {
+  it('LIMITE_BASE_DE_MOCHILA é 5 — o dial do spec §7.1', () => {
     // Cravado de propósito, não derivado: é um DIAL de balanceamento, e derivá-lo
     // de outra constante tornaria a asserção tautológica e mataria o alarme no dia
     // em que alguém girasse o valor sem querer.
-    expect(LIMITE_MOCHILA).toBe(5);
+    expect(LIMITE_BASE_DE_MOCHILA).toBe(5);
   });
 });
 

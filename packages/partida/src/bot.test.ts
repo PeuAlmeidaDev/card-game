@@ -6,7 +6,7 @@ import { criarPartida } from './montagem';
 import { projetarPara } from './projecao';
 import { filaDeDados } from './testes/dados';
 import { equipamento, monstro as cartaMonstro, monstros, raca } from './testes/cartas';
-import { LIMITE_BASE_DE_MAO, LIMITE_MOCHILA } from './mao';
+import { LIMITE_BASE_DE_MAO, LIMITE_BASE_DE_MOCHILA } from './mao';
 import {
   catalogoDeTeste, comClasseDeTeste, ID_DA_RACA_DONA, ID_DA_RACA_OUTRA, ID_DO_ITEM_DE_CAPACETE,
   ID_DO_ITEM_DUAS_MAOS, ID_DO_ITEM_EXCLUSIVO, ID_DO_ITEM_FORTE, ID_DO_ITEM_FRACO, ID_DO_ITEM_LASTRO,
@@ -14,7 +14,8 @@ import {
 } from './testes/catalogo';
 import { COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import type {
-  Carta, CartaDeRaca, CartaEquipamento, CartaTesouro, EntradaJogador, EstadoPartida, Fase, Slot, VistaDaPartida,
+  Carta, CartaDeRaca, CartaDeClasse, CartaEquipamento, CartaTesouro, EntradaJogador, EstadoPartida, Fase, Slot,
+  VistaDaPartida,
 } from './tipos';
 
 /** A projeção calcula `combatente`, então precisa do catálogo. Um só para o arquivo. */
@@ -63,6 +64,8 @@ function vistaEm(
   overrides: {
     readonly suaMao?: readonly Carta[];
     readonly racaEmJogo?: CartaDeRaca | null;
+    /** `null` = Aprendiz. Ausente = herda o carimbo de `criar` (`comClasseDeTeste`). */
+    readonly classeEmJogo?: CartaDeClasse | null;
     readonly limiteDeMao?: number;
     readonly mochila?: readonly CartaTesouro[];
     readonly slots?: Partial<Record<Slot, CartaEquipamento | null>>;
@@ -81,6 +84,7 @@ function vistaEm(
             emJogo: {
               ...j.emJogo,
               raca: overrides.racaEmJogo !== undefined ? overrides.racaEmJogo : j.emJogo.raca,
+              classe: overrides.classeEmJogo !== undefined ? overrides.classeEmJogo : j.emJogo.classe,
               slots: overrides.slots !== undefined ? { ...j.emJogo.slots, ...overrides.slots } : j.emJogo.slots,
             },
           }
@@ -283,13 +287,13 @@ describe('escolherAcao', () => {
     // isso a mão também carrega um equipamento (pior que o do slot ocupado) e
     // a mochila está cheia: `temEquipamento` fica `true` (a fase legitimamente
     // para), e ainda assim não há nem o que equipar (perde para o slot
-    // ocupado) nem onde guardar (mochila em `LIMITE_MOCHILA`) — só `passar`
+    // ocupado) nem onde guardar (mochila em `LIMITE_BASE_DE_MOCHILA`) — só `passar`
     // sobra, e é o `jogarCarta` da raça que este teste prova que o bot não
     // escolhe no lugar.
     const vista = vistaEm('jogar', {
       suaMao: [raca('r7', 'orc'), equipamento('t-fraco', ID_DO_ITEM_FRACO)],
       slots: { maoDireita: equipamento('t-forte', ID_DO_ITEM_FORTE) },
-      mochila: Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-c${String(i)}`)),
+      mochila: Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-c${String(i)}`)),
     });
 
     expect(escolherAcao(vista, 'p1', catalogoDeTeste())).toEqual({ tipo: 'passar', jogadorId: 'p1' });
@@ -318,7 +322,7 @@ describe('escolherAcao', () => {
       composicaoPorJogador: Array.from({ length: 9 }, () => ({ tipo: 'monstro' as const, monstroId: 'm-teste' })),
       // 6 por jogador, e não os 2 de `COMPOSICAO_TESOURO_DE_TESTE`: a mão
       // inicial sozinha precisa segurar os 5 que sobrevivem até `jogar` (1 para
-      // ocupar `maoDireita`, `LIMITE_MOCHILA` para encher a mochila), e ainda
+      // ocupar `maoDireita`, `LIMITE_BASE_DE_MOCHILA` para encher a mochila), e ainda
       // sobrar 1 no monte para o loot do combate ter o que sacar.
       composicaoTesouros: Array.from({ length: 6 }, () => ({ tipo: 'equipamento' as const, itemId: 'i-teste' })),
       maoInicial: 3,
@@ -344,7 +348,7 @@ describe('escolherAcao', () => {
 
     // Consome os 6 tesouros por AÇÃO real (nunca forjando `fase`): equipa o
     // primeiro (ocupa `maoDireita`) e guarda os 5 seguintes (enche a mochila até
-    // `LIMITE_MOCHILA`) — exatamente o "corpo cheio + mochila cheia" que torna
+    // `LIMITE_BASE_DE_MOCHILA`) — exatamente o "corpo cheio + mochila cheia" que torna
     // `passar` a ÚNICA resposta legal que sobra, em vez de uma entre várias que
     // só não é `entregarCarta`. `entrarOuPular` mantém a fase em `jogar` a cada
     // passo porque sempre sobra equipamento (na mão ou na mochila) até o laço
@@ -353,12 +357,12 @@ describe('escolherAcao', () => {
     let corpoPronto = aplicarAcao(
       venceu, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: primeiroEquipamento.id }, deps(),
     ).estado;
-    for (let i = 0; i < LIMITE_MOCHILA; i += 1) {
+    for (let i = 0; i < LIMITE_BASE_DE_MOCHILA; i += 1) {
       const alvo = corpoPronto.jogadores[0]!.mao.find((c) => c.tipo === 'equipamento')!;
       corpoPronto = aplicarAcao(corpoPronto, { tipo: 'guardarCarta', jogadorId: 'p1', cartaId: alvo.id }, deps()).estado;
     }
     expect(corpoPronto.fase).toBe('jogar');                                    // nunca saiu da fase
-    expect(corpoPronto.jogadores[0]!.mochila).toHaveLength(LIMITE_MOCHILA);    // mochila CHEIA
+    expect(corpoPronto.jogadores[0]!.mochila).toHaveLength(LIMITE_BASE_DE_MOCHILA);    // mochila CHEIA
     expect(corpoPronto.jogadores[0]!.mao.some((c) => c.tipo === 'equipamento')).toBe(false); // mão sem mais tesouro
 
     // Com o corpo ocupado, a mochila cheia e nenhum tesouro sobrando na mão, o
@@ -560,10 +564,26 @@ describe('escolherAcao', () => {
     const vista = vistaEm('recompor', {
       suaMao: [equipamento('t-fraco', ID_DO_ITEM_FRACO)],
       slots: { maoDireita: equipamento('t-forte', ID_DO_ITEM_FORTE) },
-      mochila: Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-c${String(i)}`)),
+      mochila: Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-c${String(i)}`)),
     });
 
     expect(escolherAcao(vista, 'p1', catalogoDeTeste())).toEqual({ tipo: 'passar', jogadorId: 'p1' });
+  });
+
+  it('o Aprendiz ainda guarda com a mochila em 5 — a 6ª vaga é dele', () => {
+    // Gêmeo do teste acima: o mesmo tamanho de mochila (5) é "cheia" para quem
+    // tem classe em jogo e ainda tem vaga para o Aprendiz — sem ler
+    // `eu.limiteDeMochila` (e não um `5` cravado), o bot pediria `guardarCarta`
+    // numa mochila que ele acha cheia e nunca guardaria a 6ª carta.
+    const vista = vistaEm('recompor', {
+      classeEmJogo: null,
+      suaMao: [equipamento('t-fraco', ID_DO_ITEM_FRACO)],
+      slots: { maoDireita: equipamento('t-forte', ID_DO_ITEM_FORTE) },
+      mochila: Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-c${String(i)}`)),
+    });
+
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
+      .toEqual({ tipo: 'guardarCarta', jogadorId: 'p1', cartaId: 't-fraco' });
   });
 
   it('em `jogar`, veste o loot que acabou de cair', () => {

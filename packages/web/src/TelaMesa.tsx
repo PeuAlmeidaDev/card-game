@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api } from './api';
 import { PainelLog } from './PainelLog';
 import { descreverCarta } from './descreverCarta';
-import { acaoEhLegal, afinidadeCom, LIMITE_MOCHILA } from '@card-dungeon/shared';
+import { acaoEhLegal, afinidadeCom } from '@card-dungeon/shared';
 import type { AcaoDaMesa, AcaoNoFio, Catalogo, Fase, ItemCarta, Slot, VistaDaPartida } from '@card-dungeon/shared';
 import { rotuloDeAfinidade } from './rotuloDeAfinidade';
 
@@ -388,7 +388,7 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
           lista e não na da mão. Só a SUA aparece aqui com ação; a dos outros já
           está visível na linha do assento, acima. */}
       <section>
-        <h3>Sua mochila — {minhaMochila.length} de {LIMITE_MOCHILA}</h3>
+        <h3>Sua mochila — {minhaMochila.length} de {eu?.limiteDeMochila ?? 0}</h3>
         <ul>
           {minhaMochila.map((carta) => (
             <li key={carta.id}>
@@ -506,7 +506,7 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
               {carta.tipo === 'equipamento' && (
                 <button
                   type="button"
-                  disabled={!legal('guardarCarta') || minhaMochila.length >= LIMITE_MOCHILA}
+                  disabled={!legal('guardarCarta') || minhaMochila.length >= (eu?.limiteDeMochila ?? 0)}
                   onClick={() => void agir({ tipo: 'guardarCarta', cartaId: carta.id })}
                 >
                   Guardar

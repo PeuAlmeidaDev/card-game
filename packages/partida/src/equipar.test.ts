@@ -3,7 +3,7 @@ import { colocarNoSlot, destinoDoDesequipado } from './equipar';
 import { SLOTS_VAZIOS } from './corpo';
 import { criarPartida } from './montagem';
 import { faseDoTurnoDe } from './fase';
-import { LIMITE_MOCHILA } from './mao';
+import { LIMITE_BASE_DE_MOCHILA } from './mao';
 import { equipamento } from './testes/cartas';
 import { comClasseDeTeste } from './testes/catalogo';
 import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
@@ -122,8 +122,8 @@ describe('colocarNoSlot', () => {
 });
 
 describe('destinoDoDesequipado — o ramo da mochila', () => {
-  const cheia = Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
-  const umaVaga = cheia.slice(0, LIMITE_MOCHILA - 1);
+  const cheia = Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
+  const umaVaga = cheia.slice(0, LIMITE_BASE_DE_MOCHILA - 1);
 
   it('com vaga na mochila, nada muda: o deslocado entra e não há pendência', () => {
     // Spec §7.3. O jogador NÃO escolhe (decisão #8) enquanto houver vaga: a

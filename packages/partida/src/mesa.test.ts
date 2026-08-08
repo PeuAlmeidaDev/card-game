@@ -3,7 +3,7 @@ import { aplicarAcao } from './mesa';
 import { avancarBots } from './automacao';
 import { criarPartida } from './montagem';
 import { montarComposicao, montarComposicaoTesouros } from './baralho';
-import { LIMITE_BASE_DE_MAO, LIMITE_MOCHILA, MAO_INICIAL_PADRAO, MAO_INICIAL_TESOUROS, limiteDeMao } from './mao';
+import { LIMITE_BASE_DE_MAO, LIMITE_BASE_DE_MOCHILA, MAO_INICIAL_PADRAO, MAO_INICIAL_TESOUROS, limiteDeMao } from './mao';
 import { escolherAcao } from './bot';
 // Importado pelos helpers `comMao`: eles DERIVAM a fase da mão que montam em vez
 // de cravá-la, para não produzirem estado que o domínio nunca geraria.
@@ -1502,6 +1502,35 @@ describe('jogar carta de CLASSE', () => {
     }));
   });
 
+  it('trocar de classe com a mochila cheia abre a pendência, com o motivo `perdeuAfinidade`', () => {
+    // Gêmeo do teste de raça no describe de cima ("trocar de raça com a mochila
+    // cheia..."): `destinoDoDesequipado` é o MESMO ponto único para as duas
+    // trocas, mas até esta task só o caminho da raça tinha teste cobrindo a
+    // mochila CHEIA (achado cross-task da revisão da Task 7).
+    const cheia = Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
+    const semClasse = nascida();
+    const jogadores = semClasse.jogadores.map((j) => (j.id === 'p1'
+      ? {
+          ...j,
+          mao: [nova] as readonly Carta[],
+          mochila: cheia,
+          emJogo: {
+            raca: null, classe: null,
+            slots: { ...SLOTS_VAZIOS, armadura: equipamento('t-x', ID_DO_ITEM_EXCLUSIVO_DE_CLASSE) },
+          },
+        }
+      : j));
+    const p: EstadoPartida = {
+      ...semClasse, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...semClasse, jogadores }, 'p1')),
+    };
+
+    const r = aplicarAcao(p, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'pc-nova' }, deps([]));
+
+    expect(r.estado.queima?.deslocados.map((c) => c.id)).toEqual(['t-x']);
+    expect(r.estado.queima?.motivo).toBe('perdeuAfinidade');
+    expect(r.estado.tesouros.cemiterio).toEqual([]);
+  });
+
   it('`jogarCarta` continua recusando o que não é raça nem classe', () => {
     // UM `AcaoInvalida`, alargado — logo UMA linha na tabela de pares finos, não duas.
     const p = comMao(nascida(), [monstro('m1'), nova]);
@@ -1690,7 +1719,7 @@ describe('trocar de raça derruba o que perdeu afinidade', () => {
     // — e vira a pendência, em vez de ir direto ao cemitério (decisão #59).
     const exclusivo = equipamento('t-1', ID_DO_ITEM_EXCLUSIVO);
     const montante = equipamento('t-2', ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS);
-    const quaseCheia = Array.from({ length: LIMITE_MOCHILA - 1 }, (_, i) => equipamento(`t-cheia-${String(i)}`));
+    const quaseCheia = Array.from({ length: LIMITE_BASE_DE_MOCHILA - 1 }, (_, i) => equipamento(`t-cheia-${String(i)}`));
     const cartaDeRaca = raca('p-9', ID_DA_RACA_OUTRA);
     const estado = comCorpo(
       nascida(),
@@ -1729,7 +1758,7 @@ describe('trocar de raça derruba o que perdeu afinidade', () => {
   });
 
   it('trocar de raça com a mochila cheia abre a pendência, com o motivo `perdeuAfinidade`', () => {
-    const cheia = Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
+    const cheia = Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
     const p = comCorpo(
       nascida(),
       { capacete: equipamento('t-excl', ID_DO_ITEM_EXCLUSIVO) },
@@ -1808,7 +1837,7 @@ describe('aplicarAcao — equiparCarta', () => {
     // a carta no cemitério — é o mesmo de antes quando o jogador escolhe queimar
     // o próprio deslocado; é essa sequência de DUAS ações que este teste afirma
     // agora.
-    const cheia = Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
+    const cheia = Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
     const base = comSlots(comMao(nascida(), [equipamento('t-1')]), { maoDireita: equipamento('t-0') });
     const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
     const p: EstadoPartida = { ...base, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...base, jogadores }, 'p1')) };
@@ -1868,7 +1897,7 @@ describe('aplicarAcao — equiparCarta', () => {
     // auto-pulo nunca coexistem. O que este teste prova é o efeito observável do
     // `return` — a pendência chega ao estado e `vezDe` continua sendo de quem
     // equipou.
-    const cheia = Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
+    const cheia = Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
     const base = comSlots(comMao(nascida(), [equipamento('t-novo')]), { maoDireita: equipamento('t-0') });
     const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
     const p: EstadoPartida = { ...base, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...base, jogadores }, 'p1')) };
@@ -1888,7 +1917,7 @@ describe('aplicarAcao — equiparCarta', () => {
     // queima não precisa: abrir sempre acompanha um `equipou` ou um `racaEmJogo`.
     // Somar um termo que nunca sustenta nada seria comentário disfarçado de
     // código — esta asserção é o que segura a propriedade no lugar dele.
-    const cheia = Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
+    const cheia = Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
     const base = comSlots(comMao(nascida(), [equipamento('t-novo')]), { maoDireita: equipamento('t-0') });
     const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
     const p: EstadoPartida = { ...base, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...base, jogadores }, 'p1')) };
@@ -2032,7 +2061,7 @@ describe('aplicarAcao — equiparCarta', () => {
     // esta asserção prova que ele acha. Não é o único teste que pega essa
     // inversão — o pin gêmeo abaixo e o de `equipar.test.ts` dependem da mesma
     // ordem —, mas é o único deste describe com origem MOCHILA cheia.
-    const cheia = [equipamento('t-1'), ...Array.from({ length: LIMITE_MOCHILA - 1 }, (_, i) => equipamento(`t-cheia-${String(i)}`))];
+    const cheia = [equipamento('t-1'), ...Array.from({ length: LIMITE_BASE_DE_MOCHILA - 1 }, (_, i) => equipamento(`t-cheia-${String(i)}`))];
     const base = comSlots(comMao(nascida(), []), { maoDireita: equipamento('t-0') });
     const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
     const p: EstadoPartida = { ...base, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...base, jogadores }, 'p1')) };
@@ -2041,7 +2070,7 @@ describe('aplicarAcao — equiparCarta', () => {
 
     // A mochila continua no teto: perdeu 't-1' (foi para o slot) e ganhou 't-0'
     // (o deslocado) — nunca ficou em 4.
-    expect(jogadorDe(r.estado, 'p1').mochila).toHaveLength(LIMITE_MOCHILA);
+    expect(jogadorDe(r.estado, 'p1').mochila).toHaveLength(LIMITE_BASE_DE_MOCHILA);
     expect(jogadorDe(r.estado, 'p1').mochila.map((c) => c.id)).toContain('t-0');
     expect(r.estado.tesouros.cemiterio.map((c) => c.id)).not.toContain('t-0');
   });
@@ -2208,7 +2237,7 @@ describe('aplicarAcao — guardarCarta', () => {
     // `equiparCarta`): `faseDoTurnoDe` lê a mochila, então injetá-la depois
     // deixaria a fase velha e o teste poderia passar pelo gate de fase em vez
     // do guard de teto que ele existe para cobrir.
-    const cheia = Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
+    const cheia = Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
     const p0 = comMao(nascida(), [equipamento('t-1')]);
     const jogadores = p0.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
     const p: EstadoPartida = { ...p0, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...p0, jogadores }, 'p1')) };
@@ -2241,6 +2270,40 @@ describe('aplicarAcao — guardarCarta', () => {
 
     expect(r.estado.vezDe).toBe('p1');
     expect(r.estado.fase).toBe('recompor');
+  });
+
+  it('o Aprendiz guarda a 6ª carta que a mochila de 5 recusaria', () => {
+    const p0 = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const cheiaPara5 = Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-c${String(i)}`));
+    const jogadores = p0.jogadores.map((j) => (j.id === 'p1'
+      ? {
+          ...j,
+          mao: [equipamento('t-nova')] as readonly Carta[],
+          mochila: cheiaPara5,
+          // APRENDIZ: `criar` carimba a classe, e aqui ela é desfeita de propósito
+          // — é a ausência que compra a 6ª vaga.
+          emJogo: { ...j.emJogo, classe: null },
+        }
+      : j));
+    const p: EstadoPartida = { ...p0, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...p0, jogadores }, 'p1')) };
+
+    const r = aplicarAcao(p, { tipo: 'guardarCarta', jogadorId: 'p1', cartaId: 't-nova' }, deps([]));
+
+    expect(jogadorDe(r.estado, 'p1').mochila).toHaveLength(LIMITE_BASE_DE_MOCHILA + 1);
+  });
+
+  it('quem TEM classe é recusado na 6ª — o teto dele continua 5', () => {
+    // O gêmeo obrigatório: sem ele, um `limiteDeMochila` que devolvesse 6 para
+    // todo mundo passaria no teste acima.
+    const p0 = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const cheiaPara5 = Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-c${String(i)}`));
+    const jogadores = p0.jogadores.map((j) => (j.id === 'p1'
+      ? { ...j, mao: [equipamento('t-nova')] as readonly Carta[], mochila: cheiaPara5 }
+      : j));
+    const p: EstadoPartida = { ...p0, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...p0, jogadores }, 'p1')) };
+
+    expect(() => aplicarAcao(p, { tipo: 'guardarCarta', jogadorId: 'p1', cartaId: 't-nova' }, deps([])))
+      .toThrow('a mochila está cheia');
   });
 });
 
@@ -3197,7 +3260,7 @@ describe('aplicarAcao — queimarCarta', () => {
   const comQueima = (
     deslocados: readonly [CartaEquipamento, ...CartaEquipamento[]],
     mochila: readonly CartaEquipamento[] = Array.from(
-      { length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-mochila-${String(i)}`),
+      { length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-mochila-${String(i)}`),
     ),
   ): EstadoPartida => {
     const base = nascida();
@@ -3237,7 +3300,7 @@ describe('aplicarAcao — queimarCarta', () => {
     const r = aplicarAcao(p, { tipo: 'queimarCarta', jogadorId: 'p1', cartaId: 't-saiu' }, deps([]));
 
     expect(r.estado.tesouros.cemiterio.map((c) => c.id)).toContain('t-saiu');
-    expect(jogadorDe(r.estado, 'p1').mochila).toHaveLength(LIMITE_MOCHILA);
+    expect(jogadorDe(r.estado, 'p1').mochila).toHaveLength(LIMITE_BASE_DE_MOCHILA);
     expect(jogadorDe(r.estado, 'p1').mochila.map((c) => c.id)).not.toContain('t-saiu');
     expect(r.eventos).toEqual([
       { tipo: 'desequipou', jogadorId: 'p1', carta: equipamento('t-saiu'), destino: 'cemiterio', motivo: 'trocaDeSlot' },
@@ -3278,14 +3341,14 @@ describe('aplicarAcao — queimarCarta', () => {
     // teste escrito depois do código, que é o que o TDD deste projeto proíbe.
     const mochila = [
       equipamento('t-alvo'),
-      ...Array.from({ length: LIMITE_MOCHILA - 1 }, (_, i) => equipamento(`t-resto-${String(i)}`)),
+      ...Array.from({ length: LIMITE_BASE_DE_MOCHILA - 1 }, (_, i) => equipamento(`t-resto-${String(i)}`)),
     ];
     const p = comQueima([equipamento('t-saiu')], mochila);
 
     const r = aplicarAcao(p, { tipo: 'queimarCarta', jogadorId: 'p1', cartaId: 't-alvo' }, deps([]));
 
     const depois = jogadorDe(r.estado, 'p1').mochila.map((c) => c.id);
-    expect(depois).toHaveLength(LIMITE_MOCHILA);
+    expect(depois).toHaveLength(LIMITE_BASE_DE_MOCHILA);
     expect(depois).toContain('t-saiu');
     expect(depois).not.toContain('t-alvo');
     expect(r.estado.tesouros.cemiterio.map((c) => c.id)).toEqual(['t-alvo']);
@@ -3302,7 +3365,7 @@ describe('aplicarAcao — queimarCarta', () => {
     // que uma outra carta foi ao cemitério. É a decisão #27 valendo de novo.
     const mochila = [
       equipamento('t-alvo'),
-      ...Array.from({ length: LIMITE_MOCHILA - 1 }, (_, i) => equipamento(`t-resto-${String(i)}`)),
+      ...Array.from({ length: LIMITE_BASE_DE_MOCHILA - 1 }, (_, i) => equipamento(`t-resto-${String(i)}`)),
     ];
     const p = comQueima([equipamento('t-saiu')], mochila);
 

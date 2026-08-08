@@ -6,7 +6,7 @@ import type {
   ZonaEmJogo,
 } from './tipos';
 import { tirarDoTopo } from './baralho';
-import { LIMITE_MOCHILA } from './mao';
+import { limiteDeMochila } from './mao';
 import { destinoDaCaridade } from './caridade';
 import { afinidadeCom, combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
 import { colocarNoSlot, destinoDoDesequipado } from './equipar';
@@ -1029,7 +1029,7 @@ function guardarCarta(
   if (carta.tipo !== 'equipamento') {
     throw new AcaoInvalida('aplicarAcao: só carta de tesouro vai para a mochila');
   }
-  if (jogador.mochila.length >= LIMITE_MOCHILA) {
+  if (jogador.mochila.length >= limiteDeMochila(jogador)) {
     // Pedido do cliente que a regra recusa => 400. A vista dele pode ser de um
     // instante em que ainda havia vaga.
     throw new AcaoInvalida('aplicarAcao: a mochila está cheia');

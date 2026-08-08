@@ -187,10 +187,6 @@ export { acaoEhLegal } from '@card-dungeon/partida';
 // cópia escrita à mão no cliente é a que fica para trás quando o sexto nascer.
 export { SLOTS_VAZIOS } from '@card-dungeon/partida';
 
-// Valor, pelo mesmo motivo: o teto da mochila é regra, e um `5` typed by hand no
-// cliente é a cópia que fica para trás quando o dial girar.
-export { LIMITE_MOCHILA } from '@card-dungeon/partida';
-
 // Valor, e este chegou tarde: o cliente somava classe + base por conta própria
 // (`calcularPreview`, em `App.tsx`) porque `web` não alcança `personagem`. A
 // cópia JÁ tinha divergido — `montarCombatente` aplica `PISO = 1` e a do cliente

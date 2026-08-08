@@ -7,8 +7,8 @@ import type { EventoDaMesa, JogadorPublico } from '@card-dungeon/shared';
 
 const combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
 const jogadores: readonly JogadorPublico[] = [
-  { id: 'p1', nome: 'Você', ehBot: false, patente: 1, derrotas: 0, combatente, emJogo: { raca: null, classe: null, slots: SLOTS_VAZIOS }, cartasNaMao: 0, limiteDeMao: 5, mochila: [] },
-  { id: 'p2', nome: 'Bot 1', ehBot: true, patente: 1, derrotas: 0, combatente, emJogo: { raca: null, classe: null, slots: SLOTS_VAZIOS }, cartasNaMao: 0, limiteDeMao: 5, mochila: [] },
+  { id: 'p1', nome: 'Você', ehBot: false, patente: 1, derrotas: 0, combatente, emJogo: { raca: null, classe: null, slots: SLOTS_VAZIOS }, cartasNaMao: 0, limiteDeMao: 5, mochila: [], limiteDeMochila: 6 },
+  { id: 'p2', nome: 'Bot 1', ehBot: true, patente: 1, derrotas: 0, combatente, emJogo: { raca: null, classe: null, slots: SLOTS_VAZIOS }, cartasNaMao: 0, limiteDeMao: 5, mochila: [], limiteDeMochila: 6 },
 ];
 const racas = [
   { id: 'elfo', nome: 'Elfo', texto: 'Presciência: vê o perigo antes de encará-lo.' },

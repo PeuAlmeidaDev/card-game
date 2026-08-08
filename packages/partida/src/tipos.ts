@@ -211,6 +211,8 @@ export interface JogadorPublico {
   readonly cartasNaMao: number;
   /** A capacidade dele agora (o limite é regra pública, não segredo). */
   readonly limiteDeMao: number;
+  /** A capacidade da MOCHILA agora — mesmo motivo do `limiteDeMao`, gêmeo dela. */
+  readonly limiteDeMochila: number;
 }
 
 /**

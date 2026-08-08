@@ -2,7 +2,6 @@ import type { Combatente } from '@card-dungeon/motor';
 import type {
   AcaoDaMesa, CartaEquipamento, CatalogoDaMesa, JogadorPublico, Slot, VistaDaPartida, ZonaEmJogo,
 } from './tipos';
-import { LIMITE_MOCHILA } from './mao';
 // O par de mãos vem do MESMO lugar que `colocarNoSlot` usa: o custo que o bot
 // calcula tem que ser o custo que o reducer vai cobrar, e duas listas escritas à
 // mão divergem em silêncio (o slot que nascer não entra na cópia).
@@ -260,7 +259,7 @@ function vestirOuGuardar(
   // `AcaoInvalida` subiria por `avancarBots` e viraria 400 na jogada do HUMANO —
   // o Critical que matou 28 de 30 mesas no Plano 3b.
   const naMao = vista.suaMao.find((c) => c.tipo === 'equipamento');
-  if (naMao !== undefined && eu.mochila.length < LIMITE_MOCHILA) {
+  if (naMao !== undefined && eu.mochila.length < eu.limiteDeMochila) {
     return { tipo: 'guardarCarta', jogadorId, cartaId: naMao.id };
   }
 

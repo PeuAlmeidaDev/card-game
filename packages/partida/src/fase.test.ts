@@ -4,7 +4,7 @@ import { criarPartida } from './montagem';
 import { aplicarAcao } from './mesa';
 import { escolherAcao } from './bot';
 import { projetarPara } from './projecao';
-import { limiteDeMao, LIMITE_BASE_DE_MAO, LIMITE_MOCHILA } from './mao';
+import { limiteDeMao, LIMITE_BASE_DE_MAO, LIMITE_BASE_DE_MOCHILA } from './mao';
 import { montarComposicao } from './baralho';
 import { criarDadoCiclico } from './testes/dados';
 import { CARTA_DE_CLASSE_DE_TESTE, catalogoDeTeste, comClasseDeTeste } from './testes/catalogo';
@@ -205,10 +205,10 @@ describe('faseSeAutoPula (spec §6.1)', () => {
   });
 
   it('com a mochila NO TETO, nenhuma das duas se pula — é o que torna o auto-pulo impossível com queima pendente', () => {
-    // A `queima` só abre quando a mochila já está em `LIMITE_MOCHILA`
+    // A `queima` só abre quando a mochila já está em `LIMITE_BASE_DE_MOCHILA`
     // (`destinoDoDesequipado`), e é este teste que prende a outra ponta: nesse
     // mesmo estado, `faseSeAutoPula` já devolve `false` nas duas fases paradas.
-    const cheia = Array.from({ length: LIMITE_MOCHILA }, (_, i) => equipamento(`t-${String(i)}`));
+    const cheia = Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-${String(i)}`));
     expect(faseSeAutoPula('recompor', { ...comMao([]), mochila: cheia })).toBe(false);
     expect(faseSeAutoPula('jogar', { ...comMao([]), mochila: cheia })).toBe(false);
   });
