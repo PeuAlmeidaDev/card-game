@@ -975,9 +975,17 @@ retrabalho no cliente (request/response → push). Justificativa em #45.
 > ⚠️ **Este bloco descreve o DESTINO, e a fatia 8 real entregou menos** (varredura de 2026-07-29).
 > Construído e mergeado: mão com limite, zona em jogo, 5 slots, mochila, cartas de **raça** e de
 > **item (equipamento)**, máquina de fases (5 na varredura; **6 desde o Plano 4b**, com a
-> `encrenca`). **NÃO construído: maldições e classe como carta** —
-> classe ainda vem do construtor (`classeId`), e não existe uma única maldição no catálogo.
+> `encrenca`). **NÃO construído *em 2026-07-29*: maldições e classe como carta** —
+> classe **ainda vinha** do construtor (`classeId`), e não existia uma única maldição no catálogo.
 > Quem contar escopo de MVP lendo este bloco **conta como pronto o que não está**.
+>
+> ✏️ **CORREÇÃO MARCADA (2026-08-08) — metade desse "não construído" saiu.** A fatia
+> **`classe como carta`** (Planos A e B) construiu a classe como carta de Portas: o `classeId`
+> **morreu** e o construtor da fatia 2 foi **demolido** (decisões **#88** e **#94**). **Maldições
+> continuam não construídas** — nenhuma existe no catálogo, e elas nascem no **bloco 2** do §3.1.
+> ⚠️ O parágrafo acima fica intacto de propósito: ele registra o que a varredura **sabia em
+> 2026-07-29**, e é ESTA linha que diz o presente. Sem ela o bloco passou a contar o **oposto** do
+> que existe — que é exatamente o erro de escopo de MVP que ele foi escrito para impedir.
 >
 > **Fatia 9 — Habilidades de classe.** (A fatia 5 antiga, já desenhada, entra aqui inteira.)
 >

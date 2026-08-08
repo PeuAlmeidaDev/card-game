@@ -1526,6 +1526,97 @@ inteira para aprender isso.
   **mira outro jogador** e o **conserto da economia** (#46 e #40). As três fatias que a #61 meteu na
   frente dela **acabaram**.
 
+### 📋 Os Minors DEFERIDOS das Tasks 2–14, salvos do ledger antes de ele sumir
+
+**Fonte: a triagem da revisão ampla do branch** (veredicto *"pronto com ressalvas"*, zero Critical),
+que leu os ~45 Minors deferidos no ledger `.superpowers/sdd/2026-08-07-classe-como-carta-plano-b/progress.md`.
+🔴 **Esse ledger é gitignored e vai ser APAGADO** — o que não estiver aqui deixa de existir. Os
+marcados **"conserta antes do merge"** já foram feitos (leva de correção de 2026-08-08: os dois testes
+novos, o comentário do `mesa.ts`, o título do teste, o bloco histórico do §17 do bible); os marcados
+**"descarta"** não vieram. O que segue é o balde **"conserta depois"** — trabalho real, medido,
+**nenhum deles é bug vivo**.
+
+**🧪 Teste que não morde** (a mutação passa, ou passa pelo motivo errado)
+
+- `partida/src/mesa.test.ts:1574` — o gêmeo de `mochilaEncolheu` não morde `>` → `>=` em `mesa.ts:906`.
+  ⚠️ **A mutação NÃO fica verde** (2 outros testes reprovam): o invariante está protegido, só **não
+  pelo teste que o comentário dele promete**. Conserto de 1 linha (afirmar que `r.eventos` não traz
+  `desequipou`).
+- `personagem/src/catalogo.test.ts:17-18` — as duas asserções passam **VAZIAS** se o array esvaziar
+  (`CATALOGO.classes[0] === undefined` não reprova `.not.toHaveProperty`); o gêmeo das raças ainda
+  tem `toHaveLength(5)`. Família *"teste de ausência vira vácuo"*.
+- `partida/src/montagem.test.ts:105` — `!('classeId' in j)` fica verde e **mudo** se o campo renascer
+  com outro nome; duplica `projecao.test.ts:165`.
+- `web/src/TelaMesa.test.tsx` (guard estrutural do construtor) — cobre **`<select>`**; um construtor
+  que voltasse como grupo de `<radio>` ou lista de botões passaria pelas quatro asserções.
+- `web/src/TelaMesa.tsx:509` — o `disabled` de "Guardar" continua **sem morder `>= 6`** (cravar o
+  valor do Aprendiz). O `>= 5` (a constante global que a Task 8 matou) foi fechado nesta leva.
+- **Nenhum teste cobre o BOT** jogando classe → encolher a mochila → abrir a queima — a interação que
+  a Task 8 criou, declarada fora do escopo da Task 9.
+
+**🎯 Asserção fraca** (não prova o que o nome diz)
+
+- `partida/src/mesa.test.ts:1499` e `:1508` — `.toThrow(AcaoInvalida)` **sem fixar a mensagem**: o
+  gate de fase lança a MESMA classe, então um fixture que caísse noutra fase passaria **pelo motivo
+  errado**. O irmão mais velho (`:1348`) fixa a string, e é a convenção do arquivo.
+- `server/src/app.ts:132` (asserção em `app.test.ts`) — usa `.find(c => c.tipo === 'classe')` e confere
+  **só a primeira** carta de classe: substituição **MISTA** por `'aprendiz'` dá **29/29**. Prova
+  *"existe ao menos uma válida"*, não *"todo `classeId` pertence a `CLASSES_SACAVEIS`"*.
+- `partida/src/projecao.test.ts:196-207` — **não prova "por jogador"**, que é o que o nome diz: `[6,6]`
+  passaria com um `6` cravado. Quem pega é `bot.test.ts:560-572`, em **outro arquivo**.
+- `web/src/App.test.tsx:35` — o **título afirma o que a asserção não checa** (*"não há mais nada entre
+  o título e ela"*, e a asserção só busca um botão). Medido: um `<p>` no meio passa **2/2**.
+- `partida/src/mesa.test.ts:1543-1548` — o teste da ordem depende de `criar` carimbar a classe e
+  **nunca afirma isso**; a falha viria como *"filaDeDados esgotada"*, que não aponta a causa.
+- `web/src/TelaMesa.tsx:47` — `api.criarPartida({ body: {} })` sem asserção sobre o argumento.
+
+**🕰️ Comentário / título / doc envelhecido** (o vício nº 1 deste projeto)
+
+- `web/src/narrarEvento.tsx:144-146` — `mochilaEncolheu` + `destino: 'mochila'` produz frase que **se
+  contradiz** (*"não cabe mais na mochila … vai para a mochila"*), e é o **ramo NORMAL**. 🔴 O
+  relatório da Task 8 afirmou cobertura *"nos dois `destino`"* que **não existe** (há um teste, um
+  destino).
+- `web/src/TelaMesa.tsx:250` — o rótulo `(saiu do corpo)` é falso para o deslocado de
+  `mochilaEncolheu`: essa carta veio da **mochila**. Só rótulo.
+- `web/src/TelaMesa.tsx:434-438` — o `<p role="status">` do excedente não menciona a carta de classe.
+  **Decisão do Pedro** (estava fora do escopo da Task 11).
+- `server/src/app.ts:42-43` — docstring **PRÉ-EXISTENTE** afirmando presente falso (*"sem consumidor
+  até a Task 14"* — as rotas existem e `embaralhar` é consumido).
+- `CLAUDE.md:1113` — cita **`LIMITE_MOCHILA`**, constante que **não existe mais**
+  (`LIMITE_BASE_DE_MOCHILA` + `limiteDeMochila(jogador)`).
+- `partida/src/fase.test.ts:208` — o texto diz que a queima só abre com a mochila em
+  `LIMITE_BASE_DE_MOCHILA`; um Aprendiz com **6** que joga raça abre com 6. A proteção segue válida.
+- `partida/src/mesa.ts:238` e `:394-398` — coluna desalinhada na tabela de pares finos, e 5 linhas de
+  narração histórica onde 1 bastava (o bloco já é candidato a deleção: *"o `git log` já guarda"*).
+- `MEMORY.md` — a linha de `texto-do-plano-e-a-fonte-de-achado.md` diz *"3 de 4"*; os registros novos
+  dizem **8**.
+
+**🧰 Guard de compilação que falta**
+
+- **`ModificadoresDeStat` é gêmeo em `cartas/src/stats.ts` × `personagem/src/tipos.ts` SEM guard:**
+  acrescentar `sorte?: number` a **um só** deixa o `pnpm typecheck` **7/7 limpo**. O contraste é
+  `_CoberturaSlot`/`_CoberturaEixo`, que existem em `shared` **exatamente para este tipo de par**.
+
+**🧬 Fixture duplicado ou que o domínio não produz**
+
+- `partida/src/mesa.test.ts:1465` e `:1536` — `soMonstro` duplicado verbatim (3ª e 4ª cópias).
+- `partida/src/mao.test.ts:32-39` e `:47-56` — são **o MESMO teste**; o nome do segundo (*"o bônus é da
+  CLASSE, não da raça"*) exigiria o caso que o arquivo nunca produz (com raça e **sem** classe → 6).
+- `web/src/PainelLog.test.tsx:10-11` — `limiteDeMao: 5`, valor que o domínio **não emite** desde o giro
+  do dial (só 7 ou 8). Pré-existente.
+- `server/src/app.test.ts` — `NUM_JOGADORES_DE_PRODUCAO = 4` duplica o `[0,1,2].map(…)` de `app.ts` e
+  está **exatamente no limite**: se a mesa crescer segue correto, se **encolher** para 3, quebra. E o
+  `52` cravado onde o teste vizinho deriva das constantes.
+
+**📐 Método do soak** (o `soak.ts` é gitignored e **vai sumir** — quem remedir escreve o dele)
+
+- `soak.ts:39` — `PATENTE_ALVO = 10` **hardcoded** em vez de importar o `PATENTE_ALVO_PADRAO` que
+  `app.ts:20` exporta. Declarado como cópia no comentário, mas é o **único dial que pode driftar em
+  silêncio**.
+- O `z`/`p` do §5.1 do relatório usa teste de proporções **independentes**, mas classe e raça saem das
+  **mesmas 480 partidas** (amostras **pareadas**) — o veredicto não muda, o `p` deveria vir marcado
+  como aproximado. E numeradores/denominadores **por rodada** não foram publicados.
+
 ## Stack (alvo)
 
 Monorepo pnpm workspaces, Node ≥ 22.13 (dev em 24; exigido pelo `pnpm@11.9`), **TypeScript strict** (+ `noUncheckedIndexedAccess`).
