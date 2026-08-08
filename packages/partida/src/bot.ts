@@ -10,9 +10,17 @@ import type {
 // que `colocarNoSlot` escolhe para um item de mão sem `mao` explícito — o
 // reducer prefere a vaga LIVRE (`resolverMao`), e aqui o custo continua
 // assumindo sempre `MAOS[0]`. Isto é dívida ACEITA e TEMPORÁRIA: a Task 3 desta
-// fatia reescreve `vestirOuGuardar` para avaliar as duas mãos de verdade; até
-// lá o bot só fica um pouco mais conservador (pode achar que desloca um item
-// quando a mão livre estaria disponível de graça), nunca produz `AcaoInvalida`.
+// fatia reescreve `vestirOuGuardar` para avaliar as duas mãos de verdade.
+//
+// 🔴 CORRIGIDO (achado do review da Task 2, que tinha ficado como presente
+// errado aqui): esta nota dizia "nunca produz `AcaoInvalida`" — falso desde o
+// guard que a própria Task 2 acrescentou em `mesa.ts` (`precisaDeAlvo`). Com as
+// DUAS mãos já ocupadas por item de uma mão, este bot chama `equiparCarta` SEM
+// `mao` (a linha do `return`, abaixo), e o reducer agora RECUSA com
+// `AcaoInvalida` — que `avancarBots` não captura (sem `try`/`catch`) e vaza
+// como 400 na ação do HUMANO que disparou os bots em cadeia. Dívida ACEITA
+// para a Task 3 corrigir; até lá NÃO rode soak nem `pnpm dev` contra esta
+// branch — o caminho é alcançável, só não é exercitado pela suíte de hoje.
 import { MAOS } from './equipar';
 import { afinidadeCom, contribuicaoDe } from './corpo';
 

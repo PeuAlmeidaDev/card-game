@@ -142,11 +142,16 @@ sem girar dial nenhum. (Ela continua de pé para `pes`, que tem 2.)
 4. Item de mão com **as duas vagas ocupadas** → o campo é **OBRIGATÓRIO**. Omitido, é
    `AcaoInvalida` (400).
 
-🔑 **A regra 4 é o par fino novo** — o 17º da tabela do `aplicarAcao` —, e **como todo par fino ele
-precisa de gêmeo na tela** (§6). ⚠️ A convenção da tabela é **uma linha por par**, e a recontagem
-tem que sair **do reducer para a tabela, nunca ao contrário**: essa tabela já mentiu **quatro vezes**
-— três por agrupar duas fases numa célula, uma por **omissão** — mais um erro de **inflação** na
-contagem. Hoje ela declara **16 pares em 19 linhas**, recontados a partir do reducer em 2026-08-08.
+🔑 **A regra 4 é o par fino novo** — **DUAS linhas** da tabela do `aplicarAcao`, uma por fase parada
+(mesma convenção da afinidade: `equiparCarta` é legal em `recompor` **e** `jogar`) —, e **como todo
+par fino ele precisa de gêmeo na tela** (§6). ⚠️ A convenção da tabela é **uma linha por par**, e a
+recontagem tem que sair **do reducer para a tabela, nunca ao contrário**: essa tabela já mentiu
+**quatro vezes** — três por agrupar duas fases numa célula, uma por **omissão** — mais um erro de
+**inflação** na contagem.
+⚠️ **Correção marcada (achado do review da Task 2, 2026-08-08):** este parágrafo dizia *"o 17º"* e
+*"Hoje ela declara 16 pares em 19 linhas"* — os números de ANTES da regra 4 existir, e o "17º"
+já cometia o erro que a frase seguinte adverte contra (contar a regra 4 como UMA linha). ✅
+**Recontada a partir do reducer na Task 2: 18 pares em 21 linhas.**
 
 ⚠️ **A regra 3 tem uma armadilha:** `mao` presente apontando para uma mão **ocupada** enquanto a
 outra está **livre** é escolha legítima do jogador (ele quer trocar *aquele* item), **não** erro.

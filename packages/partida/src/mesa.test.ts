@@ -2414,6 +2414,45 @@ describe('aplicarAcao — equiparCarta', () => {
       }, deps([]));
       expect(jogadorDe(r.estado, 'p1').emJogo.slots.maoEsquerda?.id).toBe('t-montante');
     });
+
+    it('a mão ALVO explícita é HONRADA mesmo apontando para a que NÃO é `MAOS[0]`', () => {
+      // Achado do review: todo fixture acima que passa `mao` passa 'maoDireita'
+      // — que é BYTE-IDÊNTICO ao que `resolverMao` devolveria de qualquer jeito
+      // com as duas mãos cheias (o fallback é `MAOS[0]`). Um reducer que
+      // recusasse corretamente sem `mao` e depois DROPASSE `acao.mao` na
+      // chamada de `colocarNoSlot` (ignorando a escolha do jogador) ficava
+      // verde em todos os outros testes. Só apontar para a ESQUERDA prova que
+      // a escolha atravessa o reducer até `colocarNoSlot`.
+      const r = aplicarAcao(estadoComAsDuasMaosCheias, {
+        tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-nova', mao: 'maoEsquerda',
+      }, deps([]));
+
+      expect(jogadorDe(r.estado, 'p1').emJogo.slots.maoEsquerda?.id).toBe('t-nova');
+      // A mão que NÃO foi apontada fica intocada — é o outro lado da mesma prova.
+      expect(jogadorDe(r.estado, 'p1').emJogo.slots.maoDireita?.id).toBe('t-0');
+      expect(r.eventos).toContainEqual({
+        tipo: 'desequipou', jogadorId: 'p1', destino: 'mochila', motivo: 'trocaDeSlot',
+        carta: { id: 't-outra-mao', tipo: 'equipamento', itemId: 'i-teste' },
+      });
+    });
+
+    it('com uma mão livre, `mao` apontando para a OCUPADA troca AQUELE item — a armadilha da regra 3', () => {
+      // Spec §4 regra 3: `mao` presente apontando para uma mão OCUPADA enquanto
+      // a outra está LIVRE é escolha legítima do jogador (ele quer trocar
+      // aquele item), não erro. Um guard que exigisse vaga livre reprovaria
+      // isto — e nenhum teste deste describe cobria a regra 3 pelo reducer até
+      // agora (os seis fixtures com `mao` estão todos na regra 4).
+      const r = aplicarAcao(estadoComUmaMaoLivre, {
+        tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-nova', mao: 'maoDireita',
+      }, deps([]));
+
+      expect(jogadorDe(r.estado, 'p1').emJogo.slots.maoDireita?.id).toBe('t-nova');
+      expect(jogadorDe(r.estado, 'p1').emJogo.slots.maoEsquerda).toBeNull();
+      expect(r.eventos).toContainEqual({
+        tipo: 'desequipou', jogadorId: 'p1', destino: 'mochila', motivo: 'trocaDeSlot',
+        carta: { id: 't-0', tipo: 'equipamento', itemId: 'i-teste' },
+      });
+    });
   });
 });
 
