@@ -967,6 +967,14 @@ describe('TelaMesa — a escolha de mão', () => {
     ...ITENS_PADRAO,
     { id: 'machado', nome: 'Machado', slot: 'mao', duasMaos: false, modificadores: { forca: 3 }, exclusivo: null },
     { id: 'montante', nome: 'Montante', slot: 'mao', duasMaos: true, modificadores: { forca: 4, agilidade: -1 }, exclusivo: null },
+    // Exclusivo de propósito — só para o teste que precisa de `desabilitado
+    // === true` sem mexer na fase (o resto do describe já cobre `disabled`
+    // igual a `false`, que é indistinguível de um `disabled` esquecido).
+    {
+      id: 'machado-exclusivo', nome: 'Machado Exclusivo', slot: 'mao', duasMaos: false,
+      modificadores: { forca: 3 },
+      exclusivo: { eixo: 'raca', donoId: 'orc', semAfinidade: { forca: 2 } },
+    },
   ];
 
   // `tesouro(id)` sem segundo argumento já é 'espada-curta' — não precisa de um
@@ -1014,6 +1022,19 @@ describe('TelaMesa — a escolha de mão', () => {
     expect(within(linha).getAllByRole('button', { name: /^Equipar/ })).toHaveLength(1);
   });
 
+  it('item que NÃO é de mão continua com UM botão só, mesmo com as duas mãos ocupadas', async () => {
+    // Par fino da spec §4 regra 1: só item de mão (`info.slot === 'mao'`) abre
+    // a escolha. Sem este guard um capacete renderizaria "Equipar na
+    // direita"/"na esquerda" — o reducer ignora `mao` para item que não é de
+    // mão, então o dano seria só cosmético (nunca um 400), mas seria a tela
+    // oferecendo uma escolha que o corpo não tem.
+    await abrirComCorpo(DUAS_MAOS_OCUPADAS, [tesouro('t-elmo', 'elmo-de-couro')]);
+
+    const linha = (await screen.findByText(/Elmo de Couro/)).closest('li');
+    if (linha === null) throw new Error('a carta não foi renderizada');
+    expect(within(linha).getAllByRole('button', { name: /^Equipar/ })).toHaveLength(1);
+  });
+
   it('com as DUAS mãos ocupadas, aparecem os dois botões de mão', async () => {
     await abrirComCorpo(DUAS_MAOS_OCUPADAS, [tesouro('t-machado', 'machado')]);
 
@@ -1041,6 +1062,42 @@ describe('TelaMesa — a escolha de mão', () => {
     });
   });
 
+  it('com as duas mãos ocupadas e afinidade proibida, os dois botões ficam DESABILITADOS — mas CONTINUAM visíveis (decisão #26)', async () => {
+    // Todo teste de "duas mãos" acima roda com `desabilitado === false` (fase
+    // `recompor`, item sem `exclusivo`): `disabled={desabilitado}` e
+    // `disabled={false}` são indistinguíveis nesses casos, e nenhum deles
+    // prende a metade #26 do botão ("apaga, não some"). O gêmeo que prende:
+    // o item é exclusivo do Orc e quem está em jogo é Anão — `afinidadeCom`
+    // devolve `proibida`, `desabilitado` vira `true`, e os dois botões
+    // continuam no DOM, só apagados.
+    await abrirMesa(
+      {
+        ...vistaBase,
+        fase: 'recompor',
+        jogadores: vistaBase.jogadores.map((j) => (
+          j.id === 'p1'
+            ? {
+                ...j,
+                emJogo: { raca: { id: 'r1', tipo: 'raca', racaId: 'anao' }, classe: null, slots: DUAS_MAOS_OCUPADAS },
+                limiteDeMao: 7,
+              }
+            : j
+        )),
+        suaMao: [tesouro('t-machado', 'machado-exclusivo')],
+      },
+      undefined, undefined, ITENS_MAO,
+    );
+
+    const linha = (await screen.findByText(/Machado Exclusivo/)).closest('li');
+    if (linha === null) throw new Error('a carta não foi renderizada');
+    const direita = within(linha).getByRole('button', { name: /direita/i });
+    const esquerda = within(linha).getByRole('button', { name: /esquerda/i });
+    expect(direita).toBeDisabled();
+    expect(direita).toBeInTheDocument();
+    expect(esquerda).toBeDisabled();
+    expect(esquerda).toBeInTheDocument();
+  });
+
   it('arma de DUAS MÃOS continua com um botão só, mesmo com as duas ocupadas', async () => {
     await abrirComCorpo(DUAS_MAOS_OCUPADAS, [tesouro('t-montante', 'montante')]);
 
@@ -1065,7 +1122,25 @@ describe('TelaMesa — a escolha de mão', () => {
 
   // O GÊMEO na MOCHILA — a fatia `afinidade` já pagou uma vez por não testar
   // esta lista (o `disabled` da mochila sem teste que o prendesse); o brief
-  // desta task só cobre a mão, e é esta a lacuna que os dois testes abaixo fecham.
+  // desta task só cobre a mão. QUATRO testes fecham a lacuna: os dois de
+  // contagem positiva (dois botões, cada um manda a sua mão) e os dois de
+  // NEGATIVO — sem eles, nada prova que a mochila renderiza UM botão só nos
+  // casos em que ela deve, e a Task 2 do Plano 4a já pagou por essa mesma
+  // omissão (o "Guardar" sem teste que prendesse o `disabled` da mochila).
+  it('na MOCHILA, com uma mão livre, "Equipar" é UM botão só', async () => {
+    await abrirComCorpoEMochila(UMA_MAO_LIVRE, [tesouro('t-machado', 'machado')]);
+
+    const linha = linhaDaMochila(/Machado/);
+    expect(within(linha).getAllByRole('button', { name: /^Equipar/ })).toHaveLength(1);
+  });
+
+  it('na MOCHILA, arma de DUAS MÃOS continua com um botão só, mesmo com as duas ocupadas', async () => {
+    await abrirComCorpoEMochila(DUAS_MAOS_OCUPADAS, [tesouro('t-montante', 'montante')]);
+
+    const linha = linhaDaMochila(/Montante/);
+    expect(within(linha).getAllByRole('button', { name: /^Equipar/ })).toHaveLength(1);
+  });
+
   it('na MOCHILA, com as duas mãos ocupadas, também aparecem os dois botões', async () => {
     await abrirComCorpoEMochila(DUAS_MAOS_OCUPADAS, [tesouro('t-machado', 'machado')]);
 

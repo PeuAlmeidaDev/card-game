@@ -31,7 +31,12 @@ const NOME_DO_SLOT: Record<Slot, string> = {
 
 /**
  * As duas mãos, mesmo par que `MAOS` em `packages/partida/src/equipar.ts` —
- * duplicado aqui porque `web` só depende de `shared`, não de `partida`.
+ * copiado aqui em vez de reexportado por `shared` (como `acaoEhLegal`,
+ * `SLOTS_VAZIOS` e `afinidadeCom` são). ⚠️ A cópia não é FORÇADA — `web` já
+ * depende de `shared`, e `MAOS` já é exportado de `equipar.ts:16`; dava para
+ * reexportar como valor pela mesma porta. Ficou como está por decisão da
+ * revisão desta task (o re-export vai para a revisão final da fatia), não
+ * porque não houvesse caminho.
  */
 const MAOS: readonly ['maoDireita', 'maoEsquerda'] = ['maoDireita', 'maoEsquerda'];
 
@@ -448,9 +453,8 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
       </section>
 
       {/* A MOCHILA. Zona ABERTA (spec §11) e FORA do teto de mão: guardar aqui não
-          é descartar, é adiar o "vestir" — daí o botão "Equipar" nascer nesta
-          lista e não na da mão. Só a SUA aparece aqui com ação; a dos outros já
-          está visível na linha do assento, acima. */}
+          é descartar, é adiar o "vestir". Só a SUA aparece aqui com ação; a dos
+          outros já está visível na linha do assento, acima. */}
       <section>
         <h3>Sua mochila — {minhaMochila.length} de {eu?.limiteDeMochila ?? 0}</h3>
         <ul>
