@@ -92,7 +92,7 @@ export function comClasseDeTeste(estado: EstadoPartida): EstadoPartida {
 export const ID_DO_ITEM_DE_TESTE = 'i-teste';
 export const ITEM_DE_TESTE = {
   id: ID_DO_ITEM_DE_TESTE, nome: 'Item de Teste',
-  slot: 'maoDireita' as const, duasMaos: false, modificadores: { forca: 1 }, exclusivo: null,
+  slot: 'mao' as const, duasMaos: false, modificadores: { forca: 1 }, exclusivo: null,
 };
 
 /**
@@ -104,12 +104,27 @@ export const ITEM_DE_TESTE = {
 export const ID_DO_ITEM_FORTE = 'i-forte';
 export const ITEM_FORTE = {
   id: ID_DO_ITEM_FORTE, nome: 'Item Forte',
-  slot: 'maoDireita' as const, duasMaos: false, modificadores: { forca: 3 }, exclusivo: null,
+  slot: 'mao' as const, duasMaos: false, modificadores: { forca: 3 }, exclusivo: null,
 };
 export const ID_DO_ITEM_FRACO = 'i-fraco';
 export const ITEM_FRACO = {
   id: ID_DO_ITEM_FRACO, nome: 'Item Fraco',
-  slot: 'maoDireita' as const, duasMaos: false, modificadores: { forca: 1 }, exclusivo: null,
+  slot: 'mao' as const, duasMaos: false, modificadores: { forca: 1 }, exclusivo: null,
+};
+
+/**
+ * Terceiro item de UMA mão, mais forte que os dois de cima somados (3+1=4).
+ * Sem ele, "o bot avalia as duas mãos" (`empunhadura dupla`) é INEXERCITÁVEL: um
+ * candidato valendo 2 contra Forte(3)+Fraco(1) dá um ganho positivo (+1, deslocar
+ * o Fraco) e um negativo (−1, deslocar o Forte) — um bot que pegasse a PRIMEIRA
+ * troca positiva, sem comparar as duas, também passaria. Com 5, os dois ganhos
+ * são positivos e DISTINTOS (+4 contra o Fraco, +2 contra o Forte): só um bot que
+ * compara as duas mãos escolhe a maior.
+ */
+export const ID_DO_ITEM_POTENTE = 'i-potente';
+export const ITEM_POTENTE = {
+  id: ID_DO_ITEM_POTENTE, nome: 'Item Potente',
+  slot: 'mao' as const, duasMaos: false, modificadores: { forca: 5 }, exclusivo: null,
 };
 
 /**
@@ -125,7 +140,7 @@ export const ITEM_FRACO = {
 export const ID_DO_ITEM_DUAS_MAOS = 'i-duas-maos';
 export const ITEM_DUAS_MAOS = {
   id: ID_DO_ITEM_DUAS_MAOS, nome: 'Item de Duas Mãos',
-  slot: 'maoDireita' as const, duasMaos: true, modificadores: { forca: 4 }, exclusivo: null,
+  slot: 'mao' as const, duasMaos: true, modificadores: { forca: 4 }, exclusivo: null,
 };
 
 /** Ids NEUTROS de propósito: `partida` é cego ao catálogo. */
@@ -181,7 +196,7 @@ export const ITEM_EXCLUSIVO_DE_CLASSE = {
 export const ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS = 'i-exclusivo-duas-maos';
 export const ITEM_EXCLUSIVO_DUAS_MAOS = {
   id: ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS, nome: 'Item Exclusivo de Duas Mãos',
-  slot: 'maoDireita' as const, duasMaos: true,
+  slot: 'mao' as const, duasMaos: true,
   modificadores: { forca: 4 },
   exclusivo: { eixo: 'raca' as const, donoId: ID_DA_RACA_DONA, semAfinidade: { forca: 1 } },
 };
@@ -217,6 +232,7 @@ export function catalogoDeTeste(
       if (id === ID_DO_ITEM_DE_TESTE) return ITEM_DE_TESTE;
       if (id === ID_DO_ITEM_FORTE) return ITEM_FORTE;
       if (id === ID_DO_ITEM_FRACO) return ITEM_FRACO;
+      if (id === ID_DO_ITEM_POTENTE) return ITEM_POTENTE;
       if (id === ID_DO_ITEM_DUAS_MAOS) return ITEM_DUAS_MAOS;
       if (id === ID_DO_ITEM_EXCLUSIVO) return ITEM_EXCLUSIVO;
       if (id === ID_DO_ITEM_DE_CAPACETE) return ITEM_DE_CAPACETE;

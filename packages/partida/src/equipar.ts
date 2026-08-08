@@ -1,5 +1,5 @@
 import type {
-  CartaEquipamento, EstadoPartida, EventoDaMesa, InfoItem, QueimaPendente, Slot, ZonaEmJogo,
+  CartaEquipamento, EstadoPartida, EventoDaMesa, InfoItem, MaoSlot, QueimaPendente, Slot, ZonaEmJogo,
 } from './tipos';
 import { limiteDeMochila } from './mao';
 
@@ -9,11 +9,50 @@ import { limiteDeMochila } from './mao';
  * fora deste arquivo: `bot.ts` escrevia o par à mão para calcular o custo de
  * equipar uma arma grande. A cópia não era teórica: uma mutação nela deixou os
  * 240 testes verdes, porque o catálogo de teste não tinha arma de duas mãos.
+ *
+ * Tupla, não array: `resolverMao` e o `?? MAOS[0]` abaixo precisam de um índice
+ * `0` que `noUncheckedIndexedAccess` aceite sem `| undefined`.
  */
-export const MAOS: readonly Slot[] = ['maoDireita', 'maoEsquerda'];
+export const MAOS: readonly [MaoSlot, MaoSlot] = ['maoDireita', 'maoEsquerda'];
+
+/**
+ * A vaga de mão que recebe o item: `maoAlvo` quando o chamador escolhe, senão a
+ * livre, ou a primeira de `MAOS` quando as duas estão cheias.
+ */
+function resolverMao(slots: ZonaEmJogo['slots'], maoAlvo?: MaoSlot): MaoSlot {
+  return maoAlvo ?? MAOS.find((m) => slots[m] === null) ?? MAOS[0];
+}
+
+/**
+ * O item exige que o jogador APONTE uma mão? Só quando ele é de mão, não é de
+ * duas mãos e as duas estão ocupadas: sem vaga livre não há mão que
+ * `resolverMao` prefira, e escolher por ele seria destruir um item ao acaso
+ * (spec §4 regra 4). Com uma só ocupada isto é `false` de propósito — apontar
+ * para a ocupada ali é o jogador trocando aquele item de propósito (regra 3).
+ *
+ * Mora aqui, e não em `mesa.ts`, porque tem DOIS leitores: o reducer, que cobra
+ * o `mao` da ação, e a tela, que decide quantos botões "Equipar" renderizar. A
+ * cópia escrita à mão no cliente é a que fica para trás no dia em que a regra
+ * mudar — e o preço é um 400 na cara do jogador, que é exatamente o que a tabela
+ * de pares finos do `aplicarAcao` existe para evitar. `shared` reexporta como
+ * VALOR, mesma porta de `afinidadeCom`, `acaoEhLegal` e `SLOTS_VAZIOS`.
+ *
+ * Recebe a `ZonaEmJogo` inteira, não os `slots`: é a forma que os dois lados já
+ * têm na mão (`jogador.emJogo` no reducer, `eu.emJogo` da projeção na tela), e é
+ * a mesma assinatura de `afinidadeCom`.
+ */
+export function precisaEscolherMao(info: InfoItem, emJogo: ZonaEmJogo): boolean {
+  return info.slot === 'mao' && !info.duasMaos && MAOS.every((m) => emJogo.slots[m] !== null);
+}
 
 /**
  * Põe a carta no slot que o item declara e devolve o corpo novo mais o que saiu.
+ *
+ * Item de mão (`slot: 'mao'`) sem `duasMaos` resolve para `maoAlvo` quando a
+ * ação aponta uma; sem ela, a vaga LIVRE, ou a primeira de `MAOS` quando as
+ * duas estão ocupadas — `resolverMao`, acima. O reducer (`equiparCarta`, em
+ * `./mesa`) é quem cobra `maoAlvo` quando ela é obrigatória (spec §4); esta
+ * função só executa a escolha, nunca a exige.
  *
  * **Duas mãos põe a MESMA instância nos dois slots** (spec §5.1) em vez de
  * inventar um estado de "ocupação parcial": com a mesma referência, a UI lê
@@ -26,8 +65,14 @@ export function colocarNoSlot(
   slots: ZonaEmJogo['slots'],
   carta: CartaEquipamento,
   info: InfoItem,
-): { readonly slots: ZonaEmJogo['slots']; readonly deslocados: readonly CartaEquipamento[] } {
-  const alvos: readonly Slot[] = info.duasMaos ? MAOS : [info.slot];
+  maoAlvo?: MaoSlot,
+): {
+  readonly slots: ZonaEmJogo['slots'];
+  readonly deslocados: readonly CartaEquipamento[];
+  readonly ocupados: readonly [Slot, ...Slot[]];
+} {
+  const alvos: readonly [Slot, ...Slot[]] =
+    info.duasMaos ? MAOS : [info.slot === 'mao' ? resolverMao(slots, maoAlvo) : info.slot];
 
   // Dedup por id: o montante ocupando as duas mãos sai UMA vez da lista de
   // deslocados — senão ele iria duas vezes para o cemitério e o baralho de
@@ -51,7 +96,7 @@ export function colocarNoSlot(
   for (const slot of alvos) {
     novos[slot] = carta;
   }
-  return { slots: novos, deslocados: [...deslocados.values()] };
+  return { slots: novos, deslocados: [...deslocados.values()], ocupados: alvos };
 }
 
 /**

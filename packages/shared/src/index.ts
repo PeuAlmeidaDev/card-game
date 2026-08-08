@@ -20,13 +20,17 @@ import type {
   Fase,
   GrauDeAfinidade,
   JogadorPublico,
+  MaoSlot,
   PosicaoFinal,
   QueimaPendente,
   Slot,
+  SlotDeItem,
   VistaDaPartida,
   ZonaEmJogo,
 } from '@card-dungeon/partida';
-import type { Slot as SlotDaCarta, ItemCarta, EixoDeAfinidade as EixoDaCarta } from '@card-dungeon/cartas';
+import type {
+  Slot as SlotDaCarta, SlotDeItem as SlotDeItemDaCarta, ItemCarta, EixoDeAfinidade as EixoDaCarta,
+} from '@card-dungeon/cartas';
 
 /**
  * Corpo do POST /api/partida: **vazio**. A classe virou carta do baralho, como a
@@ -67,11 +71,18 @@ export const acaoDaMesaSchema = z.discriminatedUnion('tipo', [
   // borda de verdade.
   z.object({ tipo: z.literal('jogarCarta'), cartaId: z.string().min(1).max(64) }),
   z.object({ tipo: z.literal('entregarCarta'), cartaId: z.string().min(1).max(64) }),
-  // Só o `cartaId`: o SLOT não viaja no fio. Ele sai do item, pelo catálogo do
-  // servidor — deixar o cliente escolher onde encaixar seria deixá-lo pôr o
-  // capacete no pé, e a checagem viraria mais um guard no reducer em vez de ser
-  // impossível por construção. Mesmo teto de 64 e pelo mesmo motivo.
-  z.object({ tipo: z.literal('equiparCarta'), cartaId: z.string().min(1).max(64) }),
+  // O SLOT não viaja no fio: ele sai do item, pelo catálogo do servidor — deixar
+  // o cliente escolher a FAMÍLIA de slot seria deixá-lo pôr o capacete no pé, e
+  // a checagem viraria mais um guard no reducer em vez de ser impossível por
+  // construção. A MÃO é diferente (fatia `empunhadura dupla`, spec §4): com item
+  // de mão e as duas ocupadas, ela é a única escolha real que o corpo oferece —
+  // qual das duas fisicamente equivalentes libera —, e por isso `mao` viaja.
+  // Mesmo teto de 64 no `cartaId`, e pelo mesmo motivo dos outros verbos.
+  z.object({
+    tipo: z.literal('equiparCarta'),
+    cartaId: z.string().min(1).max(64),
+    mao: z.enum(['maoDireita', 'maoEsquerda']).optional(),
+  }),
   // Mesmo teto de 64 e pelo mesmo motivo do `equiparCarta`: o `cartaId` é
   // refletido verbatim no 400 e no log. O DESTINO não viaja — guardar tem um
   // destino só (a mochila), então não há o que o cliente escolher.
@@ -110,6 +121,28 @@ const _coberturaAcao: _CoberturaAcao = true;
 void _coberturaAcao;
 
 /**
+ * O mesmo buraco do `_CoberturaAcao`, um nível abaixo: ele trava a lista de
+ * TIPOS de ação, e nada travava o `mao` DENTRO do `equiparCarta`. O `z.enum`
+ * acima é escrito à mão, e pelo mesmo motivo de covariância um enum mais
+ * ESTREITO que `MaoSlot` passa limpo — uma mão nova no domínio ficaria
+ * inalcançável pelo fio, sem nada acusando. (Um erro de digitação no enum é
+ * pego pela atribuição em `server/src/app.ts`; o domínio CRESCENDO não é.)
+ *
+ * `NonNullable` porque `mao` é opcional na ação: o que interessa comparar é a
+ * união de valores, não a ausência.
+ *
+ * A tupla é obrigatória pelo mesmo motivo do `_CoberturaAcao`: `A | B extends X`
+ * DISTRIBUI sobre a união e a checagem se auto-satisfaz.
+ *
+ * ⚠️ Guard de COMPILAÇÃO. Quem acusa é o `pnpm typecheck`, nunca a suíte.
+ */
+type MaoNoFio = NonNullable<Extract<AcaoNoFio, { tipo: 'equiparCarta' }>['mao']>;
+type _CoberturaMao =
+  [MaoSlot] extends [MaoNoFio] ? ([MaoNoFio] extends [MaoSlot] ? true : never) : never;
+const _coberturaMao: _CoberturaMao = true;
+void _coberturaMao;
+
+/**
  * Trava as duas uniões `Slot` — a de `partida` (a REGRA: o corpo tem 5 encaixes)
  * e a de `cartas` (o DADO: onde cada item se encaixa). Elas são declaradas
  * separadas porque `partida` é cego ao catálogo e a direção de dependência
@@ -132,6 +165,17 @@ type _CoberturaSlot =
   [Slot] extends [SlotDaCarta] ? ([SlotDaCarta] extends [Slot] ? true : never) : never;
 const _coberturaSlot: _CoberturaSlot = true;
 void _coberturaSlot;
+
+/**
+ * Trava as duas uniões `SlotDeItem` — a de `partida` (a regra) e a de `cartas`
+ * (o dado). Mesma tupla e mesmo preço do `_CoberturaSlot`, acima.
+ *
+ * ⚠️ Guard de COMPILAÇÃO. Quem acusa é o `pnpm typecheck`, nunca a suíte.
+ */
+type _CoberturaSlotDeItem =
+  [SlotDeItem] extends [SlotDeItemDaCarta] ? ([SlotDeItemDaCarta] extends [SlotDeItem] ? true : never) : never;
+const _coberturaSlotDeItem: _CoberturaSlotDeItem = true;
+void _coberturaSlotDeItem;
 
 /**
  * Trava as duas uniões `EixoDeAfinidade` — a de `partida` (a regra) e a de
@@ -169,6 +213,12 @@ export { SLOTS_VAZIOS } from '@card-dungeon/partida';
 // Valor, pelo mesmo motivo: a afinidade é regra, e mostrar o valor CHEIO na tela
 // de quem veste reduzido é a tela mentindo.
 export { afinidadeCom, contribuicaoDe } from '@card-dungeon/partida';
+
+// Valor, pelo mesmo motivo: "as duas mãos ocupadas => a ação precisa de `mao`" é
+// o par fino que o reducer cobra, e é ele que decide se a tela renderiza UM
+// botão "Equipar" ou um por mão. Copiado no cliente, a tela oferece o número
+// velho de botões no dia em que a regra mudar — e isso é 400 na cara do jogador.
+export { precisaEscolherMao } from '@card-dungeon/partida';
 
 const c = initContract();
 

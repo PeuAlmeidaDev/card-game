@@ -10,11 +10,11 @@ const zona = (racaId: string | null): ZonaEmJogo => ({
 });
 
 const comum: ItemCarta = {
-  id: 'espada-curta', nome: 'Espada Curta', slot: 'maoDireita',
+  id: 'espada-curta', nome: 'Espada Curta', slot: 'mao',
   duasMaos: false, modificadores: { forca: 2 }, exclusivo: null,
 };
 const doOrc: ItemCarta = {
-  id: 'machado', nome: 'Machado', slot: 'maoDireita', duasMaos: false,
+  id: 'machado', nome: 'Machado', slot: 'mao', duasMaos: false,
   modificadores: { forca: 3, habilidade: 1 },
   exclusivo: { eixo: 'raca', donoId: 'orc', semAfinidade: { forca: 2 } },
 };

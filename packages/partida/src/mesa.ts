@@ -9,7 +9,7 @@ import { tirarDoTopo } from './baralho';
 import { limiteDeMochila } from './mao';
 import { destinoDaCaridade } from './caridade';
 import { afinidadeCom, combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
-import { colocarNoSlot, destinoDoDesequipado } from './equipar';
+import { colocarNoSlot, destinoDoDesequipado, precisaEscolherMao } from './equipar';
 import { classificar } from './classificacao';
 import { AcaoInvalida } from './erros';
 import { acaoEhLegal, faseDoTurnoDe, faseSeAutoPula } from './fase';
@@ -213,8 +213,8 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // entrar na tabela, e o `Record<Fase, …>` cobra.
   //
   // ⚠️ O QUE A TABELA NÃO RESPONDE. Passar aqui não garante que a ação será
-  // aceita: a elegibilidade FINA continua em cada função, e hoje são DEZESSEIS
-  // pares em DEZENOVE linhas — cada par precisa de gêmeo na tela, porque o
+  // aceita: a elegibilidade FINA continua em cada função, e hoje são DEZOITO
+  // pares em VINTE E UMA linhas — cada par precisa de gêmeo na tela, porque o
   // `legal()` da `TelaMesa` lê ESTA tabela e não sabe deles. As três linhas que
   // não são par estão marcadas na própria tabela e explicadas logo abaixo dela.
   //
@@ -240,6 +240,8 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   //   jogar                equiparCarta   carta.tipo === 'equipamento' `equiparCarta`
   //   recompor             equiparCarta   afinidade !== 'proibida'     `equiparCarta`
   //   jogar                equiparCarta   afinidade !== 'proibida'     `equiparCarta`
+  //   recompor             equiparCarta   as duas mãos ocupadas => `mao`  `equiparCarta`
+  //   jogar                equiparCarta   as duas mãos ocupadas => `mao`  `equiparCarta`
   //   recompor             guardarCarta   carta.tipo === 'equipamento' `guardarCarta`
   //   recompor             guardarCarta   mochila cheia                `guardarCarta`
   //   jogar                guardarCarta   carta.tipo === 'equipamento' `guardarCarta`
@@ -247,7 +249,7 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   //   combate              atacar         `proximaDecisao`             o motor (`AcaoIlegal`)
   //   combate              esquivar       `proximaDecisao`             o motor (`AcaoIlegal`)
   //   encrenca             procurarEncrenca  a carta é do tipo monstro `procurarEncrenca`
-  //   ↑ DEZESSEIS pares. As três linhas abaixo NÃO são par — estão aqui para provar
+  //   ↑ DEZOITO pares. As três linhas abaixo NÃO são par — estão aqui para provar
   //     que a recontagem chegou até estes verbos:
   //   encrenca             saquear        — (nenhum guard fino; #62)   — (ausência)
   //   encrenca             procurarEncrenca  a carta está na sua mão   (gêmeo ESTRUTURAL)
@@ -307,7 +309,8 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // jogador nunca aprende que existe.
   //
   // HISTÓRICO da contagem, que é a lição do parágrafo acima — os números abaixo
-  // são de planos passados, NÃO a contagem de hoje (que é dezesseis):
+  // são de planos passados, NÃO a contagem de hoje (que é DEZOITO, como dizem o
+  // preâmbulo lá em cima e a última entrada deste histórico):
   // no Plano 3b a lista subiu de sete para oito, e ao conferir descobriu-se que a
   // contagem anterior também mentia — as linhas `vasculhar/descartar` escondiam
   // DOIS pares cada uma dentro de uma célula agrupada, então nunca foram nove
@@ -340,6 +343,12 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // DEZENOVE linhas: `jogarCarta` ALARGOU o guard existente (`carta.tipo` passa a
   // aceitar 'raca' OU 'classe'), não ganhou um `AcaoInvalida` novo — a linha do
   // par é a mesma, só o texto da condição mudou.
+  //
+  // A Task 2 da fatia `empunhadura dupla` foi de DEZESSEIS para DEZOITO pares,
+  // vinte e uma linhas: o guard novo de `equiparCarta` (as duas mãos ocupadas
+  // sem `mao`) é DUAS linhas, não uma — mesma convenção da afinidade, porque
+  // `equiparCarta` é legal nas duas fases paradas. Recontagem a partir do
+  // reducer, `AcaoInvalida` por `AcaoInvalida`.
   if (!acaoEhLegal(estado.fase, estado.queima !== null, acao.tipo)) {
     throw new AcaoInvalida(
       estado.queima === null
@@ -961,8 +970,11 @@ function jogarCarta(
  * para quem joga: até aqui o vencedor acumulava tesouro sem poder usá-lo.
  *
  * O SLOT não vem do cliente — vem do item, pelo catálogo. Deixar o cliente
- * escolher onde encaixar seria deixá-lo pôr o capacete no pé, e a checagem viraria
- * mais um guard aqui em vez de ser impossível por construção.
+ * escolher a FAMÍLIA de slot seria deixá-lo pôr o capacete no pé. A MÃO é
+ * diferente (fatia `empunhadura dupla`, spec §4): com item de mão e as duas
+ * ocupadas, `acao.mao` escolhe QUAL liberar — as duas são fisicamente
+ * equivalentes, e essa é uma escolha real que o corpo oferece, não um slot a
+ * inventar.
  *
  * A vez NÃO passa: equipar é decisão do próprio turno, como jogar raça.
  */
@@ -988,7 +1000,15 @@ function equiparCarta(
     throw new AcaoInvalida(`aplicarAcao: ${info.nome} é exclusivo de outra especialização`);
   }
 
-  const { slots, deslocados } = colocarNoSlot(jogador.emJogo.slots, carta, info);
+  // O par fino novo da fatia (spec §4 regra 4), lido de `./equipar` — a MESMA
+  // função que a `TelaMesa` chama por `shared` para decidir quantos botões
+  // "Equipar" renderizar. Reescrevê-lo aqui inline deixaria a tela oferecendo um
+  // botão a menos no dia em que a regra mudasse, e isso é 400 na cara do jogador.
+  if (precisaEscolherMao(info, jogador.emJogo) && acao.mao === undefined) {
+    throw new AcaoInvalida('equiparCarta: as duas mãos estão ocupadas — escolha qual liberar');
+  }
+
+  const { slots, deslocados, ocupados } = colocarNoSlot(jogador.emJogo.slots, carta, info, acao.mao);
   const atualizado: JogadorNaMesa = {
     ...jogador,
     // Remove da zona de ORIGEM, nunca das duas: filtrar a mão quando a carta veio
@@ -1012,8 +1032,13 @@ function equiparCarta(
   // `equipou` primeiro: o log conta a ação que o jogador pediu, e só então o que
   // ela custou. Invertido, a linha "Espada Curta foi para a mochila" apareceria
   // antes de existir motivo para ela.
+  // `ocupados[0]`, não `info.slot`: `info.slot` é `SlotDeItem` (o que o item
+  // DECLARA — pode ser o genérico `'mao'`), e o evento carrega o slot FÍSICO que
+  // `colocarNoSlot` de fato ocupou. Para o montante os dois são `maoDireita`,
+  // idêntico ao comportamento de antes; para uma arma de uma mão passa a
+  // reportar a mão que ela realmente ocupou.
   const eventos: readonly EventoDaMesa[] = [
-    { tipo: 'equipou', jogadorId: acao.jogadorId, slot: info.slot, carta },
+    { tipo: 'equipou', jogadorId: acao.jogadorId, slot: ocupados[0], carta },
     ...doDeslocado,
   ];
 

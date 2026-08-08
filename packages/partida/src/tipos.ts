@@ -72,6 +72,20 @@ export type CartaEquipamento = Extract<CartaTesouro, { readonly tipo: 'equipamen
  */
 export type Slot = 'capacete' | 'armadura' | 'maoDireita' | 'maoEsquerda' | 'pes';
 
+/** As duas vagas de mão, no corpo. Extraído de `Slot` para não repetir os literais. */
+export type MaoSlot = Extract<Slot, 'maoDireita' | 'maoEsquerda'>;
+
+/**
+ * O que um ITEM declara. Diferente de `Slot` (o corpo): as duas mãos são vagas
+ * equivalentes, então o item diz `'mao'` e quem resolve para qual é
+ * `colocarNoSlot`, em `equipar.ts`.
+ *
+ * ⚠️ Gêmea da união em `cartas/src/itens.ts` — a direção é
+ * `cartas ← personagem ← partida`. Quem impede as duas de divergirem é o guard
+ * `_CoberturaSlotDeItem` em `shared/src/index.ts`.
+ */
+export type SlotDeItem = 'capacete' | 'armadura' | 'mao' | 'pes';
+
 /**
  * ⚠️ Gêmea da união em `cartas/src/itens.ts`, pelo mesmo motivo do `Slot`:
  * `partida` é cego ao catálogo e a direção `cartas ← personagem ← partida` proíbe
@@ -97,7 +111,7 @@ export interface Afinidade {
  * por isso `partida` nunca precisa importar `cartas`.
  */
 export interface InfoItem extends Equipamento {
-  readonly slot: Slot;
+  readonly slot: SlotDeItem;
   readonly duasMaos: boolean;
   /** `null` = item comum. */
   readonly exclusivo: Afinidade | null;
@@ -364,9 +378,13 @@ export type EventoDaMesa =
    * inteira passa a ver seria teatro. Assimetria deliberada em relação ao `loot`
    * (zona oculta, só a contagem) — o que decide é a zona de DESTINO.
    *
-   * `slot` é o que o ITEM declara. Uma arma de duas mãos ocupa as duas e mesmo
-   * assim sai um evento só, com o slot declarado: o log conta o que o jogador
-   * fez, e o corpo resultante já viaja aberto na projeção.
+   * `slot` é o encaixe FÍSICO que a carta de fato ocupou — `ocupados[0]`, o que
+   * `colocarNoSlot` devolve —, nunca o que o item DECLARA. Desde a fatia
+   * `empunhadura dupla` os dois são uniões diferentes: o item declara
+   * `SlotDeItem`, e o genérico `'mao'` dele não é membro de `Slot`. Uma arma de
+   * duas mãos ocupa as duas e mesmo assim sai um evento só, com a PRIMEIRA
+   * (`maoDireita`): o log conta o que o jogador fez, e o corpo resultante já
+   * viaja aberto na projeção.
    */
   | { readonly tipo: 'equipou'; readonly jogadorId: string;
       readonly slot: Slot; readonly carta: CartaEquipamento }
@@ -437,9 +455,12 @@ export type AcaoDaMesa =
   /**
    * Tira um tesouro da mão OU da mochila e o encaixa no corpo. As duas origens
    * desde o Plano 4a (ver `cartaEquipavelDe`, em `./mesa`); a mão tem precedência
-   * se o id estiver nas duas. O slot vem do ITEM, nunca do cliente.
+   * se o id estiver nas duas. O SLOT vem do ITEM, nunca do cliente — `mao`
+   * escolhe só QUAL das duas mãos fisicamente equivalentes recebe um item de
+   * mão quando as duas já estão ocupadas (spec §4, fatia `empunhadura dupla`);
+   * fora desse caso o campo é ignorado.
    */
-  | { readonly tipo: 'equiparCarta'; readonly jogadorId: string; readonly cartaId: string }
+  | { readonly tipo: 'equiparCarta'; readonly jogadorId: string; readonly cartaId: string; readonly mao?: MaoSlot }
   /**
    * Tira um tesouro da mão e o põe na MOCHILA. Sempre nessa direção: mochila → mão
    * não existe nesta fatia (spec §6/§11), e é essa mão única que faz a mochila ser

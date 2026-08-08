@@ -15,7 +15,7 @@ import { classe, monstro, monstros, raca, equipamento } from './testes/cartas';
 import {
   catalogoDeTeste, comClasseDeTeste, ID_DA_CLASSE_DE_TESTE, CLASSE_DE_TESTE, MONSTRO_DE_TESTE, ID_DO_ITEM_EXCLUSIVO,
   ID_DA_RACA_OUTRA, ID_DA_RACA_DONA, ID_DO_ITEM_DE_TESTE, ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS, ID_DO_ITEM_EXCLUSIVO_PES,
-  ID_DO_ITEM_EXCLUSIVO_DE_CLASSE,
+  ID_DO_ITEM_EXCLUSIVO_DE_CLASSE, ID_DO_ITEM_DE_CAPACETE, ID_DO_ITEM_DUAS_MAOS,
 } from './testes/catalogo';
 import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import { combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
@@ -1896,7 +1896,16 @@ describe('aplicarAcao — equiparCarta', () => {
     expect(comMao(nascida(), monstros(1)).fase).toBe('vasculhar');
   });
 
-  /** Mesa com o corpo de p1 forjado. Espalha `SLOTS_VAZIOS` para não escrever os 5 slots à mão. */
+  /**
+   * Mesa com o corpo de p1 forjado. Espalha `SLOTS_VAZIOS` para não escrever os 5
+   * slots à mão.
+   *
+   * ⚠️ Desde a fatia `empunhadura dupla`, um item de mão só desloca o que está em
+   * `maoDireita` se a `maoEsquerda` TAMBÉM estiver ocupada — com uma vaga livre,
+   * `colocarNoSlot` prefere ela (`resolverMao`) quando a ação não aponta `mao`
+   * explicitamente. Os fixtures abaixo que testam DESLOCAMENTO ocupam as DUAS
+   * mãos de propósito.
+   */
   const comSlots = (estado: EstadoPartida, slots: Partial<ZonaEmJogo['slots']>): EstadoPartida => ({
     ...estado,
     jogadores: estado.jogadores.map((j) => (
@@ -1927,11 +1936,21 @@ describe('aplicarAcao — equiparCarta', () => {
     // o próprio deslocado; é essa sequência de DUAS ações que este teste afirma
     // agora.
     const cheia = Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
-    const base = comSlots(comMao(nascida(), [equipamento('t-1')]), { maoDireita: equipamento('t-0') });
+    // Ocupa as DUAS mãos: com a esquerda livre, o novo item iria para lá em vez
+    // de deslocar 't-0' — ver o aviso em `comSlots`, acima.
+    const base = comSlots(
+      comMao(nascida(), [equipamento('t-1')]),
+      { maoDireita: equipamento('t-0'), maoEsquerda: equipamento('t-outra-mao') },
+    );
     const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
     const p: EstadoPartida = { ...base, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...base, jogadores }, 'p1')) };
 
-    const { estado: naPendencia } = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+    // `mao: 'maoDireita'`: as duas mãos estão cheias, e desde o par fino novo
+    // (Task 2) isso torna o alvo OBRIGATÓRIO — este teste não é sobre qual mão,
+    // então aponta a mesma que o fallback já escolhia.
+    const { estado: naPendencia } = aplicarAcao(
+      p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1', mao: 'maoDireita' }, deps([]),
+    );
     expect(naPendencia.queima?.deslocados.map((c) => c.id)).toEqual(['t-0']);
 
     const { estado: depois } = aplicarAcao(
@@ -1956,6 +1975,22 @@ describe('aplicarAcao — equiparCarta', () => {
     });
   });
 
+  it('o evento `equipou` reporta a mão que ela DE FATO ocupou — não `MAOS[0]` cravado', () => {
+    // Achado do review do Task 1: o teste acima (slots vazios) não morde a
+    // mudança do Step 6, porque com as duas mãos livres `ocupados[0]` e um
+    // `slot: 'maoDireita'` hardcoded dão o MESMO resultado. Aqui a direita
+    // começa OCUPADA e a esquerda livre: `resolverMao` manda o item novo para a
+    // esquerda, e é isso — não a constante — que o evento tem que carregar.
+    const b = comSlots(comMao(nascida(), [equipamento('t-1')]), { maoDireita: equipamento('t-0') });
+
+    const { eventos } = aplicarAcao(b, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+
+    expect(eventos).toContainEqual({
+      tipo: 'equipou', jogadorId: 'p1', slot: 'maoEsquerda',
+      carta: { id: 't-1', tipo: 'equipamento', itemId: 'i-teste' },
+    });
+  });
+
   it('o evento `desequipou` CHEGA ao log pela ação real, com o destino certo', () => {
     // Gêmeo de integração do teste de `equipar.test.ts`: lá a unidade devolve os
     // eventos, aqui se prova que `equiparCarta` os REPASSA. Sem este, a função
@@ -1965,9 +2000,16 @@ describe('aplicarAcao — equiparCarta', () => {
     // emite o `desequipou` na hora — com ela CHEIA a decisão vira pendência, e o
     // evento só nasce quando `queimarCarta` a resolve (ver o teste acima e o
     // describe de `queimarCarta`).
-    const b = comSlots(comMao(nascida(), [equipamento('t-1')]), { maoDireita: equipamento('t-0') });
+    const b = comSlots(
+      comMao(nascida(), [equipamento('t-1')]),
+      { maoDireita: equipamento('t-0'), maoEsquerda: equipamento('t-outra-mao') },
+    );
 
-    const { eventos } = aplicarAcao(b, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+    // `mao: 'maoDireita'`: as duas mãos estão cheias — alvo obrigatório desde a
+    // Task 2, apontando a mesma que o fallback já escolhia.
+    const { eventos } = aplicarAcao(
+      b, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1', mao: 'maoDireita' }, deps([]),
+    );
 
     expect(eventos).toContainEqual({
       tipo: 'desequipou', jogadorId: 'p1', destino: 'mochila', motivo: 'trocaDeSlot',
@@ -1987,11 +2029,18 @@ describe('aplicarAcao — equiparCarta', () => {
     // `return` — a pendência chega ao estado e `vezDe` continua sendo de quem
     // equipou.
     const cheia = Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
-    const base = comSlots(comMao(nascida(), [equipamento('t-novo')]), { maoDireita: equipamento('t-0') });
+    const base = comSlots(
+      comMao(nascida(), [equipamento('t-novo')]),
+      { maoDireita: equipamento('t-0'), maoEsquerda: equipamento('t-outra-mao') },
+    );
     const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
     const p: EstadoPartida = { ...base, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...base, jogadores }, 'p1')) };
 
-    const r = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-novo' }, deps([]));
+    // `mao: 'maoDireita'`: as duas mãos estão cheias — alvo obrigatório desde a
+    // Task 2, apontando a mesma que o fallback já escolhia.
+    const r = aplicarAcao(
+      p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-novo', mao: 'maoDireita' }, deps([]),
+    );
 
     expect(r.estado.queima?.deslocados.map((c) => c.id)).toEqual(['t-0']);
     expect(r.estado.queima?.motivo).toBe('trocaDeSlot');
@@ -2007,12 +2056,19 @@ describe('aplicarAcao — equiparCarta', () => {
     // Somar um termo que nunca sustenta nada seria comentário disfarçado de
     // código — esta asserção é o que segura a propriedade no lugar dele.
     const cheia = Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-cheia-${String(i)}`));
-    const base = comSlots(comMao(nascida(), [equipamento('t-novo')]), { maoDireita: equipamento('t-0') });
+    const base = comSlots(
+      comMao(nascida(), [equipamento('t-novo')]),
+      { maoDireita: equipamento('t-0'), maoEsquerda: equipamento('t-outra-mao') },
+    );
     const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
     const p: EstadoPartida = { ...base, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...base, jogadores }, 'p1')) };
     const antes = versaoDe(p);
 
-    const r = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-novo' }, deps([]));
+    // `mao: 'maoDireita'`: as duas mãos estão cheias — alvo obrigatório desde a
+    // Task 2, apontando a mesma que o fallback já escolhia.
+    const r = aplicarAcao(
+      p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-novo', mao: 'maoDireita' }, deps([]),
+    );
 
     expect(versaoDe(r.estado)).toBeGreaterThan(antes);
   });
@@ -2151,11 +2207,18 @@ describe('aplicarAcao — equiparCarta', () => {
     // inversão — o pin gêmeo abaixo e o de `equipar.test.ts` dependem da mesma
     // ordem —, mas é o único deste describe com origem MOCHILA cheia.
     const cheia = [equipamento('t-1'), ...Array.from({ length: LIMITE_BASE_DE_MOCHILA - 1 }, (_, i) => equipamento(`t-cheia-${String(i)}`))];
-    const base = comSlots(comMao(nascida(), []), { maoDireita: equipamento('t-0') });
+    const base = comSlots(
+      comMao(nascida(), []),
+      { maoDireita: equipamento('t-0'), maoEsquerda: equipamento('t-outra-mao') },
+    );
     const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: cheia } : j));
     const p: EstadoPartida = { ...base, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...base, jogadores }, 'p1')) };
 
-    const r = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+    // `mao: 'maoDireita'`: as duas mãos estão cheias — alvo obrigatório desde a
+    // Task 2, apontando a mesma que o fallback já escolhia.
+    const r = aplicarAcao(
+      p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1', mao: 'maoDireita' }, deps([]),
+    );
 
     // A mochila continua no teto: perdeu 't-1' (foi para o slot) e ganhou 't-0'
     // (o deslocado) — nunca ficou em 4.
@@ -2177,12 +2240,19 @@ describe('aplicarAcao — equiparCarta', () => {
     // O pin de ordem não alcança isto: lá a mochila cheia deixa 4 cartas para trás,
     // então a versão stale ainda responde "tenho equipamento" e o auto-pulo não
     // dispara. É preciso que a mochila stale fique VAZIA.
-    const base = comSlots(comMao(nascida(), []), { maoDireita: equipamento('t-0') });
+    const base = comSlots(
+      comMao(nascida(), []),
+      { maoDireita: equipamento('t-0'), maoEsquerda: equipamento('t-outra-mao') },
+    );
     const jogadores = base.jogadores.map((j) => (j.id === 'p1' ? { ...j, mochila: [equipamento('t-1')] } : j));
     const p: EstadoPartida = { ...base, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...base, jogadores }, 'p1')) };
     expect(p.fase).toBe('recompor');
 
-    const r = aplicarAcao(p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
+    // `mao: 'maoDireita'`: as duas mãos estão cheias — alvo obrigatório desde a
+    // Task 2, apontando a mesma que o fallback já escolhia.
+    const r = aplicarAcao(
+      p, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1', mao: 'maoDireita' }, deps([]),
+    );
 
     // O deslocado achou vaga (a carta equipada acabou de liberar uma)...
     expect(jogadorDe(r.estado, 'p1').mochila.map((c) => c.id)).toEqual(['t-0']);
@@ -2291,6 +2361,119 @@ describe('aplicarAcao — equiparCarta', () => {
     const r = aplicarAcao(estado, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' }, deps([]));
 
     expect(jogadorDe(r.estado, 'p1').emJogo.raca?.racaId).toBe(ID_DA_RACA_DONA);
+  });
+
+  describe('a mão ALVO — o par fino novo da fatia `empunhadura dupla`', () => {
+    // As duas mãos ocupadas por item de UMA mão cada; a mão em si carrega um
+    // item de mão livre (`t-nova`), um de capacete (`t-elmo`) e um de duas mãos
+    // (`t-montante`) — os três ramos que a regra 1/2/4 do spec §4 precisa cobrir.
+    const estadoComAsDuasMaosCheias = comSlots(
+      comMao(nascida(), [
+        equipamento('t-nova'),
+        equipamento('t-elmo', ID_DO_ITEM_DE_CAPACETE),
+        equipamento('t-montante', ID_DO_ITEM_DUAS_MAOS),
+      ]),
+      { maoDireita: equipamento('t-0'), maoEsquerda: equipamento('t-outra-mao') },
+    );
+
+    const estadoComUmaMaoLivre = comSlots(
+      comMao(nascida(), [equipamento('t-nova')]),
+      { maoDireita: equipamento('t-0') },
+    );
+
+    it('equipar uma arma com AS DUAS mãos cheias e sem `mao` é AcaoInvalida', () => {
+      // A mensagem é fixada porque o gate de fase lança a MESMA classe: sem ela,
+      // um fixture que caísse em outra fase passaria pelo motivo errado — é a
+      // convenção do arquivo.
+      expect(() => aplicarAcao(estadoComAsDuasMaosCheias, {
+        tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-nova',
+      }, deps([]))).toThrow(/as duas mãos estão ocupadas/i);
+    });
+
+    it('com uma mão livre, `mao` é dispensável', () => {
+      const r = aplicarAcao(estadoComUmaMaoLivre, {
+        tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-nova',
+      }, deps([]));
+      expect(jogadorDe(r.estado, 'p1').emJogo.slots.maoEsquerda?.id).toBe('t-nova');
+    });
+
+    it('item que NÃO é de mão dispensa `mao` — e a mão apontada é IGNORADA', () => {
+      // O guard tem que olhar o SLOT DO ITEM, não só o estado das mãos — senão um
+      // elmo com as mãos cheias levaria 400.
+      //
+      // A ação manda `mao` de propósito, apontando para a esquerda: `colocarNoSlot`
+      // só consulta `maoAlvo` no ramo do item de MÃO (spec §8.2 ramo 8), e um
+      // `maoAlvo ?? info.slot` no lugar do ternário poria o elmo numa mão. Sem as
+      // duas asserções abaixo essa mutação fica verde.
+      const r = aplicarAcao(estadoComAsDuasMaosCheias, {
+        tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-elmo', mao: 'maoEsquerda',
+      }, deps([]));
+      expect(jogadorDe(r.estado, 'p1').emJogo.slots.capacete?.id).toBe('t-elmo');
+      expect(jogadorDe(r.estado, 'p1').emJogo.slots.maoDireita?.id).toBe('t-0');
+      expect(jogadorDe(r.estado, 'p1').emJogo.slots.maoEsquerda?.id).toBe('t-outra-mao');
+    });
+
+    it('arma de DUAS MÃOS dispensa `mao` com as duas cheias — e os DOIS deslocados são roteados', () => {
+      // Mesma armadilha do anterior: o montante ocupa as duas por definição,
+      // então não há escolha a cobrar.
+      //
+      // É o ÚNICO caminho do reducer que produz uma lista de DOIS deslocados, e
+      // até 2026-08-08 nada afirmava o que acontecia com ela: `colocarNoSlot`
+      // devolvendo dois (`equipar.test.ts`) e `destinoDoDesequipado` roteando dois
+      // (idem) estavam provados, mas o FIO entre eles não. Verificado por mutação
+      // (`deslocados.slice(0, 1)` na chamada de `destinoDoDesequipado`): com só a
+      // asserção de slot, 352/352 ficavam VERDES e `t-outra-mao` sumia do jogo —
+      // nem o censo de conservação do soak pegaria, porque a política do bot não
+      // produz este cenário (zero em 3.859).
+      const r = aplicarAcao(estadoComAsDuasMaosCheias, {
+        tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-montante',
+      }, deps([]));
+
+      expect(jogadorDe(r.estado, 'p1').emJogo.slots.maoEsquerda?.id).toBe('t-montante');
+      expect(jogadorDe(r.estado, 'p1').emJogo.slots.maoDireita?.id).toBe('t-montante');
+      expect(r.eventos.filter((e) => e.tipo === 'desequipou').map((e) => e.carta.id))
+        .toEqual(['t-0', 't-outra-mao']);
+      expect(jogadorDe(r.estado, 'p1').mochila.map((c) => c.id)).toEqual(['t-0', 't-outra-mao']);
+    });
+
+    it('a mão ALVO explícita é HONRADA mesmo apontando para a que NÃO é `MAOS[0]`', () => {
+      // Achado do review: todo fixture acima que passa `mao` passa 'maoDireita'
+      // — que é BYTE-IDÊNTICO ao que `resolverMao` devolveria de qualquer jeito
+      // com as duas mãos cheias (o fallback é `MAOS[0]`). Um reducer que
+      // recusasse corretamente sem `mao` e depois DROPASSE `acao.mao` na
+      // chamada de `colocarNoSlot` (ignorando a escolha do jogador) ficava
+      // verde em todos os outros testes. Só apontar para a ESQUERDA prova que
+      // a escolha atravessa o reducer até `colocarNoSlot`.
+      const r = aplicarAcao(estadoComAsDuasMaosCheias, {
+        tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-nova', mao: 'maoEsquerda',
+      }, deps([]));
+
+      expect(jogadorDe(r.estado, 'p1').emJogo.slots.maoEsquerda?.id).toBe('t-nova');
+      // A mão que NÃO foi apontada fica intocada — é o outro lado da mesma prova.
+      expect(jogadorDe(r.estado, 'p1').emJogo.slots.maoDireita?.id).toBe('t-0');
+      expect(r.eventos).toContainEqual({
+        tipo: 'desequipou', jogadorId: 'p1', destino: 'mochila', motivo: 'trocaDeSlot',
+        carta: { id: 't-outra-mao', tipo: 'equipamento', itemId: 'i-teste' },
+      });
+    });
+
+    it('com uma mão livre, `mao` apontando para a OCUPADA troca AQUELE item — a armadilha da regra 3', () => {
+      // Spec §4 regra 3: `mao` presente apontando para uma mão OCUPADA enquanto
+      // a outra está LIVRE é escolha legítima do jogador (ele quer trocar
+      // aquele item), não erro. Um guard que exigisse vaga livre reprovaria
+      // isto — e nenhum teste deste describe cobria a regra 3 pelo reducer até
+      // agora (os seis fixtures com `mao` estão todos na regra 4).
+      const r = aplicarAcao(estadoComUmaMaoLivre, {
+        tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-nova', mao: 'maoDireita',
+      }, deps([]));
+
+      expect(jogadorDe(r.estado, 'p1').emJogo.slots.maoDireita?.id).toBe('t-nova');
+      expect(jogadorDe(r.estado, 'p1').emJogo.slots.maoEsquerda).toBeNull();
+      expect(r.eventos).toContainEqual({
+        tipo: 'desequipou', jogadorId: 'p1', destino: 'mochila', motivo: 'trocaDeSlot',
+        carta: { id: 't-0', tipo: 'equipamento', itemId: 'i-teste' },
+      });
+    });
   });
 });
 

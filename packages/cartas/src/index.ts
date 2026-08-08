@@ -3,7 +3,7 @@ export { RACAS, RACAS_PUBLICAS, RACAS_SACAVEIS, obterRaca } from './racas';
 export { cascaDePedra, escorregadio, sangueDeGuerra, golpeCerteiro, impacto, explosao } from './passivas';
 export type { MonstroCarta } from './monstros';
 export { MONSTROS, MONSTROS_SACAVEIS, obterMonstro } from './monstros';
-export type { ItemCarta, ModificadoresDeItem, Slot, Afinidade, EixoDeAfinidade } from './itens';
+export type { ItemCarta, ModificadoresDeItem, Slot, SlotDeItem, Afinidade, EixoDeAfinidade } from './itens';
 export { ITENS, ITENS_SACAVEIS, obterItem } from './itens';
 export type { ModificadoresDeStat } from './stats';
 export type { ClasseCarta, ClasseResumo } from './classes';
