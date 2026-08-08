@@ -13,8 +13,9 @@ import { AcaoInvalida } from './erros';
 import { filaDeDados, criarDadoCiclico } from './testes/dados';
 import { classe, monstro, monstros, raca, equipamento } from './testes/cartas';
 import {
-  catalogoDeTeste, comClasseDeTeste, ID_DA_CLASSE_DE_TESTE, MONSTRO_DE_TESTE, ID_DO_ITEM_EXCLUSIVO, ID_DA_RACA_OUTRA,
-  ID_DA_RACA_DONA, ID_DO_ITEM_DE_TESTE, ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS, ID_DO_ITEM_EXCLUSIVO_PES,
+  catalogoDeTeste, comClasseDeTeste, ID_DA_CLASSE_DE_TESTE, CLASSE_DE_TESTE, MONSTRO_DE_TESTE, ID_DO_ITEM_EXCLUSIVO,
+  ID_DA_RACA_OUTRA, ID_DA_RACA_DONA, ID_DO_ITEM_DE_TESTE, ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS, ID_DO_ITEM_EXCLUSIVO_PES,
+  ID_DO_ITEM_EXCLUSIVO_DE_CLASSE,
 } from './testes/catalogo';
 import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import { combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
@@ -1343,7 +1344,7 @@ describe('aplicarAcao — jogarCarta', () => {
       .toThrow('aplicarAcao: a carta r9 não está na sua mão');
   });
 
-  it('recusa carta que não é de raça', () => {
+  it('recusa carta que não é de raça nem de classe', () => {
     // A raça na mão é o que sustenta a fase 1: sem ela `recompor` se auto-pula e o
     // fixture seria uma vista que o domínio não produz. A carta APONTADA é a de
     // monstro — é ela que o guard de tipo recusa.
@@ -1351,7 +1352,7 @@ describe('aplicarAcao — jogarCarta', () => {
     const p = comMao(p0, [monstro('m9'), raca('r1', 'anao')]);
 
     expect(() => aplicarAcao(p, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'm9' }, deps([])))
-      .toThrow('aplicarAcao: só carta de raça entra em jogo nesta fatia');
+      .toThrow('aplicarAcao: só carta de raça ou de classe entra em jogo');
   });
 
   it('com espiada pendente, jogar raça é recusado pela FASE — o guard próprio morreu', () => {
@@ -1445,6 +1446,118 @@ describe('aplicarAcao — jogarCarta', () => {
     expect(depois.emJogo.raca?.id).toBe('r9');
     expect(depois.mao).toHaveLength(LIMITE_BASE_DE_MAO);
     expect(limiteDeMao(depois) - depois.mao.length).toBe(0);   // NET-ZERO: nada foi ganho
+  });
+});
+
+describe('jogar carta de CLASSE', () => {
+  const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
+  /** Mesa nascida, p1 com a mão dada e a fase DERIVADA dela (nunca forjada). */
+  const comMao = (estado: EstadoPartida, mao: readonly Carta[]): EstadoPartida => {
+    const jogadores = estado.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao } : j));
+    return { ...estado, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...estado, jogadores }, 'p1')) };
+  };
+  const nascida = () => criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+  const nova = classe('pc-nova', ID_DA_CLASSE_DE_TESTE);
+
+  it('põe a classe na zona, manda a anterior ao cemitério de Portas e emite `classeEmJogo`', () => {
+    // `criar` já carimba `CARTA_DE_CLASSE_DE_TESTE` (id `pc-teste`) na zona: é
+    // dela que sai a "anterior" que vai para o cemitério.
+    const p = comMao(nascida(), [nova]);
+    expect(p.fase).toBe('recompor');
+
+    const r = aplicarAcao(p, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'pc-nova' }, deps([]));
+
+    expect(jogadorDe(r.estado, 'p1').emJogo.classe?.id).toBe('pc-nova');
+    expect(maoDe(r.estado, 'p1')).toEqual([]);
+    expect(r.estado.vezDe).toBe('p1');   // jogar classe é decisão do próprio turno
+    expect(r.eventos[0]).toEqual({ tipo: 'classeEmJogo', jogadorId: 'p1', carta: nova });
+    expect(r.estado.portas.cemiterio.map((c) => c.id)).toContain('pc-teste');
+  });
+
+  it('trocar de classe DERRUBA o item exclusivo que ficou proibido', () => {
+    // Reusa `itensSemAfinidade` + `destinoDoDesequipado`, sem mecânica nova: é a
+    // metade que a #74 deixou pronta e que a Task 6 ligou.
+    // `ITEM_EXCLUSIVO_DE_CLASSE` é de 'c-outra'; SEM classe em jogo o grau é `sem`
+    // (equipar é legal), e com 'c-teste' em jogo vira `proibida`.
+    const semClasse = nascida();
+    const jogadores = semClasse.jogadores.map((j) => (j.id === 'p1'
+      ? {
+          ...j,
+          mao: [nova] as readonly Carta[],
+          emJogo: {
+            raca: null, classe: null,
+            slots: { ...SLOTS_VAZIOS, armadura: equipamento('t-x', ID_DO_ITEM_EXCLUSIVO_DE_CLASSE) },
+          },
+        }
+      : j));
+    const p: EstadoPartida = {
+      ...semClasse, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...semClasse, jogadores }, 'p1')),
+    };
+
+    const r = aplicarAcao(p, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'pc-nova' }, deps([]));
+
+    expect(jogadorDe(r.estado, 'p1').emJogo.slots.armadura).toBeNull();
+    expect(r.eventos).toContainEqual(expect.objectContaining({
+      tipo: 'desequipou', motivo: 'perdeuAfinidade',
+    }));
+  });
+
+  it('`jogarCarta` continua recusando o que não é raça nem classe', () => {
+    // UM `AcaoInvalida`, alargado — logo UMA linha na tabela de pares finos, não duas.
+    const p = comMao(nascida(), [monstro('m1'), nova]);
+    expect(() => aplicarAcao(p, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'm1' }, deps([])))
+      .toThrow(AcaoInvalida);
+  });
+
+  it('e recusa também carta de EQUIPAMENTO — jogar não é o verbo que veste', () => {
+    // Mutação medida (Step 8c do plano): uma versão de `jogarCarta` que só
+    // recusa `carta.tipo === 'monstro'` (em vez de aceitar SÓ `raca`/`classe`)
+    // passava a suíte inteira sem este teste — nenhum outro apontava um tesouro
+    // para este verbo. `equiparCarta` é quem veste.
+    const p = comMao(nascida(), [equipamento('t-9')]);
+    expect(() => aplicarAcao(p, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 't-9' }, deps([])))
+      .toThrow(AcaoInvalida);
+  });
+});
+
+describe('a ordem de composição das passivas é raça → classe', () => {
+  const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
+
+  it('a passiva da RAÇA compõe primeiro, e a da CLASSE em cima do resultado dela', () => {
+    // Dublês DISTINGUÍVEIS: a raça SOMA 1, a classe DOBRA.
+    //   raça → classe: (base + 1) * 2 = 10 ; classe → raça: base * 2 + 1 = 9
+    // Com dano base 4, inverter a ordem muda a vida do monstro — é isso que faz
+    // este teste morder. Dublês que somassem os dois não distinguiriam nada.
+    const somaUm: PassivaCombate = { id: 'soma-um', aoCausarDano: (b, ctx) => ({ dano: b + 1, estado: ctx.estado }) };
+    const dobra: PassivaCombate = { id: 'dobra', aoCausarDano: (b, ctx) => ({ dano: b * 2, estado: ctx.estado }) };
+    const catalogo = catalogoDeTeste({
+      raca: () => ({ passivaCombate: somaUm, espiaTopo: false }),
+      classe: () => ({ ...CLASSE_DE_TESTE, passivaCombate: dobra }),
+    });
+    const depsOrdem = (dados: readonly number[]): DepsMesa => ({
+      rolar: filaDeDados(dados), embaralhar: semEmbaralhar, catalogo,
+    });
+
+    const p0 = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const jogadores = p0.jogadores.map((j) => (j.id === 'p1'
+      ? { ...j, emJogo: { ...j.emJogo, raca: raca('pr-1', 'r-dona') } }
+      : j));
+    // Vasculhar abre o combate contra `MONSTRO_DE_TESTE` (vida 10, agilidade 1);
+    // p1 é mais ágil, então ele ataca primeiro.
+    const comCombate = aplicarAcao(
+      { ...p0, jogadores }, { tipo: 'vasculhar', jogadorId: 'p1' }, depsOrdem([]),
+    ).estado;
+
+    // Golpe: 4 <= habilidade 8 acerta; esquiva 12 > 4 falha; dano base = patente 1
+    // + forca 3 = 4; composto = (4 + 1) * 2 = 10; vida 10 - 10 = 0 => vitória.
+    const r = aplicarAcao(comCombate, { tipo: 'atacar', jogadorId: 'p1' }, depsOrdem([4, 12]));
+
+    expect(r.estado.combate).toBeNull();
+    expect(r.eventos).toContainEqual(expect.objectContaining({ tipo: 'patente', patente: 2 }));
+    const doCombate = r.eventos.find((e) => e.tipo === 'combate');
+    expect(doCombate?.tipo === 'combate' && doCombate.eventos).toContainEqual(
+      { tipo: 'dano', alvo: 'b', quantidade: 10, vidaRestante: 0 },
+    );
   });
 });
 

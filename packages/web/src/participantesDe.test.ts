@@ -61,6 +61,7 @@ describe('participantesDe', () => {
       { tipo: 'derrota', jogadorId: 'p1', derrotas: 1 },
       { tipo: 'vez', jogadorId: 'p1' },
       { tipo: 'racaEmJogo', jogadorId: 'p1', carta: { id: 'r1', tipo: 'raca', racaId: 'elfo' } },
+      { tipo: 'classeEmJogo', jogadorId: 'p1', carta: { id: 'pc1', tipo: 'classe', classeId: 'guerreiro' } },
       { tipo: 'entrega', jogadorId: 'p1', paraJogadorId: 'p2', rolagem: null },
       { tipo: 'descarte', jogadorId: 'p1', carta: { id: 'c2', tipo: 'raca', racaId: 'r-teste' } },
       { tipo: 'loot', jogadorId: 'p1', quantidade: 1 },

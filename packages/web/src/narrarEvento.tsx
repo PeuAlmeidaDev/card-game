@@ -53,6 +53,8 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
       return 'A partida terminou.';
     case 'racaEmJogo':
       return `${ctx.nomeDe(evento.jogadorId)} entra em campo como ${ctx.nomeDaRaca(evento.carta.racaId)}.`;
+    case 'classeEmJogo':
+      return `${ctx.nomeDe(evento.jogadorId)} passa a lutar como ${ctx.nomeDaClasse(evento.carta.classeId)}.`;
     // A entrega é PRIVADA: o evento não carrega a carta (spec §5) e a apresentação
     // não pode inventar o que ele não diz. Só o destinatário descobre o quê, pela
     // própria mão. A rolagem aparece quando houve empate a desempatar.

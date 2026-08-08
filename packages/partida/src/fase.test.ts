@@ -9,7 +9,7 @@ import { montarComposicao } from './baralho';
 import { criarDadoCiclico } from './testes/dados';
 import { CARTA_DE_CLASSE_DE_TESTE, catalogoDeTeste, comClasseDeTeste } from './testes/catalogo';
 import { COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
-import { equipamento, monstro, monstros, raca } from './testes/cartas';
+import { classe, equipamento, monstro, monstros, raca } from './testes/cartas';
 import { SLOTS_VAZIOS } from './corpo';
 import type { AcaoDaMesa, JogadorNaMesa, EntradaJogador, EstadoPartida, Fase } from './tipos';
 
@@ -158,6 +158,20 @@ describe('faseSeAutoPula (spec §6.1)', () => {
 
   it('`recompor` NÃO se pula com uma raça na mão', () => {
     expect(faseSeAutoPula('recompor', comMao([raca('r1', 'elfo')]))).toBe(false);
+  });
+
+  it('`recompor` NÃO se auto-pula com uma carta de classe na mão', () => {
+    // Sem isto, quem saca uma classe é pulado por cima da única fase em que pode
+    // jogá-la — e a carta morre na mão sem nunca ter tido janela.
+    const comClasseNaMao = comMao([classe('pc-1', 'c-teste')]);
+    expect(faseSeAutoPula('recompor', comClasseNaMao)).toBe(false);
+  });
+
+  it('`jogar` continua se auto-pulando com classe na mão — ela só entra em `recompor`', () => {
+    // Mesma regra da raça (decisão #7 do spec da fatia 8): trocar depois de ver a
+    // porta seria reagir ao monstro.
+    const comClasseNaMao = comMao([classe('pc-1', 'c-teste')]);
+    expect(faseSeAutoPula('jogar', comClasseNaMao)).toBe(true);
   });
 
   it('`recompor` NÃO se pula com um equipamento na mão', () => {

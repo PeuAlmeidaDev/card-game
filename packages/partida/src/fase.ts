@@ -90,7 +90,10 @@ export function acaoEhLegal(
  * `switch` exaustivo com `never`: fase nova é obrigada a declarar se se pula.
  */
 export function faseSeAutoPula(fase: Fase, jogador: JogadorNaMesa): boolean {
-  const temRaca = jogador.mao.some((c) => c.tipo === 'raca');
+  // As DUAS cartas que `jogarCarta` aceita em `recompor` (spec §3.3): raça E
+  // classe. Só raça aqui pularia por cima da única fase em que uma classe sacada
+  // pode ser jogada, e ela morreria na mão sem nunca ter tido janela.
+  const temEspecializacao = jogador.mao.some((c) => c.tipo === 'raca' || c.tipo === 'classe');
   // As DUAS origens de `equiparCarta` (spec §6): mão e mochila. Enquanto a
   // mochila não existia, olhar só a mão era a mesma pergunta; desde que ela é
   // origem, um jogador de mão vazia e mochila cheia ainda tem o que vestir —
@@ -103,10 +106,10 @@ export function faseSeAutoPula(fase: Fase, jogador: JogadorNaMesa): boolean {
   const temEquipamento = jogador.mao.some((c) => c.tipo === 'equipamento') || jogador.mochila.length > 0;
   switch (fase) {
     case 'recompor':
-      return !temRaca && !temEquipamento;
+      return !temEspecializacao && !temEquipamento;
     case 'jogar':
-      // SEM a raça: ela só entra em jogo na fase 1 (decisão #7). Uma raça na mão
-      // não dá o que fazer aqui, então não segura a fase.
+      // SEM raça nem classe: as duas só entram em jogo na fase 1 (decisão #7).
+      // Nenhuma das duas dá o que fazer aqui, então não seguram a fase.
       return !temEquipamento;
     case 'vasculhar':
     case 'encrenca':

@@ -309,6 +309,8 @@ export type EventoDaMesa =
   | { readonly tipo: 'vez'; readonly jogadorId: string }
   | { readonly tipo: 'fim'; readonly classificacao: readonly PosicaoFinal[] }
   | { readonly tipo: 'racaEmJogo'; readonly jogadorId: string; readonly carta: CartaDeRaca }
+  /** Gêmeo do `racaEmJogo`, para a carta de CLASSE (spec §3.3). */
+  | { readonly tipo: 'classeEmJogo'; readonly jogadorId: string; readonly carta: CartaDeClasse }
   /**
    * Doação PRIVADA: diz quem deu e a quem, **nunca o quê**. O `log` viaja inteiro
    * para todos na projeção — carregar a carta aqui anunciaria publicamente o que

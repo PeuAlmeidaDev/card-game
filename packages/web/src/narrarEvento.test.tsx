@@ -51,6 +51,13 @@ describe('narrarEvento — linhas de texto puro', () => {
     )).toBe('Bot 1 entra em campo como Orc.');
   });
 
+  it('classeEmJogo nomeia a classe pelo catálogo — gêmeo do racaEmJogo', () => {
+    expect(narrarEvento(
+      { tipo: 'classeEmJogo', jogadorId: 'p2', carta: { id: 'pc1', tipo: 'classe', classeId: 'guerreiro' } },
+      ctx,
+    )).toBe('Bot 1 passa a lutar como Guerreiro.');
+  });
+
   it('entrega NÃO diz qual carta foi — o log é público', () => {
     // A assimetria vive no tipo (o evento não carrega a carta). Aqui ela só não
     // pode ser desfeita por acidente na narração.

@@ -30,9 +30,15 @@ function racaDoLutador(deps: DepsMesa, jogador: JogadorNaMesa | undefined): Info
   return deps.catalogo.raca(jogador?.emJogo.raca?.racaId);
 }
 
+/** As passivas do lutador, na ordem de composição declarada: raça primeiro, classe depois (spec §3.3). */
 function passivasDoLutador(deps: DepsMesa, jogador: JogadorNaMesa | undefined): readonly PassivaCombate[] {
   const daRaca = racaDoLutador(deps, jogador)?.passivaCombate ?? null;
-  return daRaca === null ? [] : [daRaca];
+  const classeId = jogador?.emJogo.classe?.classeId;
+  // O `?? null` engole o `undefined` do catálogo de propósito: aqui a pergunta é
+  // "que passiva ele tem", e id órfão já é `Error` cru em `combatenteDe`, que roda
+  // antes no mesmo caminho.
+  const daClasse = classeId === undefined ? null : deps.catalogo.classe(classeId)?.passivaCombate ?? null;
+  return [daRaca, daClasse].filter((p): p is PassivaCombate => p !== null);
 }
 
 export interface ResultadoAcao {
@@ -229,7 +235,7 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   //   vasculhar            manterCarta    espiada !== null             `resolverEspiada`
   //   vasculhar            empurrarCarta  espiada !== null             `resolverEspiada`
   //   vasculhar            empurrarCarta  monte+cemitério não vazios   `resolverEspiada`
-  //   recompor             jogarCarta     carta.tipo === 'raca'        `jogarCarta`
+  //   recompor             jogarCarta     carta.tipo é 'raca' ou 'classe' `jogarCarta`
   //   recompor             equiparCarta   carta.tipo === 'equipamento' `equiparCarta`
   //   jogar                equiparCarta   carta.tipo === 'equipamento' `equiparCarta`
   //   recompor             equiparCarta   afinidade !== 'proibida'     `equiparCarta`
@@ -329,6 +335,11 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // estrutural. Recontagem feita a partir do reducer, `AcaoInvalida` por
   // `AcaoInvalida` — par que não cresce também se declara, senão a próxima
   // recontagem não sabe se alguém olhou.
+  //
+  // A Task 7 do Plano B (`classe como carta`) manteve DEZESSEIS pares em
+  // DEZENOVE linhas: `jogarCarta` ALARGOU o guard existente (`carta.tipo` passa a
+  // aceitar 'raca' OU 'classe'), não ganhou um `AcaoInvalida` novo — a linha do
+  // par é a mesma, só o texto da condição mudou.
   if (!acaoEhLegal(estado.fase, estado.queima !== null, acao.tipo)) {
     throw new AcaoInvalida(
       estado.queima === null
@@ -832,11 +843,11 @@ function tirarDosSlots(
 }
 
 /**
- * Põe uma carta de raça da mão na zona em jogo. A anterior vai para o cemitério:
- * a zona é ABERTA, então trocar de raça é jogada pública.
+ * Põe uma carta de raça OU DE CLASSE da mão na zona em jogo. A anterior vai para
+ * o cemitério: a zona é ABERTA, então trocar de especialização é jogada pública.
  *
- * A vez NÃO passa — jogar raça é decisão do próprio turno, e o turno segue para a
- * fase 2 (ou fica em `recompor`, se ainda houver o que vestir).
+ * A vez NÃO passa — jogar raça ou classe é decisão do próprio turno, e o turno
+ * segue para a fase 2 (ou fica em `recompor`, se ainda houver o que vestir).
  *
  * DEIXOU de ser saída do excedente (decisão #7 do spec): só é legal em
  * `recompor`, e `faseDoTurnoDe` manda quem abre o turno estourado direto para
@@ -855,7 +866,8 @@ function tirarDosSlots(
  * Em `descartar` sobra só `entregarCarta`: `equiparCarta` saiu junto, para as duas
  * fases paradas que acontecem ANTES da cobrança do excedente.
  *
- * Trocar de raça DERRUBA o item que ficou proibido, por `destinoDoDesequipado`.
+ * Trocar de raça OU DE CLASSE DERRUBA o item que ficou proibido, por
+ * `destinoDoDesequipado`.
  */
 function jogarCarta(
   estado: EstadoPartida,
@@ -867,17 +879,19 @@ function jogarCarta(
   // pendência deixou de ser alcançável nesta função — era exatamente o que o
   // comentário antigo previa para quando `recompor` nascesse.
   const { jogador, carta } = cartaDaMao(estado, acao);
-  if (carta.tipo !== 'raca') {
-    throw new AcaoInvalida('aplicarAcao: só carta de raça entra em jogo nesta fatia');
+  if (carta.tipo !== 'raca' && carta.tipo !== 'classe') {
+    throw new AcaoInvalida('aplicarAcao: só carta de raça ou de classe entra em jogo');
   }
 
-  const anterior = jogador.emJogo.raca;
-  const comRacaNova: ZonaEmJogo = { ...jogador.emJogo, raca: carta };
-  const perdidos = itensSemAfinidade(comRacaNova, deps.catalogo);
+  const anterior = carta.tipo === 'raca' ? jogador.emJogo.raca : jogador.emJogo.classe;
+  const comEspecializacaoNova: ZonaEmJogo = carta.tipo === 'raca'
+    ? { ...jogador.emJogo, raca: carta }
+    : { ...jogador.emJogo, classe: carta };
+  const perdidos = itensSemAfinidade(comEspecializacaoNova, deps.catalogo);
   const atualizado: JogadorNaMesa = {
     ...jogador,
     mao: jogador.mao.filter((c) => c.id !== carta.id),
-    emJogo: { ...comRacaNova, slots: tirarDosSlots(comRacaNova.slots, perdidos) },
+    emJogo: { ...comEspecializacaoNova, slots: tirarDosSlots(comEspecializacaoNova.slots, perdidos) },
   };
 
   const comJogador: EstadoPartida = {
@@ -891,7 +905,10 @@ function jogarCarta(
   const { estado: base, eventos: doDeslocado, queima } =
     destinoDoDesequipado(comJogador, perdidos, acao.jogadorId, 'perdeuAfinidade');
   const eventos: readonly EventoDaMesa[] = [
-    { tipo: 'racaEmJogo', jogadorId: acao.jogadorId, carta }, ...doDeslocado,
+    carta.tipo === 'raca'
+      ? { tipo: 'racaEmJogo', jogadorId: acao.jogadorId, carta }
+      : { tipo: 'classeEmJogo', jogadorId: acao.jogadorId, carta },
+    ...doDeslocado,
   ];
 
   // Este `return` carrega a `queima` para o estado registrado, sem passar por
