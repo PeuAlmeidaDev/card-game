@@ -470,16 +470,23 @@ describe('TelaMesa — a mão', () => {
     expect(screen.getByText(/uma carta de Orc/)).toBeInTheDocument();
   });
 
-  it('só carta de raça tem botão de jogar', async () => {
-    // `fase: 'recompor'` porque é a única em que jogar raça é legal: uma vista de
-    // `vasculhar` com "Jogar" na tela seria uma vista que nunca aceita o clique.
+  it('a carta de PORTA jogável (raça e classe) tem botão de jogar; o monstro não', async () => {
+    // O título dizia *"só carta de raça"*, e a Task 11 derrubou a exclusividade —
+    // a asserção não quebrou porque a fixture não tinha classe. A fixture passou a
+    // ter: quem prova a exclusão agora é o `toHaveLength(2)` sobre TRÊS cartas.
+    // `fase: 'recompor'` porque é a única em que jogar raça ou classe é legal: uma
+    // vista de `vasculhar` com "Jogar" na tela seria uma vista que nunca aceita o clique.
     await abrirMesa({
       ...vistaBase,
       fase: 'recompor',
-      suaMao: [{ id: 'p-1', tipo: 'monstro', monstroId: 'goblin' }, { id: 'p-2', tipo: 'raca', racaId: 'orc' }],
+      suaMao: [
+        { id: 'p-1', tipo: 'monstro', monstroId: 'goblin' },
+        { id: 'p-2', tipo: 'raca', racaId: 'orc' },
+        { id: 'pc-1', tipo: 'classe', classeId: 'guerreiro' },
+      ],
     });
 
-    expect(screen.getAllByRole('button', { name: 'Jogar' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Jogar' })).toHaveLength(2);
   });
 
   it('dentro do limite, entregar fica desabilitado', async () => {
@@ -1177,6 +1184,23 @@ describe('TelaMesa — a mochila', () => {
     await abrirMesa(emParada('recompor', [tesouro('t-1')], cheia));
 
     expect(await screen.findByRole('button', { name: /guardar/i })).toBeDisabled();
+  });
+
+  it('"Guardar" ACESO com 5 na mochila e teto 6 — o `disabled` segue o teto DA VISTA', async () => {
+    // O fixture DISCRIMINANTE que faltava: o gêmeo de cima usa 6 (`6 >= 5` e
+    // `6 >= 6` dão o mesmo) e o de "aceso" usa mochila vazia, então nenhum
+    // distinguia 5 de 6. Uma regressão do cliente para a constante global que a
+    // Task 8 matou (`>= 5`) apagaria "Guardar" para o Aprendiz com 5 na mochila —
+    // numa ação que o domínio ACEITA. É a cópia da regra no cliente, o vício que
+    // o teto POR JOGADOR existe para matar.
+    const cinco = Array.from({ length: 5 }, (_, i) => tesouro(`t-c${String(i)}`));
+    const vista = emParada('recompor', [tesouro('t-1')], cinco);
+    // Pré-condição explícita: p1 é Aprendiz, e o teto que a VISTA publica é 6.
+    expect(vista.jogadores.find((j) => j.id === 'p1')?.limiteDeMochila).toBe(6);
+
+    await abrirMesa(vista);
+
+    expect(await screen.findByRole('button', { name: /guardar/i })).toBeEnabled();
   });
 
   it('carta de PORTA na mão não tem "Guardar" — o outro par fino', async () => {
