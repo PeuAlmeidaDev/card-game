@@ -1,26 +1,10 @@
 import type { Combatente } from '@card-dungeon/motor';
 import type {
-  AcaoDaMesa, CartaEquipamento, CatalogoDaMesa, JogadorPublico, Slot, VistaDaPartida, ZonaEmJogo,
+  AcaoDaMesa, CartaEquipamento, CatalogoDaMesa, JogadorPublico, MaoSlot, Slot, VistaDaPartida, ZonaEmJogo,
 } from './tipos';
 // O par de mãos vem do MESMO lugar que `colocarNoSlot` usa: o custo que o bot
 // calcula tem que ser o custo que o reducer vai cobrar, e duas listas escritas à
 // mão divergem em silêncio (o slot que nascer não entra na cópia).
-//
-// ⚠️ Desde a fatia `empunhadura dupla`, `MAOS[0]` NÃO é mais garantidamente o
-// que `colocarNoSlot` escolhe para um item de mão sem `mao` explícito — o
-// reducer prefere a vaga LIVRE (`resolverMao`), e aqui o custo continua
-// assumindo sempre `MAOS[0]`. Isto é dívida ACEITA e TEMPORÁRIA: a Task 3 desta
-// fatia reescreve `vestirOuGuardar` para avaliar as duas mãos de verdade.
-//
-// 🔴 CORRIGIDO (achado do review da Task 2, que tinha ficado como presente
-// errado aqui): esta nota dizia "nunca produz `AcaoInvalida`" — falso desde o
-// guard que a própria Task 2 acrescentou em `mesa.ts` (`precisaDeAlvo`). Com as
-// DUAS mãos já ocupadas por item de uma mão, este bot chama `equiparCarta` SEM
-// `mao` (a linha do `return`, abaixo), e o reducer agora RECUSA com
-// `AcaoInvalida` — que `avancarBots` não captura (sem `try`/`catch`) e vaza
-// como 400 na ação do HUMANO que disparou os bots em cadeia. Dívida ACEITA
-// para a Task 3 corrigir; até lá NÃO rode soak nem `pnpm dev` contra esta
-// branch — o caminho é alcançável, só não é exercitado pela suíte de hoje.
 import { MAOS } from './equipar';
 import { afinidadeCom, contribuicaoDe } from './corpo';
 
@@ -239,6 +223,14 @@ function candidatosQueEuPossoVestir(
  * serve agora, passa quando não há nem uma coisa nem outra. Uma função para as
  * duas porque a decisão é a MESMA — o que muda entre `recompor` e `jogar` é só
  * quando ela acontece, e duplicá-la deixaria uma das cópias para trás.
+ *
+ * Item de UMA mão (`slot: 'mao'`, sem `duasMaos`) gera DUAS avaliações — uma por
+ * mão candidata — e a melhor delas concorre com os outros candidatos; item de
+ * duas mãos ou de slot fixo gera UMA. O `> melhorGanho` ESTRITO vale para as
+ * duas: com duas mãos candidatas há duas trocas possíveis por decisão, e
+ * afrouxar o comparador é o loop de troca que a `afinidade` mediu travando a
+ * partida (ritmo 179–207 contra ~105, com 5.942–8.692 `trocaDeSlot` por 80
+ * partidas).
  */
 function vestirOuGuardar(
   vista: VistaDaPartida,
@@ -250,30 +242,58 @@ function vestirOuGuardar(
 
   let melhor: CartaEquipamento | undefined;
   let melhorGanho = 0;
+  // `undefined` = a ação não precisa de `mao` (slot fixo, duas mãos, ou a mão
+  // vencedora está LIVRE — o reducer resolve para ela sozinho via `resolverMao`).
+  let melhorMao: MaoSlot | undefined;
+
   for (const carta of candidatos) {
     const info = catalogo.item(carta.itemId);
     if (info === undefined) continue;
-    // O que ele DESLOCA: os slots que ele vai ocupar. Duas mãos desloca os dois.
-    // Item de mão sem `duasMaos`: assume `MAOS[0]`, não a vaga livre — ver o
-    // aviso no import de `MAOS`, acima.
+    const valor = valorEfetivoDe(carta.itemId, catalogo, eu.emJogo);
+
+    if (info.slot === 'mao' && !info.duasMaos) {
+      for (const mao of MAOS) {
+        const ocupante = eu.emJogo.slots[mao];
+        const custo = ocupante === null ? 0 : valorEfetivoDe(ocupante.itemId, catalogo, eu.emJogo);
+        const ganho = valor - custo;
+        if (ganho > melhorGanho) {
+          melhor = carta;
+          melhorGanho = ganho;
+          melhorMao = ocupante === null ? undefined : mao;
+        }
+      }
+      continue;
+    }
+
+    // Não é item de mão, ou é de duas mãos: os alvos são fixos. Duas mãos
+    // desloca as duas, deduplicado por id pelo mesmo motivo de `colocarNoSlot`
+    // — um montante ocupando as duas mãos seria contado duas vezes e pareceria
+    // melhor do que é.
+    //
+    // `info.slot === 'mao' ? MAOS[0] : info.slot`, e não só `info.slot`: o `if`
+    // acima já exclui (`slot: 'mao'` E `!duasMaos`) por `continue`, então este
+    // ramo nunca VÊ um `slot: 'mao'` sem `duasMaos` — mas o compilador não lê
+    // essa relação entre os dois campos, só `SlotDeItem` inclui `'mao'` e `Slot`
+    // não. O `? :` é o que devolve o tipo estreito sem duplicar o guard.
     const alvos: readonly Slot[] = info.duasMaos ? MAOS : [info.slot === 'mao' ? MAOS[0] : info.slot];
     const ocupantes = new Map<string, string>();
     for (const slot of alvos) {
       const atual = eu.emJogo.slots[slot];
       if (atual !== null) ocupantes.set(atual.id, atual.itemId);
     }
-    // Dedup por id pelo mesmo motivo de `colocarNoSlot`: um montante ocupando as
-    // duas mãos seria contado duas vezes e pareceria melhor do que é.
     const custo = [...ocupantes.values()].reduce((s, itemId) => s + valorEfetivoDe(itemId, catalogo, eu.emJogo), 0);
-    const ganho = valorEfetivoDe(carta.itemId, catalogo, eu.emJogo) - custo;
+    const ganho = valor - custo;
     if (ganho > melhorGanho) {
       melhor = carta;
       melhorGanho = ganho;
+      melhorMao = undefined;
     }
   }
 
   if (melhor !== undefined) {
-    return { tipo: 'equiparCarta', jogadorId, cartaId: melhor.id };
+    return melhorMao !== undefined
+      ? { tipo: 'equiparCarta', jogadorId, cartaId: melhor.id, mao: melhorMao }
+      : { tipo: 'equiparCarta', jogadorId, cartaId: melhor.id };
   }
 
   // Não melhora nada: tira do teto de mão o que não serve agora, se houver vaga.

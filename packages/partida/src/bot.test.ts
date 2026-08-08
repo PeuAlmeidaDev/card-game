@@ -10,7 +10,7 @@ import { LIMITE_BASE_DE_MAO, LIMITE_BASE_DE_MOCHILA } from './mao';
 import {
   CARTA_DE_CLASSE_DE_TESTE, catalogoDeTeste, comClasseDeTeste, ID_DA_CLASSE_DE_TESTE, ID_DA_RACA_DONA,
   ID_DA_RACA_OUTRA, ID_DO_ITEM_DE_CAPACETE, ID_DO_ITEM_DUAS_MAOS, ID_DO_ITEM_EXCLUSIVO, ID_DO_ITEM_FORTE,
-  ID_DO_ITEM_FRACO, ID_DO_ITEM_LASTRO, ID_DO_MONSTRO_FORTE,
+  ID_DO_ITEM_FRACO, ID_DO_ITEM_LASTRO, ID_DO_ITEM_POTENTE, ID_DO_MONSTRO_FORTE,
 } from './testes/catalogo';
 import { COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import type {
@@ -325,15 +325,26 @@ describe('escolherAcao', () => {
     // `faseSeAutoPula` nunca entregaria passa verde sem provar nada. Com a mão
     // só a raça e corpo/mochila vazios, `temEquipamento` seria `false` e
     // `jogar` se auto-pularia — a mesa NUNCA para aqui com esse corpo. Por
-    // isso a mão também carrega um equipamento (pior que o do slot ocupado) e
-    // a mochila está cheia: `temEquipamento` fica `true` (a fase legitimamente
-    // para), e ainda assim não há nem o que equipar (perde para o slot
-    // ocupado) nem onde guardar (mochila em `LIMITE_BASE_DE_MOCHILA`) — só `passar`
-    // sobra, e é o `jogarCarta` da raça que este teste prova que o bot não
-    // escolhe no lugar.
+    // isso a mão também carrega um equipamento (pior que o das DUAS mãos
+    // ocupadas) e a mochila está cheia: `temEquipamento` fica `true` (a fase
+    // legitimamente para), e ainda assim não há nem o que equipar (perde para
+    // as duas mãos ocupadas) nem onde guardar (mochila em
+    // `LIMITE_BASE_DE_MOCHILA`) — só `passar` sobra, e é o `jogarCarta` da
+    // raça que este teste prova que o bot não escolhe no lugar.
+    //
+    // 🔴 A `empunhadura dupla` (Task 3) OBRIGA as duas mãos ocupadas aqui: com
+    // só `maoDireita` cheia, a mão ESQUERDA livre venceria — o item fraco
+    // entraria de graça nela (ganho = valor cheio, sem custo) e o bot
+    // escolheria `equiparCarta` em vez de `passar`. É exatamente o cenário que
+    // o teste `'com uma mão LIVRE, equipa sem deslocar nada'` prova como
+    // correto — este teste precisa fechar as DUAS mãos para continuar
+    // provando "nada sobra para vestir".
     const vista = vistaEm('jogar', {
       suaMao: [raca('r7', 'orc'), equipamento('t-fraco', ID_DO_ITEM_FRACO)],
-      slots: { maoDireita: equipamento('t-forte', ID_DO_ITEM_FORTE) },
+      slots: {
+        maoDireita: equipamento('t-forte-d', ID_DO_ITEM_FORTE),
+        maoEsquerda: equipamento('t-forte-e', ID_DO_ITEM_FORTE),
+      },
       mochila: Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-c${String(i)}`)),
     });
 
@@ -348,9 +359,9 @@ describe('escolherAcao', () => {
     //
     // Também chega jogando: mão inicial EXATAMENTE no teto de quem está sem raça
     // em jogo (`LIMITE_BASE_DE_MAO` Portas + 1 Tesouro = `LIMITE_BASE_DE_MAO + 1`),
-    // agora composta como 3 Portas + 5 Tesouros em vez de 7 + 1 — é o Tesouro que
-    // precisa ser abundante aqui (ver por quê logo abaixo), e o monte de Portas
-    // sobra de sobra com só 3 saindo da mão inicial de um baralho de 9/jogador.
+    // composta como 3 Portas + 5 Tesouros — é o Tesouro que precisa ser abundante
+    // aqui (ver por quê logo abaixo), e o monte de Portas sobra de sobra com só 3
+    // saindo da mão inicial de um baralho de 9/jogador.
     //
     // A ação de `recompor` é `{ tipo: 'passar' }` FORJADA (não `escolherAcao`) de
     // propósito: é o que preserva os 5 tesouros da mão inicial intocados até
@@ -362,10 +373,17 @@ describe('escolherAcao', () => {
       // monstro no topo do monte para o combate abrir.
       composicaoPorJogador: Array.from({ length: 9 }, () => ({ tipo: 'monstro' as const, monstroId: 'm-teste' })),
       // 6 por jogador, e não os 2 de `COMPOSICAO_TESOURO_DE_TESTE`: a mão
-      // inicial sozinha precisa segurar os 5 que sobrevivem até `jogar` (1 para
-      // ocupar `maoDireita`, `LIMITE_BASE_DE_MOCHILA` para encher a mochila), e ainda
-      // sobrar 1 no monte para o loot do combate ter o que sacar.
-      composicaoTesouros: Array.from({ length: 6 }, () => ({ tipo: 'equipamento' as const, itemId: 'i-teste' })),
+      // inicial sozinha precisa segurar os 5 que sobrevivem até `jogar` (1 de duas
+      // mãos, que ocupa as DUAS numa AÇÃO só — a `empunhadura dupla` deixa uma
+      // vaga livre valendo mais que qualquer custo, então "nada sobra para
+      // vestir" exige as duas mãos fechadas, e o Montante de teste fecha as duas
+      // de uma vez sem gastar um segundo tesouro —, `LIMITE_BASE_DE_MOCHILA` para
+      // encher a mochila), e ainda sobrar 1 no monte para o loot do combate ter o
+      // que sacar.
+      composicaoTesouros: [
+        { tipo: 'equipamento' as const, itemId: ID_DO_ITEM_DUAS_MAOS },
+        ...Array.from({ length: 5 }, () => ({ tipo: 'equipamento' as const, itemId: 'i-teste' })),
+      ],
       maoInicial: 3,
       maoInicialTesouros: 5,
     };
@@ -388,21 +406,25 @@ describe('escolherAcao', () => {
     expect(eu!.mao.filter((c) => c.tipo === 'equipamento')).toHaveLength(6); // 5 da mão inicial + 1 do loot
 
     // Consome os 6 tesouros por AÇÃO real (nunca forjando `fase`): equipa o
-    // primeiro (ocupa `maoDireita`) e guarda os 5 seguintes (enche a mochila até
-    // `LIMITE_BASE_DE_MOCHILA`) — exatamente o "corpo cheio + mochila cheia" que torna
-    // `passar` a ÚNICA resposta legal que sobra, em vez de uma entre várias que
-    // só não é `entregarCarta`. `entrarOuPular` mantém a fase em `jogar` a cada
-    // passo porque sempre sobra equipamento (na mão ou na mochila) até o laço
-    // acabar — a mesma regra que `faseSeAutoPula` teria testado.
-    const primeiroEquipamento = venceu.jogadores[0]!.mao.find((c) => c.tipo === 'equipamento')!;
+    // Montante (ocupa as DUAS mãos NUMA ação — sem isso a mão esquerda livre
+    // venceria de graça na asserção final) e guarda os 5 seguintes (enche a
+    // mochila até `LIMITE_BASE_DE_MOCHILA`) — exatamente o "corpo cheio + mochila
+    // cheia" que torna `passar` a ÚNICA resposta legal que sobra, em vez de uma
+    // entre várias que só não é `entregarCarta`. `entrarOuPular` mantém a fase
+    // em `jogar` a cada passo porque sempre sobra equipamento (na mão ou na
+    // mochila) até o laço acabar — a mesma regra que `faseSeAutoPula` teria
+    // testado.
+    const montante = venceu.jogadores[0]!.mao.find((c) => c.tipo === 'equipamento')!;
     let corpoPronto = aplicarAcao(
-      venceu, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: primeiroEquipamento.id }, deps(),
+      venceu, { tipo: 'equiparCarta', jogadorId: 'p1', cartaId: montante.id }, deps(),
     ).estado;
     for (let i = 0; i < LIMITE_BASE_DE_MOCHILA; i += 1) {
       const alvo = corpoPronto.jogadores[0]!.mao.find((c) => c.tipo === 'equipamento')!;
       corpoPronto = aplicarAcao(corpoPronto, { tipo: 'guardarCarta', jogadorId: 'p1', cartaId: alvo.id }, deps()).estado;
     }
     expect(corpoPronto.fase).toBe('jogar');                                    // nunca saiu da fase
+    expect(corpoPronto.jogadores[0]!.emJogo.slots.maoDireita).not.toBeNull();   // as DUAS mãos ocupadas —
+    expect(corpoPronto.jogadores[0]!.emJogo.slots.maoEsquerda).not.toBeNull();  // senão a livre venceria de graça
     expect(corpoPronto.jogadores[0]!.mochila).toHaveLength(LIMITE_BASE_DE_MOCHILA);    // mochila CHEIA
     expect(corpoPronto.jogadores[0]!.mao.some((c) => c.tipo === 'equipamento')).toBe(false); // mão sem mais tesouro
 
@@ -463,21 +485,6 @@ describe('escolherAcao', () => {
       .toEqual({ tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-1' });
   });
 
-  it('NÃO equipa o item que piora — o slot ocupado tem mais modificador', () => {
-    // ⚠️ O `itemId` é o SEGUNDO argumento de `equipamento` (o primeiro é só o id
-    // da carta) — passar 't-fraco'/'t-forte' ali só nomeia a carta, e as duas
-    // cairiam no `itemId` DEFAULT ('i-teste') se eu não passasse
-    // `ID_DO_ITEM_FRACO`/`ID_DO_ITEM_FORTE` aqui: o teste exerceria um EMPATE
-    // (ganho 0, também rejeitado por `ganho > 0`), nunca uma perda de verdade.
-    const vista = vistaEm('recompor', {
-      suaMao: [equipamento('t-fraco', ID_DO_ITEM_FRACO)],
-      slots: { maoDireita: equipamento('t-forte', ID_DO_ITEM_FORTE) },
-    });
-
-    expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
-      .not.toEqual({ tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-fraco' });
-  });
-
   it('entre vários candidatos, equipa o de MAIOR ganho', () => {
     // Cobertura que faltava para a dupla `i-forte`/`i-fraco`: um candidato só
     // prova que o guloso reconhece "melhora" contra "nada" — não que ele
@@ -530,6 +537,88 @@ describe('escolherAcao', () => {
 
     expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
       .toEqual({ tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-2m' });
+  });
+
+  it('com as duas mãos ocupadas, desloca a de MENOR valor', () => {
+    // A `empunhadura dupla` (Task 3): um item de UMA mão passa a gerar DUAS
+    // avaliações (uma por mão), e o melhor ganho estritamente positivo entre as
+    // duas vence. Forte (3) na direita, Fraco (1) na esquerda; o candidato
+    // (`ITEM_POTENTE`, 5) vale mais que os dois. Deslocar o Fraco dá ganho +4;
+    // deslocar o Forte dá ganho +2 — os dois POSITIVOS, e distintos de propósito
+    // (ver o comentário de `ITEM_POTENTE` no catálogo de teste): um bot que
+    // pegasse a primeira troca positiva, sem comparar as duas mãos, escolheria a
+    // direita e perderia força.
+    const vista = vistaEm('recompor', {
+      suaMao: [equipamento('t-potente', ID_DO_ITEM_POTENTE)],
+      slots: {
+        maoDireita: equipamento('t-forte', ID_DO_ITEM_FORTE),
+        maoEsquerda: equipamento('t-fraco', ID_DO_ITEM_FRACO),
+      },
+    });
+
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
+      .toEqual({ tipo: 'equiparCarta', jogadorId: 'p1', cartaId: 't-potente', mao: 'maoEsquerda' });
+  });
+
+  it('não equipa quando NENHUMA das duas mãos melhora', () => {
+    // O gêmeo do teste acima, e o que fecha o par: as duas mãos ocupadas por
+    // Forte (3), candidato Fraco (1) — os dois ganhos são negativos (−2 cada). O
+    // `> 0` estrito recusa, e é ele que impede o loop de troca (§5 do spec: com
+    // duas mãos candidatas o risco de loop AUMENTA, não diminui).
+    //
+    // Substitui o teste de mão única que existia aqui antes desta fatia ("NÃO
+    // equipa o item que piora — o slot ocupado tem mais modificador"): com só
+    // UMA mão ocupada, a mão livre vence de graça (é o teste logo abaixo,
+    // "com uma mão LIVRE") — o cenário de mão única deixou de provar "não
+    // piora" e passou a provar o oposto do que o nome dizia.
+    const vista = vistaEm('recompor', {
+      suaMao: [equipamento('t-fraco', ID_DO_ITEM_FRACO)],
+      slots: {
+        maoDireita: equipamento('t-forte-d', ID_DO_ITEM_FORTE),
+        maoEsquerda: equipamento('t-forte-e', ID_DO_ITEM_FORTE),
+      },
+    });
+
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
+      .not.toMatchObject({ tipo: 'equiparCarta' });
+  });
+
+  it('não desloca por EMPATE — ganho zero não é melhora (anti-loop)', () => {
+    // 🔴 Fecha o comparador `> 0` ESTRITO por MUTAÇÃO: nem o teste acima nem o de
+    // "desloca a de MENOR valor" prendem `>` contra `>=` no ramo de UMA mão — os
+    // dois ganhos deles são NEGATIVOS (−2), e trocar `>` por `>=` só muda o
+    // resultado quando o ganho é EXATAMENTE zero. As duas mãos ocupadas por
+    // Fraco (1) e o candidato também vale 1: ganho zero nas duas. Com `>=` no
+    // lugar de `>`, isto equiparia — e a próxima decisão desequiparia de volta,
+    // repetindo para sempre: é o loop de troca que a `afinidade` mediu travando
+    // a partida (ritmo 179–207 contra ~105, com 5.942–8.692 `trocaDeSlot` por 80
+    // partidas). Verificado por mutação (`>=` no lugar de `>`): SÓ este teste
+    // reprova — os outros dois desta Task ficam verdes.
+    const vista = vistaEm('recompor', {
+      suaMao: [equipamento('t-fraco-novo', ID_DO_ITEM_FRACO)],
+      slots: {
+        maoDireita: equipamento('t-fraco-d', ID_DO_ITEM_FRACO),
+        maoEsquerda: equipamento('t-fraco-e', ID_DO_ITEM_FRACO),
+      },
+    });
+
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
+      .not.toMatchObject({ tipo: 'equiparCarta' });
+  });
+
+  it('com uma mão LIVRE, equipa sem deslocar nada', () => {
+    // O ganho aqui é o valor CHEIO do item (custo 0, não há ocupante) — é a
+    // diferença que a empunhadura dupla cria: antes desta fatia o bot só via
+    // `MAOS[0]` e teria comparado o Fraco contra o Forte (perdendo); agora ele
+    // vê a mão livre e entra nela, ainda que exista uma mão pior candidata a
+    // deslocar.
+    const vista = vistaEm('recompor', {
+      suaMao: [equipamento('t-fraco', ID_DO_ITEM_FRACO)],
+      slots: { maoDireita: equipamento('t-forte', ID_DO_ITEM_FORTE) },
+    });
+
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
+      .toMatchObject({ tipo: 'equiparCarta', cartaId: 't-fraco' });
   });
 
   it('NUNCA propõe equipar um item proibido, mesmo sendo o de maior valor cheio', () => {
@@ -588,9 +677,16 @@ describe('escolherAcao', () => {
   it('guarda o que não melhora, se a mochila tem vaga', () => {
     // Ordem do spec §8: equipar se melhora → guardar se há vaga. Guardar o que não
     // serve agora tira a carta do teto de mão sem jogá-la fora.
+    //
+    // 🔴 As DUAS mãos ocupadas são load-bearing desde a `empunhadura dupla`
+    // (Task 3): com só `maoDireita` cheia, a mão ESQUERDA livre venceria de
+    // graça (ganho = valor cheio) e o bot equiparia em vez de guardar.
     const vista = vistaEm('recompor', {
       suaMao: [equipamento('t-fraco', ID_DO_ITEM_FRACO)],
-      slots: { maoDireita: equipamento('t-forte', ID_DO_ITEM_FORTE) },
+      slots: {
+        maoDireita: equipamento('t-forte-d', ID_DO_ITEM_FORTE),
+        maoEsquerda: equipamento('t-forte-e', ID_DO_ITEM_FORTE),
+      },
       mochila: [],
     });
 
@@ -602,9 +698,14 @@ describe('escolherAcao', () => {
     // Sem este ramo o bot pediria `guardarCarta` numa mochila cheia, o
     // `AcaoInvalida` subiria por `avancarBots` e viraria 400 na jogada do HUMANO —
     // exatamente o Critical que matou 28 de 30 mesas no Plano 3b.
+    //
+    // 🔴 As DUAS mãos ocupadas são load-bearing pelo mesmo motivo do teste acima.
     const vista = vistaEm('recompor', {
       suaMao: [equipamento('t-fraco', ID_DO_ITEM_FRACO)],
-      slots: { maoDireita: equipamento('t-forte', ID_DO_ITEM_FORTE) },
+      slots: {
+        maoDireita: equipamento('t-forte-d', ID_DO_ITEM_FORTE),
+        maoEsquerda: equipamento('t-forte-e', ID_DO_ITEM_FORTE),
+      },
       mochila: Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-c${String(i)}`)),
     });
 
@@ -616,10 +717,15 @@ describe('escolherAcao', () => {
     // tem classe em jogo e ainda tem vaga para o Aprendiz — sem ler
     // `eu.limiteDeMochila` (e não um `5` cravado), o bot pediria `guardarCarta`
     // numa mochila que ele acha cheia e nunca guardaria a 6ª carta.
+    //
+    // 🔴 As DUAS mãos ocupadas são load-bearing pelo mesmo motivo dos dois de cima.
     const vista = vistaEm('recompor', {
       classeEmJogo: null,
       suaMao: [equipamento('t-fraco', ID_DO_ITEM_FRACO)],
-      slots: { maoDireita: equipamento('t-forte', ID_DO_ITEM_FORTE) },
+      slots: {
+        maoDireita: equipamento('t-forte-d', ID_DO_ITEM_FORTE),
+        maoEsquerda: equipamento('t-forte-e', ID_DO_ITEM_FORTE),
+      },
       mochila: Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-c${String(i)}`)),
     });
 

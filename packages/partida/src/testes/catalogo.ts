@@ -113,6 +113,21 @@ export const ITEM_FRACO = {
 };
 
 /**
+ * Terceiro item de UMA mão, mais forte que os dois de cima somados (3+1=4).
+ * Sem ele, "o bot avalia as duas mãos" (`empunhadura dupla`) é INEXERCITÁVEL: um
+ * candidato valendo 2 contra Forte(3)+Fraco(1) dá um ganho positivo (+1, deslocar
+ * o Fraco) e um negativo (−1, deslocar o Forte) — um bot que pegasse a PRIMEIRA
+ * troca positiva, sem comparar as duas, também passaria. Com 5, os dois ganhos
+ * são positivos e DISTINTOS (+4 contra o Fraco, +2 contra o Forte): só um bot que
+ * compara as duas mãos escolhe a maior.
+ */
+export const ID_DO_ITEM_POTENTE = 'i-potente';
+export const ITEM_POTENTE = {
+  id: ID_DO_ITEM_POTENTE, nome: 'Item Potente',
+  slot: 'mao' as const, duasMaos: false, modificadores: { forca: 5 }, exclusivo: null,
+};
+
+/**
  * Arma de duas mãos SEM afinidade — para o item exclusivo de duas mãos, ver
  * `ITEM_EXCLUSIVO_DUAS_MAOS`, abaixo.
  *
@@ -217,6 +232,7 @@ export function catalogoDeTeste(
       if (id === ID_DO_ITEM_DE_TESTE) return ITEM_DE_TESTE;
       if (id === ID_DO_ITEM_FORTE) return ITEM_FORTE;
       if (id === ID_DO_ITEM_FRACO) return ITEM_FRACO;
+      if (id === ID_DO_ITEM_POTENTE) return ITEM_POTENTE;
       if (id === ID_DO_ITEM_DUAS_MAOS) return ITEM_DUAS_MAOS;
       if (id === ID_DO_ITEM_EXCLUSIVO) return ITEM_EXCLUSIVO;
       if (id === ID_DO_ITEM_DE_CAPACETE) return ITEM_DE_CAPACETE;
