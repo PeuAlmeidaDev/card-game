@@ -220,6 +220,36 @@ export const ITEM_EXCLUSIVO_PES = {
   exclusivo: { eixo: 'raca' as const, donoId: ID_DA_RACA_DONA, semAfinidade: { agilidade: 1 } },
 };
 
+/**
+ * 🎚️ Cura de 4 contra o `MONSTRO_DE_TESTE` de vida 10: o valor existe para caber
+ * ABAIXO do teto em um cenário e ESTOURAR o teto em outro. Um valor que nunca
+ * estoura deixa o `min(…, vidaInicial)` inexercitável.
+ */
+export const ID_DO_INSTANTANEO_DE_TESTE = 'ins-teste';
+export const INSTANTANEO_DE_TESTE = {
+  nome: 'Instantâneo de Teste', efeitos: [{ tipo: 'stats' as const, modificadores: { vida: 4 } }],
+};
+
+/** Modificador NEGATIVO — sem ele o piso de stat é inexercitável. */
+export const ID_DO_INSTANTANEO_NEGATIVO = 'ins-negativo';
+export const INSTANTANEO_NEGATIVO = {
+  nome: 'Instantâneo Negativo', efeitos: [{ tipo: 'stats' as const, modificadores: { forca: -99 } }],
+};
+
+/**
+ * DOIS efeitos na mesma carta. Nenhuma carta de produção tem mais de um (#120),
+ * então sem este dublê o laço do interpretador é percorrido só uma vez e
+ * `efeitos.slice(0, 1)` fica VERDE.
+ */
+export const ID_DO_INSTANTANEO_DUPLO = 'ins-duplo';
+export const INSTANTANEO_DUPLO = {
+  nome: 'Instantâneo Duplo',
+  efeitos: [
+    { tipo: 'stats' as const, modificadores: { forca: 2 } },
+    { tipo: 'stats' as const, modificadores: { habilidade: 3 } },
+  ],
+};
+
 export function catalogoDeTeste(
   parcial: Partial<CatalogoDaMesa> = {},
 ): CatalogoDaMesa {
@@ -245,6 +275,14 @@ export function catalogoDeTeste(
       if (id === ID_DO_ITEM_EXCLUSIVO_DE_CLASSE) return ITEM_EXCLUSIVO_DE_CLASSE;
       if (id === ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS) return ITEM_EXCLUSIVO_DUAS_MAOS;
       if (id === ID_DO_ITEM_EXCLUSIVO_PES) return ITEM_EXCLUSIVO_PES;
+      return undefined;
+    },
+    // Só os ids listados, pelo mesmo princípio do monstro: um dublê que aprova
+    // qualquer id não é dublê, é a ausência de um.
+    instantaneo: (id) => {
+      if (id === ID_DO_INSTANTANEO_DE_TESTE) return INSTANTANEO_DE_TESTE;
+      if (id === ID_DO_INSTANTANEO_NEGATIVO) return INSTANTANEO_NEGATIVO;
+      if (id === ID_DO_INSTANTANEO_DUPLO) return INSTANTANEO_DUPLO;
       return undefined;
     },
     ...parcial,

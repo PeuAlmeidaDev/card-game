@@ -10,7 +10,7 @@ import { montarComposicao, montarComposicaoTesouros } from './baralho';
 import { criarDadoCiclico, filaDeDados } from './testes/dados';
 import { CARTA_DE_CLASSE_DE_TESTE, catalogoDeTeste, comClasseDeTeste } from './testes/catalogo';
 import { COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
-import { classe, equipamento, monstro, monstros, raca } from './testes/cartas';
+import { classe, equipamento, instantaneo, monstro, monstros, raca } from './testes/cartas';
 import { SLOTS_VAZIOS } from './corpo';
 import type { DepsMesa } from './mesa';
 import type {
@@ -206,6 +206,26 @@ describe('faseSeAutoPula (spec §6.1)', () => {
   it('as duas se pulam com mão E mochila vazias', () => {
     expect(faseSeAutoPula('recompor', { ...comMao([]), mochila: [] })).toBe(true);
     expect(faseSeAutoPula('jogar', { ...comMao([]), mochila: [] })).toBe(true);
+  });
+
+  // 🔑 O achado desta fatia: a mochila deixou de ser equipamento-only. Um
+  // jogador cuja mochila só tem poção não tem NADA para vestir, e cobrar-lhe um
+  // "Passar" é um clique que não decide nada — o comentário de `temEquipamento`
+  // (`fase.ts`) afirmava a premissa contrária, e ela morreu quando a família
+  // `instantaneo` nasceu em `ReceitaTesouro`.
+  it('as duas se pulam com a mão vazia e SÓ um instantâneo na mochila', () => {
+    const soInstantaneo = { ...comMao([]), mochila: [instantaneo('t-1')] };
+    expect(faseSeAutoPula('recompor', soInstantaneo)).toBe(true);
+    expect(faseSeAutoPula('jogar', soInstantaneo)).toBe(true);
+  });
+
+  it('as duas NÃO se pulam com um equipamento na mochila, mesmo ao lado de um instantâneo', () => {
+    // Prova que o `.some` continua distinguindo a família dentro de uma mochila
+    // MISTA — não bastava trocar `.length > 0` por `.some`; a pergunta certa é
+    // "há EQUIPAMENTO aqui", não "há Tesouro aqui".
+    const mista = { ...comMao([]), mochila: [instantaneo('t-1'), equipamento('t-2')] };
+    expect(faseSeAutoPula('recompor', mista)).toBe(false);
+    expect(faseSeAutoPula('jogar', mista)).toBe(false);
   });
 
   it('com a mochila NO TETO, nenhuma das duas se pula — é o que torna o auto-pulo impossível com queima pendente', () => {

@@ -1450,10 +1450,38 @@ describe('TelaMesa — a mochila', () => {
     expect(screen.queryByRole('button', { name: /guardar/i })).not.toBeInTheDocument();
   });
 
+  it('um INSTANTÂNEO na mão também tem "Guardar" aceso — o guard virou família, não membro', async () => {
+    // A fatia `consumíveis (instantâneo)` alargou `guardarCarta` de "é
+    // equipamento?" para "é carta de Tesouro?" (`mesa.ts`). Sem o gêmeo aqui,
+    // este botão continuaria apagado para o segundo membro da família, e a
+    // mesma ação levaria 400 no dia em que a Task 4 desse ao jogador como
+    // sacar essa carta.
+    await abrirMesa(emParada('recompor', [{ id: 'i-1', tipo: 'instantaneo', instantaneoId: 'pocao-de-cura' }]));
+
+    expect(await screen.findByRole('button', { name: /guardar/i })).toBeEnabled();
+  });
+
   it('o item na MOCHILA tem "Equipar" na fase `jogar`', async () => {
     await abrirMesa(emParada('jogar', [], [tesouro('t-1')]));
 
     expect(await screen.findByRole('button', { name: /equipar/i })).toBeEnabled();
+  });
+
+  it('um instantâneo na MOCHILA NÃO tem "Equipar" — `equiparCarta` continua equipamento-only', async () => {
+    // Guardar alargou para a família de Tesouro; equipar não — um instantâneo
+    // não tem slot, e a ação de jogá-lo (spec §4, bloco 5) ainda não existe.
+    // Sem este teste, alargar `botaoEquipar` por engano passaria batido: os
+    // dois pares (Equipar/Guardar) têm o MESMO guard de tipo hoje, e é fácil
+    // copiar um para o outro sem notar que a resposta certa diverge.
+    await abrirMesa(emParada('jogar', [], [{ id: 'i-1', tipo: 'instantaneo', instantaneoId: 'pocao-de-cura' }]));
+
+    // Escopado à seção "Sua mochila": o resumo de mochila da linha do assento,
+    // acima, também nomeia a carta (zona ABERTA), e um `findByText` sem escopo
+    // acharia as DUAS e lançaria por ambiguidade.
+    const secaoMochila = (await screen.findByText(/Sua mochila — 1 de 6/)).closest('section');
+    if (secaoMochila === null) throw new Error('seção "Sua mochila" não encontrada');
+    expect(within(secaoMochila).getByText(/pocao-de-cura/)).toBeInTheDocument();
+    expect(within(secaoMochila).queryByRole('button', { name: /equipar/i })).not.toBeInTheDocument();
   });
 
   it('em `descartar` o "Guardar" EXISTE e está apagado — guardar não é saída do excedente', async () => {

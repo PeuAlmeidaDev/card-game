@@ -1,4 +1,4 @@
-import type { CartaPorta, CartaDeRaca, CartaDeClasse, CartaEquipamento } from '../tipos';
+import type { CartaPorta, CartaDeRaca, CartaDeClasse, CartaEquipamento, CartaInstantaneo } from '../tipos';
 
 /**
  * Cartas-instância para testes que forjam monte/cemitério. O id é EXPLÍCITO (não
@@ -24,6 +24,12 @@ export const classe = (id: string, classeId: string): CartaDeClasse => ({ id, ti
 // o `catalogoDeTeste()` conhece — carta forjada resolve pelo catálogo default em
 // vez de depender de ele aprovar qualquer coisa.
 export const equipamento = (id: string, itemId = 'i-teste'): CartaEquipamento => ({ id, tipo: 'equipamento', itemId });
+// A SEGUNDA família de Tesouro (fatia consumíveis, instantâneo). Anotada como
+// `CartaInstantaneo` pelo mesmo motivo da `raca`: continua atribuível a tudo que
+// espera `Carta`/`CartaTesouro`. O `instantaneoId` default (`'ins-teste'`) é o
+// único que `catalogoDeTeste()` conhece — carta forjada resolve pelo catálogo
+// default em vez de depender de ele aprovar qualquer coisa.
+export const instantaneo = (id: string, instantaneoId = 'ins-teste'): CartaInstantaneo => ({ id, tipo: 'instantaneo', instantaneoId });
 
 /**
  * `n` cartas numeradas (`m1`, `m2`, … / `s1`, `s2`, …). Existe para que uma mão

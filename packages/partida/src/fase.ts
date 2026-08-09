@@ -97,13 +97,16 @@ export function faseSeAutoPula(fase: Fase, jogador: JogadorNaMesa): boolean {
   // As DUAS origens de `equiparCarta` (spec §6): mão e mochila. Enquanto a
   // mochila não existia, olhar só a mão era a mesma pergunta; desde que ela é
   // origem, um jogador de mão vazia e mochila cheia ainda tem o que vestir —
-  // pulá-lo esconderia a única ação disponível. `mochila.length > 0`, não
-  // `.some((c) => c.tipo === 'equipamento')`: a mochila é tipada
-  // `readonly CartaTesouro[]`, e essa família é equipamento-only POR DESENHO
-  // (ver o docstring de `ReceitaTesouro` em `./tipos`) — classe é carta de
-  // Portas e maldição nunca entra na mochila. `.length > 0` e o `.some` são a
-  // MESMA pergunta; o `.some` sugeriria uma distinção que o modelo não tem.
-  const temEquipamento = jogador.mao.some((c) => c.tipo === 'equipamento') || jogador.mochila.length > 0;
+  // pulá-lo esconderia a única ação disponível.
+  // 🔴 `mochila.some(…)` e NÃO `mochila.length > 0`: até a fatia `consumíveis
+  // (instantâneo)` a mochila era `readonly CartaTesouro[]` com uma família só, e
+  // as duas perguntas eram a mesma — o comentário anterior dizia, com todas as
+  // letras, que a família era "equipamento-only POR DESENHO". Com o
+  // `instantaneo` na mochila elas DIVERGEM: quem só tem poção guardada não tem
+  // nada para vestir, e um `length > 0` prenderia a fase cobrando um "Passar"
+  // que não decide nada.
+  const temEquipamento = jogador.mao.some((c) => c.tipo === 'equipamento')
+    || jogador.mochila.some((c) => c.tipo === 'equipamento');
   switch (fase) {
     case 'recompor':
       return !temEspecializacao && !temEquipamento;

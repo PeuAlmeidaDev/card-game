@@ -9,10 +9,13 @@ afterEach(cleanup);
 const ctx: ContextoDeNarracao = {
   voce: 'p1',
   nomeDe: (id) => (id === 'p1' ? 'Você' : id === 'p2' ? 'Bot 1' : id),
-  nomeDaRaca: (id) => (id === 'orc' ? 'Orc' : id === 'elfo' ? 'Elfo' : id),
-  nomeDoMonstro: (id) => (id === 'goblin' ? 'Goblin' : id),
-  nomeDoItem: (id) => (id === 'espada-curta' ? 'Espada Curta' : id === 'elmo-de-couro' ? 'Elmo de Couro' : id),
-  nomeDaClasse: (id) => (id === 'guerreiro' ? 'Guerreiro' : id),
+  nomes: {
+    raca: (id) => (id === 'orc' ? 'Orc' : id === 'elfo' ? 'Elfo' : id),
+    monstro: (id) => (id === 'goblin' ? 'Goblin' : id),
+    item: (id) => (id === 'espada-curta' ? 'Espada Curta' : id === 'elmo-de-couro' ? 'Elmo de Couro' : id),
+    classe: (id) => (id === 'guerreiro' ? 'Guerreiro' : id),
+    instantaneo: (id) => id,
+  },
 };
 
 describe('narrarEvento — linhas de texto puro', () => {

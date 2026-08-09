@@ -49,6 +49,7 @@ Vários tipos são **gêmeos** entre pacotes. Sem guard, acrescentar um membro a
 | `_CoberturaSlotDeItem` | `SlotDeItem`, o mesmo par |
 | `_CoberturaEixo` | `EixoDeAfinidade`, o mesmo par |
 | `_CoberturaBadStuff` | `BadStuff` — a regra em `partida` × o dado em `cartas` |
+| `_CoberturaEfeitoInstantaneo` | `EfeitoInstantaneo` — a regra em `partida` × o dado em `cartas` |
 
 🔑 **O `_CoberturaBadStuff` (2026-08-09) é o caso que mostra POR QUE a lista existe.** O `partida`
 **nunca vê `MonstroCarta`** — ele só conhece `CatalogoDaMesa.monstro(id) → InfoMonstro`, e as cartas

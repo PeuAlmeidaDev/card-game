@@ -15,6 +15,7 @@ import type {
   CartaEquipamento,
   CartaPorta,
   CartaTesouro,
+  EfeitoInstantaneo,
   EixoDeAfinidade,
   EspiadaPendente,
   EventoDaMesa,
@@ -31,7 +32,7 @@ import type {
 } from '@card-dungeon/partida';
 import type {
   Slot as SlotDaCarta, SlotDeItem as SlotDeItemDaCarta, ItemCarta, EixoDeAfinidade as EixoDaCarta,
-  BadStuff as BadStuffDaCarta,
+  BadStuff as BadStuffDaCarta, EfeitoInstantaneo as EfeitoDaCarta,
 } from '@card-dungeon/cartas';
 
 /**
@@ -200,6 +201,22 @@ type _CoberturaBadStuff =
   [BadStuff] extends [BadStuffDaCarta] ? ([BadStuffDaCarta] extends [BadStuff] ? true : never) : never;
 const _coberturaBadStuff: _CoberturaBadStuff = true;
 void _coberturaBadStuff;
+
+/**
+ * Trava as duas uniões `EfeitoInstantaneo` — a de `partida` (a regra) e a de
+ * `cartas` (o dado). Mesma tupla e mesmo preço do `_CoberturaSlot`.
+ *
+ * 🔴 Sem ele, um verbo novo em `cartas` deixa `pnpm typecheck` 7/7 LIMPO com o
+ * interpretador do reducer nunca alcançando o verbo.
+ *
+ * ⚠️ Guard de COMPILAÇÃO. Quem acusa é o `pnpm typecheck`, nunca a suíte.
+ */
+type _CoberturaEfeitoInstantaneo =
+  [EfeitoInstantaneo['tipo']] extends [EfeitoDaCarta['tipo']]
+    ? ([EfeitoDaCarta['tipo']] extends [EfeitoInstantaneo['tipo']] ? true : never)
+    : never;
+const _coberturaEfeitoInstantaneo: _CoberturaEfeitoInstantaneo = true;
+void _coberturaEfeitoInstantaneo;
 
 /**
  * Corpo do POST /api/partida/:id/acao: a ação MAIS a versão do estado que o

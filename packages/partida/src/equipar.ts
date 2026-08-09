@@ -1,5 +1,5 @@
 import type {
-  CartaEquipamento, EstadoPartida, EventoDaMesa, InfoItem, MaoSlot, QueimaPendente, Slot, ZonaEmJogo,
+  CartaEquipamento, CartaTesouro, EstadoPartida, EventoDaMesa, InfoItem, MaoSlot, QueimaPendente, Slot, ZonaEmJogo,
 } from './tipos';
 import { limiteDeMochila } from './mao';
 
@@ -114,10 +114,17 @@ export function colocarNoSlot(
  *
  * @param motivo Sem default: o valor certo depende de quem chamou, e o compilador
  * tem que cobrar cada call-site novo.
+ *
+ * `deslocados: readonly CartaTesouro[]`, não `CartaEquipamento[]` — alargado na
+ * fatia `consumíveis (instantâneo)`: o chamador de `mochilaEncolheu`
+ * (`jogarCarta`, em `./mesa`) pode entregar um instantaneo que estava só
+ * GUARDADO, nunca equipado. Os dois outros chamadores (`equiparCarta`,
+ * `trocaDeSlot`/`perdeuAfinidade`) continuam entregando só `CartaEquipamento` —
+ * a função aceita a mais, não passa a exigir a mais.
  */
 export function destinoDoDesequipado(
   estado: EstadoPartida,
-  deslocados: readonly CartaEquipamento[],
+  deslocados: readonly CartaTesouro[],
   jogadorId: string,
   motivo: Extract<EventoDaMesa, { readonly tipo: 'desequipou' }>['motivo'],
 ): {
@@ -135,7 +142,7 @@ export function destinoDoDesequipado(
   const mochila = [...jogador.mochila];
   const teto = limiteDeMochila(jogador);
   const eventos: EventoDaMesa[] = [];
-  let pendentes: readonly CartaEquipamento[] = [];
+  let pendentes: readonly CartaTesouro[] = [];
   for (const [i, carta] of deslocados.entries()) {
     if (mochila.length >= teto) {
       pendentes = deslocados.slice(i);

@@ -1,7 +1,8 @@
-import type { ReactNode } from 'react';
+﻿import type { ReactNode } from 'react';
 import { narrarCombate } from './narrarCombate';
 import { narrarPorta } from './narrarPorta';
 import { descreverCarta } from './descreverCarta';
+import type { NomesDoCatalogo } from './descreverCarta';
 import type { EventoDaMesa, SlotDeItem } from '@card-dungeon/shared';
 
 /**
@@ -18,14 +19,17 @@ const ENCAIXE: Record<SlotDeItem, { readonly nomeado: string; readonly comDe: st
   pes: { nomeado: 'os pés', comDe: 'dos pés' },
 };
 
-/** O que o narrador precisa saber além do evento: quem é você e como nomear as coisas. */
+/**
+ * O que o narrador precisa saber além do evento: quem é você e como nomear as
+ * coisas. `nomes: NomesDoCatalogo` — um campo, não quatro soltos — desde a
+ * fatia `consumíveis (instantâneo)`: a mesma razão de `descreverCarta` ter
+ * virado objeto (o quinto resolvedor não podia nascer como sexto parâmetro
+ * solto).
+ */
 export interface ContextoDeNarracao {
   readonly voce: string;
   readonly nomeDe: (jogadorId: string) => string;
-  readonly nomeDaRaca: (racaId: string) => string;
-  readonly nomeDoMonstro: (monstroId: string) => string;
-  readonly nomeDoItem: (itemId: string) => string;
-  readonly nomeDaClasse: (classeId: string) => string;
+  readonly nomes: NomesDoCatalogo;
 }
 
 /**
@@ -46,9 +50,9 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
       return narrarPorta(
         evento.carta,
         evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId),
-        ctx.nomeDaRaca,
-        ctx.nomeDoMonstro,
-        ctx.nomeDaClasse,
+        ctx.nomes.raca,
+        ctx.nomes.monstro,
+        ctx.nomes.classe,
       );
     // Porta FECHADA: o evento não carrega a carta, e a narração não pode inventar
     // o que ele não diz. Vale inclusive para quem sacou — ele descobre o quê pela
@@ -71,9 +75,9 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
     case 'fim':
       return 'A partida terminou.';
     case 'racaEmJogo':
-      return `${ctx.nomeDe(evento.jogadorId)} entra em campo como ${ctx.nomeDaRaca(evento.carta.racaId)}.`;
+      return `${ctx.nomeDe(evento.jogadorId)} entra em campo como ${ctx.nomes.raca(evento.carta.racaId)}.`;
     case 'classeEmJogo':
-      return `${ctx.nomeDe(evento.jogadorId)} passa a lutar como ${ctx.nomeDaClasse(evento.carta.classeId)}.`;
+      return `${ctx.nomeDe(evento.jogadorId)} passa a lutar como ${ctx.nomes.classe(evento.carta.classeId)}.`;
     // A entrega é PRIVADA: o evento não carrega a carta (spec §5) e a apresentação
     // não pode inventar o que ele não diz. Só o destinatário descobre o quê, pela
     // própria mão. A rolagem aparece quando houve empate a desempatar.
@@ -94,7 +98,7 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
     // adversário ficou mais perigoso, que é a única razão de a zona ser aberta.
     case 'equipou':
       return `${evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId)} equipa `
-        + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem, ctx.nomeDaClasse)}.`;
+        + `${descreverCarta(evento.carta, ctx.nomes)}.`;
     // A mochila é zona ABERTA, então o evento carrega a carta e a narração pode
     // nomeá-la — mesma regra do `equipou`, e a mesma assimetria com o `loot`.
     // Passa por `descreverCarta` e não por `nomeDoItem` direto: hoje o resultado é
@@ -104,11 +108,11 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
     // continuaria compilando, calado.
     case 'guardou':
       return `${evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId)} guarda `
-        + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem, ctx.nomeDaClasse)} na mochila.`;
+        + `${descreverCarta(evento.carta, ctx.nomes)} na mochila.`;
     // O descarte é PÚBLICO: o cemitério já é zona aberta, esconder aqui seria teatro.
     case 'descarte':
       return `${ctx.nomeDe(evento.jogadorId)} descartou `
-        + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem, ctx.nomeDaClasse)}.`;
+        + `${descreverCarta(evento.carta, ctx.nomes)}.`;
     case 'combate':
       return (
         <>
@@ -137,7 +141,7 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
     // independentes, e quatro (agora seis) frases à mão seriam lugares para divergir.
     case 'desequipou': {
       const quem = evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId);
-      const item = descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem, ctx.nomeDaClasse);
+      const item = descreverCarta(evento.carta, ctx.nomes);
       const quemMinusculo = quem === 'Você' ? 'você' : quem;
       // `switch` com `never`, não ternário: um ternário de dois braços não dá
       // pressão de compilador nenhuma quando `motivo` ganha um terceiro valor —
@@ -168,7 +172,7 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
     // carrega a carta e a narração pode nomeá-la — mesma regra do `guardou`.
     case 'queimou':
       return `${evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId)} queima `
-        + `${descreverCarta(evento.carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem, ctx.nomeDaClasse)} para abrir vaga na mochila.`;
+        + `${descreverCarta(evento.carta, ctx.nomes)} para abrir vaga na mochila.`;
     // A única pista que o jogador tem de que a economia da mesa secou. NOMEIA o
     // baralho em vez de dizer só "não ganhou nada": sem isso ele lê a própria
     // vitória como bug — foi exatamente o que aconteceu no gate ocular do 4a.
@@ -193,7 +197,7 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
         return `O Bad Stuff mira ${encaixe.nomeado} de ${quemMinusculo}, mas não havia nada equipado ali.`;
       }
       const itens = evento.cartas
-        .map((carta) => descreverCarta(carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem, ctx.nomeDaClasse))
+        .map((carta) => descreverCarta(carta, ctx.nomes))
         .join(' e ');
       return `O Bad Stuff arranca ${itens} ${encaixe.comDe} de ${quemMinusculo}.`;
     }
@@ -208,12 +212,12 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
       const partes: string[] = [];
       if (evento.doCorpo.length > 0) {
         partes.push(`do corpo: ${evento.doCorpo
-          .map((carta) => descreverCarta(carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem, ctx.nomeDaClasse))
+          .map((carta) => descreverCarta(carta, ctx.nomes))
           .join(', ')}`);
       }
       if (evento.daMochila.length > 0) {
         partes.push(`da mochila: ${evento.daMochila
-          .map((carta) => descreverCarta(carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem, ctx.nomeDaClasse))
+          .map((carta) => descreverCarta(carta, ctx.nomes))
           .join(', ')}`);
       }
       if (evento.daMao > 0) {

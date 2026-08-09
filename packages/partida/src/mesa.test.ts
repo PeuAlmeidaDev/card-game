@@ -11,7 +11,7 @@ import { faseDoTurnoDe } from './fase';
 import { projetarPara, versaoDe } from './projecao';
 import { AcaoInvalida } from './erros';
 import { filaDeDados, criarDadoCiclico } from './testes/dados';
-import { classe, monstro, monstros, raca, equipamento } from './testes/cartas';
+import { classe, monstro, monstros, raca, equipamento, instantaneo } from './testes/cartas';
 import {
   catalogoDeTeste, comClasseDeTeste, ID_DA_CLASSE_DE_TESTE, CLASSE_DE_TESTE, MONSTRO_DE_TESTE, ID_DO_ITEM_EXCLUSIVO,
   ID_DA_RACA_OUTRA, ID_DA_RACA_DONA, ID_DO_ITEM_DE_TESTE, ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS, ID_DO_ITEM_EXCLUSIVO_PES,
@@ -2701,6 +2701,22 @@ describe('aplicarAcao — guardarCarta', () => {
     expect(maoDe(r.estado, 'p1')).toEqual([]);
     expect(jogadorDe(r.estado, 'p1').mochila).toEqual([equipamento('t-1')]);
     expect(r.eventos).toContainEqual({ tipo: 'guardou', jogadorId: 'p1', carta: equipamento('t-1') });
+  });
+
+  it('guarda um instantâneo na mochila — a família deixou de ser equipamento-only', () => {
+    // Mesmo teste de cima, pelo SEGUNDO membro de `ReceitaTesouro`: o guard de
+    // `guardarCarta` deixou de perguntar "é equipamento?" e passou a perguntar
+    // "é Tesouro?" (fatia consumíveis, instantâneo). O equipamento na mão ao
+    // lado do instantâneo é só o que segura `recompor` aberta — um instantâneo
+    // sozinho não a seguraria (`equiparCarta` não o aceita), e cravar a fase em
+    // vez de derivá-la produziria um estado que o domínio nunca gera sozinho.
+    const p = comMao(nascida(), [instantaneo('t-9'), equipamento('t-1')]);
+
+    const r = aplicarAcao(p, { tipo: 'guardarCarta', jogadorId: 'p1', cartaId: 't-9' }, deps([]));
+
+    expect(maoDe(r.estado, 'p1')).toEqual([equipamento('t-1')]);
+    expect(jogadorDe(r.estado, 'p1').mochila).toEqual([instantaneo('t-9')]);
+    expect(r.eventos).toContainEqual({ tipo: 'guardou', jogadorId: 'p1', carta: instantaneo('t-9') });
   });
 
   it('a mochila CHEIA recusa como AcaoInvalida, não como 500', () => {

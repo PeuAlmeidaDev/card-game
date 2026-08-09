@@ -207,9 +207,12 @@ function candidatosQueEuPossoVestir(
   eu: JogadorPublico,
   catalogo: CatalogoDaMesa,
 ): readonly CartaEquipamento[] {
+  // A mochila guarda TESOURO, não só equipamento (fatia `consumíveis
+  // (instantâneo)`): um instantâneo ali não é candidato a vestir, e o bot não tem
+  // política nenhuma para ele ainda (a ação de jogá-lo chega no bloco 5).
   return [
     ...vista.suaMao.filter((c): c is CartaEquipamento => c.tipo === 'equipamento'),
-    ...eu.mochila,
+    ...eu.mochila.filter((c): c is CartaEquipamento => c.tipo === 'equipamento'),
   ].filter((carta) => {
     const info = catalogo.item(carta.itemId);
     // Id desconhecido passa: `valorEfetivoDe` já o zera, e recusar aqui seria a

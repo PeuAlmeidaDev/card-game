@@ -5,6 +5,7 @@ import { contrato } from '@card-dungeon/shared';
 import { CATALOGO } from '@card-dungeon/personagem';
 import {
   MONSTROS_SACAVEIS, RACAS_SACAVEIS, CLASSES_SACAVEIS, ITENS_SACAVEIS, obterRaca, obterClasse, obterItem,
+  obterInstantaneo,
   type MonstroCarta,
 } from '@card-dungeon/cartas';
 import {
@@ -110,6 +111,11 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
     monstro: acharMonstro,
     classe: obterClasse,
     item: obterItem,
+    // Resolvedor exigido pelo tipo (fatia `consumíveis (instantâneo)`) — a mesa
+    // de PRODUÇÃO ainda não sabe sacar um instantaneo: `composicaoTesourosDeProducao`,
+    // acima, continua derivada só de `ITENS_SACAVEIS`. Sem receita nenhuma no
+    // baralho, este resolvedor não tem id para resolver ainda.
+    instantaneo: obterInstantaneo,
   };
   const deps = { rolar, embaralhar, catalogo };
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { narrarEvento } from './narrarEvento';
 import { participantesDe } from './participantesDe';
+import type { NomesDoCatalogo } from './descreverCarta';
 import type { Catalogo, EventoDaMesa, JogadorPublico } from '@card-dungeon/shared';
 
 /**
@@ -47,6 +48,14 @@ export function PainelLog({ log, jogadores, voce, racas, monstros, itens, classe
   // nada acusar — o log diria "equipa espada-curta" e a suíte ficaria verde.
   const nomeDoItem = (id: string): string => itens.find((i) => i.id === id)?.nome ?? id;
   const nomeDaClasse = (id: string): string => classes.find((c) => c.id === id)?.nome ?? id;
+  // Sem prop de catálogo ainda: o `GET /api/catalogo` não publica instantâneos
+  // nesta fatia (`consumíveis (instantâneo)` — Task 2 só faz a família nascer no
+  // MODELO). Cai no id, mesma degradação defensiva dos outros quatro — e nenhum
+  // evento de produção carrega um instantaneo até a carta existir num baralho.
+  const nomeDoInstantaneo = (id: string): string => id;
+  const nomes: NomesDoCatalogo = {
+    raca: nomeDaRaca, monstro: nomeDoMonstro, item: nomeDoItem, classe: nomeDaClasse, instantaneo: nomeDoInstantaneo,
+  };
 
   // `null` = Todos. O filtro é estado LOCAL: é preferência de leitura, não estado
   // de jogo — subir isso para a TelaMesa (ou para o servidor) só acoplaria coisas.
@@ -102,7 +111,7 @@ export function PainelLog({ log, jogadores, voce, racas, monstros, itens, classe
           const cor = 'jogadorId' in evento ? corDoJogador(jogadores, evento.jogadorId) : CINZA;
           return (
             <li key={i} style={{ color: cor }}>
-              {narrarEvento(evento, { voce, nomeDe, nomeDaRaca, nomeDoMonstro, nomeDoItem, nomeDaClasse })}
+              {narrarEvento(evento, { voce, nomeDe, nomes })}
             </li>
           );
         })}

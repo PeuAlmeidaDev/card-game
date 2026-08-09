@@ -33,10 +33,40 @@ export type CartaDeRaca = Extract<CartaPorta, { readonly tipo: 'raca' }>;
 export type CartaDeClasse = Extract<CartaPorta, { readonly tipo: 'classe' }>;
 
 /**
- * **Receita** de carta do baralho de TESOUROS. Equipamento-only POR DESENHO, não
- * por acidente desta fatia: classe é carta de PORTAS (vai para a mão, como
- * raça) e maldição nunca entra na mochila — nenhuma das duas pertence a esta
- * família.
+ * ⚠️ Gêmea da união em `cartas/src/instantaneos.ts`, pelo mesmo motivo do `Slot`
+ * e do `BadStuff`: `partida` é cego ao catálogo e a direção
+ * (`cartas ← personagem ← partida`) proíbe o import. O guard
+ * `_CoberturaEfeitoInstantaneo` em `shared` é o que impede a divergência.
+ */
+export type EfeitoInstantaneo =
+  | { readonly tipo: 'stats'; readonly modificadores: ModificadoresDeStat };
+
+/**
+ * Em quem o instantâneo cai. Mora na AÇÃO, não na carta — a mesma assinatura da
+ * `carta de combate` do §4 do bible. Bufar o monstro (ou sabotar a si mesmo) é
+ * jogada LEGAL: hoje irracional, no bloco 5 é a mecânica inteira.
+ *
+ * ⚠️ Nasce nesta fatia SEM consumidor: a ação que carrega o alvo (spec §4) ainda
+ * não existe, então esta união ainda não tem twin em `shared` — nem `z.enum`, nem
+ * guard. Quando a ação chegar, ela precisa do MESMO tratamento gêmeo que
+ * `EfeitoInstantaneo` recebe abaixo.
+ */
+export type AlvoDeInstantaneo = 'lutador' | 'monstro';
+
+/** A janela do reducer para a carta consumível. `InstantaneoCarta` a satisfaz estruturalmente. */
+export interface InfoInstantaneo {
+  readonly nome: string;
+  readonly efeitos: readonly EfeitoInstantaneo[];
+}
+
+/**
+ * **Receita** de carta do baralho de TESOUROS. Até a fatia `consumíveis
+ * (instantâneo)` era equipamento-only POR DESENHO: classe é carta de PORTAS (vai
+ * para a mão, como raça) e maldição nunca entra na mochila, então nenhuma das
+ * duas chegou a pertencer a esta família. O `instantaneo` é o SEGUNDO membro, e é
+ * o que derruba essa premissa — quem lia "tem algo na mochila" como sinônimo de
+ * "tem o que vestir" (`faseSeAutoPula`, em `./fase`) teve que voltar a perguntar
+ * pela família, não pelo membro único.
  *
  * Família SEPARADA de `ReceitaPorta`, e não um `tipo` a mais na mesma união com
  * um campo `baralho`: com o campo, nada impediria um monstro etiquetado como
@@ -44,7 +74,8 @@ export type CartaDeClasse = Extract<CartaPorta, { readonly tipo: 'classe' }>;
  * runtime. Com dois tipos, quem recusa é o compilador.
  */
 export type ReceitaTesouro =
-  | { readonly tipo: 'equipamento'; readonly itemId: string };
+  | { readonly tipo: 'equipamento'; readonly itemId: string }
+  | { readonly tipo: 'instantaneo'; readonly instantaneoId: string };
 
 export type CartaTesouro = ReceitaTesouro & { readonly id: string };
 
@@ -61,6 +92,13 @@ export type Carta = CartaPorta | CartaTesouro;
  * checagem viraria runtime em vez de compilação. Mesma jogada de `CartaDeRaca`.
  */
 export type CartaEquipamento = Extract<CartaTesouro, { readonly tipo: 'equipamento' }>;
+
+/**
+ * A carta consumível como instância. Gêmea de `CartaEquipamento`, mesma jogada:
+ * tipar o slot ou a ação errados com `CartaTesouro` cru deixaria a checagem
+ * virar runtime em vez de compilação.
+ */
+export type CartaInstantaneo = Extract<CartaTesouro, { readonly tipo: 'instantaneo' }>;
 
 /**
  * Onde uma peça se encaixa no corpo. Cinco slots (bible §5).
@@ -307,6 +345,8 @@ export interface CatalogoDaMesa {
   readonly classe: (classeId: string) => InfoClasse | undefined;
   /** `undefined` = id que não existe: invariante quebrada, não pedido inválido. */
   readonly item: (itemId: string) => InfoItem | undefined;
+  /** `undefined` = id que não existe: invariante quebrada, não pedido inválido. */
+  readonly instantaneo: (instantaneoId: string) => InfoInstantaneo | undefined;
 }
 
 export interface PosicaoFinal {
@@ -442,9 +482,16 @@ export type EventoDaMesa =
    * (Aprendiz 6 → 5), e quem já estava no teto antigo perde uma vaga na hora —
    * mesmo tratamento dos outros dois motivos, o jogador escolhe o que sai
    * (decisão #59), nunca um auto-trim silencioso.
+   *
+   * `carta: CartaTesouro`, não `CartaEquipamento` — alargado na fatia
+   * `consumíveis (instantâneo)`: só o motivo `mochilaEncolheu` pode carregar um
+   * instantaneo aqui (a mochila encolhendo evict a carta que está no fundo dela,
+   * de QUALQUER família); `trocaDeSlot` e `perdeuAfinidade` continuam vindo só
+   * de um slot do corpo, que só aceita `CartaEquipamento` — o tipo larga a mais
+   * para o membro novo, não para os três motivos.
    */
   | { readonly tipo: 'desequipou'; readonly jogadorId: string;
-      readonly carta: CartaEquipamento; readonly destino: 'mochila' | 'cemiterio';
+      readonly carta: CartaTesouro; readonly destino: 'mochila' | 'cemiterio';
       readonly motivo: 'trocaDeSlot' | 'perdeuAfinidade' | 'mochilaEncolheu' }
   /**
    * A carta da MOCHILA que o jogador escolheu destruir para abrir vaga ao item
@@ -582,8 +629,12 @@ export interface QueimaPendente {
   /**
    * A fila. O PRIMEIRO é o que a escolha de agora resolve — tupla não-vazia para
    * que "pendência aberta sem carta a resolver" não seja representável.
+   *
+   * `CartaTesouro`, não `CartaEquipamento` — gêmeo do alargamento do `desequipou`
+   * acima, pela mesma razão: o motivo `mochilaEncolheu` pode trazer um
+   * instantaneo desde a fatia `consumíveis (instantâneo)`.
    */
-  readonly deslocados: readonly [CartaEquipamento, ...CartaEquipamento[]];
+  readonly deslocados: readonly [CartaTesouro, ...CartaTesouro[]];
   readonly motivo: Extract<EventoDaMesa, { readonly tipo: 'desequipou' }>['motivo'];
 }
 

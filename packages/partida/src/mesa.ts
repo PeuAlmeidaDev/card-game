@@ -346,9 +346,9 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   //   jogar                equiparCarta   afinidade !== 'proibida'     `equiparCarta`
   //   recompor             equiparCarta   as duas mãos ocupadas => `mao`  `equiparCarta`
   //   jogar                equiparCarta   as duas mãos ocupadas => `mao`  `equiparCarta`
-  //   recompor             guardarCarta   carta.tipo === 'equipamento' `guardarCarta`
+  //   recompor             guardarCarta   carta.tipo é 'equipamento' ou 'instantaneo' `guardarCarta`
   //   recompor             guardarCarta   mochila cheia                `guardarCarta`
-  //   jogar                guardarCarta   carta.tipo === 'equipamento' `guardarCarta`
+  //   jogar                guardarCarta   carta.tipo é 'equipamento' ou 'instantaneo' `guardarCarta`
   //   jogar                guardarCarta   mochila cheia                `guardarCarta`
   //   combate              atacar         `proximaDecisao`             o motor (`AcaoIlegal`)
   //   combate              esquivar       `proximaDecisao`             o motor (`AcaoIlegal`)
@@ -399,9 +399,11 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // botão "Passar" chega).
   //
   // Os QUATRO pares de `guardarCarta` (Task 2) têm gêmeo na tela
-  // (`TelaMesa.test.tsx`, describe "a mochila"): `carta.tipo === 'equipamento'`
-  // é gate de EXISTÊNCIA do botão "Guardar" (mesmo tratamento que `equiparCarta`
-  // dá ao seu par de tipo), e "mochila cheia" é `disabled` comum.
+  // (`TelaMesa.test.tsx`, describe "a mochila"): `carta.tipo` sendo de Tesouro
+  // (`'equipamento'` OU, desde a fatia `consumíveis (instantâneo)`,
+  // `'instantaneo'`) é gate de EXISTÊNCIA do botão "Guardar" (mesmo tratamento
+  // que `equiparCarta` dá ao seu par de tipo), e "mochila cheia" é `disabled`
+  // comum.
   //
   // O gate de FASE deste botão JÁ FOI existência também, pelo argumento de que
   // guardar numa fase errada não é "espere a hora certa" mas fugir do teto de
@@ -453,6 +455,12 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // sem `mao`) é DUAS linhas, não uma — mesma convenção da afinidade, porque
   // `equiparCarta` é legal nas duas fases paradas. Recontagem a partir do
   // reducer, `AcaoInvalida` por `AcaoInvalida`.
+  //
+  // A fatia `consumíveis (instantâneo)` manteve DEZOITO pares em VINTE E UMA
+  // linhas: `guardarCarta` ALARGOU o guard existente (`carta.tipo` passa a
+  // aceitar 'equipamento' OU 'instantaneo'), não ganhou um `AcaoInvalida` novo —
+  // mesma jogada que `jogarCarta` fez na Task 7 do Plano B, a linha do par é a
+  // mesma, só o texto da condição mudou.
   if (!acaoEhLegal(estado.fase, estado.queima !== null, acao.tipo)) {
     throw new AcaoInvalida(
       estado.queima === null
@@ -864,7 +872,11 @@ function descartarNoBaralhoCerto(estado: EstadoPartida, carta: Carta): EstadoPar
     case 'raca':
     case 'classe':
       return { ...estado, portas: { ...estado.portas, cemiterio: [...estado.portas.cemiterio, carta] } };
+    // O instantâneo é a SEGUNDA família de Tesouro (fatia `consumíveis
+    // (instantâneo)`): mesmo cemitério do equipamento, mesma razão — os dois
+    // vieram do baralho de Tesouros e é para lá que voltam.
     case 'equipamento':
+    case 'instantaneo':
       return { ...estado, tesouros: { ...estado.tesouros, cemiterio: [...estado.tesouros.cemiterio, carta] } };
     default: {
       const naoTratada: never = carta;
@@ -1020,7 +1032,11 @@ function jogarCarta(
   // de `QueimaPendente`.
   const tetoNovo = limiteDeMochila(atualizado);
   const excedeu = atualizado.mochila.length > tetoNovo;
-  const cartaExcedente: CartaEquipamento | undefined = excedeu
+  // `CartaTesouro`, não `CartaEquipamento`: a mochila guarda as duas famílias
+  // desde a fatia `consumíveis (instantâneo)`, e o que estoura o teto ao
+  // encolher pode ser qualquer uma — a pergunta é "o que está no fundo da
+  // mochila", não "que família é ela".
+  const cartaExcedente: CartaTesouro | undefined = excedeu
     ? atualizado.mochila[atualizado.mochila.length - 1]
     : undefined;
   const comMochilaCerta: JogadorNaMesa = cartaExcedente === undefined
@@ -1188,7 +1204,11 @@ function guardarCarta(
   deps: DepsMesa,
 ): ResultadoAcao {
   const { jogador, carta } = cartaDaMao(estado, acao);
-  if (carta.tipo !== 'equipamento') {
+  // A mochila guarda TESOURO, não só equipamento (fatia `consumíveis
+  // (instantâneo)`). A pergunta certa é pela família, não pelo membro: um
+  // terceiro tipo de Tesouro (a `carta de combate`, bloco 5) entra aqui sem
+  // tocar este guard.
+  if (carta.tipo !== 'equipamento' && carta.tipo !== 'instantaneo') {
     throw new AcaoInvalida('aplicarAcao: só carta de tesouro vai para a mochila');
   }
   if (jogador.mochila.length >= limiteDeMochila(jogador)) {
