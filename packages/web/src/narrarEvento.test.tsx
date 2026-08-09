@@ -11,7 +11,7 @@ const ctx: ContextoDeNarracao = {
   nomeDe: (id) => (id === 'p1' ? 'Você' : id === 'p2' ? 'Bot 1' : id),
   nomeDaRaca: (id) => (id === 'orc' ? 'Orc' : id === 'elfo' ? 'Elfo' : id),
   nomeDoMonstro: (id) => (id === 'goblin' ? 'Goblin' : id),
-  nomeDoItem: (id) => (id === 'espada-curta' ? 'Espada Curta' : id),
+  nomeDoItem: (id) => (id === 'espada-curta' ? 'Espada Curta' : id === 'elmo-de-couro' ? 'Elmo de Couro' : id),
   nomeDaClasse: (id) => (id === 'guerreiro' ? 'Guerreiro' : id),
 };
 
@@ -205,14 +205,20 @@ describe('narrarEvento — linhas de texto puro', () => {
       {
         tipo: 'evacuou',
         jogadorId: 'p2',
+        // Itens DIFERENTES em cada zona de propósito (fix round 1, Task 7): com
+        // a mesma carta nas duas, comentar fora o bloco que nomeia a mochila
+        // ainda deixava "Espada Curta" aparecer (vinda do corpo) e o teste
+        // continuava verde — mutação confirmada pelo revisor. Só com dublês
+        // distintos a asserção prova que AS DUAS zonas foram nomeadas.
         doCorpo: [{ id: 't-1', tipo: 'equipamento', itemId: 'espada-curta' }],
-        daMochila: [{ id: 't-2', tipo: 'equipamento', itemId: 'espada-curta' }],
+        daMochila: [{ id: 't-2', tipo: 'equipamento', itemId: 'elmo-de-couro' }],
         daMao: 3,
       },
       ctx,
     );
     expect(linha).toContain('Bot 1');
     expect(linha).toContain('Espada Curta');
+    expect(linha).toContain('Elmo de Couro');
     expect(linha).toContain('3 cartas da mão');
     // A regra de sigilo: a frase pode dizer QUANTAS cartas da mão foram
     // perdidas, nunca QUAIS. Não há como testar "não lista as cartas" por
