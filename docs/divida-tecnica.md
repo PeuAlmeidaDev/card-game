@@ -1,7 +1,8 @@
 # Dívida técnica — o balde "conserta depois"
 
 Consolidado em **2026-08-09** das duas listas de *Minors deferidos* que foram salvas dos ledgers
-gitignored, mais os débitos nomeados ao longo das fatias.
+gitignored, mais os débitos nomeados ao longo das fatias — e atualizado no mesmo dia com os Minors da
+fatia `Bad Stuff e evacuação` (marcados **`[2a]`**).
 
 🔴 **Nenhum item aqui é bug vivo.** Os "conserta antes do merge" já foram feitos nos fix rounds de
 cada fatia. Isto é trabalho real, medido, e deliberadamente adiado.
@@ -37,6 +38,13 @@ função / de teste sempre que possível.
 - **`partida`** · `bot.ts`, o reset `melhorMao = ocupante === null ? undefined : mao` — o ramo
   estreito (um candidato **de mão** vence primeiro e um de **slot fixo** ultrapassa depois) precisa
   de fixture própria. Inofensivo hoje: o campo é ignorado para slot não-mão.
+- **`[2a]`** · **`web`** · `narrarEvento.tsx` — o ramo **singular** de `evacuou`
+  (`daMao === 1 ? 'carta' : 'cartas'`) **não é exercitado por teste**: só `daMao: 3` e `daMao: 0`
+  aparecem. Só concordância.
+- **`[2a]`** · 🔴 **Nenhum monstro de PRODUÇÃO percorre o laço de `aplicarBadStuff`** — todas as
+  listas de `badStuff` têm tamanho **1** (#120). A mutação `efeitos.slice(0, 1)` só reprova por causa
+  do **dublê de dois efeitos**, que existe e morde. ⚠️ **Não é dívida a pagar; é um ramo cujo único
+  visitante é dublê**, e quem criar o primeiro monstro de dois efeitos precisa saber disso.
 
 ## 🎯 Asserção fraca (não prova o que o nome diz)
 
@@ -79,7 +87,29 @@ função / de teste sempre que possível.
 - **`partida`** · `bot.ts` — **seis linhas** justificando o cast `SlotDeItem` → `Slot`; caberia em
   duas sob a política de comentário enxuto.
 - **`MEMORY.md`** — a linha de `texto-do-plano-e-a-fonte-de-achado.md` diz *"3 de 4"*; os registros
-  novos dizem **8**.
+  novos dizem **8**, mais **4** da fatia 2a.
+- **`[2a]`** · **`cartas`** · `monstros.test.ts`, teste *"mantém o Goblin na statline do monstro fixo
+  da fatia 2"* — o comentário diz *"os outros 6 stats"* e a contagem **não bate em leitura nenhuma**
+  (são 7 campos, ou 5 se só os numéricos). 🔑 **PRÉ-EXISTENTE** (já dizia 6 quando só `tesouros` era
+  novo); a fatia **tocou a linha sem corrigir**.
+- **`[2a]`** · **`partida`** · `mesa.ts`, docstring de `fecharCombate` — descreve a função **só em
+  termos do vencedor** (*"larga o loot na mão do vencedor… decide o fim"*), sem mencionar que ela
+  agora **também aplica o Bad Stuff ao perdedor**. **Não é falso — é SILÊNCIO sobre metade nova.**
+- **`[2a]`** · **`partida`** · `mesa.ts`, o docstring novo do guard de esgotamento — diz que espelha
+  `sacarTesouros` **"LOGO ABAIXO"**, e `sacarTesouros` está **~1.264 linhas depois**. Conteúdo certo,
+  **promessa de posição enganosa**. Trocar por *"mais adiante neste arquivo"*. 🔑 É o vício nº 1 em
+  miniatura **dentro do comentário que explica o fix de um bug achado por soak**.
+- **`[2a]`** · **`web`** · `TelaMesa.tsx`, painel de combate — *"· Se ele vencer:"* **capitaliza**
+  depois do separador `·`, e **todas** as ocorrências pré-existentes de `{' · '}` no arquivo estão em
+  minúscula (*"força…"*, *"sua vez de atacar"*). `Se` → `se`. Só leitura visual.
+- **`[2a]`** · **`web`** · `rotuloDeBadStuff.ts` — a frase de **dois efeitos** repete o verbo
+  (*"arranca seu capacete e arranca suas botas"*). Funciona, e o peso da `evacuacao` está certo, mas
+  soa mecânico. ⚠️ **A string exata foi cravada pelo TESTE DO BRIEF** — é escolha do controlador, não
+  do implementador. Cosmético: **nenhum monstro de produção tem 2 efeitos hoje**.
+- **`[2a]`** · **`web`** · `narrarEvento.tsx` — o padrão `de ${quemMinusculo}` produz *"o capacete DE
+  VOCÊ"* / *"da mão DE VOCÊ"*, menos natural que *"o SEU capacete"*. ⚠️ **Débito HERDADO, não novo:**
+  é a convenção que o `desequipou` já usava. **Se for consertar, conserte os dois juntos**, senão o
+  arquivo fica com dois estilos.
 
 ## 🧰 Guard de compilação que falta
 
@@ -101,6 +131,13 @@ função / de teste sempre que possível.
   `app.ts` e está **exatamente no limite**: se a mesa crescer segue correto, se **encolher** para 3,
   quebra. E há um `52` cravado onde o teste vizinho deriva das constantes.
 
+## 🧩 Duplicação candidata a extração
+
+- **`[2a]`** · **`partida`** · `mesa.ts` — o padrão *"catálogo/jogador não encontrado ⇒ `Error` cru"*
+  agora aparece **3×** dentro de `fecharCombate` (ramo da vitória, ramo da derrota novo, e o fim da
+  função). **Não é regressão:** a fatia replicou fielmente um padrão que já existia entre dois
+  pontos. Candidato a extração, **sem urgência**.
+
 ## 🔴 Débitos nomeados (maiores que um Minor)
 
 - **`tirarDosSlots` em `mesa.ts`** — o comentário sobre o cast de `Object.keys(SLOTS_VAZIOS)` é a
@@ -121,10 +158,37 @@ função / de teste sempre que possível.
   a decisão **#27** fechou para o item deslocado. Saídas candidatas: **(a)** renderizar o contador do
   cemitério (barato, paga duas ocorrências de uma vez) · **(b)** um evento `saiuDeJogo` com a carta ·
   **(c)** aceitar. **A leitura é do Pedro.**
+- **`[2a]`** · 🔴 **O log diz *"foi evacuado"* em TODA derrota, e agora isso engana.** O evento
+  `derrota` — emitido em **toda** derrota, desde muito antes desta fatia — é narrado como
+  `"<nome> foi evacuado."` (`narrarEvento.tsx`). A palavra era **sabor**; a fatia 2a fez de
+  *"evacuação"* uma **mecânica específica que só o Ogro dispara**.
+  ➡️ **Duas consequências vivas:** (1) perder para o Rato Gigante imprime *"Bot 1 foi evacuado."* e
+  **ele não foi** — só perdeu as botas; (2) perder para o Ogro imprime **duas linhas quase idênticas
+  em sequência** (`derrota` + `evacuou`).
+  🔑 **NÃO é bug — o estado está certo, e o censo prova isso em 179.318 ações.** É **texto**, e é a
+  variante mais difícil do vício nº 1: **não há diff nenhum**, nem no arquivo nem no vizinho; uma
+  palavra ganhou significado novo em outro lugar. **Reportado, não consertado** (seria código, e quem
+  achou estava na task de documentação). Saídas candidatas: **(a)** trocar a frase do `derrota` por
+  algo neutro (*"perdeu o combate"*) e deixar *"evacuado"* só para o `evacuou` — barato e resolve as
+  duas; **(b)** suprimir o `derrota` quando um `evacuou` sai no mesmo lote — resolve a repetição e
+  **não** a frase enganosa das outras 4/5 derrotas; **(c)** aceitar. ⚠️ **A (a) mexe em texto que o
+  gate ocular usa** — o roteiro da 2a já avisa sobre isso em linha.
 
 ## 📐 Método do soak — para quem escrever o próximo harness
 
-🔴 **O `soak.ts` é gitignored e some a cada fatia.** Este é o **quinto** que vai ser escrito do zero.
+🔴 **O `soak.ts` é gitignored e some a cada fatia.** O da fatia 2a foi o **sexto**; o próximo é o
+**sétimo**, escrito do zero como todos.
+
+- 🔴 **CONTAGEM POSITIVA, sempre, ao lado do censo.** *"Censo zero falhas"* **não distingue *"a
+  feature nunca rodou"* de *"rodou e não fez nada"*** — com o efeito descartado, nada é movido nem
+  duplicado e o censo fica verde. Meça **eventos da feature > 0**, ou uma identidade aritmética que
+  só fecha se o caminho foi percorrido. Ver [`licoes-aprendidas.md §15`](licoes-aprendidas.md).
+- ✅ **Prefira o controle de DOIS BRAÇOS na mesma sessão** (duas versões da mesma carta, injetadas
+  por `OpcoesApp`/`catalogo`): ele **dispensa a licença** de comparar contra fatia anterior. ⚠️ E
+  **rode-o duas vezes**: o braço que a mudança não alcança vira **régua de ruído de sessão** de
+  graça.
+- ⚠️ **Cuidado com denominador que a própria intervenção move.** Compare **por partida** (N fixo nos
+  dois braços), nunca por evento cuja frequência o braço altera.
 
 - **Pule o contador de deslocamento quando `acao.tipo === 'queimarCarta'`** — `queimarCarta`
   **também** emite `desequipou` ao resolver a fila, e sem isso todo deslocamento roteado por queima

@@ -1,7 +1,8 @@
 # Lições aprendidas — os vícios que este projeto já pagou
 
 Catálogo dos defeitos **recorrentes**, com a contagem de ocorrências e o mecanismo de cada um.
-Consolidado em **2026-08-09** a partir das 10 sessões do `CLAUDE.md` raiz.
+Consolidado em **2026-08-09** a partir das 10 sessões do `CLAUDE.md` raiz, e atualizado no mesmo dia
+com a fatia `Bad Stuff e evacuação` (§15 é dela).
 
 📌 **Isto é um índice, não a fonte.** O relato original de cada ocorrência está **verbatim** em
 [`historico/`](historico/README.md) — nada foi deletado para escrever este arquivo. Aqui está o
@@ -14,7 +15,7 @@ seguinte.
 
 ---
 
-## 1. 🕰️ Comentário que afirma um presente errado — **16 ocorrências**
+## 1. 🕰️ Comentário que afirma um presente errado — **17 ocorrências**
 
 **O vício nº 1 deste projeto.** Um comentário, docstring, título de teste ou linha de doc afirma
 uma regra que **já não é verdade** — normalmente porque descreve o presente *de antes do diff em
@@ -33,6 +34,9 @@ o jogo não tem (o docstring de `partida/src/tipos.ts` afirmando que maldição 
 | **Parêntese que começa com "logo"** | Dedução disfarçada de fato — o lugar onde a derivação se esconde |
 | **Comentário justificando uma AUSÊNCIA de código** | 🔴 **Não há linha para conferir.** Nenhuma revisão de diff pega, porque não há diff |
 | Preâmbulo que contradiz o próprio bloco | O `mesa.ts` teve um cabeçalho dizendo "dezesseis" oito linhas acima do parágrafo que dizia dezoito |
+| **Docstring que NASCE falso afirmando *"invariante testada"*** | O teste **não existia**. Pego em revisão, e o conserto foi **escrever o teste**, não apagar a frase |
+| **Promessa de POSIÇÃO, não de conteúdo** | *"espelha `sacarTesouros`, **LOGO ABAIXO**"* — e ele está **~1.264 linhas depois**. O conteúdo estava certo; o leitor é que não acha |
+| 🔴 **Palavra que ganha significado NOVO e deixa um texto antigo mentindo** | *"foi evacuado"* era **sabor** para qualquer derrota; a fatia 2a fez de *"evacuação"* uma **mecânica que só o Ogro dispara**. Nenhuma linha mudou, e a frase pré-existente virou enganosa em 4/5 das derrotas. ➡️ **Este não tem diff nenhum — nem no arquivo, nem no arquivo vizinho** |
 
 ➡️ **A regra:** comentário afirma o **presente**. Intenção futura vai para o spec ou para um teste
 que falha quando a hora chegar. E a regra de ler o bible antes de escrever regra **vale também para
@@ -49,9 +53,9 @@ que nenhum grep, teste ou typecheck alcançava.
 
 ---
 
-## 2. 🧪 Mutação verde = o dublê não produz o cenário — **11 ocorrências**
+## 2. 🧪 Mutação verde = o dublê não produz o cenário — **12 ocorrências**
 
-Você quebra o código de produção de propósito e **a suíte continua verde**. Em **nenhuma** das 11
+Você quebra o código de produção de propósito e **a suíte continua verde**. Em **nenhuma** das 12
 vezes a causa foi guard redundante. A causa foi sempre a mesma: **o fixture não consegue produzir o
 cenário**, então a regra era *inexercitável*, não só desprotegida.
 
@@ -67,8 +71,17 @@ Casos que valem por si:
   mutação **que ninguém prescreveu**.
 - Um teste do bot cuja **única razão de existir** era um guard estava sustentado por *leitura de
   código*: passava antes da task.
+- 🔑 **A 12ª, e a mais instrutiva sobre COINCIDÊNCIA ARITMÉTICA — também achada pelo próprio
+  implementador, sem revisor.** O `'recompor'` cravado do recomeço é a decisão #116 inteira, e mutá-lo
+  vinha **verde**: o fixture **não dava raça** ao jogador antes de evacuar, e **sem raça o limite é
+  8**, então a recompra de `4+4` caía **exatamente no teto** e `faseDoTurnoDe` devolvia `'recompor'`
+  **pelo caminho errado, com o resultado certo**. ➡️ **O dublê produzia um estado adjacente**, não o
+  estado da regra — e a asserção não tinha como notar. Conserto: `comRacaEmJogo` no fixture; a
+  mutação passou a reprovar com `'descartar' != 'recompor'`.
 
 🔑 **A pergunta certa nunca é "o teste existe?", é "a mutação reprova?"**
+⚠️ **E a pergunta seguinte é *"a mutação reprova PELO MOTIVO CERTO?"*** — duas ocorrências já
+passaram por um teste **verde por coincidência aritmética**, não por proteção.
 
 ---
 
@@ -89,7 +102,7 @@ construtor que voltasse como grupo de `<radio>` passaria pelas quatro.
 
 ---
 
-## 4. 👻 Publicado e nunca renderizado — **6 ocorrências**
+## 4. 👻 Publicado e nunca renderizado — **6 ocorrências, e a 7ª foi BARRADA**
 
 Um campo viaja na projeção, o cliente o recebe, e **nenhum pixel o mostra**. Compila, tipa, passa
 nos testes, e o jogador não vê.
@@ -101,6 +114,21 @@ da mesa tendo secado) · `ehBot` · `mochila` · `cartasNoCemiterio`.
 *publicar + renderizar*; ao **estreitar** um contrato, a pergunta é **quem RENDERIZAVA**, não quem
 compilava — tirar `modificadores` de `Catalogo.classes` **não deu erro de tipo** (o fallback tinha a
 mesma forma) e o preview seguiu mostrando um número plausível e errado.
+
+### ✅ A 7ª foi EVITADA em 2026-08-09, e é a primeira vez que isso acontece
+
+`MonstroCarta.badStuff` chega ao cliente **de graça** — `Catalogo.monstros` publica a carta
+**inteira**, sem projeção `Resumo`, porque *"a carta é revelada com a face para cima"*. **Zero linha
+de encanamento, zero erro de tipo, e ninguém obrigado a desenhá-lo.** Era o candidato perfeito.
+
+🔑 **O que fechou o buraco não foi vigilância — foi o REQUISITO DE PRODUTO ter sido escrito antes**
+(decisão **#119**: *"na carta do monstro tem que ter escrito qual é a coisa ruim que ele faz"*), e
+com ele uma **task própria** só para as duas superfícies. **Sem essa task, ninguém o desenharia.**
+
+➡️ **A lição transferível:** este padrão não se evita perguntando *"alguém renderiza?"* na revisão —
+se evita **transformando a renderização em item de escopo** no spec, com teste por superfície. As
+seis ocorrências anteriores foram todas descobertas **depois**; esta foi a única em que o spec
+chegou primeiro.
 
 ---
 
@@ -176,6 +204,26 @@ coisa. Quando ele diz *"aparentemente tudo ok"*, registre **a palavra dele** —
   limpa (o montante desloca no máximo 2 ⇒ fila 3 é **aritmeticamente impossível** pelo mecanismo
   afirmado).
 - **Um controle de instrumento LICENCIA a comparação; nunca ATRIBUI causa.**
+- ✅ **O controle que dispensa licença é o de DOIS BRAÇOS na mesma sessão.** A fatia 2a mediu a
+  evacuação injetando **duas versões da MESMA carta** (o Ogro com `perdeSlot` × com `evacuacao`),
+  mesmo build, mesma sessão, **uma variável**. ➡️ **Não há comparação entre fatias para licenciar** —
+  é a saída da ressalva-mãe que a `empunhadura dupla` não conseguiu contornar. ⚠️ **Mas ele muda o
+  que está sendo medido, e isso tem que viajar com o número:** o braço de controle **também** devolve
+  carta, então o resultado é a **margem sobre uma punição leve**, e o **valor absoluto fica NÃO
+  MEDIDO**.
+- 🔑 **O braço que a mudança NÃO alcança vira RÉGUA DE RUÍDO DE SESSÃO — de graça.** Rodando o mesmo
+  desenho duas vezes, o braço não afetado se moveu **+1,2pp com o MESMO código**. A régua serve para
+  duas coisas: dizer que um movimento **rodada × rodada** foi ruído, e dizer que a diferença
+  **entre braços** (~5× a régua) **não** foi. ⚠️ **Não é intervalo de confiança** — um par de
+  sessões, duas observações.
+- 🔴 **Num soak de dois braços rodado duas vezes existem DUAS comparações, e colapsá-las inverte a
+  leitura.** *(braço A × braço B, na mesma sessão)* é a **licenciada** — uma variável, e o efeito é
+  atribuível. *(rodada 1 × rodada 2, no mesmo braço)* é **ruído**. Escrever *"a queda não tem causa
+  atribuída"* sem dizer **qual das duas** transforma um resultado medido em nada. ⚠️ **E mesmo a
+  licenciada não entrega o MECANISMO** quando a intervenção move o denominador intermediário.
+- ⚠️ **Denominadores que a própria intervenção MOVE não servem para comparar.** As derrotas diferiram
+  entre os dois braços (795 × 778) porque a evacuação muda a partida dali em diante. A comparação
+  **por partida** (N fixo) é honesta; **por derrota** seria enganosa.
 
 ---
 
@@ -230,6 +278,20 @@ anteriores já tinham feito.
 ➡️ **O que pagou foi a conferência do controlador contra o código real ANTES do dispatch** — ela
 impediu duas remoções que quebrariam o combate (`MAX_TURNOS` e `montarCombatente` estavam listados
 como candidatos a órfão e são **código vivo**).
+
+**Mais 4 na fatia seguinte que mediu isto (2026-08-09), e cada uma tem uma forma própria:**
+
+| Forma | O caso |
+|---|---|
+| **Afirmar o que NÃO será tocado, sem grep** | *"não toque em `packages/web`"* — e **3 fixtures de teste de `web`** quebravam com campo obrigatório novo, mais um literal em `server` que o brief não citava |
+| **Exigência do spec que não migrou para o brief** | O spec mandava a invariante *"virar teste, não suposição"*; o brief não repassou, e **o docstring nasceu falso** afirmando que ela era testada |
+| **Roteiro de revisão mandando mutar o ARQUIVO ERRADO** | Mutar `SlotDeItem` em `cartas` acusa o `itens.test.ts` e o guard de `shared`, e **nenhuma** das tabelas do `web` — o tipo que elas leem vem de `partida` |
+| **Número errado no dispatch** | *"estado atual: 728 testes"* quando eram 724 |
+
+🔑 **Os quatro foram absorvidos pelo MESMO mecanismo: o implementador (ou o revisor) conferiu contra
+o CÓDIGO em vez de obedecer ao texto** — e nos dois primeiros ele **declarou a divergência** em vez
+de silenciá-la. ➡️ **É por isso que os briefs carregam números e nomes de arquivo: para poderem ser
+desmentidos.**
 
 ---
 
@@ -287,3 +349,53 @@ uniões **nas duas direções**.
 
 ⚠️ E a lista escrita à mão tem o mesmo problema: `SLOTS_DE_ITEM` só passou a morder quando virou
 `Record<SlotDeItem, true>` — antes, acrescentar `'cinto'` à união deixava o `tsc` limpo.
+
+📌 **As uniões gêmeas de hoje são QUATRO**, e todas têm guard: `Slot`, `SlotDeItem`,
+`EixoDeAfinidade` e **`BadStuff`** (`_CoberturaBadStuff`, desde 2026-08-09).
+
+---
+
+## 15. 🧮 O censo de conservação: o que ele prova, e o que ele NÃO prova
+
+O censo id-a-id depois de **cada** ação é o instrumento mais forte que os soaks desta base têm. Em
+2026-08-09 ele fez as **duas** coisas que definem o alcance dele, na mesma fatia.
+
+### ✅ O que ele prova, e é muito: ele acha bug que a SUÍTE não acha
+
+**Primeira vez nesta base que o censo pegou um defeito real.** `comprarMaoInicial` **substituía** a
+mão do jogador que voltava de uma evacuação, em vez de anexar — e quem evacua **mantém a patente**,
+logo continua alvo **legítimo** de caridade enquanto espera a vez. A carta doada nesse intervalo
+**sumia de todas as zonas**: sem roteamento, sem evento, sem log.
+
+📊 **35 de 240 partidas (14,6%), 81 cartas distintas.** **730 testes verdes e as revisões das OITO tasks de código anteriores
+passaram por cima** — o cenário exige três turnos, dois jogadores e uma doação no intervalo certo, e
+nenhum fixture o produzia.
+
+🔑 **O que o torna um instrumento diferente de um teste:** o teste afirma o que alguém **pensou em
+afirmar**; o censo afirma uma **invariante global** (*"nenhuma carta some nem duplica, nunca"*)
+contra estados que ninguém desenhou.
+
+### 🔴 O que ele NÃO prova: um censo zero NÃO detecta a feature DESLIGADA
+
+**Achado da mesma fatia, confirmado por reprodução.** Com o Bad Stuff **inteiramente descartado**,
+nada é movido nem duplicado — o estado final é **idêntico** ao de antes. Um censo que só soma ids por
+zona **não distingue *"nunca rodou"* de *"rodou e não fez nada"***.
+
+➡️ **Todo soak precisa de CONTAGEM POSITIVA** ao lado do censo: eventos da feature `> 0`, crescimento
+da zona de destino, uma identidade aritmética que só fecha se o caminho foi percorrido.
+*"Censo zero falhas"* prova que a feature é **segura quando dispara** — **nunca** que ela dispara.
+
+⚠️ **É a mesma família dos rótulos do §7:** *"zero"* sem dizer **do quê** e **em relação a quê** é
+uma afirmação mais fraca do que parece.
+
+### 🔑 E o zero do censo só vale com o SMOKE que rodou ANTES
+
+Duas partes, as duas obrigatórias:
+
+1. **Sabotagem por zona** — pular a mão, a mochila ou **cada encaixe individualmente** tem que
+   **ACUSAR**; e a arma de duas mãos tem que **deduplicar por id** (contar sem dedup mostra excesso).
+2. **Contagem positiva via `aplicarAcao` real**, pela razão acima.
+
+🔴 **Foi `emJogo.raca` que um script esqueceu**, e a **zona nova de cada fatia é sempre a candidata
+seguinte** (`emJogo.classe` na `classe como carta`, a `maoEsquerda` na `empunhadura dupla`).
+**Um zero de conservação sem esse gate não vale nada.**
