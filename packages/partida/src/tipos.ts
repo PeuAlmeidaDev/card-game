@@ -94,6 +94,15 @@ export type SlotDeItem = 'capacete' | 'armadura' | 'mao' | 'pes';
 export type EixoDeAfinidade = 'raca' | 'classe';
 
 /**
+ * Gêmeo do `BadStuff` de `cartas`. A duplicação é o preço de `partida` não
+ * importar `cartas` — o mesmo que `InfoMonstro` já paga replicando os 5 stats —,
+ * e quem impede as duas de divergirem é o `_CoberturaBadStuff` em `shared`.
+ */
+export type BadStuff =
+  | { readonly tipo: 'evacuacao' }
+  | { readonly tipo: 'perdeSlot'; readonly slot: SlotDeItem };
+
+/**
  * A quem um item pertence, do ponto de vista da MESA. `ItemCarta` (pacote
  * `cartas`) satisfaz este contrato estruturalmente — é o que dispensa qualquer
  * import de `cartas` aqui.
@@ -262,6 +271,8 @@ export interface InfoMonstro {
   readonly level: number;
   /** Quantas cartas de Tesouro o cadáver larga na mão do vencedor. */
   readonly tesouros: number;
+  /** O preço da derrota. A janela por onde o reducer enxerga o dado da carta. */
+  readonly badStuff: readonly BadStuff[];
 }
 
 /**

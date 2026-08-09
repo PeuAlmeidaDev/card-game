@@ -10,6 +10,7 @@ import type {
 import type {
   AcaoDaMesa,
   Afinidade,
+  BadStuff,
   Carta,
   CartaEquipamento,
   CartaPorta,
@@ -30,6 +31,7 @@ import type {
 } from '@card-dungeon/partida';
 import type {
   Slot as SlotDaCarta, SlotDeItem as SlotDeItemDaCarta, ItemCarta, EixoDeAfinidade as EixoDaCarta,
+  BadStuff as BadStuffDaCarta,
 } from '@card-dungeon/cartas';
 
 /**
@@ -189,6 +191,17 @@ const _coberturaEixo: _CoberturaEixo = true;
 void _coberturaEixo;
 
 /**
+ * Trava as duas uniões `BadStuff` — a de `partida` (a regra) e a de `cartas`
+ * (o dado). Mesma tupla e mesmo preço do `_CoberturaSlot`, acima.
+ *
+ * ⚠️ Guard de COMPILAÇÃO. Quem acusa é o `pnpm typecheck`, nunca a suíte.
+ */
+type _CoberturaBadStuff =
+  [BadStuff] extends [BadStuffDaCarta] ? ([BadStuffDaCarta] extends [BadStuff] ? true : never) : never;
+const _coberturaBadStuff: _CoberturaBadStuff = true;
+void _coberturaBadStuff;
+
+/**
  * Corpo do POST /api/partida/:id/acao: a ação MAIS a versão do estado que o
  * cliente acredita estar vendo. O servidor recusa com 409 se não bater — é o que
  * impede que um duplo-clique ou um retry de rede role o dado duas vezes.
@@ -314,4 +327,8 @@ export type {
   EixoDeAfinidade,
   GrauDeAfinidade,
   ZonaEmJogo,
+  // O preço da derrota. Mesma jogada: `partida` declara a regra, `cartas`
+  // declara o dado, e o `_CoberturaBadStuff` acima garante que são a mesma
+  // coisa.
+  BadStuff,
 };

@@ -9,6 +9,11 @@ import type { CartaDeClasse, CatalogoDaMesa, EstadoPartida } from '../tipos';
  */
 export const MONSTRO_DE_TESTE = {
   forca: 2, vida: 10, habilidade: 6, agilidade: 1, level: 1, tesouros: 1,
+  // 🔴 VAZIO de propósito. O docstring acima já avisa que mudar estes números
+  // muda metade da suíte, e dar Bad Stuff ao monstro default faria TODA derrota
+  // já testada passar a arrancar equipamento — mudando dezenas de asserções que
+  // não são sobre esta fatia. Quem testa Bad Stuff monta o monstro dele.
+  badStuff: [],
 } as const;
 
 /**
@@ -29,7 +34,7 @@ export const ID_DO_MONSTRO_DE_TESTE = 'm-teste';
  */
 export const ID_DO_MONSTRO_FORTE = 'm-forte';
 export const MONSTRO_FORTE = {
-  forca: 30, vida: 200, habilidade: 11, agilidade: 9, level: 5, tesouros: 3,
+  forca: 30, vida: 200, habilidade: 11, agilidade: 9, level: 5, tesouros: 3, badStuff: [],
 } as const;
 
 /**
