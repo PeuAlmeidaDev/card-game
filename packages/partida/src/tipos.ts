@@ -453,7 +453,29 @@ export type EventoDaMesa =
    * fase é que não tinha o que oferecer. Linha de log para isso seria ruído em
    * praticamente todo turno.
    */
-  | { readonly tipo: 'passou'; readonly jogadorId: string; readonly de: FaseParada };
+  | { readonly tipo: 'passou'; readonly jogadorId: string; readonly de: FaseParada }
+  /**
+   * O monstro arrancou uma família de encaixe. Carrega AS CARTAS porque o slot é
+   * zona ABERTA — a mesa já as via no corpo.
+   *
+   * 🔴 Emitido MESMO COM `cartas` VAZIO, quando o encaixe estava livre. Sem ele,
+   * "o Goblin tentou arrancar seu capacete e você não usa capacete" fica
+   * indistinguível de nada ter acontecido, e o jogador nunca aprende que aquele
+   * monstro mira aquele encaixe. É a #28 valendo.
+   */
+  | { readonly tipo: 'perdeuEquipamento'; readonly jogadorId: string;
+      readonly slot: SlotDeItem; readonly cartas: readonly CartaEquipamento[] }
+  /**
+   * A evacuação. Corpo e mochila são zonas ABERTAS e viajam com as cartas; a MÃO
+   * é oculta, então viaja só a QUANTIDADE — mesma regra de sigilo do `loot`.
+   *
+   * 🔴 Emitido mesmo com as três listas vazias (evacuar já sem nada), pelo mesmo
+   * motivo do `perdeuEquipamento`.
+   */
+  | { readonly tipo: 'evacuou'; readonly jogadorId: string;
+      readonly doCorpo: readonly CartaEquipamento[];
+      readonly daMochila: readonly CartaTesouro[];
+      readonly daMao: number };
 
 export type AcaoDaMesa =
   | { readonly tipo: 'vasculhar'; readonly jogadorId: string }
