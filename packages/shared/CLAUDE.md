@@ -48,6 +48,15 @@ Vários tipos são **gêmeos** entre pacotes. Sem guard, acrescentar um membro a
 | `_CoberturaSlot` | `Slot` de `partida` (o corpo) × `Slot` de `cartas` (o dado) |
 | `_CoberturaSlotDeItem` | `SlotDeItem`, o mesmo par |
 | `_CoberturaEixo` | `EixoDeAfinidade`, o mesmo par |
+| `_CoberturaBadStuff` | `BadStuff` — a regra em `partida` × o dado em `cartas` |
+
+🔑 **O `_CoberturaBadStuff` (2026-08-09) é o caso que mostra POR QUE a lista existe.** O `partida`
+**nunca vê `MonstroCarta`** — ele só conhece `CatalogoDaMesa.monstro(id) → InfoMonstro`, e as cartas
+de `cartas` satisfazem esse retorno **estruturalmente**. Essa cegueira é deliberada, e o preço dela é
+a união ser **declarada duas vezes**: sem o guard, acrescentar um verbo de Bad Stuff em `cartas` e
+esquecer o `partida` deixa o `pnpm typecheck` **7/7 limpo**, com o interpretador do reducer nunca
+alcançando o verbo novo. **É o `ModificadoresDeStat` sendo criado de novo** — e desta vez foi
+evitado.
 
 🔴 **A TUPLA é obrigatória:** `type _X = [A] extends [B] ? true : never`. Sem os colchetes,
 `A | B extends X` distribui sobre a união e a checagem **se auto-satisfaz**. ⚠️ E o guard tem que ser

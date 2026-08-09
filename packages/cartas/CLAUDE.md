@@ -15,7 +15,7 @@ neste pacote, provavelmente ele pertence a outro.
 |---|---|---|
 | `racas.ts` | `RACAS`, `RACAS_PUBLICAS`, `RACAS_SACAVEIS` | 🔴 **`RACAS_SACAVEIS` exclui o Humano — são 4, não 5** |
 | `classes.ts` | `CLASSES`, `CLASSES_PUBLICAS`, `CLASSES_SACAVEIS` | O **Aprendiz** é a ausência de classe; **3** sacáveis |
-| `monstros.ts` | `MONSTROS`, `MONSTROS_SACAVEIS` | 5 monstros; `tesouros` = 1/1/2/2/3 |
+| `monstros.ts` | `MONSTROS`, `MONSTROS_SACAVEIS`, `BadStuff` | 5 monstros; `tesouros` = 1/1/2/2/3; **`badStuff` obrigatório** |
 | `itens.ts` | `ITENS`, `ITENS_SACAVEIS` | **12** itens; 4 exclusivos por raça |
 | `passivas.ts` | as 6 passivas nomeadas | Consumidas por raças e classes |
 
@@ -36,6 +36,29 @@ As duas mãos são **vagas equivalentes** desde a fatia `empunhadura dupla` (#98
 🔴 **As duas uniões são GÊMEAS de declarações em `partida`, e o que impede a divergência silenciosa
 são os guards `_CoberturaSlot` / `_CoberturaSlotDeItem` em `shared`.** Mexer numa união aqui sem a
 gêmea lá é um `pnpm typecheck` **7/7 limpo** com o jogo quebrado.
+
+## 💀 `BadStuff` — o preço da derrota, e a TERCEIRA união gêmea deste pacote
+
+`readonly badStuff: readonly BadStuff[]` em `MonstroCarta`, **obrigatório**. Dois verbos:
+`{ tipo: 'evacuacao' }` e `{ tipo: 'perdeSlot'; slot: SlotDeItem }`.
+
+🔑 **Obrigatório, NUNCA opcional:** monstro novo sem Bad Stuff **quebra a compilação** e obriga o
+autor a decidir. Opcional deixaria a carta nascer sem punição **em silêncio** — o modo de falha da
+**#54**. ⚠️ **Lista VAZIA é o buraco que o tipo deixa**, e por isso `monstros.test.ts` cobra
+`badStuff.length > 0` **por monstro** (não por `.find` — isso seria a #54 por outra porta).
+
+🔴 **É união GÊMEA de `partida/src/tipos.ts`, travada por `_CoberturaBadStuff` em `shared`.** O
+`partida` **nunca vê `MonstroCarta`** (ele conhece `InfoMonstro`, satisfeito **estruturalmente**), e
+essa cegueira é deliberada — o guard é o preço dela. Verbo novo aqui sem a gêmea lá é `typecheck`
+**7/7 limpo** com o interpretador do reducer nunca alcançando o verbo.
+
+⚠️ **Aqui é DADO, nunca código** — e isto não foi escolha estilística: as passivas podem ser função
+dentro de `cartas` porque só tocam o `Combatente`, que é um **valor**; o Bad Stuff toca **mão,
+mochila e slots**, que são zonas de `partida`, e a direção `cartas ← personagem ← partida` significa
+que uma função daqui **não enxerga** as zonas.
+
+⚠️ **Hoje toda lista de produção tem tamanho 1** (#120), então o **laço** do interpretador é
+percorrido **só por dublê** — `efeitos.slice(0, 1)` ficaria verde sem ele.
 
 ## Afinidade
 

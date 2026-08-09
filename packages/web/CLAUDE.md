@@ -1,7 +1,7 @@
 # `@card-dungeon/web`
 
 **A tela: React + Vite.** Depende **só** de `shared` — nunca importe um pacote de domínio direto.
-Testes com vitest + Testing Library (170 testes).
+Testes com vitest + Testing Library (**181 testes**).
 
 ## Papel na arquitetura
 
@@ -21,7 +21,15 @@ de botões e cada clique virar 400. **Copiar a regra é o defeito; importá-la �
 | `narrarEvento.tsx` | Um evento → uma linha de log |
 | `participantesDe.ts` | **Quem um evento ENVOLVE** (`switch` fechado por `never`) |
 | `PainelLog.tsx` | O log, filtrado por participante |
-| `descreverCarta.ts` · `narrarPorta.ts` · `narrarCombate.ts` · `rotuloDeAfinidade.ts` | Texto |
+| `descreverCarta.ts` · `narrarPorta.ts` · `narrarCombate.ts` · `rotuloDeAfinidade.ts` · `rotuloDeBadStuff.ts` | Texto |
+
+⚠️ **Os `rotuloDe*` são o molde desta base para *"dado de domínio → frase para humano"***: função
+pura, `switch` fechado por `never`, e tabela de nomes **local** quando a união é **fechada** (o
+`SlotDeItem` não é dado de catálogo). 🔑 **`rotuloDeBadStuff` e `narrarEvento` têm tabelas de encaixe
+SEPARADAS de propósito** — o log é 3ª pessoa **sem** possessivo (*"o capacete"*) e a carta é 2ª
+pessoa **com** ele (*"seu capacete"*); e `pes` é **"suas botas"** na carta contra **"os pés"** no log,
+palavra que **nenhuma substituição mecânica produz**. As duas são `Record<SlotDeItem, …>`, então
+membro novo **quebra a compilação nos dois lugares**.
 
 ## 🔑 O log é indexado por quem o evento ENVOLVE, não por quem o CAUSOU
 
@@ -42,7 +50,7 @@ as respostas do contrato são `c.type<T>()` e o Zod está só na entrada.
 ⚠️ **O `never` é cobrado pelo `pnpm typecheck`, NUNCA pelo vitest** — o esbuild apaga `import type` e
 não checa tipos. Mudança só de tipo **passa verde no vitest e falha no typecheck**.
 
-## 🔴 Publicado e nunca renderizado — **6 ocorrências, e este pacote é o palco**
+## 🔴 Publicado e nunca renderizado — **6 ocorrências, e a 7ª foi BARRADA**
 
 O elenco: `combatente` · `tesourosNoMonte` (**duas vezes** — e a segunda escondia a economia da mesa
 tendo secado) · `ehBot` · `mochila` · `cartasNoCemiterio` (**ainda vivo**: publicado, e em produção
@@ -52,6 +60,12 @@ aparece uma única vez só para desabilitar um botão).
 **publicar + renderizar**. E ao **estreitar** um contrato, pergunte **quem RENDERIZAVA**, não quem
 compilava — tirar `modificadores` de `Catalogo.classes` não deu erro de tipo (o fallback tinha a
 mesma forma) e o preview seguiu mostrando um número **errado**.
+
+✅ **A 7ª foi EVITADA em 2026-08-09** — a primeira vez nesta base. `MonstroCarta.badStuff` chega ao
+cliente **de graça** (a carta inteira viaja no `/catalogo`, sem projeção `Resumo`), então era o
+candidato perfeito. 🔑 **O que fechou não foi vigilância na revisão: foi o requisito ter virado ITEM
+DE ESCOPO no spec** (#119), com **task própria** e teste **por superfície**. Sem ela, ninguém
+desenharia o campo.
 
 ## Convenções de UI decididas
 
@@ -63,6 +77,17 @@ mesma forma) e o preview seguiu mostrando um número **errado**.
 - **A seção "Seu corpo" imprime os CINCO encaixes sempre**, inclusive vazios. É a superfície de
   verificação do gate ocular. ⚠️ **O log NÃO serve para isso:** `equipou` narra *"Você equipa Espada
   Curta"* e **nunca diz em qual mão**.
+- **O Bad Stuff do monstro aparece em DUAS superfícies** (#119): o **painel de combate** (*"· Se ele
+  vencer: …"*, à vista a luta inteira) e a **carta de monstro na mão** (*"— se perder: …"*, ao lado de
+  "Procurar encrenca", que é onde a **escolha** acontece). **Fora:** a espiada da Presciência (que nem
+  nomeia o monstro) e o log (repetir a punição a cada porta é ruído). ⚠️ **O texto da mão aparece em
+  QUALQUER fase** — só o **botão** é apagado por fase.
+
+⚠️ **`derrota` narra *"X foi evacuado."* em TODA derrota, e a palavra ganhou significado específico
+em 2026-08-09.** Perder para o Ogro produz **duas linhas quase idênticas** (`derrota` + `evacuou`);
+perder para os outros quatro produz *"foi evacuado"* **sem evacuação nenhuma**. **Não é bug — é
+texto**, está em `docs/divida-tecnica.md`, e **todo item de gate ocular sobre evacuação tem que
+avisar disso**, senão reprova contra código correto.
 
 ## 🔴 Armadilhas medidas neste pacote
 

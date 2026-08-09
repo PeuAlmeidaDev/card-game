@@ -1,7 +1,7 @@
 # `@card-dungeon/partida`
 
 **A mesa: o reducer da partida, as fases do turno, as zonas e o bot.** O maior pacote de domínio
-(352 testes). TS puro, dado e embaralho **injetados**. Depende de `motor` + `personagem`.
+(**377 testes**). TS puro, dado e embaralho **injetados**. Depende de `motor` + `personagem`.
 
 ## Papel na arquitetura
 
@@ -53,6 +53,12 @@ na tela**, porque o `legal()` da `TelaMesa` lê só a tabela de fases. **Botão 
    desta tabela.
 3. **Par que NÃO cresce também se declara.** Escrever *"continua 18"* é o que impede a próxima
    recontagem de não saber se alguém olhou.
+   ✅ **Recontado em 2026-08-09** (fatia `Bad Stuff e evacuação`), `AcaoInvalida` por `AcaoInvalida`:
+   **continua 18 em 21 linhas**, e a lista de `throw` do reducer saiu **byte-idêntica** à do
+   merge-base. 🔑 **A razão é estrutural e vale saber: o Bad Stuff NÃO é ação do jogador** — é
+   consequência do reducer dentro de `fecharCombate`, não passa por `acaoEhLegal`, e **não há botão
+   na tela para ter gêmeo**. Regra geral: **efeito disparado pelo domínio não gera par fino; só ação
+   que o cliente pede gera.**
 
 ⚠️ **Três das 21 linhas NÃO são par, e estão lá de propósito:**
 
@@ -73,10 +79,13 @@ na tela**, porque o `legal()` da `TelaMesa` lê só a tabela de fases. **Botão 
 
 | Zona | Aberta? | Origens |
 |---|---|---|
-| `mao: readonly Carta[]` | 🔒 oculta | vasculhar · loot · saquear · caridade |
+| `mao: readonly Carta[]` | 🔒 oculta | vasculhar · loot · saquear · caridade · **a recompra do evacuado** |
 | `mochila: readonly CartaTesouro[]` | 👁️ aberta | `guardarCarta` **e** `destinoDoDesequipado` |
 | `emJogo.slots: Record<Slot, CartaEquipamento \| null>` | 👁️ aberta | `equiparCarta` |
 | `emJogo.raca` / `emJogo.classe` | 👁️ aberta | `jogarCarta` |
+
+⚠️ **A ÚNICA coisa que ESVAZIA três zonas de uma vez é o Bad Stuff** (`src/badStuff.ts`) — e ele
+manda tudo **direto aos cemitérios**, nunca à mochila.
 
 🔑 **Zona oculta decide o evento.** O `loot` diz só a **quantidade**; o `saqueou` **não diz o quê**;
 o `equipou` **carrega a carta**, porque o slot é aberto. Ao criar evento novo, pergunte **em que zona
@@ -85,6 +94,43 @@ a carta termina**.
 ⚠️ **`combatenteDe(jogador, catalogo)` (`src/corpo.ts`) calcula os stats lendo a zona em jogo a cada
 consulta.** Não existe campo denormalizado para dessincronizar — foi assim que `combatenteBase`
 morreu. **Não reintroduza cache de stats.**
+
+## 💀 O Bad Stuff (`src/badStuff.ts`) — o preço da derrota
+
+`aplicarBadStuff(jogador, efeitos) → { jogador, perdidas, eventos }`. **Função pura**, `switch`
+fechado por `never`, chamada de **um ponto só**: o ramo da derrota de `fecharCombate`. **Sem fase
+nova, sem verbo novo, sem pendência nova** — e o `motor` não sabe que ela existe.
+
+- 🔑 **Ela devolve os EVENTOS, e isso não é conveniência.** Só ela sabe **qual efeito produziu o
+  quê**; reconstruir isso no `mesa.ts` instalaria um **segundo interpretador da união `BadStuff`**, e
+  o verbo novo passaria a ter que ser tratado em dois lugares em vez de **quebrar a compilação num
+  só**. As `perdidas` e as cartas dentro dos eventos têm trabalhos diferentes — **roteamento** ×
+  **narração**.
+- 🔴 **`perdeSlot('mao')` limpa OS DOIS encaixes e deduplica por id.** A arma de duas mãos é **uma
+  carta em duas vagas**: limpar uma só a deixaria viva na outra, dando stats cheios. **Passa verde em
+  qualquer dublê sem Montante.**
+- 🔴 **O item arrancado vai DIRETO ao cemitério de Tesouros — assimetria DELIBERADA com
+  `destinoDoDesequipado`**, que prefere a mochila. Trocar equipamento é **sua escolha**; o Bad Stuff é
+  o monstro **tomando**. Se fosse à mochila, o item voltaria ao corpo na fase `jogar` do **mesmo
+  turno** (a punição vira nada) **e devolveria zero carta ao baralho** (a economia vira nada).
+  ⚠️ **Um refactor que "conserte a duplicação" reusando `destinoDoDesequipado` mata a fatia inteira.**
+  ✅ Consequência de graça: `perdeSlot` **nunca abre pendência de queima**.
+- ⚠️ **O evento sai MESMO quando nada saiu** (`cartas: []`, encaixe já livre). Medido: **1 em 3** dos
+  `perdeSlot` acerta encaixe vazio. É a **#28** valendo.
+- 🔴 **`InfoMonstro.badStuff` é a janela por onde o reducer enxerga — o `partida` NÃO importa
+  `cartas`.** A união é gêmea, e o que impede a divergência silenciosa é o `_CoberturaBadStuff` em
+  `shared`.
+- 🔴 **A armadilha do Plano 4a mora aqui também:** `fecharCombate` termina em `entrarOuPular`, e ele
+  precisa do **estado** pós-Bad Stuff **e** do **jogador relido dele**. Passar o estado velho
+  **descarta a evacuação inteira**; passar o jogador velho deixa quem evacuou **parado em `jogar`**
+  sem nada — e num assento de bot vira `AcaoInvalida` por `avancarBots` ⇒ **400 na jogada do humano**.
+  **As duas metades são prendidas por mutação.**
+- 🔁 **O recomeço:** `evacuado: boolean` é ligado na evacuação e **consumido em `encerrarTurno`**.
+  **COMPRA ANTES DE CALCULAR A FASE** (calcular antes daria a fase a um jogador de mão vazia, que se
+  auto-pularia), a fase é **`'recompor'` CRAVADO**, e a compra **ANEXA à mão, nunca substitui** — quem
+  evacuou continua alvo legítimo de caridade enquanto espera a vez, e substituir apagava a carta
+  recebida de **todas** as zonas (bug medido em 35/240 partidas). 🔴 **Tesouros esgotado é tratado com
+  graça** (espelha `sacarTesouros`); **Portas não**, pela #62.
 
 ## O que é re-exportado como VALOR (e por quê)
 
