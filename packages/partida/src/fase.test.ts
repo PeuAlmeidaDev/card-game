@@ -228,6 +228,20 @@ describe('faseSeAutoPula (spec §6.1)', () => {
     expect(faseSeAutoPula('jogar', mista)).toBe(false);
   });
 
+  // 🔴 Fix round 1 (achado da revisão): um instantâneo SOZINHO na MÃO (não na
+  // mochila) segura as duas fases — `guardarCarta` só lê a MÃO (mochila → mão
+  // não existe) e aceita as duas famílias de Tesouro desde esta fatia. A versão
+  // anterior só perguntava por EQUIPAMENTO na mão (`temEquipamento`), então uma
+  // mão só com poção era tratada como mão vazia — a fase se auto-pulava por
+  // cima do único botão real ("Guardar") que ela tinha, violando o próprio
+  // contrato do docstring desta função ("`true` quando a ÚNICA ação legal é
+  // `passar`"): `acaoEhLegalNaFase(fase, 'guardarCarta')` já era `true`.
+  it('`recompor` e `jogar` NÃO se pulam com um instantâneo SOZINHO na mão — "Guardar" é ação real para essa carta', () => {
+    const comInstantaneoNaMao = comMao([instantaneo('i-1')]);
+    expect(faseSeAutoPula('recompor', comInstantaneoNaMao)).toBe(false);
+    expect(faseSeAutoPula('jogar', comInstantaneoNaMao)).toBe(false);
+  });
+
   it('com a mochila NO TETO, nenhuma das duas se pula — é o que torna o auto-pulo impossível com queima pendente', () => {
     // A `queima` só abre quando a mochila já está em `LIMITE_BASE_DE_MOCHILA`
     // (`destinoDoDesequipado`), e é este teste que prende a outra ponta: nesse

@@ -21,8 +21,8 @@ import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/compo
 import { combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
 import type { DepsMesa, ResultadoAcao } from './mesa';
 import type {
-  BadStuff, Carta, ConfigPartida, EntradaJogador, CartaPorta, CartaEquipamento, EstadoPartida, InfoMonstro,
-  JogadorNaMesa, ZonaEmJogo,
+  BadStuff, Carta, ConfigPartida, EntradaJogador, CartaPorta, CartaEquipamento, CartaTesouro, EstadoPartida,
+  InfoMonstro, JogadorNaMesa, ZonaEmJogo,
 } from './tipos';
 import type { PassivaCombate } from '@card-dungeon/motor';
 
@@ -1772,6 +1772,49 @@ describe('jogar carta de CLASSE', () => {
     expect(jogadorDe(r.estado, 'p1').mochila.map((c) => c.id)).not.toContain('t-c5');
   });
 
+  it('a carta excedente pode ser um INSTANTÂNEO — o corte é pela ÚLTIMA da mochila, não pela família', () => {
+    // Achado da revisão (Important 2, Fix round 1): uma variante que escolhe
+    // "o ÚLTIMO EQUIPAMENTO da mochila" em vez do último ELEMENTO (qualquer
+    // família) passava os 384 testes de então — porque nenhum deles tinha uma
+    // mochila mista. Com um instantâneo no fundo, essa variante faz duas
+    // coisas erradas ao mesmo tempo: o `slice(0,-1)` (inalterado) ainda remove
+    // o ÚLTIMO elemento físico (o instantâneo) da mochila, mas `cartaExcedente`
+    // aponta para o último EQUIPAMENTO (`t-c4`) — que nunca saiu da mochila.
+    // Resultado: o instantâneo desaparece de toda zona (não está na mochila,
+    // não entra na fila, não vai a cemitério nenhum) e `t-c4` fica contado
+    // DUAS vezes (na mochila E na fila de queima). É a mesma classe de perda
+    // silenciosa de carta que o soak da fatia anterior mediu (decisão #121).
+    const cheiaComInstantaneoNoFundo: readonly CartaTesouro[] = [
+      ...Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-c${String(i)}`)),
+      instantaneo('t-c5'),
+    ];
+    const p0 = nascida();
+    const jogadores = p0.jogadores.map((j) => (j.id === 'p1'
+      ? {
+          ...j,
+          mao: [nova] as readonly Carta[],
+          mochila: cheiaComInstantaneoNoFundo,
+          emJogo: { ...j.emJogo, classe: null },
+        }
+      : j));
+    const p: EstadoPartida = { ...p0, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...p0, jogadores }, 'p1')) };
+    expect(jogadorDe(p, 'p1').mochila).toHaveLength(LIMITE_BASE_DE_MOCHILA + 1);
+
+    const r = aplicarAcao(p, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'pc-nova' }, deps([]));
+
+    // A carta que vira pendência é a ÚLTIMA da mochila — o instantâneo — e não
+    // um equipamento escolhido por família.
+    expect(r.estado.queima?.deslocados.map((c) => c.id)).toEqual(['t-c5']);
+    expect(r.estado.queima?.deslocados[0]?.tipo).toBe('instantaneo');
+    expect(r.estado.queima?.motivo).toBe('mochilaEncolheu');
+    // As CINCO cartas de equipamento continuam intactas na mochila — nenhuma
+    // some, nenhuma duplica entre mochila e fila de queima.
+    const mochilaFinal = jogadorDe(r.estado, 'p1').mochila;
+    expect(mochilaFinal.map((c) => c.id)).toEqual(
+      Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => `t-c${String(i)}`),
+    );
+  });
+
   it('as DUAS causas na mesma jogada viajam na MESMA fila: o perdido por afinidade E o excedente', () => {
     // O ramo composto de `mesa.ts` (`[...perdidos, cartaExcedente]`) não tinha um
     // único visitante: `[cartaExcedente]` sozinho deixava a suíte inteira verde, e
@@ -2706,15 +2749,21 @@ describe('aplicarAcao — guardarCarta', () => {
   it('guarda um instantâneo na mochila — a família deixou de ser equipamento-only', () => {
     // Mesmo teste de cima, pelo SEGUNDO membro de `ReceitaTesouro`: o guard de
     // `guardarCarta` deixou de perguntar "é equipamento?" e passou a perguntar
-    // "é Tesouro?" (fatia consumíveis, instantâneo). O equipamento na mão ao
-    // lado do instantâneo é só o que segura `recompor` aberta — um instantâneo
-    // sozinho não a seguraria (`equiparCarta` não o aceita), e cravar a fase em
-    // vez de derivá-la produziria um estado que o domínio nunca gera sozinho.
-    const p = comMao(nascida(), [instantaneo('t-9'), equipamento('t-1')]);
+    // "é Tesouro?" (fatia consumíveis, instantâneo).
+    //
+    // 🔴 Fix round 1: até esta correção, um instantâneo SOZINHO na mão não
+    // segurava `recompor` (`faseSeAutoPula` só perguntava por equipamento), e
+    // este teste precisava de um equipamento extra na mão só para a fase não se
+    // auto-pular por cima do cenário — cravando um workaround em vez de provar
+    // o caminho real. Com `podeGuardar` consertado em `fase.ts`, a mão SÓ com
+    // instantâneo já deriva `recompor` sozinha; `comMao` (abaixo) faz essa
+    // derivação de verdade via `faseDoTurnoDe`, não crava nada.
+    const p = comMao(nascida(), [instantaneo('t-9')]);
+    expect(p.fase).toBe('recompor');
 
     const r = aplicarAcao(p, { tipo: 'guardarCarta', jogadorId: 'p1', cartaId: 't-9' }, deps([]));
 
-    expect(maoDe(r.estado, 'p1')).toEqual([equipamento('t-1')]);
+    expect(maoDe(r.estado, 'p1')).toEqual([]);
     expect(jogadorDe(r.estado, 'p1').mochila).toEqual([instantaneo('t-9')]);
     expect(r.eventos).toContainEqual({ tipo: 'guardou', jogadorId: 'p1', carta: instantaneo('t-9') });
   });

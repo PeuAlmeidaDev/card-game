@@ -1469,19 +1469,34 @@ describe('TelaMesa — a mochila', () => {
 
   it('um instantâneo na MOCHILA NÃO tem "Equipar" — `equiparCarta` continua equipamento-only', async () => {
     // Guardar alargou para a família de Tesouro; equipar não — um instantâneo
-    // não tem slot, e a ação de jogá-lo (spec §4, bloco 5) ainda não existe.
+    // não tem slot, e a ação de jogá-lo (spec §4, Task 4) ainda não existe.
     // Sem este teste, alargar `botaoEquipar` por engano passaria batido: os
     // dois pares (Equipar/Guardar) têm o MESMO guard de tipo hoje, e é fácil
     // copiar um para o outro sem notar que a resposta certa diverge.
-    await abrirMesa(emParada('jogar', [], [{ id: 'i-1', tipo: 'instantaneo', instantaneoId: 'pocao-de-cura' }]));
+    //
+    // 🔴 Fix round 1 (achado da revisão): o equipamento AO LADO do instantâneo
+    // na mochila é o que mantém `jogar` aberta de VERDADE (`podeEquipar` via
+    // mochila, em `fase.ts`) — uma mochila só com instantâneo faria `jogar` se
+    // auto-pular, e a vista representaria um estado que o domínio nunca produz.
+    // Um teste que afirma um estado impossível não prova nada (mesma lição do
+    // teste de "Guardar" logo acima, que tinha o problema gêmeo antes desta
+    // correção).
+    await abrirMesa(emParada('jogar', [], [
+      { id: 'i-1', tipo: 'instantaneo', instantaneoId: 'pocao-de-cura' },
+      tesouro('t-1'),
+    ]));
 
     // Escopado à seção "Sua mochila": o resumo de mochila da linha do assento,
-    // acima, também nomeia a carta (zona ABERTA), e um `findByText` sem escopo
-    // acharia as DUAS e lançaria por ambiguidade.
-    const secaoMochila = (await screen.findByText(/Sua mochila — 1 de 6/)).closest('section');
+    // acima, também nomeia as duas cartas (zona ABERTA), e um `findByText` sem
+    // escopo acharia mais de um "pocao-de-cura" e lançaria por ambiguidade.
+    const secaoMochila = (await screen.findByText(/Sua mochila — 2 de 6/)).closest('section');
     if (secaoMochila === null) throw new Error('seção "Sua mochila" não encontrada');
-    expect(within(secaoMochila).getByText(/pocao-de-cura/)).toBeInTheDocument();
-    expect(within(secaoMochila).queryByRole('button', { name: /equipar/i })).not.toBeInTheDocument();
+    const linhaDoInstantaneo = within(secaoMochila).getByText(/pocao-de-cura/).closest('li');
+    if (linhaDoInstantaneo === null) throw new Error('linha do instantâneo não encontrada');
+    expect(within(linhaDoInstantaneo).queryByRole('button', { name: /equipar/i })).not.toBeInTheDocument();
+    // E o botão não sumiu da SEÇÃO inteira por acidente — ele existe na linha
+    // do EQUIPAMENTO ao lado, que é o par positivo desta asserção negativa.
+    expect(within(secaoMochila).getByRole('button', { name: /equipar/i })).toBeEnabled();
   });
 
   it('em `descartar` o "Guardar" EXISTE e está apagado — guardar não é saída do excedente', async () => {

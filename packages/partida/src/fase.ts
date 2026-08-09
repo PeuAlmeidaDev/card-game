@@ -105,15 +105,30 @@ export function faseSeAutoPula(fase: Fase, jogador: JogadorNaMesa): boolean {
   // `instantaneo` na mochila elas DIVERGEM: quem só tem poção guardada não tem
   // nada para vestir, e um `length > 0` prenderia a fase cobrando um "Passar"
   // que não decide nada.
-  const temEquipamento = jogador.mao.some((c) => c.tipo === 'equipamento')
+  const podeEquipar = jogador.mao.some((c) => c.tipo === 'equipamento')
     || jogador.mochila.some((c) => c.tipo === 'equipamento');
+  // 🔴 Fix round 1 (achado da revisão): `guardarCarta` só lê a MÃO (mochila →
+  // mão não existe) e aceita as DUAS famílias de Tesouro desde esta fatia — um
+  // instantâneo sozinho na mão SEGURA a fase, porque "Guardar" é uma ação real
+  // disponível para ele (ao contrário de "Equipar", que só existe para
+  // equipamento). A primeira versão desta fatia só perguntava por equipamento
+  // aqui (`podeEquipar` sozinho), então uma mão só com poção era tratada como
+  // mão vazia e a fase se auto-pulava sobre o único botão que ela tinha —
+  // violando o contrato do docstring desta função ("`true` quando a ÚNICA ação
+  // legal é `passar`"), já que `guardarCarta` continuava legal na fase.
+  //
+  // Não checamos "a mochila tem vaga" aqui — mesma grosseria que `podeEquipar`
+  // já tinha (também não checa afinidade): o pior caso de um falso "não se
+  // pula" é UM clique extra em "Passar" quando a mochila estiver cheia demais
+  // para aceitar a carta, nunca uma ação ilegal.
+  const podeGuardar = jogador.mao.some((c) => c.tipo === 'equipamento' || c.tipo === 'instantaneo');
   switch (fase) {
     case 'recompor':
-      return !temEspecializacao && !temEquipamento;
+      return !temEspecializacao && !podeEquipar && !podeGuardar;
     case 'jogar':
       // SEM raça nem classe: as duas só entram em jogo na fase 1 (decisão #7).
       // Nenhuma das duas dá o que fazer aqui, então não seguram a fase.
-      return !temEquipamento;
+      return !podeEquipar && !podeGuardar;
     case 'vasculhar':
     case 'encrenca':
     case 'combate':

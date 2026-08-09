@@ -1,4 +1,4 @@
-﻿import type { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { narrarCombate } from './narrarCombate';
 import { narrarPorta } from './narrarPorta';
 import { descreverCarta } from './descreverCarta';

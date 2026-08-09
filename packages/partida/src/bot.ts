@@ -209,7 +209,8 @@ function candidatosQueEuPossoVestir(
 ): readonly CartaEquipamento[] {
   // A mochila guarda TESOURO, não só equipamento (fatia `consumíveis
   // (instantâneo)`): um instantâneo ali não é candidato a vestir, e o bot não tem
-  // política nenhuma para ele ainda (a ação de jogá-lo chega no bloco 5).
+  // política nenhuma para JOGÁ-LO ainda (a ação chega na Task 4 — o bloco 5 é a
+  // `carta de combate`, família diferente).
   return [
     ...vista.suaMao.filter((c): c is CartaEquipamento => c.tipo === 'equipamento'),
     ...eu.mochila.filter((c): c is CartaEquipamento => c.tipo === 'equipamento'),
@@ -303,7 +304,13 @@ function vestirOuGuardar(
   // Sem o teste de vaga, o bot pediria `guardarCarta` numa mochila cheia, o
   // `AcaoInvalida` subiria por `avancarBots` e viraria 400 na jogada do HUMANO —
   // o Critical que matou 28 de 30 mesas no Plano 3b.
-  const naMao = vista.suaMao.find((c) => c.tipo === 'equipamento');
+  //
+  // 🔴 Fix round 1: `c.tipo === 'equipamento'` sozinho deixava um instantâneo
+  // solto na mão inalcançável para o bot — `guardarCarta` aceita as DUAS
+  // famílias de Tesouro desde esta fatia, e um instantâneo nunca entra em
+  // `candidatosQueEuPossoVestir` (não tem o que equipar), então "guardar o que
+  // não serve agora" é exatamente a política certa para ele também.
+  const naMao = vista.suaMao.find((c) => c.tipo === 'equipamento' || c.tipo === 'instantaneo');
   if (naMao !== undefined && eu.mochila.length < eu.limiteDeMochila) {
     return { tipo: 'guardarCarta', jogadorId, cartaId: naMao.id };
   }

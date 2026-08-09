@@ -209,11 +209,22 @@ void _coberturaBadStuff;
  * 🔴 Sem ele, um verbo novo em `cartas` deixa `pnpm typecheck` 7/7 LIMPO com o
  * interpretador do reducer nunca alcançando o verbo.
  *
+ * 🔴 Fix round 1 (Minor 2 da revisão): a forma original comparava só
+ * `['tipo']` — mais fraca que a dos outros guards deste arquivo (e mais fraca
+ * do que o texto ACIMA já prometia: "mesma tupla e mesmo preço do
+ * `_CoberturaSlot`", que compara a união INTEIRA). Comparando a união inteira
+ * (`[EfeitoInstantaneo] extends [EfeitoDaCarta]`, não só o campo `tipo`), o
+ * guard passa a travar TRANSITIVAMENTE o `ModificadoresDeStat` de dentro do
+ * `modificadores` de cada membro — a dívida nomeada na tabela de guards
+ * (acima) e em `docs/divida-tecnica.md`. `ModificadoresDeStat` continua sem
+ * guard PRÓPRIO (a dívida não fecha para os outros consumidores dele), mas
+ * este caminho específico já não passa despercebido.
+ *
  * ⚠️ Guard de COMPILAÇÃO. Quem acusa é o `pnpm typecheck`, nunca a suíte.
  */
 type _CoberturaEfeitoInstantaneo =
-  [EfeitoInstantaneo['tipo']] extends [EfeitoDaCarta['tipo']]
-    ? ([EfeitoDaCarta['tipo']] extends [EfeitoInstantaneo['tipo']] ? true : never)
+  [EfeitoInstantaneo] extends [EfeitoDaCarta]
+    ? ([EfeitoDaCarta] extends [EfeitoInstantaneo] ? true : never)
     : never;
 const _coberturaEfeitoInstantaneo: _CoberturaEfeitoInstantaneo = true;
 void _coberturaEfeitoInstantaneo;

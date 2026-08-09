@@ -5,7 +5,7 @@ import { avancarBots } from './automacao';
 import { criarPartida } from './montagem';
 import { projetarPara } from './projecao';
 import { filaDeDados } from './testes/dados';
-import { classe, equipamento, monstro as cartaMonstro, monstros, raca } from './testes/cartas';
+import { classe, equipamento, instantaneo, monstro as cartaMonstro, monstros, raca } from './testes/cartas';
 import { LIMITE_BASE_DE_MAO, LIMITE_BASE_DE_MOCHILA } from './mao';
 import {
   CARTA_DE_CLASSE_DE_TESTE, catalogoDeTeste, comClasseDeTeste, ID_DA_CLASSE_DE_TESTE, ID_DA_RACA_DONA,
@@ -739,6 +739,41 @@ describe('escolherAcao', () => {
 
     expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
       .toEqual({ tipo: 'guardarCarta', jogadorId: 'p1', cartaId: 't-fraco' });
+  });
+
+  // 🔴 Fix round 1 (achado da revisão, item a): com `faseSeAutoPula` consertado
+  // (`fase.ts`), uma mão SÓ com instantâneo já não se auto-pula — o bot
+  // precisa saber responder essa fase sem tentar `equiparCarta` num consumível
+  // (que viraria `AcaoInvalida` dentro de `avancarBots`, 400 na jogada do
+  // humano). `candidatosQueEuPossoVestir` já filtra instantâneo fora do que
+  // pode vestir; este teste prova a OUTRA ponta — que ele ainda assim guarda a
+  // carta, em vez de travar em `passar` com uma ação real disponível.
+  it('guarda um instantâneo sozinho na mão, quando não há nada a equipar', () => {
+    const vista = vistaEm('recompor', {
+      suaMao: [instantaneo('i-1')],
+      mochila: [],
+    });
+
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
+      .toEqual({ tipo: 'guardarCarta', jogadorId: 'p1', cartaId: 'i-1' });
+  });
+
+  it('com a mochila CHEIA, passa em vez de tentar guardar o instantâneo — gêmeo do teste de equipamento', () => {
+    // As DUAS mãos ocupadas por itens FORTES são load-bearing pelo mesmo
+    // motivo do teste gêmeo (linha ~710): sem isso, o `ITEM_DE_TESTE` que
+    // enche a mochila abaixo pareceria uma melhora (slot livre = ganho
+    // positivo) e o bot tentaria EQUIPAR em vez de chegar ao ramo que este
+    // teste prova.
+    const vista = vistaEm('recompor', {
+      suaMao: [instantaneo('i-1')],
+      slots: {
+        maoDireita: equipamento('t-forte-d', ID_DO_ITEM_FORTE),
+        maoEsquerda: equipamento('t-forte-e', ID_DO_ITEM_FORTE),
+      },
+      mochila: Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-c${String(i)}`)),
+    });
+
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste())).toEqual({ tipo: 'passar', jogadorId: 'p1' });
   });
 
   it('em `jogar`, veste o loot que acabou de cair', () => {
