@@ -199,6 +199,14 @@ export interface JogadorNaMesa {
   readonly mochila: readonly CartaTesouro[];
   /** Zona ABERTA. É daqui que sai a raça do lutador — não mais da criação da partida. */
   readonly emJogo: ZonaEmJogo;
+  /**
+   * Ligada pela evacuação, consumida em `encerrarTurno` quando a vez volta a ele:
+   * é a marca de que ele deve recomprar a mão inicial antes de jogar.
+   *
+   * Não pode ficar ligada duas vezes seguidas — combate só acontece no turno do
+   * próprio jogador, e a evacuação encerra esse turno. Invariante testada.
+   */
+  readonly evacuado: boolean;
 }
 
 /**

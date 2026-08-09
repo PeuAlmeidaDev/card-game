@@ -38,8 +38,9 @@ function evacuar(jogador: JogadorNaMesa): {
   const slots = { ...jogador.emJogo.slots };
   for (const e of Object.keys(slots) as Slot[]) slots[e] = null;
   return {
-    // `emJogo.raca` e `emJogo.classe` sobrevivem (#115).
-    jogador: { ...jogador, mao: [], mochila: [], emJogo: { ...jogador.emJogo, slots } },
+    // `emJogo.raca` e `emJogo.classe` sobrevivem (#115). `evacuado: true` é o que
+    // liga o recomeço em `encerrarTurno` quando a vez voltar a ele.
+    jogador: { ...jogador, mao: [], mochila: [], emJogo: { ...jogador.emJogo, slots }, evacuado: true },
     doCorpo,
     daMochila: jogador.mochila,
     daMao: jogador.mao,

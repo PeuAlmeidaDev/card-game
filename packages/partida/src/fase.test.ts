@@ -17,7 +17,7 @@ import type { AcaoDaMesa, JogadorNaMesa, EntradaJogador, EstadoPartida, Fase } f
 const catalogoPadrao = catalogoDeTeste();
 const jogador = (mao: JogadorNaMesa['mao'], comRaca: boolean): JogadorNaMesa => ({
   id: 'p1', nome: 'Você', ehBot: false,
-  patente: 1, derrotas: 0, mao, mochila: [],
+  patente: 1, derrotas: 0, mao, mochila: [], evacuado: false,
   emJogo: { raca: comRaca ? raca('r1', 'anao') : null, classe: CARTA_DE_CLASSE_DE_TESTE, slots: { ...SLOTS_VAZIOS } },
 });
 

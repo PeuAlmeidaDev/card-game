@@ -6,7 +6,7 @@ import type {
   ZonaEmJogo,
 } from './tipos';
 import { tirarDoTopo } from './baralho';
-import { limiteDeMochila } from './mao';
+import { limiteDeMochila, MAO_INICIAL_PADRAO, MAO_INICIAL_TESOUROS } from './mao';
 import { destinoDaCaridade } from './caridade';
 import { aplicarBadStuff } from './badStuff';
 import { afinidadeCom, combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
@@ -72,6 +72,43 @@ function proximoJogador(estado: EstadoPartida): JogadorNaMesa {
 }
 
 /**
+ * Recompra a mão inicial de quem voltou de uma evacuação: 4 Portas + 4
+ * Tesouros, do topo dos dois baralhos, mesma contagem de `criarPartida`. É o
+ * único chamador que apaga `evacuado` — a flag existe para chegar viva até
+ * aqui, e não sobrevive à própria compra.
+ *
+ * `MAO_INICIAL_PADRAO`/`MAO_INICIAL_TESOUROS`, não os dials de `ConfigPartida`:
+ * o recomeço é uma regra da MESA (spec §7.1), não uma escolha da borda — a
+ * mesa nasce e renasce com o mesmo número.
+ */
+function comprarMaoInicial(
+  estado: EstadoPartida,
+  jogador: JogadorNaMesa,
+  deps: DepsMesa,
+): { readonly estado: EstadoPartida; readonly jogador: JogadorNaMesa } {
+  let portas = estado.portas;
+  const compradasPortas: CartaPorta[] = [];
+  for (let i = 0; i < MAO_INICIAL_PADRAO; i += 1) {
+    const t = tirarDoTopo(portas, deps.embaralhar);
+    portas = t.baralho;
+    compradasPortas.push(t.carta);
+  }
+
+  let tesouros = estado.tesouros;
+  const compradosTesouros: CartaTesouro[] = [];
+  for (let i = 0; i < MAO_INICIAL_TESOUROS; i += 1) {
+    const t = tirarDoTopo(tesouros, deps.embaralhar);
+    tesouros = t.baralho;
+    compradosTesouros.push(t.carta);
+  }
+
+  return {
+    estado: { ...estado, portas, tesouros },
+    jogador: { ...jogador, mao: [...compradasPortas, ...compradosTesouros], evacuado: false },
+  };
+}
+
+/**
  * Encerra o turno: cobra o limite de mão e, se ele couber, passa a vez. Porta
  * ÚNICA — a sala vazia, a carta de raça e o fim de combate encerravam cada uma
  * por conta própria, e esta checagem teria que ser lembrada em três lugares.
@@ -81,7 +118,7 @@ function proximoJogador(estado: EstadoPartida): JogadorNaMesa {
  * a ação que chegou até aqui já emitiu os dela, então a versão se move e o guard
  * de 409 do server continua funcionando sem tratamento especial.
  */
-function encerrarTurno(base: EstadoPartida, eventos: readonly EventoDaMesa[]): ResultadoAcao {
+function encerrarTurno(base: EstadoPartida, eventos: readonly EventoDaMesa[], deps: DepsMesa): ResultadoAcao {
   const daVez = base.jogadores.find((j) => j.id === base.vezDe);
   // `daVez === undefined` é a vez apontando para fora da mesa: NÃO é tratado
   // aqui. O limite simplesmente não se aplica a quem não existe, e quem lança
@@ -97,9 +134,32 @@ function encerrarTurno(base: EstadoPartida, eventos: readonly EventoDaMesa[]): R
   }
 
   const seguinte = proximoJogador(base);
+  // `seguinteEvacuou` CAPTURADO antes da compra: `comprarMaoInicial` apaga a
+  // flag no jogador que devolve, então lê-la DEPOIS já veria sempre `false` — a
+  // fase cravada tem que sair desta variável, nunca do jogador pós-compra.
+  const seguinteEvacuou = seguinte.evacuado;
+  // COMPRA ANTES DE CALCULAR A FASE. Calcular antes daria a fase a um jogador de
+  // mão vazia, que se auto-pularia — o bug do Plano 4a, mesma família e mesmo
+  // arquivo. A ordem é prendida por teste, não só por este comentário.
+  let mesa = base;
+  let recomposto = seguinte;
+  if (seguinteEvacuou) {
+    const compra = comprarMaoInicial(mesa, seguinte, deps);
+    mesa = compra.estado;
+    recomposto = compra.jogador;
+  }
   return registrar(
-    { ...base, vezDe: seguinte.id, fase: faseDoTurnoDe(seguinte) },
-    [...eventos, { tipo: 'vez', jogadorId: seguinte.id }],
+    {
+      ...mesa,
+      jogadores: mesa.jogadores.map((j) => (j.id === recomposto.id ? recomposto : j)),
+      vezDe: recomposto.id,
+      // `'recompor'` CRAVADO, não `faseDoTurnoDe`: ele volta com 8 cartas e teto
+      // 7 (mantém a raça, #115), então `faseDoTurnoDe` o mandaria a `descartar`,
+      // onde a única saída é a caridade. É o §11 valendo: quem devolve a folga é
+      // EQUIPAR, não doar.
+      fase: seguinteEvacuou ? 'recompor' : faseDoTurnoDe(recomposto),
+    },
+    [...eventos, { tipo: 'vez', jogadorId: recomposto.id }],
   );
 }
 
@@ -117,11 +177,12 @@ function sairDaParada(
   estado: EstadoPartida,
   fase: FaseParada,
   eventos: readonly EventoDaMesa[],
+  deps: DepsMesa,
 ): ResultadoAcao {
   if (fase === 'recompor') {
     return registrar({ ...estado, fase: 'vasculhar' }, eventos);
   }
-  return encerrarTurno(estado, eventos);
+  return encerrarTurno(estado, eventos, deps);
 }
 
 /**
@@ -146,9 +207,10 @@ function entrarOuPular(
   jogador: JogadorNaMesa,
   fase: FaseParada,
   eventos: readonly EventoDaMesa[],
+  deps: DepsMesa,
 ): ResultadoAcao {
   if (faseSeAutoPula(fase, jogador)) {
-    return sairDaParada(estado, fase, eventos);
+    return sairDaParada(estado, fase, eventos, deps);
   }
   return registrar({ ...estado, fase }, eventos);
 }
@@ -379,7 +441,7 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   }
 
   if (acao.tipo === 'guardarCarta') {
-    return guardarCarta(estado, acao);
+    return guardarCarta(estado, acao, deps);
   }
 
   if (acao.tipo === 'passar') {
@@ -390,7 +452,7 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
     }
     return sairDaParada(estado, estado.fase, [
       { tipo: 'passou', jogadorId: acao.jogadorId, de: estado.fase },
-    ]);
+    ], deps);
   }
 
   if (acao.tipo === 'atacar' || acao.tipo === 'esquivar') {
@@ -406,7 +468,7 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   }
 
   if (acao.tipo === 'queimarCarta') {
-    return queimarCarta(estado, acao);
+    return queimarCarta(estado, acao, deps);
   }
 
   // Exaustividade: a cadeia de `if` acima cobre TODO `AcaoDaMesa['tipo']` de hoje
@@ -580,6 +642,7 @@ function saquear(estado: EstadoPartida, jogadorId: string, deps: DepsMesa): Resu
     comACarta,
     'jogar',
     [{ tipo: 'saqueou', jogadorId }],
+    deps,
   );
 }
 
@@ -803,6 +866,7 @@ function entregarCarta(
     return encerrarTurno(
       descartarNoBaralhoCerto({ ...estado, jogadores }, carta),
       [{ tipo: 'descarte', jogadorId: jogador.id, carta }],
+      deps,
     );
   }
 
@@ -818,6 +882,7 @@ function entregarCarta(
   return encerrarTurno(
     { ...estado, jogadores },
     [{ tipo: 'entrega', jogadorId: jogador.id, paraJogadorId: destinatarioId, rolagem: destino.rolagem }],
+    deps,
   );
 }
 
@@ -963,6 +1028,7 @@ function jogarCarta(
     // vai estar mentindo — e é por isso que ele fica visível em vez de derivado.
     'recompor',
     eventos,
+    deps,
   );
 }
 
@@ -1065,6 +1131,7 @@ function equiparCarta(
     // mandaria quem equipou depois de vencer um combate de volta para a fase 1.
     estado.fase,
     eventos,
+    deps,
   );
 }
 
@@ -1077,6 +1144,7 @@ function equiparCarta(
 function guardarCarta(
   estado: EstadoPartida,
   acao: Extract<AcaoDaMesa, { readonly tipo: 'guardarCarta' }>,
+  deps: DepsMesa,
 ): ResultadoAcao {
   const { jogador, carta } = cartaDaMao(estado, acao);
   if (carta.tipo !== 'equipamento') {
@@ -1107,7 +1175,7 @@ function guardarCarta(
 
   return entrarOuPular(base, atualizado, estado.fase, [
     { tipo: 'guardou', jogadorId: acao.jogadorId, carta },
-  ]);
+  ], deps);
 }
 
 /**
@@ -1120,6 +1188,7 @@ function guardarCarta(
 function queimarCarta(
   estado: EstadoPartida,
   acao: Extract<AcaoDaMesa, { readonly tipo: 'queimarCarta' }>,
+  deps: DepsMesa,
 ): ResultadoAcao {
   const queima = estado.queima;
   if (queima === null) {
@@ -1191,7 +1260,7 @@ function queimarCarta(
     // acontece em fase nenhuma além dessas duas. Invariante NOSSA => Error cru.
     throw new Error(`queimarCarta: fase não-parada ${estado.fase}`);
   }
-  return entrarOuPular(base, atualizado, estado.fase, eventos);
+  return entrarOuPular(base, atualizado, estado.fase, eventos, deps);
 }
 
 function agirNoCombate(estado: EstadoPartida, acao: AcaoDeCombate, deps: DepsMesa): ResultadoAcao {
@@ -1414,5 +1483,5 @@ function fecharCombate(
   // saque. Sem loot na mão ela se auto-pula, então o derrotado só a vê se já
   // trouxesse um tesouro da mão — e aí vestir antes de encerrar o turno é
   // exatamente o que a fase existe para permitir.
-  return entrarOuPular(comLoot, jogadorAtual, 'jogar', eventos);
+  return entrarOuPular(comLoot, jogadorAtual, 'jogar', eventos, deps);
 }

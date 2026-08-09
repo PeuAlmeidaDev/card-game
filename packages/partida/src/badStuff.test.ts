@@ -7,6 +7,7 @@ import type { JogadorNaMesa } from './tipos';
 const jogadorBase = (over: Partial<JogadorNaMesa> = {}): JogadorNaMesa => ({
   id: 'p1', nome: 'Você', ehBot: false, patente: 4, derrotas: 2,
   mao: [], mochila: [], emJogo: { raca: null, classe: null, slots: { ...SLOTS_VAZIOS } },
+  evacuado: false,
   ...over,
 });
 
@@ -120,6 +121,16 @@ describe('evacuacao', () => {
     expect(r.eventos).toEqual([
       { tipo: 'evacuou', jogadorId: 'p1', doCorpo: [], daMochila: [], daMao: 0 },
     ]);
+  });
+
+  it('a evacuação LIGA a flag', () => {
+    const r = aplicarBadStuff(jogadorBase(), [{ tipo: 'evacuacao' }]);
+    expect(r.jogador.evacuado).toBe(true);
+  });
+
+  it('`perdeSlot` NÃO liga a flag', () => {
+    const r = aplicarBadStuff(jogadorBase(), [{ tipo: 'perdeSlot', slot: 'pes' }]);
+    expect(r.jogador.evacuado).toBe(false);
   });
 });
 

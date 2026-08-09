@@ -3149,6 +3149,110 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
   });
 });
 
+describe('encerrarTurno — quem evacuou recompra 4+4 quando a vez volta (Task 5)', () => {
+  // Baralhos GRANDES de propósito, e NÃO os `COMPOSICAO_DE_TESTE`/
+  // `COMPOSICAO_TESOURO_DE_TESTE` do arquivo: o cenário força DUAS lutas (a que
+  // evacua p1 e a que o bot p2 vence de graça, saqueando 1 Tesouro) mais a
+  // recompra de 4+4 de p1 — cinco saques de Tesouro contra os 4 da composição
+  // baseline (2 por jogador × 2 jogadores) estourariam o monte SEM cemitério
+  // para reembaralhar, e `tirarDoTopo` lançaria `Error` cru no meio do teste.
+  // Só monstro nas Portas, para o `vasculhar` de p2 nunca cair no ramo de
+  // raça/classe — abriria `encrenca` em vez de combate e mudaria a contagem de
+  // ações do turno dele.
+  const configGrande: ConfigPartida = {
+    patenteAlvo: 10,
+    composicaoPorJogador: montarComposicao({
+      monstroIds: Array.from({ length: 10 }, () => 'm-teste'),
+      copiasPorMonstro: 1,
+      racaIds: [],
+      copiasPorRaca: 0,
+      classeIds: [],
+      copiasPorClasse: 0,
+    }),
+    composicaoTesouros: montarComposicaoTesouros(Array.from({ length: 10 }, () => 'i-teste')),
+  };
+
+  const monstroForteComEvacuacao: InfoMonstro = {
+    forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1, tesouros: 0,
+    badStuff: [{ tipo: 'evacuacao' }],
+  };
+
+  /**
+   * p1 com uma raça JÁ em jogo, ANTES da evacuação — sem isto o teste NÃO
+   * exercita a #115 (a raça sobrevive à evacuação) nem o motivo real do
+   * `'recompor'` cravado: sem raça em jogo o limite de p1 é `LIMITE_BASE_DE_MAO
+   * + 1` (8), a recompra de 8 cartas cai EXATAMENTE nele (não o excede), e
+   * `faseDoTurnoDe` devolveria `'recompor'` de qualquer jeito — a Mutação Step 6
+   * (2/2), abaixo, ficaria VERDE por acidente de fixture, não por o cravado
+   * estar certo. Com a raça em jogo o limite cai para 7, e 8 > 7 força
+   * `faseDoTurnoDe` a `'descartar'` se o cravado morrer.
+   */
+  const comRacaEmJogo = (estado: EstadoPartida): EstadoPartida => ({
+    ...estado,
+    jogadores: estado.jogadores.map((j) => (
+      j.id === 'p1' ? { ...j, emJogo: { ...j.emJogo, raca: raca('p-raca-p1', 'orc') } } : j
+    )),
+  });
+
+  /**
+   * Abre combate contra o monstro FORTE e faz p1 PERDER — mesmo orçamento de
+   * dado de "Bad Stuff na derrota": o monstro mais ágil ataca primeiro e acerta
+   * (rolagem 1 ≤ habilidade 12); a esquiva de p1 (2 > 1) falha e o dano
+   * (1 + 30 = 31) passa da vida 20. p1 evacua sem nada equipado — a mão e a
+   * mochila já nascem vazias, e o único slot preenchido pela raça é
+   * `emJogo.raca`, que a evacuação preserva (#115).
+   */
+  const evacuarP1 = (estado: EstadoPartida): EstadoPartida => {
+    const fabrica = depsComMonstro(monstroForteComEvacuacao);
+    const comCombate = aplicarAcao(estado, { tipo: 'vasculhar', jogadorId: 'p1' }, fabrica([1])).estado;
+    return aplicarAcao(comCombate, { tipo: 'esquivar', jogadorId: 'p1' }, fabrica([2])).estado;
+  };
+
+  /**
+   * Deps do turno do bot p2: catálogo DEFAULT (o monstro que ele encontra é o
+   * `MONSTRO_DE_TESTE` fraco, não o forte que evacuou p1) e o mesmo ciclo de
+   * três dados de `venceOCombate` — comprimento ÍMPAR, então fica alinhado com
+   * "cada `atacar` gasta 3 dados" indefinidamente (ver a trava de paridade
+   * documentada em `criarDadoCiclico`).
+   */
+  const depsDoBotP2: DepsMesa = {
+    rolar: criarDadoCiclico([4, 12, 12]),
+    embaralhar: semEmbaralhar,
+    catalogo: catalogoDeTeste(),
+  };
+
+  /** p1 evacuado, com a vez já em p2 (bot) — o ponto de partida dos três testes abaixo. */
+  const mesaComP1Evacuado = (): EstadoPartida =>
+    evacuarP1(comRacaEmJogo(criar('m1', entradas, configGrande, { embaralhar: semEmbaralhar })));
+
+  it('quem evacuou recompra 4 Portas + 4 Tesouros quando a vez chega nele', () => {
+    const { estado: depois } = avancarBots(mesaComP1Evacuado(), depsDoBotP2);
+
+    expect(depois.jogadores[0]?.mao).toHaveLength(8);
+    expect(depois.jogadores[0]?.evacuado).toBe(false);
+  });
+
+  it('🔴 ele entra em `recompor`, NÃO em `descartar`', () => {
+    // Ele mantém a raça (#115), logo o limite dele é 7 — e 4+4 = 8. Saindo de
+    // `faseDoTurnoDe` ele cairia em `descartar`, onde a única ação legal é a
+    // CARIDADE: doaria uma carta a um rival e `entregarCarta` terminaria em
+    // `encerrarTurno`, que então o veria dentro do limite e passaria a vez.
+    // Ele esperaria uma rodada, voltaria, doaria e perderia o turno de novo.
+    const { estado: depois } = avancarBots(mesaComP1Evacuado(), depsDoBotP2);
+
+    expect(depois.fase).toBe('recompor');
+  });
+
+  it('🔴 COMPRA antes de calcular a fase', () => {
+    // Calcular antes daria a fase a um jogador de mão vazia, que se auto-pularia.
+    // É exatamente o bug do Plano 4a, no mesmo arquivo.
+    const { estado: depois } = avancarBots(mesaComP1Evacuado(), depsDoBotP2);
+
+    expect(depois.vezDe).toBe('p1');
+    expect(depois.fase).toBe('recompor');
+  });
+});
+
 describe('aplicarAcao — vasculhar com a mão estourada', () => {
   const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
   // 🎚️ Derivada do dial: `base + 1` cartas com raça em jogo (limite = o base)
