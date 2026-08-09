@@ -8,6 +8,7 @@ import type {
 import { tirarDoTopo } from './baralho';
 import { limiteDeMochila } from './mao';
 import { destinoDaCaridade } from './caridade';
+import { aplicarBadStuff } from './badStuff';
 import { afinidadeCom, combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
 import { colocarNoSlot, destinoDoDesequipado, precisaEscolherMao } from './equipar';
 import { classificar } from './classificacao';
@@ -1324,6 +1325,30 @@ function fecharCombate(
   // 'terminada'` já recusa toda ação no topo do `aplicarAcao`.
   const semCombate: EstadoPartida = { ...estado, jogadores, combate: null, fase: 'jogar' };
 
+  // O preço da derrota. Só o ramo da derrota consulta o catálogo aqui — até esta
+  // task só o da vitória o consultava. Mesma cadeia do `Error` cru de baixo: id
+  // que o catálogo não conhece é invariante NOSSA (a carta veio da composição que
+  // a borda montou do próprio catálogo), então sobe cru => 500 sem vazar.
+  let comBadStuff = semCombate;
+  if (!venceu) {
+    const info = deps.catalogo.monstro(monstroId);
+    if (info === undefined) {
+      throw new Error(`fecharCombate: monstro ${monstroId} não está no catálogo`);
+    }
+    const alvo = semCombate.jogadores.find((j) => j.id === jogadorId);
+    if (alvo === undefined) {
+      throw new Error(`fecharCombate: jogador ${jogadorId} não está na mesa`);
+    }
+    const efeito = aplicarBadStuff(alvo, info.badStuff);
+    let base: EstadoPartida = {
+      ...semCombate,
+      jogadores: semCombate.jogadores.map((j) => (j.id === jogadorId ? efeito.jogador : j)),
+    };
+    for (const carta of efeito.perdidas) base = descartarNoBaralhoCerto(base, carta);
+    comBadStuff = base;
+    eventos.push(...efeito.eventos);
+  }
+
   // O loot vem ANTES da saída do turno de propósito: é `encerrarTurno` (do outro
   // lado de `jogar`) quem recobra o limite de mão, e o tesouro que estoura a mão
   // tem que cair na conta do mesmo turno. Depois, a fase `descartar` seria dada
@@ -1333,7 +1358,11 @@ function fecharCombate(
   // E vem DEPOIS de `combate: null`: a invariante de fase (`fase.test.ts`) cobra
   // que ninguém fique em `fase: 'combate'` com a mão estourada. Somar o loot com
   // o combate ainda aberto faria esse alarme tocar — e com razão.
-  let comLoot = semCombate;
+  //
+  // Parte de `comBadStuff`, não de `semCombate`: perder também é um jogador
+  // atualizado, e o `comLoot` de baixo (que o resto da função lê) tem que
+  // carregar a evacuação/perda de slot, não descartá-la.
+  let comLoot = comBadStuff;
   if (venceu) {
     // Id que o catálogo não conhece é invariante NOSSA quebrada (a carta veio da
     // composição que a borda montou do próprio catálogo), então sobe como Error

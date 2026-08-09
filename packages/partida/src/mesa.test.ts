@@ -19,9 +19,9 @@ import {
 } from './testes/catalogo';
 import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import { combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
-import type { DepsMesa } from './mesa';
+import type { DepsMesa, ResultadoAcao } from './mesa';
 import type {
-  Carta, ConfigPartida, EntradaJogador, CartaPorta, CartaEquipamento, EstadoPartida, InfoMonstro,
+  BadStuff, Carta, ConfigPartida, EntradaJogador, CartaPorta, CartaEquipamento, EstadoPartida, InfoMonstro,
   JogadorNaMesa, ZonaEmJogo,
 } from './tipos';
 import type { PassivaCombate } from '@card-dungeon/motor';
@@ -408,6 +408,161 @@ describe('aplicarAcao — combate', () => {
       .toThrow(TypeError);
     expect(() => aplicarAcao(comCombate, { tipo: 'atacar', jogadorId: 'p1' }, depsQuebradas))
       .not.toThrow(AcaoInvalida);
+  });
+});
+
+describe('Bad Stuff na derrota', () => {
+  const soMonstro = { ...config, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] };
+  const nascida = (): EstadoPartida => criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+
+  /**
+   * Monstro forte de sempre (`forca 30, habilidade 12, agilidade 12` — mata o
+   * jogador de UM golpe, mesmo orçamento de dados do describe de combate acima),
+   * com o `badStuff` como o único dial de cada teste.
+   */
+  const monstroComBadStuff = (badStuff: readonly BadStuff[]): InfoMonstro => (
+    { forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1, tesouros: 0, badStuff }
+  );
+
+  /**
+   * Injeta corpo/mão/mochila de p1 ANTES de abrir o combate. Espalha
+   * `SLOTS_VAZIOS` para não escrever os 5 slots à mão — mesma convenção do
+   * `comSlots` mais abaixo no arquivo.
+   */
+  const comCorpo = (
+    estado: EstadoPartida,
+    patch: {
+      readonly slots?: Partial<ZonaEmJogo['slots']>;
+      readonly mao?: readonly Carta[];
+      readonly mochila?: readonly CartaEquipamento[];
+    },
+  ): EstadoPartida => ({
+    ...estado,
+    jogadores: estado.jogadores.map((j) => (j.id === 'p1' ? {
+      ...j,
+      mao: patch.mao ?? j.mao,
+      mochila: patch.mochila ?? j.mochila,
+      emJogo: { ...j.emJogo, slots: { ...SLOTS_VAZIOS, ...patch.slots } },
+    } : j)),
+  });
+
+  /**
+   * Abre o combate e faz p1 PERDER: o monstro mais ágil ataca primeiro e acerta
+   * (rolagem 1 ≤ habilidade 12); a esquiva do jogador (2 > 1) falha e o dano
+   * (1 + 30 = 31) passa da vida 20 — mesmo orçamento de dados do teste "perder o
+   * combate conta derrota e passa a vez", acima. `antes` é o estado JÁ com o
+   * corpo/mão/mochila injetados, mas ANTES de vasculhar — é ele que o censo de
+   * conservação compara contra o `depois`.
+   */
+  const perder = (
+    estado: EstadoPartida,
+    badStuff: readonly BadStuff[],
+  ): { readonly antes: EstadoPartida; readonly depois: EstadoPartida; readonly eventos: ResultadoAcao['eventos'] } => {
+    const fabrica = depsComMonstro(monstroComBadStuff(badStuff));
+    const comCombate = aplicarAcao(estado, { tipo: 'vasculhar', jogadorId: 'p1' }, fabrica([1])).estado;
+    const r = aplicarAcao(comCombate, { tipo: 'esquivar', jogadorId: 'p1' }, fabrica([2]));
+    return { antes: estado, depois: r.estado, eventos: r.eventos };
+  };
+
+  /** Todo id de carta presente na mesa, em qualquer zona — o censo de conservação. */
+  const idsDaMesa = (estado: EstadoPartida): string[] => {
+    const ids: string[] = [
+      ...estado.portas.monte.map((c) => c.id),
+      ...estado.portas.cemiterio.map((c) => c.id),
+      ...estado.tesouros.monte.map((c) => c.id),
+      ...estado.tesouros.cemiterio.map((c) => c.id),
+    ];
+    for (const j of estado.jogadores) {
+      ids.push(...j.mao.map((c) => c.id));
+      ids.push(...j.mochila.map((c) => c.id));
+      ids.push(...itensEquipados(j.emJogo.slots).map((c) => c.id));
+      if (j.emJogo.raca !== null) ids.push(j.emJogo.raca.id);
+      if (j.emJogo.classe !== null) ids.push(j.emJogo.classe.id);
+    }
+    return ids;
+  };
+
+  it('perder aplica o Bad Stuff do monstro e manda o item ao cemitério de TESOUROS', () => {
+    const p = comCorpo(nascida(), { slots: { capacete: equipamento('t-cap') } });
+    const { depois } = perder(p, [{ tipo: 'perdeSlot', slot: 'capacete' }]);
+
+    expect(depois.tesouros.cemiterio.map((c) => c.id)).toContain('t-cap');
+    expect(depois.jogadores[0]?.emJogo.slots.capacete).toBeNull();
+  });
+
+  it('🔴 o item arrancado vai DIRETO ao cemitério, mesmo com vaga na mochila', () => {
+    // Assimetria DELIBERADA com `destinoDoDesequipado`, que prefere a mochila:
+    // trocar de equipamento é SUA escolha, o Bad Stuff é o monstro TOMANDO. Se
+    // fosse à mochila, o item voltaria ao corpo na fase `jogar` do mesmo turno (a
+    // punição vira nada) E devolveria zero carta ao baralho (a economia vira nada).
+    const p = comCorpo(nascida(), { slots: { capacete: equipamento('t-cap') } });
+    const { depois } = perder(p, [{ tipo: 'perdeSlot', slot: 'capacete' }]);
+
+    expect(depois.jogadores[0]?.mochila).toEqual([]);
+    expect(depois.tesouros.cemiterio).toHaveLength(1);
+  });
+
+  it('VENCER não aplica Bad Stuff nenhum', () => {
+    // Monstro FRACO (o `MONSTRO_DE_TESTE` de sempre) com badStuff anexado — quem
+    // ataca aqui é o JOGADOR, não o monstro. Item NEUTRO (modificadores vazios)
+    // de propósito: o orçamento de dados abaixo é o mesmo três-golpes de
+    // `venceOCombate` (dano 4 por golpe), e um item com modificador de força
+    // mudaria a conta.
+    const base = catalogoDeTeste();
+    const catalogo = catalogoDeTeste({
+      monstro: () => ({ ...MONSTRO_DE_TESTE, badStuff: [{ tipo: 'perdeSlot', slot: 'capacete' }] }),
+      item: (id) => (id === 'i-neutro'
+        ? { id: 'i-neutro', nome: 'Neutro', slot: 'capacete' as const, duasMaos: false, modificadores: {}, exclusivo: null }
+        : base.item(id)),
+    });
+    const fabrica = (dados: readonly number[]): DepsMesa => ({
+      rolar: filaDeDados(dados), embaralhar: semEmbaralhar, catalogo,
+    });
+    const p = comCorpo(nascida(), { slots: { capacete: equipamento('t-cap', 'i-neutro') } });
+    // agilidade do jogador (5) > do monstro (1) => a abertura não gasta dado.
+    const aberto = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, fabrica([])).estado;
+    let r = aplicarAcao(aberto, { tipo: 'atacar', jogadorId: 'p1' }, fabrica([4, 12, 12]));
+    r = aplicarAcao(r.estado, { tipo: 'atacar', jogadorId: 'p1' }, fabrica([4, 12, 12]));
+    r = aplicarAcao(r.estado, { tipo: 'atacar', jogadorId: 'p1' }, fabrica([4, 12, 12]));
+
+    expect(r.estado.jogadores[0]?.emJogo.slots.capacete).not.toBeNull();
+    expect(r.eventos.map((e) => e.tipo)).not.toContain('perdeuEquipamento');
+  });
+
+  it('a evacuação roteia por FAMÍLIA — Portas ao cemitério de Portas, Tesouros ao de Tesouros', () => {
+    const p = comCorpo(nascida(), { mao: [monstro('p-1'), equipamento('t-1')] });
+    const { depois } = perder(p, [{ tipo: 'evacuacao' }]);
+
+    expect(depois.portas.cemiterio.map((c) => c.id)).toContain('p-1');
+    expect(depois.tesouros.cemiterio.map((c) => c.id)).toContain('t-1');
+  });
+
+  it('🔴 quem evacuou NÃO fica parado em `jogar` — a fase se auto-pula', () => {
+    // O `entrarOuPular` no fim do `fecharCombate` tem que receber o jogador DEPOIS
+    // do Bad Stuff. Com o jogador de antes, ele responde "tenho equipamento na
+    // mão" sobre uma mão que não existe mais, e o turno para com nada a fazer —
+    // num assento de bot isso vira AcaoInvalida propagada por `avancarBots` = 400
+    // na jogada do humano. É o bug do Plano 4a, na mesma função.
+    const p = comCorpo(nascida(), {
+      slots: { capacete: equipamento('t-cap') },
+      mao: [equipamento('t-1')],
+      mochila: [equipamento('t-2')],
+    });
+    const { depois } = perder(p, [{ tipo: 'evacuacao' }]);
+
+    expect(depois.vezDe).not.toBe('p1');
+  });
+
+  it('nenhuma carta some — censo antes e depois', () => {
+    // Todo id que existia na mesa antes continua existindo depois, em alguma zona.
+    const p = comCorpo(nascida(), {
+      slots: { capacete: equipamento('t-cap') },
+      mao: [monstro('p-1'), equipamento('t-1')],
+      mochila: [equipamento('t-2')],
+    });
+    const { antes, depois } = perder(p, [{ tipo: 'evacuacao' }]);
+
+    expect(idsDaMesa(depois).sort()).toEqual(idsDaMesa(antes).sort());
   });
 });
 
