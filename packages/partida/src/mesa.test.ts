@@ -3296,7 +3296,7 @@ describe('encerrarTurno — quem evacuou recompra 4+4 quando a vez volta (Task 5
     // (decisão #116) o ramo evacuado NUNCA lê `faseDoTurnoDe`; ela só é chamada
     // no ramo NÃO-evacuado, onde `recomposto` é sempre o MESMO objeto que
     // `seguinte` (o `if` que os separaria não roda). Medido: trocar
-    // `faseDoTurnoDe(recomposto)` por `faseDoTurnoDe(seguinte)` deixa 377/377
+    // `faseDoTurnoDe(recomposto)` por `faseDoTurnoDe(seguinte)` deixa 381/381
     // verdes — mutação-equivalente, não protegida por este teste nem por
     // nenhum outro. A ordem em si segue certa (calcular antes daria a fase a
     // um jogador de mão vazia, que se auto-pularia — o bug do Plano 4a), só
