@@ -151,12 +151,35 @@ a rodada de soak devolve o número real e este parágrafo morre.
 ```ts
 export function aplicarBadStuff(
   jogador: JogadorNaMesa,
-  efeito: BadStuff,
-): { readonly jogador: JogadorNaMesa; readonly perdidas: readonly Carta[] }
+  efeitos: readonly BadStuff[],
+): {
+  readonly jogador: JogadorNaMesa;
+  readonly perdidas: readonly Carta[];      // para o roteamento aos cemitérios
+  readonly eventos: readonly EventoDaMesa[]; // para a narração
+}
 ```
+
+✏️ **SEGUNDA CORREÇÃO MARCADA (2026-08-09, ao escrever o plano):** o retorno era
+`{ jogador, perdidas }`, e **não bastava**. Os dois eventos do §5.2 precisam saber **qual efeito
+produziu o quê** — `perdeuEquipamento` nomeia o `slot`, e `evacuou` separa `doCorpo` / `daMochila` /
+`daMao`. Uma lista achatada de `perdidas` **perde essa informação**, e o `mesa.ts` teria que
+reconstruí-la olhando o `BadStuff` de novo. 🔴 **Isso instalaria um SEGUNDO interpretador da união
+`BadStuff` dentro do `mesa.ts`** — exatamente o que o `switch` fechado por `never` existe para
+impedir, e o verbo novo passaria a ter que ser tratado em dois lugares em vez de quebrar num só.
+
+➡️ **A função devolve os eventos.** A duplicação aparente entre `perdidas` e as cartas dentro dos
+eventos é deliberada: **cada uma tem um trabalho** — `perdidas` é roteamento (o `mesa.ts` chama
+`descartarNoBaralhoCerto` em cada), os eventos são narração (e o sigilo do §5.2 decide a forma
+deles). ✅ E a função continua **pura**: `EventoDaMesa` é tipo de `partida`, não de `EstadoPartida`.
 
 Função **pura**: não toca no `EstadoPartida`. Devolve o jogador novo e as cartas que saíram; quem as
 roteia é o `mesa.ts`, chamando o `descartarNoBaralhoCerto` que já existe e já fecha por `never`.
+
+✏️ **CORREÇÃO MARCADA (2026-08-09):** esta assinatura dizia `efeito: BadStuff`, no **singular**, e
+ficou incoerente com o `readonly BadStuff[]` que a **#120** criou no §3.1.1 poucas linhas acima —
+escrita na mesma sessão, na revisão que introduziu a lista. 🔑 **O laço mora DENTRO da função pura**,
+não no `mesa.ts`: assim o `mesa.ts` chama uma vez, e a acumulação das `perdidas` entre efeitos fica
+no lugar que os testes de dublê já alcançam.
 
 🔑 **Por que o Bad Stuff é DADO na carta e CÓDIGO em `partida` — isto não foi escolha.** As passivas
 podem ser código dentro de `cartas` porque só tocam o `Combatente`, que é um **valor**. O Bad Stuff
