@@ -1,7 +1,7 @@
 # `@card-dungeon/partida`
 
 **A mesa: o reducer da partida, as fases do turno, as zonas e o bot.** O maior pacote de domínio
-(**377 testes**). TS puro, dado e embaralho **injetados**. Depende de `motor` + `personagem`.
+(**381 testes**). TS puro, dado e embaralho **injetados**. Depende de `motor` + `personagem`.
 
 ## Papel na arquitetura
 

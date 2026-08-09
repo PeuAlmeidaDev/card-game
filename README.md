@@ -3,7 +3,7 @@
 Dungeon crawl de cartas, sério, com combate por rounds resolvido por dado (1d12).
 Projeto de aprendizado (Método Akita) — título final a definir.
 
-**Status:** em construção — sete pacotes, 693 testes verdes, typecheck 7/7 (2026-08-09).
+**Status:** em construção — sete pacotes, 737 testes verdes, typecheck 7/7 (2026-08-09).
 
 | Onde | O quê |
 |---|---|

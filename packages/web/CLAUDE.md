@@ -1,7 +1,7 @@
 # `@card-dungeon/web`
 
 **A tela: React + Vite.** Depende **só** de `shared` — nunca importe um pacote de domínio direto.
-Testes com vitest + Testing Library (**181 testes**).
+Testes com vitest + Testing Library (**182 testes**).
 
 ## Papel na arquitetura
 

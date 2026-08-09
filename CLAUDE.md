@@ -62,8 +62,8 @@ completo está em [`docs/licoes-aprendidas.md §1`](docs/licoes-aprendidas.md). 
 ## Estado atual (2026-08-09)
 
 **Sete pacotes** — `motor`, `personagem`, `cartas`, `partida`, `shared`, `server`, `web`.
-**732 testes verdes** (motor 56 · cartas 55 · personagem 11 · partida 377 · shared 23 · server 29 ·
-web 181), **typecheck 7/7**, lint limpo — rodados em 2026-08-09.
+**737 testes verdes** (motor 56 · cartas 55 · personagem 11 · partida 381 · shared 23 · server 29 ·
+web 182), **typecheck 7/7**, lint limpo — rodados em 2026-08-09.
 
 **Fatias 1–8 completas, mais o bloco 2 começado.** A última fatia de código é a
 **`Bad Stuff e evacuação`** (a **2a**, decisões #112–#126), em que **perder um combate passou a
