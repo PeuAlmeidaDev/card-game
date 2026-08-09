@@ -37,7 +37,12 @@ As duas mãos são **vagas equivalentes** desde a fatia `empunhadura dupla` (#98
 são os guards `_CoberturaSlot` / `_CoberturaSlotDeItem` em `shared`.** Mexer numa união aqui sem a
 gêmea lá é um `pnpm typecheck` **7/7 limpo** com o jogo quebrado.
 
-## 💀 `BadStuff` — o preço da derrota, e a TERCEIRA união gêmea deste pacote
+## 💀 `BadStuff` — o preço da derrota, e a QUARTA união gêmea deste pacote
+
+⚠️ **Corrigido em 2026-08-09** (Minor da leva de correção da fatia `Bad Stuff e evacuação`): este
+cabeçalho dizia "TERCEIRA", mas `Slot`, `SlotDeItem` e `EixoDeAfinidade` já eram três — `BadStuff` é
+a quarta. O spec §3.4 e [`docs/licoes-aprendidas.md §14`](../../docs/licoes-aprendidas.md) já diziam
+QUATRO; só este cabeçalho contradizia os outros dois. Vício nº 1 escrito nesta própria fatia.
 
 `readonly badStuff: readonly BadStuff[]` em `MonstroCarta`, **obrigatório**. Dois verbos:
 `{ tipo: 'evacuacao' }` e `{ tipo: 'perdeSlot'; slot: SlotDeItem }`.
