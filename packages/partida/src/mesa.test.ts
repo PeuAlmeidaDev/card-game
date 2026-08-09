@@ -564,6 +564,52 @@ describe('Bad Stuff na derrota', () => {
 
     expect(idsDaMesa(depois).sort()).toEqual(idsDaMesa(antes).sort());
   });
+
+  /**
+   * 🔴 IMPORTANT 1 da revisão da leva de correção (2026-08-09): `badStuff.test.ts`
+   * prova que `aplicarBadStuff` DEVOLVE os eventos certos; `narrarEvento.test.tsx`
+   * prova que a tela SABE narrá-los, com eventos construídos à mão. O FIO entre os
+   * dois — `fecharCombate` repassando `efeito.eventos` para o resultado do
+   * reducer — não tinha um teste próprio. Apagar
+   * `eventos.push(...efeito.eventos)` do ramo `!venceu` de `fecharCombate`
+   * deixava a suíte inteira verde: a punição mais dura do jogo acontecia em
+   * silêncio absoluto, e nenhum teste notava.
+   */
+  it('🔴 `perdeuEquipamento` chega ao RESULTADO do reducer, com o slot e as cartas certas, DEPOIS de `derrota`', () => {
+    const p = comCorpo(nascida(), { slots: { capacete: equipamento('t-cap') } });
+    const { eventos } = perder(p, [{ tipo: 'perdeSlot', slot: 'capacete' }]);
+
+    const indiceDerrota = eventos.findIndex((e) => e.tipo === 'derrota');
+    const indicePerdeu = eventos.findIndex((e) => e.tipo === 'perdeuEquipamento');
+    expect(indiceDerrota).toBeGreaterThanOrEqual(0);
+    // A ORDEM que o plano promete: `derrota` primeiro, o Bad Stuff depois — é
+    // `fecharCombate` empurrando `derrota` ANTES de chamar `aplicarBadStuff`.
+    expect(indicePerdeu).toBeGreaterThan(indiceDerrota);
+    expect(eventos[indicePerdeu]).toEqual({
+      tipo: 'perdeuEquipamento', jogadorId: 'p1', slot: 'capacete', cartas: [equipamento('t-cap')],
+    });
+  });
+
+  it('🔴 `evacuou` chega ao RESULTADO do reducer, com doCorpo/daMochila/daMao certos, DEPOIS de `derrota`', () => {
+    const p = comCorpo(nascida(), {
+      slots: { capacete: equipamento('t-cap') },
+      mao: [monstro('p-1'), equipamento('t-1')],
+      mochila: [equipamento('t-2')],
+    });
+    const { eventos } = perder(p, [{ tipo: 'evacuacao' }]);
+
+    const indiceDerrota = eventos.findIndex((e) => e.tipo === 'derrota');
+    const indiceEvacuou = eventos.findIndex((e) => e.tipo === 'evacuou');
+    expect(indiceDerrota).toBeGreaterThanOrEqual(0);
+    expect(indiceEvacuou).toBeGreaterThan(indiceDerrota);
+    expect(eventos[indiceEvacuou]).toEqual({
+      tipo: 'evacuou',
+      jogadorId: 'p1',
+      doCorpo: [equipamento('t-cap')],
+      daMochila: [equipamento('t-2')],
+      daMao: 2,
+    });
+  });
 });
 
 describe('vencer larga tesouro na mão', () => {
@@ -3243,12 +3289,23 @@ describe('encerrarTurno — quem evacuou recompra 4+4 quando a vez volta (Task 5
     expect(depois.fase).toBe('recompor');
   });
 
-  it('🔴 COMPRA antes de calcular a fase', () => {
-    // Calcular antes daria a fase a um jogador de mão vazia, que se auto-pularia.
-    // É exatamente o bug do Plano 4a, no mesmo arquivo.
+  it('🔴 quem evacuou recebe as 8 cartas da recompra, com a vez em `recompor`', () => {
+    // 🔴 Achado da revisão da leva de correção (2026-08-09): o título antigo
+    // ("COMPRA antes de calcular a fase") prometia sensibilidade à ORDEM entre
+    // `comprarMaoInicial` e o cálculo da fase — mas com `'recompor'` CRAVADO
+    // (decisão #116) o ramo evacuado NUNCA lê `faseDoTurnoDe`; ela só é chamada
+    // no ramo NÃO-evacuado, onde `recomposto` é sempre o MESMO objeto que
+    // `seguinte` (o `if` que os separaria não roda). Medido: trocar
+    // `faseDoTurnoDe(recomposto)` por `faseDoTurnoDe(seguinte)` deixa 377/377
+    // verdes — mutação-equivalente, não protegida por este teste nem por
+    // nenhum outro. A ordem em si segue certa (calcular antes daria a fase a
+    // um jogador de mão vazia, que se auto-pularia — o bug do Plano 4a), só
+    // deixou de ser OBSERVÁVEL neste ramo. A asserção que morde de verdade é o
+    // tamanho da mão pós-recompra.
     const { estado: depois } = avancarBots(mesaComP1Evacuado(), depsDoBotP2);
 
     expect(depois.vezDe).toBe('p1');
+    expect(depois.jogadores[0]?.mao).toHaveLength(8);
     expect(depois.fase).toBe('recompor');
   });
 

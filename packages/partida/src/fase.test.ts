@@ -2,16 +2,20 @@ import { describe, it, expect } from 'vitest';
 import { acaoEhLegal, acaoEhLegalNaFase, faseDoTurnoDe, faseSeAutoPula } from './fase';
 import { criarPartida } from './montagem';
 import { aplicarAcao } from './mesa';
+import { avancarBots } from './automacao';
 import { escolherAcao } from './bot';
 import { projetarPara } from './projecao';
 import { limiteDeMao, LIMITE_BASE_DE_MAO, LIMITE_BASE_DE_MOCHILA } from './mao';
-import { montarComposicao } from './baralho';
-import { criarDadoCiclico } from './testes/dados';
+import { montarComposicao, montarComposicaoTesouros } from './baralho';
+import { criarDadoCiclico, filaDeDados } from './testes/dados';
 import { CARTA_DE_CLASSE_DE_TESTE, catalogoDeTeste, comClasseDeTeste } from './testes/catalogo';
 import { COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import { classe, equipamento, monstro, monstros, raca } from './testes/cartas';
 import { SLOTS_VAZIOS } from './corpo';
-import type { AcaoDaMesa, JogadorNaMesa, EntradaJogador, EstadoPartida, Fase } from './tipos';
+import type { DepsMesa } from './mesa';
+import type {
+  AcaoDaMesa, ConfigPartida, EntradaJogador, EstadoPartida, Fase, InfoMonstro, JogadorNaMesa,
+} from './tipos';
 
 /** A projeção calcula `combatente`, então precisa do catálogo. Um só para o arquivo. */
 const catalogoPadrao = catalogoDeTeste();
@@ -560,6 +564,137 @@ describe('a fase nunca mente sobre o estado', () => {
     // monstro e cai em `saquear` — que só ADICIONA carta — quem finalmente deixa
     // o excedente sobreviver até `encerrarTurno`.
     expect([...fasesVistas].sort()).toEqual(['combate', 'descartar', 'encrenca', 'jogar', 'recompor', 'vasculhar']);
+  });
+});
+
+/**
+ * 🔴 IMPORTANT 2 da revisão da leva de correção (2026-08-09). A evacuação
+ * (`badStuff.ts`, efeito `evacuacao`) produz estados que o predicado `violacoes`
+ * do describe ANTERIOR chamaria de violação — e o predicado NUNCA os visita,
+ * porque a caminhada de partida inteira ali é gerada com `catalogoDeTeste()`, e
+ * `MONSTRO_DE_TESTE.badStuff` é `[]` DE PROPÓSITO (ver o comentário dele em
+ * `testes/catalogo.ts`: dar Bad Stuff ao monstro default mudaria dezenas de
+ * asserções de combate que não são sobre esta fatia). Nenhum monstro daquela
+ * simulação evacua ninguém, então o caminho que produz os estados abaixo é
+ * estruturalmente inalcançável por aquele teste.
+ *
+ * Os estados são CORRETOS — decisão #116 do bible crava `fase: 'recompor'` para
+ * quem evacuou, DE PROPÓSITO acima do teto (§11: quem devolve a folga é
+ * EQUIPAR, não doar) — e passam por `registrar`, não por `entrarOuPular`, então
+ * a pergunta do auto-pulo nunca é feita neste caminho. O que faltava não era
+ * corrigir o comportamento; era ESTE describe, provando que a única fonte dele
+ * é a evacuação, para que um bug que produzisse mão estourada em
+ * `recompor`/`vasculhar` por QUALQUER OUTRO caminho não tivesse a mesma saída.
+ */
+describe('a evacuação produz `recompor` com a mão estourada — e o predicado acima NUNCA a alcança', () => {
+  const semEmbaralharLocal = <T,>(itens: readonly T[]): T[] => [...itens];
+  const entradasDuas: readonly EntradaJogador[] = [
+    { id: 'p1', nome: 'Você', ehBot: false },
+    { id: 'p2', nome: 'Bot 1', ehBot: true },
+  ];
+
+  /**
+   * Composição SÓ de monstro (a recompra de p1 nunca traz raça nem classe) e
+   * Tesouros GRANDE — mesmo motivo do `configGrande` de `mesa.test.ts`: duas
+   * mãos iniciais (4 cada) + o loot da vitória de p2 + a recompra de 4 de p1
+   * somam bem mais que os 4 de `COMPOSICAO_TESOURO_DE_TESTE` (2 receitas × 2
+   * jogadores), que esgotaria o monte sem cemitério para reembaralhar.
+   */
+  const configSoMonstro: ConfigPartida = {
+    patenteAlvo: 10,
+    composicaoPorJogador: montarComposicao({
+      monstroIds: Array.from({ length: 10 }, () => 'm-teste'),
+      copiasPorMonstro: 1,
+      racaIds: [],
+      copiasPorRaca: 0,
+      classeIds: [],
+      copiasPorClasse: 0,
+    }),
+    composicaoTesouros: montarComposicaoTesouros(Array.from({ length: 10 }, () => 'i-teste')),
+  };
+
+  /** Mesmo monstro forte de `mesa.test.ts` (describe "Bad Stuff na derrota"). */
+  const monstroForteComEvacuacao: InfoMonstro = {
+    forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1, tesouros: 0,
+    badStuff: [{ tipo: 'evacuacao' }],
+  };
+  const depsEvacuacao = (dados: readonly number[]): DepsMesa => ({
+    rolar: filaDeDados(dados),
+    embaralhar: semEmbaralharLocal,
+    catalogo: catalogoDeTeste({ monstro: () => monstroForteComEvacuacao }),
+  });
+  /** O turno de p2 (bot), sempre contra o `MONSTRO_DE_TESTE` fraco — catálogo DEFAULT. */
+  const depsDoBotP2: DepsMesa = {
+    rolar: criarDadoCiclico([4, 12, 12]),
+    embaralhar: semEmbaralharLocal,
+    catalogo: catalogoDeTeste(),
+  };
+
+  const comRacaEmJogo = (estado: EstadoPartida): EstadoPartida => ({
+    ...estado,
+    jogadores: estado.jogadores.map((j) => (
+      j.id === 'p1' ? { ...j, emJogo: { ...j.emJogo, raca: raca('p-raca-p1', 'orc') } } : j
+    )),
+  });
+
+  /**
+   * Abre o combate de p1 contra o monstro forte e o faz PERDER — mesmo
+   * orçamento de dado de `mesa.test.ts`: o monstro mais ágil ataca primeiro e
+   * acerta (rolagem 1 ≤ habilidade 12); a esquiva de p1 (2 > 1) falha.
+   */
+  const evacuarP1 = (estado: EstadoPartida): EstadoPartida => {
+    const comCombate = aplicarAcao(estado, { tipo: 'vasculhar', jogadorId: 'p1' }, depsEvacuacao([1])).estado;
+    return aplicarAcao(comCombate, { tipo: 'esquivar', jogadorId: 'p1' }, depsEvacuacao([2])).estado;
+  };
+
+  it('sonda A/B: com raça em jogo, a recompra 4+4 estoura o teto (7) e o excesso sobrevive a `recompor` E a `vasculhar`', () => {
+    const nascida = comRacaEmJogo(criar('m1', entradasDuas, configSoMonstro, { embaralhar: semEmbaralharLocal }));
+    const evacuado = evacuarP1(nascida);
+    // `avancarBots` termina o turno de p1 (auto-pulado, mão/mochila vazias),
+    // joga o turno de p2 e devolve a vez a p1 já com a mão recomposta.
+    const { estado: recomprado } = avancarBots(evacuado, depsDoBotP2);
+
+    // Sonda A: `fase=recompor` com a mão de quem tem a vez estourada — o que o
+    // `case 'recompor'` de `violacoes` (describe acima) chamaria de violação.
+    const p1A = recomprado.jogadores.find((j) => j.id === 'p1');
+    if (p1A === undefined) throw new Error('p1 sumiu da mesa');
+    expect(recomprado.fase).toBe('recompor');
+    expect(recomprado.vezDe).toBe('p1');
+    expect(p1A.mao.length).toBeGreaterThan(limiteDeMao(p1A));
+
+    // Sonda B: `passar` sai de `recompor` para `vasculhar` sem cobrar o
+    // excesso — `sairDaParada` só cobra o teto em `encerrarTurno` (a saída de
+    // `jogar`), nunca na saída de `recompor`. O `case 'vasculhar'` de
+    // `violacoes` chamaria isto de violação também.
+    const depoisDePassar = aplicarAcao(recomprado, { tipo: 'passar', jogadorId: 'p1' }, depsDoBotP2).estado;
+    const p1B = depoisDePassar.jogadores.find((j) => j.id === 'p1');
+    if (p1B === undefined) throw new Error('p1 sumiu da mesa');
+    expect(depoisDePassar.fase).toBe('vasculhar');
+    expect(p1B.mao.length).toBeGreaterThan(limiteDeMao(p1B));
+  });
+
+  it('sonda C: com o baralho de Tesouros seco, a recompra vira só Portas de monstro — e `recompor` cravado dispensa o auto-pulo mesmo sem nada a recompor', () => {
+    const p0 = criar('m1', entradasDuas, configSoMonstro, { embaralhar: semEmbaralharLocal });
+    // Tesouros JÁ seco (monte e cemitério vazios) — o mesmo guard gracioso de
+    // `sacarTesouros` paga zero, e a recompra de p1 vira só as 4 Portas, todas
+    // monstro pela composição acima.
+    const semTesouros: EstadoPartida = { ...p0, tesouros: { monte: [], cemiterio: [] } };
+    const evacuado = evacuarP1(semTesouros);
+    const { estado: recomprado } = avancarBots(evacuado, depsDoBotP2);
+
+    const p1 = recomprado.jogadores.find((j) => j.id === 'p1');
+    if (p1 === undefined) throw new Error('p1 sumiu da mesa');
+    expect(recomprado.fase).toBe('recompor');
+    expect(recomprado.vezDe).toBe('p1');
+    expect(p1.mao).toHaveLength(4);
+    expect(p1.mao.every((c) => c.tipo === 'monstro')).toBe(true);
+    // O predicado `violacoes` chamaria isto de violação também (o `case
+    // 'recompor'` cobra `faseSeAutoPula` como invariante): a única ação de p1
+    // é "Passar" e ele não foi pulado. Comportamento CERTO por decisão #116 —
+    // `encerrarTurno` crava `'recompor'` para quem evacuou passando por
+    // `registrar`, não por `entrarOuPular`, então a pergunta do auto-pulo
+    // nunca é feita neste caminho.
+    expect(faseSeAutoPula('recompor', p1)).toBe(true);
   });
 });
 
