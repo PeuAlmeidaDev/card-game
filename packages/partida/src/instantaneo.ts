@@ -71,8 +71,10 @@ export function aplicarInstantaneo(
         atual = aplicarNoCombatente(atual, efeito.modificadores, vidaInicialDoAlvo);
         break;
       }
-      default:
-        throw new Error(`aplicarInstantaneo: efeito sem ramo: ${JSON.stringify(efeito)}`);
+      default: {
+        const naoTratado: never = efeito;
+        throw new Error(`aplicarInstantaneo: efeito sem ramo: ${JSON.stringify(naoTratado)}`);
+      }
     }
   }
 

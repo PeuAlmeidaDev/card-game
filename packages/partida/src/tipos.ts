@@ -39,7 +39,8 @@ export type CartaDeClasse = Extract<CartaPorta, { readonly tipo: 'classe' }>;
  * `_CoberturaEfeitoInstantaneo` em `shared` é o que impede a divergência.
  */
 export type EfeitoInstantaneo =
-  | { readonly tipo: 'stats'; readonly modificadores: ModificadoresDeStat };
+  | { readonly tipo: 'stats'; readonly modificadores: ModificadoresDeStat }
+  | { readonly tipo: never };
 
 /**
  * Em quem o instantâneo cai. Mora na AÇÃO, não na carta — a mesma assinatura da

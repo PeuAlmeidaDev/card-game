@@ -13,7 +13,8 @@ import type { ModificadoresDeStat } from './stats';
  * é `ReceitaTesouro`, que também nasceu com um membro só.
  */
 export type EfeitoInstantaneo =
-  | { readonly tipo: 'stats'; readonly modificadores: ModificadoresDeStat };
+  | { readonly tipo: 'stats'; readonly modificadores: ModificadoresDeStat }
+  | { readonly tipo: never };
 
 /**
  * Uma carta consumível do baralho de Tesouros. Dado puro, como `MonstroCarta` —
