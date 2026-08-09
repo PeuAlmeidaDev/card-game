@@ -2,7 +2,9 @@
 
 **Data:** 2026-08-08 · **Bloco 2 do §3.1**, primeira das quatro sub-fatias da decisão **#110**.
 **Decisões do bible que este spec executa:** **#110** (a decomposição), **#112** (Bad Stuff por
-monstro), **#113** (morte mantém a patente), **#114**–**#117** (nascidas neste desenho).
+monstro), **#113** (morte mantém a patente), **#114**–**#117** (nascidas neste desenho), e
+**#118**–**#120** (nascidas na **revisão** deste spec, 2026-08-09: o Bad Stuff é incondicional **na
+derrota** com escapatória por carta · ele é **público, escrito na carta** · e `badStuff` é **lista**).
 
 > 🔴 **Este spec NÃO é fonte de verdade.** O `docs/game-design/game-bible.md` vence sempre. Onde
 > este documento divergir dele, o bible está certo e este está velho.
@@ -33,14 +35,16 @@ mora na 2c/2d (maldição) e na **2a-bis** (pilhagem do cadáver, decisão **#11
 
 ### Dentro
 
-1. `MonstroCarta` ganha **`badStuff`**, obrigatório, com **dois** verbos.
-2. Perder um combate **aplica** o Bad Stuff do monstro.
+1. `MonstroCarta` ganha **`badStuff`**, obrigatório, **lista** de efeitos, com **dois** verbos.
+2. **Ser derrotado** num combate **aplica** o Bad Stuff do monstro.
 3. A **evacuação**: mão + mochila + os cinco encaixes vão aos cemitérios; **patente, raça, classe e
    derrotas ficam**.
 4. O **recomeço**: quem evacuou compra **4 Portas + 4 Tesouros** no turno seguinte dele, entrando
    em **`recompor`**.
 5. Dois eventos novos, narrados na tela.
-6. Soak com **controle interno** medindo o esgotamento do baralho de Tesouros.
+6. 🆕 **O Bad Stuff aparece NA TELA, na carta do monstro** — o jogador lê o que aquele monstro faz
+   com ele **antes** de escolher a luta (§5.3). Requisito do Pedro, 2026-08-09.
+7. Soak com **controle interno** medindo o esgotamento do baralho de Tesouros.
 
 ### Fora, por escrito
 
@@ -65,11 +69,34 @@ export type BadStuff =
   | { readonly tipo: 'perdeSlot'; readonly slot: SlotDeItem };
 ```
 
-`MonstroCarta` ganha `readonly badStuff: BadStuff`.
+`MonstroCarta` ganha `readonly badStuff: readonly BadStuff[]`.
 
 🔑 **Obrigatório, nunca opcional.** Monstro novo sem Bad Stuff **quebra a compilação** e obriga o
 autor a decidir. Opcional deixaria a carta nova nascer sem punição em silêncio — o modo de falha da
-**#54**.
+**#54**. ⚠️ **Lista VAZIA é o buraco que sobra**, e ela existe na assinatura — o teste do catálogo
+cobra `badStuff.length > 0` para todo monstro, porque *"obrigatório"* sem isso vira `[]`.
+
+### 3.1.1 🆕 Por que LISTA e não um efeito só (decisão do Pedro, 2026-08-09)
+
+*"Um monstro pode ter uma badStuff que faz diversas coisas, mas isso é pensando nos designs de
+monstros futuros."*
+
+**Hoje todo monstro tem lista de UM.** A lista é *arquitetar para o destino, construir para o
+presente* — e o custo hoje é um laço no interpretador.
+
+🔑 **O precedente é exato, e é do próprio repo: o Plano A da `classe como carta`.** O motor segurava
+`EstadoCombate.passiva` (uma) e passou a segurar `passivas: readonly EstadoPassiva[]` (N) **antes de
+qualquer carta ter duas**. Foi a decisão certa, e ela veio com uma armadilha que esta fatia herda
+inteira:
+
+🔴 **Com todas as listas de tamanho 1 em produção, a mutação `efeitos.slice(0, 1)` fica VERDE.** O
+laço existe e **nenhuma carta o percorre** — é *"ramo sem visitante"* somado a *"mutação verde = o
+dublê não produz o cenário"*, as duas famílias catalogadas. ➡️ **O dublê de monstro com DOIS efeitos
+é obrigatório**, exatamente como `composicao.test.ts` precisou de dublês para a ordem das passivas.
+
+📌 **Absorção, para não virar bug reportado:** `evacuacao` **absorve** tudo o que vier depois (não
+sobra nada para `perdeSlot` arrancar), e as duas ordens convergem no mesmo estado final. **É
+esperado**, e vira teste em vez de comentário.
 
 ✅ **Reusa `SlotDeItem`** (`capacete | armadura | mao | pes`), nascido na `empunhadura dupla` (#98).
 **Nenhuma união nova**, e o guard `_CoberturaSlotDeItem` do `shared` já trava as duas cópias.
@@ -83,6 +110,9 @@ autor a decidir. Opcional deixaria a carta nova nascer sem punição em silênci
 | Lobo Sombrio | 2 | `perdeSlot('mao')` |
 | Carniçal | 2 | `perdeSlot('armadura')` |
 | **Ogro** | **3** | **`evacuacao`** |
+
+⚠️ **Cada célula é uma lista de UM** (`[{ tipo: 'perdeSlot', slot: 'pes' }]`) — ver §3.1.1. Nenhum
+monstro de produção exercita o laço, e é o dublê que o faz.
 
 🎚️ **Qual encaixe cada monstro arranca é dial.** O que **não** é dial é a escala: **só o de 3
 tesouros evacua** (decisão do Pedro).
@@ -292,7 +322,58 @@ já sem nada.
 ⚠️ Evento novo quebra a compilação de **exatamente dois** arquivos, os dois em `web`:
 `narrarEvento.tsx` e `participantesDe.ts`.
 
-### 5.3 Duas notas de alcance, para não virarem pergunta na execução
+### 5.3 🆕 O Bad Stuff NA TELA — requisito do Pedro, 2026-08-09
+
+*"O texto do badStuff tem que ir para o front; na carta do monstro tem que ter escrito qual é a
+coisa ruim que ele faz ao derrotar um player."*
+
+#### ✅ O dado chega de GRAÇA — e isso resolve a frase que o §3.4 marcou como errada
+
+`Catalogo.monstros` é `readonly MonstroCarta[]` — **a carta inteira**, e o docstring diz por que:
+*"não há projeção `Resumo`: a carta de monstro é dado puro e os stats são informação pública — a
+carta é revelada com a face para cima."*
+
+🔑 **Então `badStuff` atravessa para o cliente no instante em que entra no `MonstroCarta`, sem uma
+linha de encanamento.** ⚠️ **E isto é a outra metade da correção do §3.4:** a frase *"atravessa o
+JSON do `/catalogo` inteira"* estava **tranquilizando sobre a coisa errada para o `partida`** (que
+nunca vê `MonstroCarta`) e **exatamente certa para o `web`** (que vê). A mesma frase, dois
+consumidores, dois veredictos — por isso ela foi **corrigida marcada** em vez de apagada.
+
+🔴 **E é justamente por chegar de graça que o risco existe:** dado que viaja e ninguém renderiza é a
+**7ª ocorrência** de *"publicado e nunca renderizado"* (`combatente`, `tesourosNoMonte` ×2, `ehBot`,
+`mochila`, `cartasNoCemiterio`) — o padrão que já escondeu a tese de um plano **três** vezes. **O
+requisito do Pedro fecha isso ANTES**, e é a primeira vez neste projeto que essa família é evitada em
+vez de descoberta.
+
+#### Onde aparece, e por quê
+
+| Superfície | Onde | Por quê |
+|---|---|---|
+| **Painel do combate** (`TelaMesa.tsx`, a linha `<nome>: <vida> de vida`) | ✅ | É onde o monstro fica à vista **a luta inteira**. É aqui que *"se eu perder esta, perco tudo"* precisa estar legível |
+| **Carta de monstro NA MÃO** (a lista que tem o botão "Procurar encrenca") | ✅ | `procurarEncrenca` é **escolha**, e o Bad Stuff é o **lado do risco** dela. Sem o texto, o jogador escolhe a luta às cegas |
+| Espiada da Presciência | ❌ | A tela diz *"Você pressente **um monstro** adiante"* e **nem nomeia qual** — deliberado. Pôr o Bad Stuff ali entregaria mais do que a espiada entrega |
+| Log (`narrarPorta`) | ❌ | Repetir a punição a cada porta é ruído; a informação mora na carta, que fica na tela |
+
+#### A forma: `packages/web/src/rotuloDeBadStuff.ts`
+
+**Função pura, `switch` fechado por `never`**, no molde exato de `rotuloDeAfinidade.ts` — que já é a
+convenção desta base para *"dado de domínio → frase para humano"*.
+
+- Recebe `readonly BadStuff[]`, devolve **uma** string, juntando os efeitos (*"arranca seu capacete
+  e suas botas"*).
+- O nome do encaixe (`capacete · armadura · mão · pés`) é **tabela local**, não injetada: `SlotDeItem`
+  é união **fechada**, não dado de catálogo — diferente de `nomeDaRaca`/`nomeDoMonstro`, que são
+  injetados porque **são** catálogo.
+- 🔴 **`evacuacao` merece texto com peso.** *"você perde tudo"* é o que a carta tem que dizer; um
+  rótulo técnico (*"evacuação"*) faz o jogador descobrir o que significa **perdendo**.
+
+⚠️ **Custo do vocabulário, declarado:** com isto, um **verbo novo de Bad Stuff** quebra a compilação
+em **três** lugares — o interpretador em `partida`, este rótulo em `web`, e o
+`_CoberturaBadStuff` em `shared` se a declaração gêmea não acompanhar. **É o preço de o `never`
+cobrar, e é o preço certo.** ⚠️ Não confundir com *"evento novo quebra exatamente 2 arquivos"*: são
+custos de coisas diferentes.
+
+### 5.4 Duas notas de alcance, para não virarem pergunta na execução
 
 - **O Bad Stuff vale para TODA derrota**, venha o combate do `vasculhar` ou do `procurarEncrenca`.
   Não há ramificação: os dois caminhos passam pelo mesmo `fecharCombate`, e a diferença entre eles é
@@ -358,7 +439,25 @@ a ordem tem que derrubar um teste.
 | 🔴 `perdeSlot('mao')` com **Montante** | limpa **os dois** encaixes, devolve **uma** carta |
 | `perdeSlot('mao')` com **duas armas distintas** | limpa os dois, devolve **duas** |
 | `evacuacao` | mão + mochila + 5 encaixes saem; raça, classe, patente e derrotas **ficam** |
+| 🔴 **dublê com DOIS efeitos** (§3.1.1) | o laço percorre a lista inteira — **nenhum monstro de produção exercita isto** |
+| **`evacuacao` + `perdeSlot` na lista, nas duas ordens** | a absorção: mesmo estado final, sem lançar |
 | cobertura | o `switch` fecha por `never` |
+
+### 7.1.1 `cartas` — o catálogo
+
+| Caso | O que prende |
+|---|---|
+| todo monstro tem `badStuff.length > 0` | *"obrigatório"* sem isto vira `[]` — o buraco que o tipo deixa |
+| ⚠️ a asserção é **por monstro**, não `.find` | é a **#54 por outra porta**: conferir o primeiro deixa substituição **parcial** passar, exatamente como no teste do baralho de classes |
+
+### 7.1.2 `web` — `rotuloDeBadStuff`
+
+| Caso | O que prende |
+|---|---|
+| cada verbo isolado | a frase de cada um, com o nome do encaixe em português |
+| **lista com dois efeitos** | os dois aparecem na frase — a mutação *"mostra só o primeiro"* tem que reprovar |
+| cobertura | o `switch` fecha por `never` |
+| 🔴 o texto aparece **no painel de combate E na carta da mão** | são **duas** superfícies (§5.3); a asserção é **escopada pela linha** (`within`), porque a base já teve teste passando com a superfície errada |
 
 ### 7.2 `mesa.ts` — integração
 
@@ -382,6 +481,10 @@ a **ordem** do recomeço.
 | 🔴 `entrarOuPular` recebendo o **estado** de antes do Bad Stuff (§5.0) | o teste da evacuação (o jogador sai com tudo) |
 | 🔴 `entrarOuPular` recebendo o **jogador** de antes do Bad Stuff (§5.0) | um teste novo: quem evacuou **não fica parado** em `jogar` |
 | acrescentar um verbo em `cartas` sem tocar o `partida` (§3.4) | o `pnpm typecheck`, **via `_CoberturaBadStuff`** |
+| 🔴 `efeitos.slice(0, 1)` — aplicar só o primeiro da lista (§3.1.1) | o teste do **dublê com dois efeitos**. ⚠️ **Sem esse dublê a mutação fica VERDE**, porque toda lista de produção tem tamanho 1 |
+| um monstro do catálogo com `badStuff: []` | o teste do catálogo (§7.1.1) |
+| o rótulo da tela mostrando só o primeiro efeito | o teste de dois efeitos em `rotuloDeBadStuff` |
+| 🆕 o Bad Stuff **não aparecer** na carta do monstro | os testes das duas superfícies (§5.3) — é a 7ª ocorrência de *"publicado e nunca renderizado"* sendo barrada |
 
 ### 7.4 A tabela de pares finos do `aplicarAcao`
 
@@ -472,7 +575,15 @@ conferir um contador que a tela nunca renderiza).
   respondeu: **e se dois jogadores morrerem antes de os despojos acabarem?** Duas pilhas ao mesmo
   tempo?
 - ⬜ **Mais verbos de Bad Stuff** — decidido adiar, e a união fechada por `never` garante que o
-  próximo quebre a compilação onde precisa.
+  próximo quebre a compilação onde precisa: **três** lugares (o interpretador em `partida`, o rótulo
+  em `web`, e o `_CoberturaBadStuff` em `shared` se a gêmea não acompanhar).
+- ⬜ **Monstro com MAIS DE UM efeito** (#120) — a lista existe, e **nenhuma carta de produção a
+  percorre**. Quem criar o primeiro monstro de dois efeitos **já tem o dublê e a mutação prontos**
+  (§3.1.1), mas precisa saber que até lá o caminho é exercitado só por dublê.
+- ⬜ **A carta que CANCELA o Bad Stuff** (#118) — decidida, sem desenho. Ela é do eixo dos
+  consumíveis (**2b**), e quando nascer terá que responder: cancela a lista **inteira** ou **um**
+  efeito? é jogada **antes** do combate ou **na hora** da derrota (o que exigiria uma pendência
+  nova, que esta fatia evita de propósito)?
 - 🎚️ **Qual encaixe cada monstro arranca** é dial, e **não foi medido**.
 - 🔴 **Se a fatia NÃO consertar a economia** (o esperado), a leitura é do Pedro: o conserto passa
   para o 2b, e a #40 continua sendo a resposta estrutural.
