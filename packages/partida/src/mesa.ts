@@ -92,8 +92,9 @@ function proximoJogador(estado: EstadoPartida): JogadorNaMesa {
  * três — a regra normal de todo mundo.
  *
  * 🔴 **Tesouros esgota com GRAÇA, Portas não** (mesmo fix round, achado
- * Important, 1/240). Espelha `sacarTesouros`, logo abaixo: baralho de Tesouros
- * vazio (monte E cemitério) não é erro — é a mesa que já distribuiu tudo, e o
+ * Important, 1/240). Espelha `sacarTesouros`, mais adiante neste arquivo:
+ * baralho de Tesouros vazio (monte E cemitério) não é erro — é a mesa que já
+ * distribuiu tudo, e o
  * jogador leva o que houver. Portas continua sem guard, de propósito: a #62
  * garante que ele nunca acaba, e o `Error` cru de `tirarDoTopo` ali é a
  * invariante NOSSA quebrada (500), não pedido inválido.
@@ -1395,14 +1396,17 @@ function sacarTesouros(
 }
 
 /**
- * Aplica o resultado do combate ao jogador, larga o loot do cadáver na mão do
- * vencedor, decide o fim da partida e entrega o turno à fase `jogar` — a janela
- * de vestir o que acabou de cair. Quem encerra o turno dali é `sairDaParada`,
- * pelo `passar` ou pelo auto-pulo.
+ * Aplica o resultado do combate ao jogador. Quem VENCEU larga o loot do cadáver
+ * na mão; quem PERDEU paga o Bad Stuff do monstro (`aplicarBadStuff`, ver
+ * `badStuff.ts`). Nos dois casos decide o fim da partida e entrega o turno à
+ * fase `jogar` — a janela de vestir o que acabou de cair (ou o que sobrou, para
+ * quem perdeu). Quem encerra o turno dali é `sairDaParada`, pelo `passar` ou
+ * pelo auto-pulo.
  *
- * Precisa do `monstroId` e das `deps` por causa do loot: a quantidade vem da
- * CARTA de monstro (`InfoMonstro.tesouros`), não de uma constante — é o que faz
- * encarar o Ogro pagar mais que o Rato.
+ * Precisa do `monstroId` e das `deps` por causa do loot (a quantidade vem da
+ * CARTA de monstro, `InfoMonstro.tesouros`, não de uma constante — é o que faz
+ * encarar o Ogro pagar mais que o Rato) e por causa do Bad Stuff (`info.badStuff`
+ * vem do mesmo lookup).
  */
 function fecharCombate(
   estado: EstadoPartida,
@@ -1480,7 +1484,7 @@ function fecharCombate(
     if (info === undefined) {
       throw new Error(`fecharCombate: monstro ${monstroId} não está no catálogo`);
     }
-    const saque = sacarTesouros(semCombate, jogadorId, info.tesouros, deps);
+    const saque = sacarTesouros(comBadStuff, jogadorId, info.tesouros, deps);
     comLoot = saque.estado;
     // `loot` só sai se algo REALMENTE saiu do baralho: `quantidade: 0` seria uma
     // linha dizendo que o jogador recebeu nada.
