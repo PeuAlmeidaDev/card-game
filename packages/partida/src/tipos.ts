@@ -204,7 +204,12 @@ export interface JogadorNaMesa {
    * é a marca de que ele deve recomprar a mão inicial antes de jogar.
    *
    * Não pode ficar ligada duas vezes seguidas — combate só acontece no turno do
-   * próprio jogador, e a evacuação encerra esse turno. Invariante testada.
+   * próprio jogador (o guard de `vezDe` no topo de `aplicarAcao`), e a evacuação
+   * encerra esse turno, então ele só volta a agir depois de a flag ser consumida.
+   * Invariante testada em `mesa.test.ts` ("quem RECEBE a vez em `encerrarTurno`
+   * NUNCA está evacuado"): `encerrarTurno` reseta a flag de QUALQUER jogador que
+   * receba a vez com ela ligada, não só de quem chegou lá por ter perdido um
+   * combate — é essa generalidade que fecha o caminho de dupla ligação.
    */
   readonly evacuado: boolean;
 }

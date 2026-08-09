@@ -3251,6 +3251,59 @@ describe('encerrarTurno — quem evacuou recompra 4+4 quando a vez volta (Task 5
     expect(depois.vezDe).toBe('p1');
     expect(depois.fase).toBe('recompor');
   });
+
+  // Composição SÓ de raça (nenhum monstro): o teste da invariante abaixo não
+  // precisa que p1 entre em combate — só precisa chegar a `encerrarTurno` pelo
+  // caminho mais barato (vasculhar → saquear, o mesmo do describe "o limite de
+  // mão segura a vez"). GRANDE pelo mesmo motivo de `configGrande`: p2 vai
+  // recomprar 4 Tesouros e p1 ainda saca 2 Portas antes disso — 20+20 cartas
+  // sobram folga de sobra, sem risco de `tirarDoTopo` esbarrar num monte E
+  // cemitério vazios.
+  const composicaoParaAInvariante: ConfigPartida = {
+    patenteAlvo: 5,
+    composicaoPorJogador: montarComposicao({
+      monstroIds: [],
+      copiasPorMonstro: 0,
+      racaIds: Array.from({ length: 10 }, () => 'r-teste'),
+      copiasPorRaca: 1,
+      classeIds: [],
+      copiasPorClasse: 0,
+    }),
+    composicaoTesouros: montarComposicaoTesouros(Array.from({ length: 10 }, () => 'i-teste')),
+  };
+
+  it('🔒 quem RECEBE a vez em `encerrarTurno` NUNCA está evacuado — é isto que sustenta "não liga duas vezes seguidas"', () => {
+    // O docstring de `JogadorNaMesa.evacuado` promete uma garantia sobre QUANDO a
+    // flag pode estar ligada, não sobre COMO ela liga (isso os outros testes deste
+    // describe já cobrem). A garantia é: `encerrarTurno` nunca entrega a vez a
+    // alguém que ainda a carrega. Como `aplicarAcao` só aceita ação de quem TEM a
+    // vez (`acao.jogadorId !== estado.vezDe` é `AcaoInvalida`), e `aplicarBadStuff`
+    // só liga a flag DENTRO de um combate — que só abre no turno de quem age —, se
+    // este teste vale, a flag nunca pode estar `true` no instante em que o dono
+    // dela volta a poder agir. É isso que torna "ligar duas vezes seguidas"
+    // impossível: entre duas leituras possíveis da flag por quem a carrega, há
+    // sempre exatamente uma passagem por `encerrarTurno` que a apaga.
+    //
+    // p2 chega evacuado por CONSTRUÇÃO DIRETA no fixture, não por perder um
+    // combate — de propósito: esta garantia é de `encerrarTurno`, independente de
+    // qual caminho ligou a flag, e testar os dois junto esconderia qual dos dois
+    // está sendo provado (os testes anteriores deste describe já cobrem "liga por
+    // perder e reseta na volta"; este cobre "reseta na volta, ponto — mesmo que a
+    // flag já estivesse ligada por qualquer outro motivo").
+    const p0 = criar('m1', entradas, composicaoParaAInvariante, { embaralhar: semEmbaralhar });
+    const p: EstadoPartida = {
+      ...p0,
+      jogadores: p0.jogadores.map((j) => (j.id === 'p2' ? { ...j, evacuado: true } : j)),
+    };
+
+    const abriuEncrenca = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
+    const r = aplicarAcao(abriuEncrenca, { tipo: 'saquear', jogadorId: 'p1' }, deps([]));
+
+    expect(r.estado.vezDe).toBe('p2');
+    const p2Depois = r.estado.jogadores.find((j) => j.id === 'p2');
+    expect(p2Depois?.evacuado).toBe(false);
+    expect(p2Depois?.mao).toHaveLength(8);
+  });
 });
 
 describe('aplicarAcao — vasculhar com a mão estourada', () => {
