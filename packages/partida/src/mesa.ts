@@ -80,12 +80,33 @@ function proximoJogador(estado: EstadoPartida): JogadorNaMesa {
  * `MAO_INICIAL_PADRAO`/`MAO_INICIAL_TESOUROS`, não os dials de `ConfigPartida`:
  * o recomeço é uma regra da MESA (spec §7.1), não uma escolha da borda — a
  * mesa nasce e renasce com o mesmo número.
+ *
+ * 🔴 **ANEXA à mão, nunca a substitui** (fix round 2, achado do soak da Task 9,
+ * bug Critical medido em 35/240 partidas, 81 cartas perdidas). Quem evacua
+ * mantém a patente (#113) e continua alvo LEGÍTIMO de caridade enquanto espera
+ * a própria vez voltar — a carta doada nesse intervalo já está em `jogador.mao`
+ * quando este helper roda. Substituir por inteiro a apagaria de toda zona, sem
+ * `descartarNoBaralhoCerto`, sem evento, sem log. Ele voltar acima do teto de
+ * 7 é coerente com a #116 (que já o faz voltar com 8 de propósito): em
+ * `recompor` ele tem três saídas, e só cai em `descartar` se desperdiçar as
+ * três — a regra normal de todo mundo.
+ *
+ * 🔴 **Tesouros esgota com GRAÇA, Portas não** (mesmo fix round, achado
+ * Important, 1/240). Espelha `sacarTesouros`, logo abaixo: baralho de Tesouros
+ * vazio (monte E cemitério) não é erro — é a mesa que já distribuiu tudo, e o
+ * jogador leva o que houver. Portas continua sem guard, de propósito: a #62
+ * garante que ele nunca acaba, e o `Error` cru de `tirarDoTopo` ali é a
+ * invariante NOSSA quebrada (500), não pedido inválido.
  */
 function comprarMaoInicial(
   estado: EstadoPartida,
   jogador: JogadorNaMesa,
   deps: DepsMesa,
-): { readonly estado: EstadoPartida; readonly jogador: JogadorNaMesa } {
+): {
+  readonly estado: EstadoPartida;
+  readonly jogador: JogadorNaMesa;
+  readonly eventos: readonly EventoDaMesa[];
+} {
   let portas = estado.portas;
   const compradasPortas: CartaPorta[] = [];
   for (let i = 0; i < MAO_INICIAL_PADRAO; i += 1) {
@@ -97,14 +118,31 @@ function comprarMaoInicial(
   let tesouros = estado.tesouros;
   const compradosTesouros: CartaTesouro[] = [];
   for (let i = 0; i < MAO_INICIAL_TESOUROS; i += 1) {
+    // Mesmo guard de `sacarTesouros`: lançar aqui derrubaria uma partida
+    // legítima por causa de um dial de composição — o baralho de Tesouros NÃO
+    // tem a garantia estrutural que a #62 dá ao de Portas.
+    if (tesouros.monte.length === 0 && tesouros.cemiterio.length === 0) break;
     const t = tirarDoTopo(tesouros, deps.embaralhar);
     tesouros = t.baralho;
     compradosTesouros.push(t.carta);
   }
 
+  // Mesmo par `loot`/`tesouroEsgotado` de `fecharCombate`: o que o baralho não
+  // conseguiu pagar sai como evento PRÓPRIO — sem ele o jogador não tem pista
+  // nenhuma de por que a recompra veio curta.
+  const naoPagas = MAO_INICIAL_TESOUROS - compradosTesouros.length;
+  const eventos: readonly EventoDaMesa[] = naoPagas > 0
+    ? [{ tipo: 'tesouroEsgotado', jogadorId: jogador.id, naoPagas }]
+    : [];
+
   return {
     estado: { ...estado, portas, tesouros },
-    jogador: { ...jogador, mao: [...compradasPortas, ...compradosTesouros], evacuado: false },
+    jogador: {
+      ...jogador,
+      mao: [...jogador.mao, ...compradasPortas, ...compradosTesouros],
+      evacuado: false,
+    },
+    eventos,
   };
 }
 
@@ -143,10 +181,12 @@ function encerrarTurno(base: EstadoPartida, eventos: readonly EventoDaMesa[], de
   // arquivo. A ordem é prendida por teste, não só por este comentário.
   let mesa = base;
   let recomposto = seguinte;
+  let eventosDaCompra: readonly EventoDaMesa[] = [];
   if (seguinteEvacuou) {
     const compra = comprarMaoInicial(mesa, seguinte, deps);
     mesa = compra.estado;
     recomposto = compra.jogador;
+    eventosDaCompra = compra.eventos;
   }
   return registrar(
     {
@@ -159,7 +199,7 @@ function encerrarTurno(base: EstadoPartida, eventos: readonly EventoDaMesa[], de
       // EQUIPAR, não doar.
       fase: seguinteEvacuou ? 'recompor' : faseDoTurnoDe(recomposto),
     },
-    [...eventos, { tipo: 'vez', jogadorId: recomposto.id }],
+    [...eventos, ...eventosDaCompra, { tipo: 'vez', jogadorId: recomposto.id }],
   );
 }
 

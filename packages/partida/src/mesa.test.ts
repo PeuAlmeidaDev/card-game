@@ -3304,6 +3304,88 @@ describe('encerrarTurno — quem evacuou recompra 4+4 quando a vez volta (Task 5
     expect(p2Depois?.evacuado).toBe(false);
     expect(p2Depois?.mao).toHaveLength(8);
   });
+
+  /** Todo id de carta presente na mesa, em qualquer zona — o censo de conservação. */
+  const idsDaMesa = (estado: EstadoPartida): string[] => {
+    const ids: string[] = [
+      ...estado.portas.monte.map((c) => c.id),
+      ...estado.portas.cemiterio.map((c) => c.id),
+      ...estado.tesouros.monte.map((c) => c.id),
+      ...estado.tesouros.cemiterio.map((c) => c.id),
+    ];
+    for (const j of estado.jogadores) {
+      ids.push(...j.mao.map((c) => c.id));
+      ids.push(...j.mochila.map((c) => c.id));
+      ids.push(...itensEquipados(j.emJogo.slots).map((c) => c.id));
+      if (j.emJogo.raca !== null) ids.push(j.emJogo.raca.id);
+      if (j.emJogo.classe !== null) ids.push(j.emJogo.classe.id);
+    }
+    return ids;
+  };
+
+  it('🐛 fix round 2 (bug 1): a caridade que chega ANTES da vez voltar NÃO se perde na recompra', () => {
+    // Achado do soak da Task 9 (Critical, 35/240 partidas, 81 cartas perdidas): a
+    // recompra SUBSTITUÍA a mão por inteiro. Quem evacua mantém a patente (#113),
+    // logo continua alvo LEGÍTIMO de caridade enquanto espera a própria vez
+    // voltar — a carta doada nesse intervalo entra em `mao` com `evacuado` ainda
+    // `true`, e a substituição a apagava de toda zona, sem `descartarNoBaralhoCerto`,
+    // sem evento, sem log.
+    const cartaDoada = monstro('p-doada');
+    const p0 = criar('m1', entradas, composicaoParaAInvariante, { embaralhar: semEmbaralhar });
+    const antes: EstadoPartida = {
+      ...p0,
+      jogadores: p0.jogadores.map((j) => {
+        if (j.id === 'p1') return { ...j, evacuado: true, mao: [], mochila: [] };
+        // A caridade só aceita quem tem patente ESTRITAMENTE menor que o doador
+        // (`candidatosACaridade`) — sem o `patente: 2` aqui, p1 (patente 1,
+        // empatado com p2) não seria candidato e a carta iria para o cemitério.
+        if (j.id === 'p2') return { ...j, patente: 2, mao: [cartaDoada] };
+        return j;
+      }),
+      vezDe: 'p2',
+      fase: 'descartar',
+    };
+
+    const r = aplicarAcao(antes, { tipo: 'entregarCarta', jogadorId: 'p2', cartaId: cartaDoada.id }, deps([]));
+
+    const p1Depois = r.estado.jogadores.find((j) => j.id === 'p1');
+    expect(r.estado.vezDe).toBe('p1');
+    expect(p1Depois?.evacuado).toBe(false);
+    expect(p1Depois?.mao).toHaveLength(9); // 8 da recompra + 1 da caridade — ANEXADA, não substituída
+    expect(p1Depois?.mao.some((c) => c.id === cartaDoada.id)).toBe(true);
+
+    // Censo de conservação: todo id que existia ANTES continua existindo DEPOIS,
+    // em alguma zona — nenhuma carta some no caminho caridade → recompra.
+    expect(idsDaMesa(r.estado).sort()).toEqual(idsDaMesa(antes).sort());
+  });
+
+  it('🐛 fix round 2 (bug 2): baralho de Tesouros SECO na recompra paga o que dá e emite `tesouroEsgotado`, sem lançar', () => {
+    // Achado do soak da Task 9 (Important, 1/240): o laço de Tesouros da recompra
+    // chamava `tirarDoTopo` sem tratar o baralho esgotado — `Error` cru = 500 numa
+    // partida legítima. `sacarTesouros` (o outro consumidor do mesmo baralho) já
+    // resolvia isso: paga o que houver e deixa o chamador narrar o resto.
+    const p0 = criar('m1', entradas, composicaoParaAInvariante, { embaralhar: semEmbaralhar });
+    const p: EstadoPartida = {
+      ...p0,
+      jogadores: p0.jogadores.map((j) => (j.id === 'p2' ? { ...j, evacuado: true } : j)),
+      // Monte E cemitério de Tesouros vazios — a MESMA condição que faz
+      // `sacarTesouros` pagar zero em vez de lançar.
+      tesouros: { monte: [], cemiterio: [] },
+    };
+
+    const abriuEncrenca = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
+
+    let r: ResultadoAcao | undefined;
+    expect(() => {
+      r = aplicarAcao(abriuEncrenca, { tipo: 'saquear', jogadorId: 'p1' }, deps([]));
+    }).not.toThrow();
+
+    const p2Depois = r?.estado.jogadores.find((j) => j.id === 'p2');
+    expect(r?.estado.vezDe).toBe('p2');
+    expect(p2Depois?.evacuado).toBe(false);
+    expect(p2Depois?.mao).toHaveLength(4); // só as 4 Portas — Tesouros pagou ZERO
+    expect(r?.eventos).toContainEqual({ tipo: 'tesouroEsgotado', jogadorId: 'p2', naoPagas: 4 });
+  });
 });
 
 describe('aplicarAcao — vasculhar com a mão estourada', () => {
