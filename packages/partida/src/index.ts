@@ -24,3 +24,4 @@ export { AcaoInvalida } from './erros';
 export { classificar } from './classificacao';
 export { projetarPara, versaoDe } from './projecao';
 export { acaoEhLegal } from './fase';
+export { aplicarInstantaneo, instantaneoTemEfeito } from './instantaneo';
