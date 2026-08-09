@@ -1,4 +1,4 @@
-import { itensEquipados } from './corpo';
+import { itensEquipados, SLOTS_VAZIOS } from './corpo';
 import type {
   BadStuff, Carta, CartaEquipamento, CartaTesouro, EventoDaMesa, JogadorNaMesa, Slot, SlotDeItem,
 } from './tipos';
@@ -22,7 +22,11 @@ function arrancar(jogador: JogadorNaMesa, slot: SlotDeItem): {
   const encaixes = ENCAIXES[slot];
   const alvo = Object.fromEntries(encaixes.map((e) => [e, jogador.emJogo.slots[e]]));
   // Dedup por id: a arma de duas mãos ocupa dois encaixes e é UMA carta.
-  const cartas = itensEquipados(alvo as JogadorNaMesa['emJogo']['slots']);
+  // `{ ...SLOTS_VAZIOS, ...alvo }`, não um cast: `itensEquipados` usa
+  // `Object.values`, e um objeto PARCIAL castado ao tipo completo deixaria
+  // `undefined` passar por `carta !== null` se a implementação dela mudasse
+  // para algo indexado por slot — `carta.id` viraria `TypeError` (500).
+  const cartas = itensEquipados({ ...SLOTS_VAZIOS, ...alvo });
   const slots = { ...jogador.emJogo.slots };
   for (const e of encaixes) slots[e] = null;
   return { jogador: { ...jogador, emJogo: { ...jogador.emJogo, slots } }, cartas };
