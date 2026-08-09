@@ -50,6 +50,14 @@ Vida entre combates, habilidades especiais de raça.
    v1 (candidato a refinamento futuro: dar papel à Agilidade). Simétrica: os dois lados
    esquivam.
 
+   > 🔴 **REVOGADA em 2026-08-08 pela decisão #105 do game bible.** A esquiva passa a ser
+   > `rolagem ≤ **habilidade do defensor**` — o stat do defensor **decide**. ⚠️ **O texto acima
+   > fica como registro do que valeu da fatia 1 até aqui, e é o que o código AINDA faz**
+   > (`packages/motor/src/ataque.ts:29`): a #105 está **decidida e NÃO construída**, e vai junto
+   > com a fatia **Maldições / Bad Stuff**. 🔑 **O "refinamento futuro" que esta decisão previa
+   > chegou — mas pela Habilidade, não pela Agilidade**, e essa escolha foi reaberta na mesma
+   > sessão: é a **pergunta 22** do §18 do bible, junto com o destino do Impacto do Guerreiro.
+
 ## Modelo de domínio
 
 **Combatente** (jogador ou monstro): `{ forca, vida, habilidade, agilidade, level }`.

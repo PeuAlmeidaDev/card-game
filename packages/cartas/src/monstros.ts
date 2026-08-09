@@ -1,3 +1,15 @@
+import type { SlotDeItem } from './itens';
+
+/**
+ * O que o monstro faz com quem ele derrota. Reusa `SlotDeItem` — a FAMÍLIA de
+ * encaixe, não o encaixe físico: depois da #98 as duas mãos são vagas
+ * equivalentes, então `mao` limpa as duas, e "por que a direita?" não tem
+ * resposta.
+ */
+export type BadStuff =
+  | { readonly tipo: 'evacuacao' }
+  | { readonly tipo: 'perdeSlot'; readonly slot: SlotDeItem };
+
 /**
  * Uma carta de monstro: identidade + tema (dado) + os 4 stats de combate mais o
  * level. Tudo **dado puro** — diferente de `RacaCarta`, não há código aqui, então
@@ -22,6 +34,11 @@ export interface MonstroCarta {
    * o perigo, para que enfrentar o Ogro seja uma escolha e não masoquismo.
    */
   readonly tesouros: number;
+  /**
+   * O preço da derrota. LISTA e não efeito único (decisão #120): hoje todo
+   * monstro tem exatamente um, e o laço existe para os designs futuros.
+   */
+  readonly badStuff: readonly BadStuff[];
 }
 
 /**
@@ -38,11 +55,11 @@ export interface MonstroCarta {
  * que o mantém uma escolha diferente e não um Lobo Sombrio com outros números.
  */
 export const MONSTROS: readonly MonstroCarta[] = [
-  { id: 'rato-gigante', nome: 'Rato Gigante', forca: 3, vida: 14, habilidade: 2, agilidade: 3, level: 1, tesouros: 1 },
-  { id: 'goblin', nome: 'Goblin', forca: 4, vida: 20, habilidade: 2, agilidade: 4, level: 1, tesouros: 1 },
-  { id: 'lobo-sombrio', nome: 'Lobo Sombrio', forca: 4, vida: 18, habilidade: 3, agilidade: 7, level: 2, tesouros: 2 },
-  { id: 'carnical', nome: 'Carniçal', forca: 5, vida: 16, habilidade: 4, agilidade: 4, level: 2, tesouros: 2 },
-  { id: 'ogro', nome: 'Ogro', forca: 6, vida: 28, habilidade: 3, agilidade: 2, level: 3, tesouros: 3 },
+  { id: 'rato-gigante', nome: 'Rato Gigante', forca: 3, vida: 14, habilidade: 2, agilidade: 3, level: 1, tesouros: 1, badStuff: [{ tipo: 'perdeSlot', slot: 'pes' }] },
+  { id: 'goblin', nome: 'Goblin', forca: 4, vida: 20, habilidade: 2, agilidade: 4, level: 1, tesouros: 1, badStuff: [{ tipo: 'perdeSlot', slot: 'capacete' }] },
+  { id: 'lobo-sombrio', nome: 'Lobo Sombrio', forca: 4, vida: 18, habilidade: 3, agilidade: 7, level: 2, tesouros: 2, badStuff: [{ tipo: 'perdeSlot', slot: 'mao' }] },
+  { id: 'carnical', nome: 'Carniçal', forca: 5, vida: 16, habilidade: 4, agilidade: 4, level: 2, tesouros: 2, badStuff: [{ tipo: 'perdeSlot', slot: 'armadura' }] },
+  { id: 'ogro', nome: 'Ogro', forca: 6, vida: 28, habilidade: 3, agilidade: 2, level: 3, tesouros: 3, badStuff: [{ tipo: 'evacuacao' }] },
 ];
 
 export function obterMonstro(id: string): MonstroCarta | undefined {

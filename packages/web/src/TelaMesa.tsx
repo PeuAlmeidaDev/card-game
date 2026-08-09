@@ -5,6 +5,7 @@ import { descreverCarta } from './descreverCarta';
 import { acaoEhLegal, afinidadeCom, precisaEscolherMao } from '@card-dungeon/shared';
 import type { AcaoDaMesa, AcaoNoFio, Catalogo, Fase, ItemCarta, Slot, VistaDaPartida } from '@card-dungeon/shared';
 import { rotuloDeAfinidade } from './rotuloDeAfinidade';
+import { rotuloDeBadStuff } from './rotuloDeBadStuff';
 
 /**
  * Os cinco encaixes na ordem em que o corpo se lê, da cabeça aos pés. É ordem de
@@ -107,6 +108,10 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
   const nomeDe = (id: string): string => vista.jogadores.find((j) => j.id === id)?.nome ?? id;
   const nomeDaRaca = (id: string): string => racas.find((r) => r.id === id)?.nome ?? id;
   const nomeDoMonstro = (id: string): string => monstros.find((m) => m.id === id)?.nome ?? id;
+  // #119: o preço da derrota, na frase que `rotuloDeBadStuff` já monta. `''`
+  // para monstro fora do catálogo (skew de versão) ou sem badStuff — as duas
+  // superfícies abaixo tratam string vazia como "nada a mostrar".
+  const badStuffDoMonstro = (id: string): string => rotuloDeBadStuff(monstros.find((m) => m.id === id)?.badStuff ?? []);
   // Mesma degradação para o id das outras duas: skew de versão (bundle antigo,
   // item novo no server) tem que virar um rótulo feio, nunca uma exceção que
   // apaga a mesa inteira por causa de um nome.
@@ -286,6 +291,11 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
           {vista.combate.proximaDecisao === 'esquiva'
             ? `o ${nomeDoMonstro(vista.combate.monstroId)} acertou — esquive!`
             : 'sua vez de atacar'}
+          {/* #119: o painel fica à vista a luta INTEIRA — é aqui, não só na
+              carta que abriu o combate, que o preço de perder precisa estar. */}
+          {badStuffDoMonstro(vista.combate.monstroId) !== '' && (
+            <> · se ele vencer: {badStuffDoMonstro(vista.combate.monstroId)}.</>
+          )}
         </p>
       )}
 
@@ -513,13 +523,20 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
                   `carta.tipo === 'monstro'` abaixo: sem ele, clicar na raça na
                   fase `encrenca` leva 400. */}
               {carta.tipo === 'monstro' && (
-                <button
-                  type="button"
-                  disabled={!legal('procurarEncrenca')}
-                  onClick={() => void agir({ tipo: 'procurarEncrenca', cartaId: carta.id })}
-                >
-                  Procurar encrenca
-                </button>
+                <>
+                  {/* #119: o lado do RISCO de "Procurar encrenca" — sem isto o
+                      jogador escolhe a luta às cegas. */}
+                  {badStuffDoMonstro(carta.monstroId) !== '' && (
+                    <>{' — se perder: '}{badStuffDoMonstro(carta.monstroId)}{' '}</>
+                  )}
+                  <button
+                    type="button"
+                    disabled={!legal('procurarEncrenca')}
+                    onClick={() => void agir({ tipo: 'procurarEncrenca', cartaId: carta.id })}
+                  >
+                    Procurar encrenca
+                  </button>
+                </>
               )}
               {/* `carta.tipo === 'equipamento'` decide se "Equipar" EXISTE — par
                   fino que `legal()` não conhece. Os outros dois pares (afinidade

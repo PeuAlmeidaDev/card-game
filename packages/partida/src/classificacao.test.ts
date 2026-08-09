@@ -7,6 +7,7 @@ const j = (id: string, patente: number, derrotas: number): JogadorNaMesa => ({
   id, nome: id, ehBot: true, patente, derrotas, mao: [],
   mochila: [],
   emJogo: { raca: null, classe: null, slots: { ...SLOTS_VAZIOS } },
+  evacuado: false,
 });
 
 describe('classificar', () => {

@@ -94,6 +94,15 @@ export type SlotDeItem = 'capacete' | 'armadura' | 'mao' | 'pes';
 export type EixoDeAfinidade = 'raca' | 'classe';
 
 /**
+ * Gêmeo do `BadStuff` de `cartas`. A duplicação é o preço de `partida` não
+ * importar `cartas` — o mesmo que `InfoMonstro` já paga replicando os 5 stats —,
+ * e quem impede as duas de divergirem é o `_CoberturaBadStuff` em `shared`.
+ */
+export type BadStuff =
+  | { readonly tipo: 'evacuacao' }
+  | { readonly tipo: 'perdeSlot'; readonly slot: SlotDeItem };
+
+/**
  * A quem um item pertence, do ponto de vista da MESA. `ItemCarta` (pacote
  * `cartas`) satisfaz este contrato estruturalmente — é o que dispensa qualquer
  * import de `cartas` aqui.
@@ -190,6 +199,19 @@ export interface JogadorNaMesa {
   readonly mochila: readonly CartaTesouro[];
   /** Zona ABERTA. É daqui que sai a raça do lutador — não mais da criação da partida. */
   readonly emJogo: ZonaEmJogo;
+  /**
+   * Ligada pela evacuação, consumida em `encerrarTurno` quando a vez volta a ele:
+   * é a marca de que ele deve recomprar a mão inicial antes de jogar.
+   *
+   * Não pode ficar ligada duas vezes seguidas — combate só acontece no turno do
+   * próprio jogador (o guard de `vezDe` no topo de `aplicarAcao`), e a evacuação
+   * encerra esse turno, então ele só volta a agir depois de a flag ser consumida.
+   * Invariante testada em `mesa.test.ts` ("quem RECEBE a vez em `encerrarTurno`
+   * NUNCA está evacuado"): `encerrarTurno` reseta a flag de QUALQUER jogador que
+   * receba a vez com ela ligada, não só de quem chegou lá por ter perdido um
+   * combate — é essa generalidade que fecha o caminho de dupla ligação.
+   */
+  readonly evacuado: boolean;
 }
 
 /**
@@ -262,6 +284,8 @@ export interface InfoMonstro {
   readonly level: number;
   /** Quantas cartas de Tesouro o cadáver larga na mão do vencedor. */
   readonly tesouros: number;
+  /** O preço da derrota. A janela por onde o reducer enxerga o dado da carta. */
+  readonly badStuff: readonly BadStuff[];
 }
 
 /**
@@ -442,7 +466,29 @@ export type EventoDaMesa =
    * fase é que não tinha o que oferecer. Linha de log para isso seria ruído em
    * praticamente todo turno.
    */
-  | { readonly tipo: 'passou'; readonly jogadorId: string; readonly de: FaseParada };
+  | { readonly tipo: 'passou'; readonly jogadorId: string; readonly de: FaseParada }
+  /**
+   * O monstro arrancou uma família de encaixe. Carrega AS CARTAS porque o slot é
+   * zona ABERTA — a mesa já as via no corpo.
+   *
+   * 🔴 Emitido MESMO COM `cartas` VAZIO, quando o encaixe estava livre. Sem ele,
+   * "o Goblin tentou arrancar seu capacete e você não usa capacete" fica
+   * indistinguível de nada ter acontecido, e o jogador nunca aprende que aquele
+   * monstro mira aquele encaixe. É a #28 valendo.
+   */
+  | { readonly tipo: 'perdeuEquipamento'; readonly jogadorId: string;
+      readonly slot: SlotDeItem; readonly cartas: readonly CartaEquipamento[] }
+  /**
+   * A evacuação. Corpo e mochila são zonas ABERTAS e viajam com as cartas; a MÃO
+   * é oculta, então viaja só a QUANTIDADE — mesma regra de sigilo do `loot`.
+   *
+   * 🔴 Emitido mesmo com as três listas vazias (evacuar já sem nada), pelo mesmo
+   * motivo do `perdeuEquipamento`.
+   */
+  | { readonly tipo: 'evacuou'; readonly jogadorId: string;
+      readonly doCorpo: readonly CartaEquipamento[];
+      readonly daMochila: readonly CartaTesouro[];
+      readonly daMao: number };
 
 export type AcaoDaMesa =
   | { readonly tipo: 'vasculhar'; readonly jogadorId: string }

@@ -19,7 +19,7 @@ const zonaDeTeste = (over: Partial<ZonaEmJogo> = {}): ZonaEmJogo => ({
 
 const jogador = (over: Partial<JogadorNaMesa> = {}): JogadorNaMesa => ({
   id: 'p1', nome: 'Você', ehBot: false,
-  patente: 1, derrotas: 0, mao: [], mochila: [],
+  patente: 1, derrotas: 0, mao: [], mochila: [], evacuado: false,
   emJogo: zonaDeTeste(),
   ...over,
 });

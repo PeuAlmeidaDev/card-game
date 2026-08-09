@@ -8,6 +8,7 @@ import type { JogadorNaMesa } from './tipos';
 const jogador = (id: string, patente: number): JogadorNaMesa => ({
   id, nome: id, ehBot: true,
   patente, derrotas: 0, mao: [], mochila: [], emJogo: { raca: null, classe: null, slots: { ...SLOTS_VAZIOS } },
+  evacuado: false,
 });
 
 describe('candidatosACaridade', () => {

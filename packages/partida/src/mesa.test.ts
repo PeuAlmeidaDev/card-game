@@ -19,9 +19,9 @@ import {
 } from './testes/catalogo';
 import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import { combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
-import type { DepsMesa } from './mesa';
+import type { DepsMesa, ResultadoAcao } from './mesa';
 import type {
-  Carta, ConfigPartida, EntradaJogador, CartaPorta, CartaEquipamento, EstadoPartida, InfoMonstro,
+  BadStuff, Carta, ConfigPartida, EntradaJogador, CartaPorta, CartaEquipamento, EstadoPartida, InfoMonstro,
   JogadorNaMesa, ZonaEmJogo,
 } from './tipos';
 import type { PassivaCombate } from '@card-dungeon/motor';
@@ -234,7 +234,7 @@ describe('aplicarAcao — vasculhar', () => {
     embaralhar: semEmbaralhar,
     catalogo: catalogoDeTeste({
       monstro: (id) => (id === 'ogro'
-        ? { forca: 2, vida: 10, habilidade: 6, agilidade: 1, level: 1, tesouros: 1 }
+        ? { forca: 2, vida: 10, habilidade: 6, agilidade: 1, level: 1, tesouros: 1, badStuff: [] }
         : undefined),
     }),
   });
@@ -327,7 +327,7 @@ describe('aplicarAcao — combate', () => {
   });
 
   it('perder o combate conta derrota e passa a vez', () => {
-    const forte = { forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1, tesouros: 1 };
+    const forte = { forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1, tesouros: 1, badStuff: [] };
     const p = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const depsForte = depsComMonstro(forte);
 
@@ -380,7 +380,7 @@ describe('aplicarAcao — combate', () => {
   it('traduz a recusa do motor em AcaoInvalida, preservando a mensagem', () => {
     // O motor recusa `atacar` quando a máquina está pedindo a esquiva. Sem a
     // tradução, esse Error cru viraria 500 na Task 14 em vez do 400 que é.
-    const forte = { forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1, tesouros: 1 };
+    const forte = { forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1, tesouros: 1, badStuff: [] };
     const depsForte = depsComMonstro(forte);
     const p = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const pedindoEsquiva = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, depsForte([1])).estado;
@@ -408,6 +408,207 @@ describe('aplicarAcao — combate', () => {
       .toThrow(TypeError);
     expect(() => aplicarAcao(comCombate, { tipo: 'atacar', jogadorId: 'p1' }, depsQuebradas))
       .not.toThrow(AcaoInvalida);
+  });
+});
+
+describe('Bad Stuff na derrota', () => {
+  const soMonstro = { ...config, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] };
+  const nascida = (): EstadoPartida => criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+
+  /**
+   * Monstro forte de sempre (`forca 30, habilidade 12, agilidade 12` — mata o
+   * jogador de UM golpe, mesmo orçamento de dados do describe de combate acima),
+   * com o `badStuff` como o único dial de cada teste.
+   */
+  const monstroComBadStuff = (badStuff: readonly BadStuff[]): InfoMonstro => (
+    { forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1, tesouros: 0, badStuff }
+  );
+
+  /**
+   * Injeta corpo/mão/mochila de p1 ANTES de abrir o combate. Espalha
+   * `SLOTS_VAZIOS` para não escrever os 5 slots à mão — mesma convenção do
+   * `comSlots` mais abaixo no arquivo.
+   */
+  const comCorpo = (
+    estado: EstadoPartida,
+    patch: {
+      readonly slots?: Partial<ZonaEmJogo['slots']>;
+      readonly mao?: readonly Carta[];
+      readonly mochila?: readonly CartaEquipamento[];
+    },
+  ): EstadoPartida => ({
+    ...estado,
+    jogadores: estado.jogadores.map((j) => (j.id === 'p1' ? {
+      ...j,
+      mao: patch.mao ?? j.mao,
+      mochila: patch.mochila ?? j.mochila,
+      emJogo: { ...j.emJogo, slots: { ...SLOTS_VAZIOS, ...patch.slots } },
+    } : j)),
+  });
+
+  /**
+   * Abre o combate e faz p1 PERDER: o monstro mais ágil ataca primeiro e acerta
+   * (rolagem 1 ≤ habilidade 12); a esquiva do jogador (2 > 1) falha e o dano
+   * (1 + 30 = 31) passa da vida 20 — mesmo orçamento de dados do teste "perder o
+   * combate conta derrota e passa a vez", acima. `antes` é o estado JÁ com o
+   * corpo/mão/mochila injetados, mas ANTES de vasculhar — é ele que o censo de
+   * conservação compara contra o `depois`.
+   */
+  const perder = (
+    estado: EstadoPartida,
+    badStuff: readonly BadStuff[],
+  ): { readonly antes: EstadoPartida; readonly depois: EstadoPartida; readonly eventos: ResultadoAcao['eventos'] } => {
+    const fabrica = depsComMonstro(monstroComBadStuff(badStuff));
+    const comCombate = aplicarAcao(estado, { tipo: 'vasculhar', jogadorId: 'p1' }, fabrica([1])).estado;
+    const r = aplicarAcao(comCombate, { tipo: 'esquivar', jogadorId: 'p1' }, fabrica([2]));
+    return { antes: estado, depois: r.estado, eventos: r.eventos };
+  };
+
+  /** Todo id de carta presente na mesa, em qualquer zona — o censo de conservação. */
+  const idsDaMesa = (estado: EstadoPartida): string[] => {
+    const ids: string[] = [
+      ...estado.portas.monte.map((c) => c.id),
+      ...estado.portas.cemiterio.map((c) => c.id),
+      ...estado.tesouros.monte.map((c) => c.id),
+      ...estado.tesouros.cemiterio.map((c) => c.id),
+    ];
+    for (const j of estado.jogadores) {
+      ids.push(...j.mao.map((c) => c.id));
+      ids.push(...j.mochila.map((c) => c.id));
+      ids.push(...itensEquipados(j.emJogo.slots).map((c) => c.id));
+      if (j.emJogo.raca !== null) ids.push(j.emJogo.raca.id);
+      if (j.emJogo.classe !== null) ids.push(j.emJogo.classe.id);
+    }
+    return ids;
+  };
+
+  it('perder aplica o Bad Stuff do monstro e manda o item ao cemitério de TESOUROS', () => {
+    const p = comCorpo(nascida(), { slots: { capacete: equipamento('t-cap') } });
+    const { depois } = perder(p, [{ tipo: 'perdeSlot', slot: 'capacete' }]);
+
+    expect(depois.tesouros.cemiterio.map((c) => c.id)).toContain('t-cap');
+    expect(depois.jogadores[0]?.emJogo.slots.capacete).toBeNull();
+  });
+
+  it('🔴 o item arrancado vai DIRETO ao cemitério, mesmo com vaga na mochila', () => {
+    // Assimetria DELIBERADA com `destinoDoDesequipado`, que prefere a mochila:
+    // trocar de equipamento é SUA escolha, o Bad Stuff é o monstro TOMANDO. Se
+    // fosse à mochila, o item voltaria ao corpo na fase `jogar` do mesmo turno (a
+    // punição vira nada) E devolveria zero carta ao baralho (a economia vira nada).
+    const p = comCorpo(nascida(), { slots: { capacete: equipamento('t-cap') } });
+    const { depois } = perder(p, [{ tipo: 'perdeSlot', slot: 'capacete' }]);
+
+    expect(depois.jogadores[0]?.mochila).toEqual([]);
+    expect(depois.tesouros.cemiterio).toHaveLength(1);
+  });
+
+  it('VENCER não aplica Bad Stuff nenhum', () => {
+    // Monstro FRACO (o `MONSTRO_DE_TESTE` de sempre) com badStuff anexado — quem
+    // ataca aqui é o JOGADOR, não o monstro. Item NEUTRO (modificadores vazios)
+    // de propósito: o orçamento de dados abaixo é o mesmo três-golpes de
+    // `venceOCombate` (dano 4 por golpe), e um item com modificador de força
+    // mudaria a conta.
+    const base = catalogoDeTeste();
+    const catalogo = catalogoDeTeste({
+      monstro: () => ({ ...MONSTRO_DE_TESTE, badStuff: [{ tipo: 'perdeSlot', slot: 'capacete' }] }),
+      item: (id) => (id === 'i-neutro'
+        ? { id: 'i-neutro', nome: 'Neutro', slot: 'capacete' as const, duasMaos: false, modificadores: {}, exclusivo: null }
+        : base.item(id)),
+    });
+    const fabrica = (dados: readonly number[]): DepsMesa => ({
+      rolar: filaDeDados(dados), embaralhar: semEmbaralhar, catalogo,
+    });
+    const p = comCorpo(nascida(), { slots: { capacete: equipamento('t-cap', 'i-neutro') } });
+    // agilidade do jogador (5) > do monstro (1) => a abertura não gasta dado.
+    const aberto = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, fabrica([])).estado;
+    let r = aplicarAcao(aberto, { tipo: 'atacar', jogadorId: 'p1' }, fabrica([4, 12, 12]));
+    r = aplicarAcao(r.estado, { tipo: 'atacar', jogadorId: 'p1' }, fabrica([4, 12, 12]));
+    r = aplicarAcao(r.estado, { tipo: 'atacar', jogadorId: 'p1' }, fabrica([4, 12, 12]));
+
+    expect(r.estado.jogadores[0]?.emJogo.slots.capacete).not.toBeNull();
+    expect(r.eventos.map((e) => e.tipo)).not.toContain('perdeuEquipamento');
+  });
+
+  it('a evacuação roteia por FAMÍLIA — Portas ao cemitério de Portas, Tesouros ao de Tesouros', () => {
+    const p = comCorpo(nascida(), { mao: [monstro('p-1'), equipamento('t-1')] });
+    const { depois } = perder(p, [{ tipo: 'evacuacao' }]);
+
+    expect(depois.portas.cemiterio.map((c) => c.id)).toContain('p-1');
+    expect(depois.tesouros.cemiterio.map((c) => c.id)).toContain('t-1');
+  });
+
+  it('🔴 quem evacuou NÃO fica parado em `jogar` — a fase se auto-pula', () => {
+    // O `entrarOuPular` no fim do `fecharCombate` tem que receber o jogador DEPOIS
+    // do Bad Stuff. Com o jogador de antes, ele responde "tenho equipamento na
+    // mão" sobre uma mão que não existe mais, e o turno para com nada a fazer —
+    // num assento de bot isso vira AcaoInvalida propagada por `avancarBots` = 400
+    // na jogada do humano. É o bug do Plano 4a, na mesma função.
+    const p = comCorpo(nascida(), {
+      slots: { capacete: equipamento('t-cap') },
+      mao: [equipamento('t-1')],
+      mochila: [equipamento('t-2')],
+    });
+    const { depois } = perder(p, [{ tipo: 'evacuacao' }]);
+
+    expect(depois.vezDe).not.toBe('p1');
+  });
+
+  it('nenhuma carta some — censo antes e depois', () => {
+    // Todo id que existia na mesa antes continua existindo depois, em alguma zona.
+    const p = comCorpo(nascida(), {
+      slots: { capacete: equipamento('t-cap') },
+      mao: [monstro('p-1'), equipamento('t-1')],
+      mochila: [equipamento('t-2')],
+    });
+    const { antes, depois } = perder(p, [{ tipo: 'evacuacao' }]);
+
+    expect(idsDaMesa(depois).sort()).toEqual(idsDaMesa(antes).sort());
+  });
+
+  /**
+   * 🔴 IMPORTANT 1 da revisão da leva de correção (2026-08-09): `badStuff.test.ts`
+   * prova que `aplicarBadStuff` DEVOLVE os eventos certos; `narrarEvento.test.tsx`
+   * prova que a tela SABE narrá-los, com eventos construídos à mão. O FIO entre os
+   * dois — `fecharCombate` repassando `efeito.eventos` para o resultado do
+   * reducer — não tinha um teste próprio. Apagar
+   * `eventos.push(...efeito.eventos)` do ramo `!venceu` de `fecharCombate`
+   * deixava a suíte inteira verde: a punição mais dura do jogo acontecia em
+   * silêncio absoluto, e nenhum teste notava.
+   */
+  it('🔴 `perdeuEquipamento` chega ao RESULTADO do reducer, com o slot e as cartas certas, DEPOIS de `derrota`', () => {
+    const p = comCorpo(nascida(), { slots: { capacete: equipamento('t-cap') } });
+    const { eventos } = perder(p, [{ tipo: 'perdeSlot', slot: 'capacete' }]);
+
+    const indiceDerrota = eventos.findIndex((e) => e.tipo === 'derrota');
+    const indicePerdeu = eventos.findIndex((e) => e.tipo === 'perdeuEquipamento');
+    expect(indiceDerrota).toBeGreaterThanOrEqual(0);
+    // A ORDEM que o plano promete: `derrota` primeiro, o Bad Stuff depois — é
+    // `fecharCombate` empurrando `derrota` ANTES de chamar `aplicarBadStuff`.
+    expect(indicePerdeu).toBeGreaterThan(indiceDerrota);
+    expect(eventos[indicePerdeu]).toEqual({
+      tipo: 'perdeuEquipamento', jogadorId: 'p1', slot: 'capacete', cartas: [equipamento('t-cap')],
+    });
+  });
+
+  it('🔴 `evacuou` chega ao RESULTADO do reducer, com doCorpo/daMochila/daMao certos, DEPOIS de `derrota`', () => {
+    const p = comCorpo(nascida(), {
+      slots: { capacete: equipamento('t-cap') },
+      mao: [monstro('p-1'), equipamento('t-1')],
+      mochila: [equipamento('t-2')],
+    });
+    const { eventos } = perder(p, [{ tipo: 'evacuacao' }]);
+
+    const indiceDerrota = eventos.findIndex((e) => e.tipo === 'derrota');
+    const indiceEvacuou = eventos.findIndex((e) => e.tipo === 'evacuou');
+    expect(indiceDerrota).toBeGreaterThanOrEqual(0);
+    expect(indiceEvacuou).toBeGreaterThan(indiceDerrota);
+    expect(eventos[indiceEvacuou]).toEqual({
+      tipo: 'evacuou',
+      jogadorId: 'p1',
+      doCorpo: [equipamento('t-cap')],
+      daMochila: [equipamento('t-2')],
+      daMao: 2,
+    });
   });
 });
 
@@ -489,7 +690,7 @@ describe('vencer larga tesouro na mão', () => {
 
   it('PERDER não larga tesouro nenhum', () => {
     // O cadáver vale 2 e mesmo assim nada sai do baralho: o loot é do VENCEDOR.
-    const forte = { forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1, tesouros: 2 };
+    const forte = { forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1, tesouros: 2, badStuff: [] };
     const depsForte = depsComMonstro(forte);
     const p = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     // monstro mais ágil ataca primeiro e acerta (1 <= habilidade 12); a esquiva
@@ -655,7 +856,7 @@ describe('vencer larga tesouro na mão', () => {
 
 describe('monstro com identidade', () => {
   it('resolve os stats do monstro pela carta, não por um monstro fixo nas deps', () => {
-    const ogro = { forca: 6, vida: 28, habilidade: 3, agilidade: 2, level: 3, tesouros: 3 };
+    const ogro = { forca: 6, vida: 28, habilidade: 3, agilidade: 2, level: 3, tesouros: 3, badStuff: [] };
     const estado = criar('m1', entradas,
       { ...config, composicaoPorJogador: [{ tipo: 'monstro', monstroId: 'ogro' }] },
       { embaralhar: semEmbaralhar });
@@ -672,8 +873,8 @@ describe('monstro com identidade', () => {
   it('dois monstros diferentes no mesmo baralho abrem combates com vidas diferentes', () => {
     const catalogo = catalogoDeTeste({
       monstro: (id) => (id === 'rato'
-        ? { forca: 1, vida: 6, habilidade: 2, agilidade: 1, level: 1, tesouros: 1 }
-        : { forca: 6, vida: 28, habilidade: 3, agilidade: 2, level: 3, tesouros: 3 }),
+        ? { forca: 1, vida: 6, habilidade: 2, agilidade: 1, level: 1, tesouros: 1, badStuff: [] }
+        : { forca: 6, vida: 28, habilidade: 3, agilidade: 2, level: 3, tesouros: 3, badStuff: [] }),
     });
     const base = criar('m1', entradas,
       { ...config, composicaoPorJogador: [{ tipo: 'monstro', monstroId: 'rato' }] },
@@ -763,7 +964,7 @@ describe('passiva da raça no combate da Mesa', () => {
           : { dano: Math.floor(base / 2), estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } },
     };
     // monstro rápido (ataca primeiro) e forte, para o 1º golpe cair no humano
-    const monstroForte = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1, tesouros: 1 };
+    const monstroForte = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1, tesouros: 1, badStuff: [] };
     const catalogo = catalogoDeTeste({
       raca: (racaId) => (racaId === 'anao' ? { passivaCombate: metade, espiaTopo: false } : undefined),
       monstro: () => monstroForte,
@@ -805,7 +1006,7 @@ describe('passiva da raça no combate da Mesa', () => {
   });
 });
 
-const monstroFraco = { forca: 1, vida: 1, habilidade: 0, agilidade: 0, level: 1, tesouros: 1 };
+const monstroFraco = { forca: 1, vida: 1, habilidade: 0, agilidade: 0, level: 1, tesouros: 1, badStuff: [] };
 // deps com Presciência ligada e um monstro fraco para o combate resolver rápido.
 const depsVidente = (dados: readonly number[]) => ({
   rolar: filaDeDados(dados),
@@ -833,7 +1034,7 @@ describe('aplicarAcao — espiada (Presciência)', () => {
     };
     // monstro rápido (ataca primeiro) e forte, para o 1º golpe cair no humano —
     // mesmo cálculo do teste "aplica a passiva do lutador ao criar o combate".
-    const monstroForte = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1, tesouros: 1 };
+    const monstroForte = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1, tesouros: 1, badStuff: [] };
     const deps1 = {
       rolar: filaDeDados([1, 12]),
       embaralhar: semEmbaralhar,
@@ -1245,7 +1446,7 @@ describe('a raça vem da ZONA EM JOGO', () => {
           : { dano: Math.floor(dano / 2), estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } },
     };
     // monstro rápido (ataca primeiro) e forte, para o 1º golpe cair no humano
-    const monstroForte = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1, tesouros: 1 };
+    const monstroForte = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1, tesouros: 1, badStuff: [] };
     const soMonstro = { patenteAlvo: 10, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }], composicaoTesouros: COMPOSICAO_TESOURO_DE_TESTE };
 
     const vidaApos = (comRacaNaZona: boolean): number | undefined => {
@@ -1402,7 +1603,7 @@ describe('aplicarAcao — jogarCarta', () => {
           ? { dano, estado: ctx.estado }
           : { dano: Math.floor(dano / 2), estado: { ...ctx.estado, usos: ctx.estado.usos + 1 } },
     };
-    const monstroForte = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1, tesouros: 1 };
+    const monstroForte = { forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1, tesouros: 1, badStuff: [] };
     const depsAnao = {
       rolar: filaDeDados([1, 12]),
       embaralhar: semEmbaralhar,
@@ -2946,7 +3147,7 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
     // para `base + 2` — o cenário viraria "acima do teto" e o teste deixaria de
     // exercitar o `>`. Perder não saqueia nada, então a mão chega intacta ao
     // `encerrarTurno`, que é o ponto sob teste.
-    const forte = { forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1, tesouros: 1 };
+    const forte = { forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1, tesouros: 1, badStuff: [] };
     const depsForte = depsComMonstro(forte);
     const p0 = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
     const p: EstadoPartida = {
@@ -2979,7 +3180,7 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
     // forjada DEPOIS que o combate já está aberto, só para provar que
     // `fecharCombate` também passa pela porta única.
     const p = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
-    const fraco = { forca: 1, vida: 1, habilidade: 0, agilidade: 0, level: 1, tesouros: 1 };
+    const fraco = { forca: 1, vida: 1, habilidade: 0, agilidade: 0, level: 1, tesouros: 1, badStuff: [] };
     const depsFraco = {
       rolar: filaDeDados([1, 12]), embaralhar: semEmbaralhar,
       catalogo: catalogoDeTeste({ monstro: () => fraco }),
@@ -2991,6 +3192,256 @@ describe('encerrarTurno — o limite de mão segura a vez', () => {
 
     expect(r.estado.combate).toBeNull();          // o combate fechou
     expect(r.estado.vezDe).toBe('p1');            // mas a vez ficou
+  });
+});
+
+describe('encerrarTurno — quem evacuou recompra 4+4 quando a vez volta (Task 5)', () => {
+  // Baralhos GRANDES de propósito, e NÃO os `COMPOSICAO_DE_TESTE`/
+  // `COMPOSICAO_TESOURO_DE_TESTE` do arquivo: o cenário força DUAS lutas (a que
+  // evacua p1 e a que o bot p2 vence de graça, saqueando 1 Tesouro) mais a
+  // recompra de 4+4 de p1 — cinco saques de Tesouro contra os 4 da composição
+  // baseline (2 por jogador × 2 jogadores) estourariam o monte SEM cemitério
+  // para reembaralhar, e `tirarDoTopo` lançaria `Error` cru no meio do teste.
+  // Só monstro nas Portas, para o `vasculhar` de p2 nunca cair no ramo de
+  // raça/classe — abriria `encrenca` em vez de combate e mudaria a contagem de
+  // ações do turno dele.
+  const configGrande: ConfigPartida = {
+    patenteAlvo: 10,
+    composicaoPorJogador: montarComposicao({
+      monstroIds: Array.from({ length: 10 }, () => 'm-teste'),
+      copiasPorMonstro: 1,
+      racaIds: [],
+      copiasPorRaca: 0,
+      classeIds: [],
+      copiasPorClasse: 0,
+    }),
+    composicaoTesouros: montarComposicaoTesouros(Array.from({ length: 10 }, () => 'i-teste')),
+  };
+
+  const monstroForteComEvacuacao: InfoMonstro = {
+    forca: 30, vida: 10, habilidade: 12, agilidade: 12, level: 1, tesouros: 0,
+    badStuff: [{ tipo: 'evacuacao' }],
+  };
+
+  /**
+   * p1 com uma raça JÁ em jogo, ANTES da evacuação — sem isto o teste NÃO
+   * exercita a #115 (a raça sobrevive à evacuação) nem o motivo real do
+   * `'recompor'` cravado: sem raça em jogo o limite de p1 é `LIMITE_BASE_DE_MAO
+   * + 1` (8), a recompra de 8 cartas cai EXATAMENTE nele (não o excede), e
+   * `faseDoTurnoDe` devolveria `'recompor'` de qualquer jeito — a Mutação Step 6
+   * (2/2), abaixo, ficaria VERDE por acidente de fixture, não por o cravado
+   * estar certo. Com a raça em jogo o limite cai para 7, e 8 > 7 força
+   * `faseDoTurnoDe` a `'descartar'` se o cravado morrer.
+   */
+  const comRacaEmJogo = (estado: EstadoPartida): EstadoPartida => ({
+    ...estado,
+    jogadores: estado.jogadores.map((j) => (
+      j.id === 'p1' ? { ...j, emJogo: { ...j.emJogo, raca: raca('p-raca-p1', 'orc') } } : j
+    )),
+  });
+
+  /**
+   * Abre combate contra o monstro FORTE e faz p1 PERDER — mesmo orçamento de
+   * dado de "Bad Stuff na derrota": o monstro mais ágil ataca primeiro e acerta
+   * (rolagem 1 ≤ habilidade 12); a esquiva de p1 (2 > 1) falha e o dano
+   * (1 + 30 = 31) passa da vida 20. p1 evacua sem nada equipado — a mão e a
+   * mochila já nascem vazias, e o único slot preenchido pela raça é
+   * `emJogo.raca`, que a evacuação preserva (#115).
+   */
+  const evacuarP1 = (estado: EstadoPartida): EstadoPartida => {
+    const fabrica = depsComMonstro(monstroForteComEvacuacao);
+    const comCombate = aplicarAcao(estado, { tipo: 'vasculhar', jogadorId: 'p1' }, fabrica([1])).estado;
+    return aplicarAcao(comCombate, { tipo: 'esquivar', jogadorId: 'p1' }, fabrica([2])).estado;
+  };
+
+  /**
+   * Deps do turno do bot p2: catálogo DEFAULT (o monstro que ele encontra é o
+   * `MONSTRO_DE_TESTE` fraco, não o forte que evacuou p1) e o mesmo ciclo de
+   * três dados de `venceOCombate` — comprimento ÍMPAR, então fica alinhado com
+   * "cada `atacar` gasta 3 dados" indefinidamente (ver a trava de paridade
+   * documentada em `criarDadoCiclico`).
+   */
+  const depsDoBotP2: DepsMesa = {
+    rolar: criarDadoCiclico([4, 12, 12]),
+    embaralhar: semEmbaralhar,
+    catalogo: catalogoDeTeste(),
+  };
+
+  /** p1 evacuado, com a vez já em p2 (bot) — o ponto de partida dos três testes abaixo. */
+  const mesaComP1Evacuado = (): EstadoPartida =>
+    evacuarP1(comRacaEmJogo(criar('m1', entradas, configGrande, { embaralhar: semEmbaralhar })));
+
+  it('quem evacuou recompra 4 Portas + 4 Tesouros quando a vez chega nele', () => {
+    const { estado: depois } = avancarBots(mesaComP1Evacuado(), depsDoBotP2);
+
+    expect(depois.jogadores[0]?.mao).toHaveLength(8);
+    expect(depois.jogadores[0]?.evacuado).toBe(false);
+  });
+
+  it('🔴 ele entra em `recompor`, NÃO em `descartar`', () => {
+    // Ele mantém a raça (#115), logo o limite dele é 7 — e 4+4 = 8. Saindo de
+    // `faseDoTurnoDe` ele cairia em `descartar`, onde a única ação legal é a
+    // CARIDADE: doaria uma carta a um rival e `entregarCarta` terminaria em
+    // `encerrarTurno`, que então o veria dentro do limite e passaria a vez.
+    // Ele esperaria uma rodada, voltaria, doaria e perderia o turno de novo.
+    const { estado: depois } = avancarBots(mesaComP1Evacuado(), depsDoBotP2);
+
+    expect(depois.fase).toBe('recompor');
+  });
+
+  it('🔴 quem evacuou recebe as 8 cartas da recompra, com a vez em `recompor`', () => {
+    // 🔴 Achado da revisão da leva de correção (2026-08-09): o título antigo
+    // ("COMPRA antes de calcular a fase") prometia sensibilidade à ORDEM entre
+    // `comprarMaoInicial` e o cálculo da fase — mas com `'recompor'` CRAVADO
+    // (decisão #116) o ramo evacuado NUNCA lê `faseDoTurnoDe`; ela só é chamada
+    // no ramo NÃO-evacuado, onde `recomposto` é sempre o MESMO objeto que
+    // `seguinte` (o `if` que os separaria não roda). Medido: trocar
+    // `faseDoTurnoDe(recomposto)` por `faseDoTurnoDe(seguinte)` deixa 381/381
+    // verdes — mutação-equivalente, não protegida por este teste nem por
+    // nenhum outro. A ordem em si segue certa (calcular antes daria a fase a
+    // um jogador de mão vazia, que se auto-pularia — o bug do Plano 4a), só
+    // deixou de ser OBSERVÁVEL neste ramo. A asserção que morde de verdade é o
+    // tamanho da mão pós-recompra.
+    const { estado: depois } = avancarBots(mesaComP1Evacuado(), depsDoBotP2);
+
+    expect(depois.vezDe).toBe('p1');
+    expect(depois.jogadores[0]?.mao).toHaveLength(8);
+    expect(depois.fase).toBe('recompor');
+  });
+
+  // Composição SÓ de raça (nenhum monstro): o teste da invariante abaixo não
+  // precisa que p1 entre em combate — só precisa chegar a `encerrarTurno` pelo
+  // caminho mais barato (vasculhar → saquear, o mesmo do describe "o limite de
+  // mão segura a vez"). GRANDE pelo mesmo motivo de `configGrande`: p2 vai
+  // recomprar 4 Tesouros e p1 ainda saca 2 Portas antes disso — 20+20 cartas
+  // sobram folga de sobra, sem risco de `tirarDoTopo` esbarrar num monte E
+  // cemitério vazios.
+  const composicaoParaAInvariante: ConfigPartida = {
+    patenteAlvo: 5,
+    composicaoPorJogador: montarComposicao({
+      monstroIds: [],
+      copiasPorMonstro: 0,
+      racaIds: Array.from({ length: 10 }, () => 'r-teste'),
+      copiasPorRaca: 1,
+      classeIds: [],
+      copiasPorClasse: 0,
+    }),
+    composicaoTesouros: montarComposicaoTesouros(Array.from({ length: 10 }, () => 'i-teste')),
+  };
+
+  it('🔒 quem RECEBE a vez em `encerrarTurno` NUNCA está evacuado — é isto que sustenta "não liga duas vezes seguidas"', () => {
+    // O docstring de `JogadorNaMesa.evacuado` promete uma garantia sobre QUANDO a
+    // flag pode estar ligada, não sobre COMO ela liga (isso os outros testes deste
+    // describe já cobrem). A garantia é: `encerrarTurno` nunca entrega a vez a
+    // alguém que ainda a carrega. Como `aplicarAcao` só aceita ação de quem TEM a
+    // vez (`acao.jogadorId !== estado.vezDe` é `AcaoInvalida`), e `aplicarBadStuff`
+    // só liga a flag DENTRO de um combate — que só abre no turno de quem age —, se
+    // este teste vale, a flag nunca pode estar `true` no instante em que o dono
+    // dela volta a poder agir. É isso que torna "ligar duas vezes seguidas"
+    // impossível: entre duas leituras possíveis da flag por quem a carrega, há
+    // sempre exatamente uma passagem por `encerrarTurno` que a apaga.
+    //
+    // p2 chega evacuado por CONSTRUÇÃO DIRETA no fixture, não por perder um
+    // combate — de propósito: esta garantia é de `encerrarTurno`, independente de
+    // qual caminho ligou a flag, e testar os dois junto esconderia qual dos dois
+    // está sendo provado (os testes anteriores deste describe já cobrem "liga por
+    // perder e reseta na volta"; este cobre "reseta na volta, ponto — mesmo que a
+    // flag já estivesse ligada por qualquer outro motivo").
+    const p0 = criar('m1', entradas, composicaoParaAInvariante, { embaralhar: semEmbaralhar });
+    const p: EstadoPartida = {
+      ...p0,
+      jogadores: p0.jogadores.map((j) => (j.id === 'p2' ? { ...j, evacuado: true } : j)),
+    };
+
+    const abriuEncrenca = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
+    const r = aplicarAcao(abriuEncrenca, { tipo: 'saquear', jogadorId: 'p1' }, deps([]));
+
+    expect(r.estado.vezDe).toBe('p2');
+    const p2Depois = r.estado.jogadores.find((j) => j.id === 'p2');
+    expect(p2Depois?.evacuado).toBe(false);
+    expect(p2Depois?.mao).toHaveLength(8);
+  });
+
+  /** Todo id de carta presente na mesa, em qualquer zona — o censo de conservação. */
+  const idsDaMesa = (estado: EstadoPartida): string[] => {
+    const ids: string[] = [
+      ...estado.portas.monte.map((c) => c.id),
+      ...estado.portas.cemiterio.map((c) => c.id),
+      ...estado.tesouros.monte.map((c) => c.id),
+      ...estado.tesouros.cemiterio.map((c) => c.id),
+    ];
+    for (const j of estado.jogadores) {
+      ids.push(...j.mao.map((c) => c.id));
+      ids.push(...j.mochila.map((c) => c.id));
+      ids.push(...itensEquipados(j.emJogo.slots).map((c) => c.id));
+      if (j.emJogo.raca !== null) ids.push(j.emJogo.raca.id);
+      if (j.emJogo.classe !== null) ids.push(j.emJogo.classe.id);
+    }
+    return ids;
+  };
+
+  it('🐛 fix round 2 (bug 1): a caridade que chega ANTES da vez voltar NÃO se perde na recompra', () => {
+    // Achado do soak da Task 9 (Critical, 35/240 partidas, 81 cartas perdidas): a
+    // recompra SUBSTITUÍA a mão por inteiro. Quem evacua mantém a patente (#113),
+    // logo continua alvo LEGÍTIMO de caridade enquanto espera a própria vez
+    // voltar — a carta doada nesse intervalo entra em `mao` com `evacuado` ainda
+    // `true`, e a substituição a apagava de toda zona, sem `descartarNoBaralhoCerto`,
+    // sem evento, sem log.
+    const cartaDoada = monstro('p-doada');
+    const p0 = criar('m1', entradas, composicaoParaAInvariante, { embaralhar: semEmbaralhar });
+    const antes: EstadoPartida = {
+      ...p0,
+      jogadores: p0.jogadores.map((j) => {
+        if (j.id === 'p1') return { ...j, evacuado: true, mao: [], mochila: [] };
+        // A caridade só aceita quem tem patente ESTRITAMENTE menor que o doador
+        // (`candidatosACaridade`) — sem o `patente: 2` aqui, p1 (patente 1,
+        // empatado com p2) não seria candidato e a carta iria para o cemitério.
+        if (j.id === 'p2') return { ...j, patente: 2, mao: [cartaDoada] };
+        return j;
+      }),
+      vezDe: 'p2',
+      fase: 'descartar',
+    };
+
+    const r = aplicarAcao(antes, { tipo: 'entregarCarta', jogadorId: 'p2', cartaId: cartaDoada.id }, deps([]));
+
+    const p1Depois = r.estado.jogadores.find((j) => j.id === 'p1');
+    expect(r.estado.vezDe).toBe('p1');
+    expect(p1Depois?.evacuado).toBe(false);
+    expect(p1Depois?.mao).toHaveLength(9); // 8 da recompra + 1 da caridade — ANEXADA, não substituída
+    expect(p1Depois?.mao.some((c) => c.id === cartaDoada.id)).toBe(true);
+
+    // Censo de conservação: todo id que existia ANTES continua existindo DEPOIS,
+    // em alguma zona — nenhuma carta some no caminho caridade → recompra.
+    expect(idsDaMesa(r.estado).sort()).toEqual(idsDaMesa(antes).sort());
+  });
+
+  it('🐛 fix round 2 (bug 2): baralho de Tesouros SECO na recompra paga o que dá e emite `tesouroEsgotado`, sem lançar', () => {
+    // Achado do soak da Task 9 (Important, 1/240): o laço de Tesouros da recompra
+    // chamava `tirarDoTopo` sem tratar o baralho esgotado — `Error` cru = 500 numa
+    // partida legítima. `sacarTesouros` (o outro consumidor do mesmo baralho) já
+    // resolvia isso: paga o que houver e deixa o chamador narrar o resto.
+    const p0 = criar('m1', entradas, composicaoParaAInvariante, { embaralhar: semEmbaralhar });
+    const p: EstadoPartida = {
+      ...p0,
+      jogadores: p0.jogadores.map((j) => (j.id === 'p2' ? { ...j, evacuado: true } : j)),
+      // Monte E cemitério de Tesouros vazios — a MESMA condição que faz
+      // `sacarTesouros` pagar zero em vez de lançar.
+      tesouros: { monte: [], cemiterio: [] },
+    };
+
+    const abriuEncrenca = aplicarAcao(p, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
+
+    let r: ResultadoAcao | undefined;
+    expect(() => {
+      r = aplicarAcao(abriuEncrenca, { tipo: 'saquear', jogadorId: 'p1' }, deps([]));
+    }).not.toThrow();
+
+    const p2Depois = r?.estado.jogadores.find((j) => j.id === 'p2');
+    expect(r?.estado.vezDe).toBe('p2');
+    expect(p2Depois?.evacuado).toBe(false);
+    expect(p2Depois?.mao).toHaveLength(4); // só as 4 Portas — Tesouros pagou ZERO
+    expect(r?.eventos).toContainEqual({ tipo: 'tesouroEsgotado', jogadorId: 'p2', naoPagas: 4 });
   });
 });
 

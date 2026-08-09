@@ -45,6 +45,9 @@ export function criarPartida(
     // todos `null`. Nascer equipado é o andaime que saiu na fatia 8 — item também
     // é carta que se saca.
     emJogo: { raca: null, classe: null, slots: { ...SLOTS_VAZIOS } },
+    // Ninguém nasce evacuado: a flag só liga por Bad Stuff, em partida já em
+    // andamento.
+    evacuado: false,
   }));
 
   // Baralho da MESA: a composição por jogador multiplicada pelo tamanho da mesa.

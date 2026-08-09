@@ -18,6 +18,15 @@ describe('participantesDe', () => {
     })).toEqual(['p2']);
   });
 
+  it('perdeuEquipamento e evacuou são do dono do corpo — uma ponta só', () => {
+    expect(participantesDe({
+      tipo: 'perdeuEquipamento', jogadorId: 'p2', slot: 'capacete', cartas: [],
+    })).toEqual(['p2']);
+    expect(participantesDe({
+      tipo: 'evacuou', jogadorId: 'p2', doCorpo: [], daMochila: [], daMao: 0,
+    })).toEqual(['p2']);
+  });
+
   it('a entrega envolve as DUAS pontas — é a razão de esta função existir', () => {
     // O filtro do `PainelLog` indexava o evento só por `jogadorId` (o doador), e
     // com isso o botão "Você" ESCONDIA a carta que você recebeu: ela ficava
@@ -69,6 +78,8 @@ describe('participantesDe', () => {
       { tipo: 'guardou', jogadorId: 'p1', carta: { id: 't1', tipo: 'equipamento', itemId: 'espada-curta' } },
       { tipo: 'passou', jogadorId: 'p1', de: 'recompor' },
       { tipo: 'saqueou', jogadorId: 'p1' },
+      { tipo: 'perdeuEquipamento', jogadorId: 'p1', slot: 'capacete', cartas: [] },
+      { tipo: 'evacuou', jogadorId: 'p1', doCorpo: [], daMochila: [], daMao: 0 },
     ];
 
     for (const evento of umDeCada) {

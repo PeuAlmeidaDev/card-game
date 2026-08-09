@@ -56,7 +56,7 @@ const RACAS_PADRAO: Catalogo['racas'] = [
 // Mesma ideia de RACAS_PADRAO, para o bestiário: os fixtures desta suíte usam
 // `monstroId: 'goblin'`, e sem o catálogo o nome cairia no fallback `?? id`.
 const MONSTROS_PADRAO: Catalogo['monstros'] = [
-  { id: 'goblin', nome: 'Goblin', forca: 4, vida: 20, habilidade: 2, agilidade: 4, level: 1, tesouros: 1 },
+  { id: 'goblin', nome: 'Goblin', forca: 4, vida: 20, habilidade: 2, agilidade: 4, level: 1, tesouros: 1, badStuff: [] },
 ];
 
 // Mesma ideia, para o baralho de Tesouros: sem o catálogo o nome do item cairia
@@ -404,6 +404,25 @@ describe('TelaMesa', () => {
     expect(await screen.findByText(/o Goblin acertou — esquive!/)).toBeInTheDocument();
   });
 
+  it('o painel de combate diz o que o monstro faz com quem ele derrota (#119)', async () => {
+    // É o requisito do dono: o painel fica à vista a luta INTEIRA, então é aqui
+    // que o preço de perder tem que estar — não só na carta que abriu o
+    // combate. `MONSTROS_PADRAO` tem `badStuff: []` de propósito (isolamento
+    // dos outros testes desta suíte); aqui o catálogo carrega o mesmo badStuff
+    // do Goblin de produção (`packages/cartas/src/monstros.ts`).
+    const monstros: Catalogo['monstros'] = [
+      { id: 'goblin', nome: 'Goblin', forca: 4, vida: 20, habilidade: 2, agilidade: 4, level: 1, tesouros: 1, badStuff: [{ tipo: 'perdeSlot', slot: 'capacete' }] },
+    ];
+    await abrirMesa(emCombateContra('goblin', 'ataque'), RACAS_PADRAO, monstros);
+
+    // Escopado pelo `<p>` do painel — é a "linha" desta superfície, o mesmo
+    // princípio de `.closest('li')` que o resto do arquivo usa para não deixar
+    // a asserção solta pegar texto de outra superfície.
+    const painel = (await screen.findByText(/Goblin:\s*23/)).closest('p');
+    if (painel === null) throw new Error('painel de combate não encontrado no DOM');
+    expect(within(painel).getByText(/arranca seu capacete/)).toBeInTheDocument();
+  });
+
   it('cai no id quando o catálogo não conhece o monstro, sem derrubar a tela', async () => {
     // Skew de versão: bundle antigo recebendo do server um monstro que ele não
     // conhece. Degradar para o id é feio e legível; lançar apagaria a mesa
@@ -468,6 +487,22 @@ describe('TelaMesa — a mão', () => {
 
     expect(screen.getByText(/um Goblin/)).toBeInTheDocument();
     expect(screen.getByText(/uma carta de Orc/)).toBeInTheDocument();
+  });
+
+  it('a carta de monstro NA MÃO mostra o Bad Stuff — é o lado do risco de "Procurar encrenca" (#119)', async () => {
+    // Sem isto o jogador clica em "Procurar encrenca" às cegas — o requisito
+    // do dono é ver o preço da derrota ANTES de escolher a luta.
+    const monstros: Catalogo['monstros'] = [
+      { id: 'goblin', nome: 'Goblin', forca: 4, vida: 20, habilidade: 2, agilidade: 4, level: 1, tesouros: 1, badStuff: [{ tipo: 'perdeSlot', slot: 'capacete' }] },
+    ];
+    await abrirMesa({ ...vistaBase, suaMao: [{ id: 'p-1', tipo: 'monstro', monstroId: 'goblin' }] }, RACAS_PADRAO, monstros);
+
+    // 🔴 Escopado PELA LINHA (`.closest('li')`), nunca `screen.getByText`
+    // solto — esta base já teve teste passando com a AÇÃO ERRADA porque vários
+    // botões tinham o mesmo rótulo e o `getByRole` genérico pegou o primeiro.
+    const linha = (await screen.findByText(/um Goblin/)).closest('li');
+    if (linha === null) throw new Error('linha da carta de monstro não encontrada no DOM');
+    expect(within(linha).getByText(/arranca seu capacete/)).toBeInTheDocument();
   });
 
   it('a carta de PORTA jogável (raça e classe) tem botão de jogar; o monstro não', async () => {

@@ -24,11 +24,12 @@ describe('catálogo de monstros', () => {
   });
 
   it('mantém o Goblin na statline do monstro fixo da fatia 2 (linha de base do balanceamento)', () => {
-    // `tesouros` é campo novo da fatia "Tesouros e o Corpo" e não existia no
-    // monstro fixo original — por isso entra aqui em vez de alterar a
-    // comparação histórica dos outros 6 stats.
+    // `tesouros` e `badStuff` são campos novos de fatias posteriores e não
+    // existiam no monstro fixo original — por isso entram aqui em vez de
+    // alterar a comparação histórica dos outros 6 stats.
     expect(obterMonstro('goblin')).toEqual({
       id: 'goblin', nome: 'Goblin', forca: 4, vida: 20, habilidade: 2, agilidade: 4, level: 1, tesouros: 1,
+      badStuff: [{ tipo: 'perdeSlot', slot: 'capacete' }],
     });
   });
 
@@ -55,5 +56,30 @@ describe('catálogo de monstros', () => {
     const rato = MONSTROS.find((m) => m.id === 'rato-gigante');
     const ogro = MONSTROS.find((m) => m.id === 'ogro');
     expect(rato?.tesouros).toBeLessThan(ogro?.tesouros ?? 0);
+  });
+
+  it('todo monstro declara pelo menos um Bad Stuff', () => {
+    // POR MONSTRO, nunca `.find`: conferir só o primeiro deixa passar substituição
+    // PARCIAL, que é a #54 entrando pela porta que o teste do baralho de classes
+    // já deixou aberta uma vez. E `readonly BadStuff[]` obrigatório NÃO impede `[]`
+    // — o tipo garante o campo, este teste garante o conteúdo.
+    for (const m of MONSTROS) {
+      expect(m.badStuff.length, `${m.id} nasceu sem Bad Stuff`).toBeGreaterThan(0);
+    }
+  });
+
+  it('só o monstro de 3 tesouros evacua', () => {
+    // 🎚️ A ESCALA é regra (decisão #114 do bible), não dial: qual encaixe cada um
+    // arranca é que é dial. Este teste prende a escala e deixa o dial livre.
+    for (const m of MONSTROS) {
+      const evacua = m.badStuff.some((b) => b.tipo === 'evacuacao');
+      expect(evacua, `${m.id} (${String(m.tesouros)} tesouros)`).toBe(m.tesouros === 3);
+    }
+  });
+
+  it('quem não evacua arranca um encaixe', () => {
+    for (const m of MONSTROS.filter((x) => x.tesouros !== 3)) {
+      expect(m.badStuff.map((b) => b.tipo), m.id).toEqual(['perdeSlot']);
+    }
   });
 });
