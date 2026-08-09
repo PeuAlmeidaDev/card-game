@@ -48,7 +48,7 @@ describe('PainelLog', () => {
     render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} classes={classes} />);
 
     expect(screen.getByText(/subiu para a patente 2/)).toHaveStyle({ color: corDoJogador(jogadores, 'p1') });
-    expect(screen.getByText(/foi evacuado/)).toHaveStyle({ color: corDoJogador(jogadores, 'p2') });
+    expect(screen.getByText(/perdeu o combate/)).toHaveStyle({ color: corDoJogador(jogadores, 'p2') });
   });
 
   it('narra o combate como bloco, com a rolagem de cada lance', () => {
@@ -181,7 +181,7 @@ describe('PainelLog — filtro e cauda', () => {
     render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} classes={classes} />);
 
     expect(screen.getByText(/subiu para a patente 2/)).toBeInTheDocument();
-    expect(screen.getByText(/foi evacuado/)).toBeInTheDocument();
+    expect(screen.getByText(/perdeu o combate/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /todos/i })).toHaveAttribute('aria-pressed', 'true');
   });
 
@@ -191,7 +191,7 @@ describe('PainelLog — filtro e cauda', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Bot 1' }));
 
     expect(screen.queryByText(/subiu para a patente 2/)).not.toBeInTheDocument();
-    expect(screen.getByText(/foi evacuado/)).toBeInTheDocument();
+    expect(screen.getByText(/perdeu o combate/)).toBeInTheDocument();
   });
 
   it('eventos globais aparecem em qualquer filtro', async () => {

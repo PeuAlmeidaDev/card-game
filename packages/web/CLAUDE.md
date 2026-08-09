@@ -83,11 +83,13 @@ desenharia o campo.
   nomeia o monstro) e o log (repetir a punição a cada porta é ruído). ⚠️ **O texto da mão aparece em
   QUALQUER fase** — só o **botão** é apagado por fase.
 
-⚠️ **`derrota` narra *"X foi evacuado."* em TODA derrota, e a palavra ganhou significado específico
-em 2026-08-09.** Perder para o Ogro produz **duas linhas quase idênticas** (`derrota` + `evacuou`);
-perder para os outros quatro produz *"foi evacuado"* **sem evacuação nenhuma**. **Não é bug — é
-texto**, está em `docs/divida-tecnica.md`, e **todo item de gate ocular sobre evacuação tem que
-avisar disso**, senão reprova contra código correto.
+✅ **CORRIGIDO em 2026-08-09** (Minor da leva de correção da fatia `Bad Stuff e evacuação`):
+`derrota` narrava *"X foi evacuado."* em TODA derrota, e a palavra tinha ganhado significado
+específico no mesmo dia (só o Ogro evacua). Perder para o Ogro produzia **duas linhas quase
+idênticas** (`derrota` + `evacuou`); perder para os outros quatro produzia *"foi evacuado"* **sem
+evacuação nenhuma**. Trocado por *"X perdeu o combate."* (saída (a) de `docs/divida-tecnica.md`) —
+*"evacuado"* fica reservado ao evento `evacuou`. **Qualquer item de gate ocular escrito ANTES desta
+data e citando essa frase está desatualizado.**
 
 ## 🔴 Armadilhas medidas neste pacote
 

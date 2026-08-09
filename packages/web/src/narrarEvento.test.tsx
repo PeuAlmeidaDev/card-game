@@ -36,8 +36,11 @@ describe('narrarEvento — linhas de texto puro', () => {
   it('patente e derrota', () => {
     expect(narrarEvento({ tipo: 'patente', jogadorId: 'p2', patente: 3 }, ctx))
       .toBe('Bot 1 subiu para a patente 3.');
+    // NEUTRO de propósito: "evacuado" é palavra reservada da mecânica do Ogro
+    // (evento `evacuou`) desde a fatia `Bad Stuff e evacuação` — narrar toda
+    // derrota como evacuação mentiria nas outras 4/5 (ver `divida-tecnica.md`).
     expect(narrarEvento({ tipo: 'derrota', jogadorId: 'p2', derrotas: 1 }, ctx))
-      .toBe('Bot 1 foi evacuado.');
+      .toBe('Bot 1 perdeu o combate.');
   });
 
   it('fim é global — não nomeia ninguém', () => {
@@ -224,6 +227,18 @@ describe('narrarEvento — linhas de texto puro', () => {
     // perdidas, nunca QUAIS. Não há como testar "não lista as cartas" por
     // conteúdo (o evento não carrega as cartas da mão), mas a contagem exata
     // aparece e nenhum nome de carta de Porta aparece aqui.
+  });
+
+  it('evacuou concorda no SINGULAR quando `daMao` é exatamente 1', () => {
+    // Minor da leva de correção (2026-08-09): só `daMao: 3` e `daMao: 0`
+    // apareciam nos testes deste arquivo — o ramo `daMao === 1 ? 'carta' :
+    // 'cartas'` nunca era exercitado.
+    const linha = narrarEvento(
+      { tipo: 'evacuou', jogadorId: 'p2', doCorpo: [], daMochila: [], daMao: 1 },
+      ctx,
+    );
+    expect(linha).toContain('1 carta da mão');
+    expect(linha).not.toContain('1 cartas');
   });
 
   it('evacuou SEU (primeira pessoa) e com as TRÊS listas vazias', () => {

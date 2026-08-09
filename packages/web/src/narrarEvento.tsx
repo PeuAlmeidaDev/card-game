@@ -59,8 +59,13 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
       return `${evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId)} vasculha o local e guarda o que encontrou.`;
     case 'patente':
       return `${ctx.nomeDe(evento.jogadorId)} subiu para a patente ${String(evento.patente)}.`;
+    // NEUTRO de propósito (Minor da leva de correção, 2026-08-09): a palavra
+    // "evacuado" passou a nomear uma mecânica ESPECÍFICA que só o Ogro dispara
+    // (`evacuou`) — dizê-la em TODA derrota mentiria em 4 das 5 derrotas do
+    // catálogo e duplicaria a linha na 5ª (`derrota` + `evacuou` quase
+    // idênticas). Ver `docs/divida-tecnica.md`, saída (a).
     case 'derrota':
-      return `${ctx.nomeDe(evento.jogadorId)} foi evacuado.`;
+      return `${ctx.nomeDe(evento.jogadorId)} perdeu o combate.`;
     case 'vez':
       return <small>Vez de {ctx.nomeDe(evento.jogadorId)}.</small>;
     case 'fim':
