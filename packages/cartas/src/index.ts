@@ -5,6 +5,8 @@ export type { MonstroCarta, BadStuff } from './monstros';
 export { MONSTROS, MONSTROS_SACAVEIS, obterMonstro } from './monstros';
 export type { ItemCarta, ModificadoresDeItem, Slot, SlotDeItem, Afinidade, EixoDeAfinidade } from './itens';
 export { ITENS, ITENS_SACAVEIS, obterItem } from './itens';
+export type { EfeitoInstantaneo, InstantaneoCarta } from './instantaneos';
+export { INSTANTANEOS, INSTANTANEOS_SACAVEIS, obterInstantaneo } from './instantaneos';
 export type { ModificadoresDeStat } from './stats';
 export type { ClasseCarta, ClasseResumo } from './classes';
 export { CLASSES, CLASSES_PUBLICAS, CLASSES_SACAVEIS, obterClasse } from './classes';
