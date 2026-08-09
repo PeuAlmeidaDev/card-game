@@ -294,7 +294,7 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
           {/* #119: o painel fica à vista a luta INTEIRA — é aqui, não só na
               carta que abriu o combate, que o preço de perder precisa estar. */}
           {badStuffDoMonstro(vista.combate.monstroId) !== '' && (
-            <> · Se ele vencer: {badStuffDoMonstro(vista.combate.monstroId)}.</>
+            <> · se ele vencer: {badStuffDoMonstro(vista.combate.monstroId)}.</>
           )}
         </p>
       )}
