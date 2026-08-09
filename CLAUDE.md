@@ -114,8 +114,18 @@ catalogar a ocorrência anterior dele** — e o mecanismo é idêntico ao que aq
 a sessão de 2026-08-08 no fim deste arquivo foi escrita com o merge e o gate corretos, e **ninguém
 releu o cabeçalho**. ➡️ **Atualizar o corpo do documento não é conferir o resumo dele.**
 
-**Próxima fatia: `Maldições / Bad Stuff`** (bloco 2 do §3.1 — a que encara a economia, pergunta 11,
-com os consumíveis da #40). ✅ **E ela vai SOZINHA (decisão #109, 2026-08-08):** as #105/#106/#107
+**Próxima fatia: `Maldições / Bad Stuff` — 🧩 DECOMPOSTA EM QUATRO (decisão #110, 2026-08-08):**
+**2a** Bad Stuff + evacuação → **2b** consumíveis (`instantâneo`) → **2c** maldição no `vasculhar` →
+**2d** maldição na mão (mira + concorrência). 🔴 **Como o §3.1 escrevia, o bloco eram SEIS eixos**, e
+os **dois caminhos de volta de carta** (evacuação e consumíveis) entrariam juntos — nenhum número
+diria qual consertou a economia (a #51 com seis variáveis). ⚠️ **O 2d está BLOQUEADO pela pergunta 16
+do §18.** 💡 **E o `instantâneo` é construível AGORA** — a #44 declara custo de ritmo zero e o código
+confirma (`proximoPasso` já para duas vezes por round esperando o lutador); só a `carta de combate`
+depende do bloco 5. ⬜ **A `2a` está com o desenho começado e NÃO fechado** — decisões **#111**
+(morte reseta a patente, 🔴 **com a objeção do §10 anexada e NÃO respondida**) e **#112** (Bad Stuff
+por monstro). **Nenhum spec foi escrito; nenhuma linha de código foi tocada.**
+
+✅ **E a fatia vai SOZINHA quanto à esquiva (decisão #109, 2026-08-08):** as #105/#106/#107
 (esquiva pela agilidade + teto por raça/classe) eram para pegar **carona** aqui quando ainda eram uma
 linha de código, e **ficam na gaveta** — decididas, **não** construídas, e **desacopladas** desta
 fatia. Duas razões: as Maldições são a fatia da **economia**, e cinco variáveis novas na mesma
