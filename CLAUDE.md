@@ -121,9 +121,15 @@ os **dois caminhos de volta de carta** (evacuação e consumíveis) entrariam ju
 diria qual consertou a economia (a #51 com seis variáveis). ⚠️ **O 2d está BLOQUEADO pela pergunta 16
 do §18.** 💡 **E o `instantâneo` é construível AGORA** — a #44 declara custo de ritmo zero e o código
 confirma (`proximoPasso` já para duas vezes por round esperando o lutador); só a `carta de combate`
-depende do bloco 5. ⬜ **A `2a` está com o desenho começado e NÃO fechado** — decisões **#111**
-(morte reseta a patente, 🔴 **com a objeção do §10 anexada e NÃO respondida**) e **#112** (Bad Stuff
-por monstro). **Nenhum spec foi escrito; nenhuma linha de código foi tocada.**
+depende do bloco 5. ⬜ **A `2a` está com o desenho começado e NÃO fechado** — decisões **#113**
+(morte = evacuação total **mantendo a patente**, recomeço no turno seguinte com **4+4**) e **#112**
+(Bad Stuff **por monstro**, contra a minha recomendação: puxa a máquina de efeito para a 2a e suja a
+medição). 🔑 **A #113 emendou a #111 no mesmo dia:** ele decidiu resetar a patente, leu a objeção
+escrita no §10 — *"voltar à patente 1 no minuto 30 é estar matematicamente eliminado… ele abandona,
+e a mesa de 4 vira 3"* — e reverteu sozinho, sem insistência. **É a justificativa escrita no bible
+fazendo o trabalho para o qual ela existe.** ⬜ **Segue aberto: a evacuação leva `emJogo.raca` e
+`emJogo.classe`?** O §10 lista três zonas e a especialização **não está nelas**.
+**Nenhum spec foi escrito; nenhuma linha de código foi tocada.**
 
 ✅ **E a fatia vai SOZINHA quanto à esquiva (decisão #109, 2026-08-08):** as #105/#106/#107
 (esquiva pela agilidade + teto por raça/classe) eram para pegar **carona** aqui quando ainda eram uma
