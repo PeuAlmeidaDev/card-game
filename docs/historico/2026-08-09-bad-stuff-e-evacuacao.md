@@ -1,9 +1,13 @@
 # 2026-08-09 — `Bad Stuff e evacuação` (fatia **2a**): perder um combate passa a custar
 
-**Branch:** `feat/bad-stuff-e-evacuacao` · **MERGE_BASE:** `63b955f` · **HEAD:** `ba19f24`
-**10 tasks** — 8 de código, uma de soak (rodada **duas** vezes) e esta de documentação.
-**732 testes verdes** (motor 56 · cartas 55 · personagem 11 · partida 377 · shared 23 · server 29 ·
-web 181), **typecheck 7/7**, lint limpo — rodados nesta sessão.
+**Branch:** `feat/bad-stuff-e-evacuacao` · **MERGE_BASE:** `63b955f`
+**10 tasks** — 8 de código, uma de soak (rodada **duas** vezes) e esta de documentação —
+**mais a revisão ampla do branch e a leva de correção final** (seção própria, no fim).
+**737 testes verdes** (motor 56 · cartas 55 · personagem 11 · partida **381** · shared 23 ·
+server 29 · web **182**), **typecheck 7/7**, lint limpo.
+✏️ *Este cabeçalho dizia `HEAD: ba19f24` e **732 testes** quando a Task 10 o escreveu; a revisão do
+branch e a leva final vieram depois e acrescentaram 5 testes. Corrigido **marcado**, porque a fatia
+inteira é sobre texto que envelhece sem ninguém notar.*
 Decisões **#121–#126** do bible; as **#112–#120**, desenhadas em 2026-08-08/09, saem de
 `⬜ NÃO CONSTRUÍDA` para **✅ CONSTRUÍDA**.
 
@@ -361,23 +365,26 @@ PIOR que item ausente:** ele *acusa* um defeito que não existe.
 🔴 **Cada item abaixo foi conferido CONTRA O CÓDIGO DA TELA antes de ser escrito** — uma fatia
 embarcou um item mandando conferir o contador do cemitério, que a tela **nunca renderiza**.
 
-### ⚠️ LEIA ANTES DE RODAR: o log diz *"foi evacuado"* em TODA derrota, e isso é PRÉ-EXISTENTE
+### ✏️ CORREÇÃO MARCADA — este bloco de aviso foi CONSERTADO na leva final, e o aviso caducou
 
-O evento **`derrota`** — emitido em **toda** derrota, desde muito antes desta fatia — é narrado como
-**`"<nome> foi evacuado."`** (`narrarEvento.tsx`). A palavra *"evacuado"* era **sabor**; a partir
-desta fatia ela nomeia **uma mecânica específica que só o Ogro dispara**.
+🔴 **Este parágrafo dizia, quando a Task 10 o escreveu:** *"⚠️ LEIA ANTES DE RODAR: o log diz **'foi
+evacuado'** em TODA derrota… o sinal confiável é a frase LONGA… **não foi consertado** — seria
+código, e esta é a task de documentação."*
 
-➡️ **Duas consequências para quem roda o gate, e as duas fariam um item reprovar código correto:**
+**Deixou de ser verdade horas depois.** A revisão ampla do branch triou esse item como *"conserta
+antes do merge"*, com o argumento decisivo de que **o gate ocular do Pedro está pendente e ele vai
+ler esse log**. A leva final trocou a narração do evento `derrota` de *"X foi evacuado."* para
+**`"<nome> perdeu o combate."`**, com o teste acompanhando.
 
-1. Perder para o **Rato Gigante** produz *"Bot 1 foi evacuado."* no log **e o Bot 1 NÃO foi
-   evacuado** — ele só perdeu as botas. **Não conclua nada dessa linha.**
-2. Perder para o **Ogro** produz **DUAS linhas quase idênticas em sequência** — *"Bot 1 foi
-   evacuado."* (do `derrota`) e *"Bot 1 é evacuado e perde tudo: …"* (do `evacuou`). **É esperado,
-   não é bug.**
+➡️ **Hoje o log é honesto:** perder para o Rato Gigante diz *"perdeu o combate"* e nada mais; só a
+derrota para o **Ogro** produz a linha do `evacuou` (*"é evacuado e perde tudo: …"*). **Não há mais
+frase curta enganosa nem par de linhas quase idênticas.**
 
-🔑 **O sinal confiável é a frase LONGA** (*"é evacuado e perde tudo: …"*), nunca a curta. O achado
-está registrado em [`divida-tecnica.md`](../divida-tecnica.md) e **não foi consertado** — seria
-código, e esta é a task de documentação.
+🔑 **Por que a correção fica MARCADA e o texto antigo não é apagado:** a palavra *"evacuado"* era
+**sabor** e virou **mecânica** nesta fatia — nenhuma linha de código mudou, e mesmo assim um texto
+pré-existente passou a mentir em 4 de cada 5 derrotas. **É a variante do vício nº 1 que não tem diff
+nenhum**, catalogada em [`licoes-aprendidas.md §1`](../licoes-aprendidas.md), e o registro de que ela
+foi vista **e** consertada vale mais que um parágrafo limpo.
 
 ### Os itens
 
@@ -429,6 +436,90 @@ código, e esta é a task de documentação.
    o caminho está preso por teste unitário com dublê de duas mãos.)*
 
 ---
+
+## 🔬 A revisão ampla do BRANCH e a leva de correção final — 2 Important, 9 Minor
+
+**Aconteceu, e é a TERCEIRA fatia seguida em que a revisão do branch acha o que as revisões por
+task não podiam achar.** As dez tasks foram revisadas contra o próprio diff e passaram limpas; a do
+branch (`63b955f..HEAD`, 16 commits, modelo mais capaz) devolveu **"pronto com ressalvas"**, **zero
+bug vivo**. Sete commits de correção, **737 testes verdes**, typecheck 7/7, lint limpo.
+
+### 🔑 Important 1 — os dois eventos do Bad Stuff não tinham UM teste prendendo-os ao reducer
+
+**Medido pelo revisor:** apagar `eventos.push(...efeito.eventos)` do ramo da derrota de
+`fecharCombate` deixava **732/732 VERDES**.
+
+**O cenário que isso deixava passar:** o jogador perde para o Ogro. Perde a mão, a mochila e os cinco
+encaixes. O estado muda **certo**, o censo de conservação fica **verde** — e **o log não diz uma
+palavra**. A punição mais dura do jogo acontecendo em silêncio absoluto.
+
+🔴 **Por que ninguém pegou, e é ESTRUTURAL, não desatenção:** `badStuff.test.ts` provava que a função
+**devolve** os eventos; `narrarEvento.test.tsx` provava que a tela **sabe narrá-los**, com eventos
+construídos à mão. **O meio — o `fecharCombate` repassando — não tinha visitante.** É exatamente o
+`deslocados.slice(0, 1)` da `empunhadura dupla` e os dois ramos da rede de equivalência do Plano A:
+**as duas pontas provadas, o fio não.**
+
+➡️ **A regra que sai daqui, e ela é a mais reutilizável desta fatia:** quando uma função pura devolve
+algo que outra função repassa, **provar as duas pontas não prova o meio**. O teste do meio custa duas
+asserções e é o único que pega a linha deletada. ⚠️ E o helper `perder()` do describe **já devolvia
+`eventos`** — nenhum teste os usava.
+
+### 🔑 Important 2 — a evacuação criou três estados que o predicado de invariante chamaria de violação, e ele nunca podia disparar
+
+O predicado de `fase.test.ts` (*"a fase nunca mente sobre o estado"*) declara violação em três
+estados que o retorno da evacuação **produz de propósito**: `recompor` com mão 8 e teto 7; o mesmo em
+`vasculhar` depois de `passar`; e o auto-pulo dispensado com o baralho de Tesouros seco.
+
+🔴 **O predicado NUNCA dispara** porque o jogo que ele percorre usa `catalogoDeTeste()`, e o
+`MONSTRO_DE_TESTE.badStuff` é **`[]`** — de propósito, e com bom comentário. **A causa raiz de
+sempre: o fixture não produz o cenário.**
+
+⚠️ **O comportamento está CERTO** (decisão #116) e **não foi mudado**. O que estava errado é a fatia
+ter criado o estado **sem atualizar o alarme nem declarar a exceção** — o predicado ficou **mais
+estreito do que se anuncia, em silêncio**, e a próxima fatia que pusesse evacuação no jogo da
+invariante levaria red em código correto.
+
+🔑 **A sonda C merece destaque porque ninguém a tinha declarado:** o `'recompor'` cravado passa por
+`registrar` e **não** por `entrarOuPular`, então **dispensa o auto-pulo incondicionalmente**. Com o
+baralho de Tesouros seco (**91,7%–97,9% das partidas**, medido no próprio soak desta fatia) e 4
+Portas de monstro, quem volta vê uma fase cuja única ação é *"Passar"*. **Declarado, não consertado**
+— é decisão do dono.
+
+### Os nove Minors, e o que eles ensinam
+
+Consertados todos. Três eram **ocorrências do vício nº 1** (o docstring de `fecharCombate` silenciando
+sobre metade nova; o *"LOGO ABAIXO"* apontando para 1.270 linhas adiante; o `packages/cartas/CLAUDE.md`
+dizendo *"TERCEIRA união gêmea"* onde o spec e as lições dizem **QUARTA**). Um era **latente e caro**:
+o cast de `arrancar` dependia, **sem dizer**, de `itensEquipados` iterar por `Object.values` — trocar
+essa implementação faria `carta.id` virar `TypeError` = **500**; o conserto foi `{ ...SLOTS_VAZIOS,
+...alvo }`, e o cast morreu.
+
+### 🔴 E a leva que consertou três ocorrências do vício nº 1 produziu a quarta
+
+Um comentário **escrito nessa mesma leva** afirmava que a mutação equivalente deixa **"377/377
+verdes"**. O número real é **381/381** — 377 era a contagem **de antes** de os dois testes dos
+Important entrarem, **na mesma leva**. O relatório da leva trazia o número certo; **ele não foi
+copiado para o código**.
+
+🔑 **Achado pelo re-revisor, que mediu por conta própria.** Corrigido no commit `9fb6af3`, declarado
+como **conserto do controlador fora do loop de revisão** (um dígito, com o valor medido de forma
+independente por duas pessoas). ➡️ **Registrado assim de propósito: o vício não poupa nem o texto
+escrito para corrigi-lo** — é a terceira vez nesta base que ele aparece dentro do material que existe
+para catalogá-lo.
+
+### O que a revisão atacou e deu LIMPO, com evidência
+
+| Mutação rodada pelo revisor | Resultado |
+|---|---|
+| `efeito.perdidas.slice(0, 1)` no roteamento aos cemitérios | **2 reprovam** — o fio roteador **tem** visitante |
+| `perdidas.push(...doCorpo, ...daMochila)` — a mão fora do roteamento | **3 reprovam** |
+| Verbo novo só em `cartas` | `_CoberturaBadStuff` acusa (`TS2322`) — tupla e mutualidade conferidas |
+
+✅ **Evacuação × pendência de queima: NÃO interage, e é estrutural.** Com a queima aberta,
+`acaoEhLegal` recusa **tudo** menos `queimarCarta` em qualquer fase — então `atacar`/`esquivar` são
+impossíveis e **nenhum combate fecha com queima aberta**. No sentido oposto, o Bad Stuff manda o item
+**direto ao cemitério**, então não abre pendência. ⚠️ O spec só prometia isso para `perdeSlot`; **vale
+também para a evacuação**, que só esvazia.
 
 ## O que fica ABERTO ao sair desta fatia
 
