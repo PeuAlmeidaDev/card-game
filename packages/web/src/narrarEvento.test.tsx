@@ -180,6 +180,54 @@ describe('narrarEvento — linhas de texto puro', () => {
     expect(narrarEvento({ tipo: 'saqueou', jogadorId: 'p2' }, ctx))
       .toBe('Bot 1 saqueia a porta fechada e leva uma carta.');
   });
+
+  it('perdeuEquipamento NOMEIA o encaixe e a carta arrancada — o corpo é zona aberta', () => {
+    expect(narrarEvento(
+      { tipo: 'perdeuEquipamento', jogadorId: 'p2', slot: 'mao',
+        cartas: [{ id: 't-1', tipo: 'equipamento', itemId: 'espada-curta' }] },
+      ctx,
+    )).toBe('O Bad Stuff arranca Espada Curta da mão de Bot 1.');
+  });
+
+  it('perdeuEquipamento VAZIO ainda nomeia o encaixe — senão o jogador nunca aprende o alvo do monstro', () => {
+    // Sem esta linha, "o monstro tentou arrancar o capacete e você não usa
+    // capacete" fica indistinguível de nada ter acontecido — o evento é
+    // emitido MESMO com `cartas: []`, e a narração precisa dizer que o Bad
+    // Stuff mirou aquele encaixe, não só ficar calada.
+    expect(narrarEvento(
+      { tipo: 'perdeuEquipamento', jogadorId: 'p1', slot: 'capacete', cartas: [] },
+      ctx,
+    )).toBe('O Bad Stuff mira o capacete de você, mas não havia nada equipado ali.');
+  });
+
+  it('evacuou NOMEIA o corpo e a mochila (zonas abertas) e SÓ CONTA a mão (zona oculta)', () => {
+    const linha = narrarEvento(
+      {
+        tipo: 'evacuou',
+        jogadorId: 'p2',
+        doCorpo: [{ id: 't-1', tipo: 'equipamento', itemId: 'espada-curta' }],
+        daMochila: [{ id: 't-2', tipo: 'equipamento', itemId: 'espada-curta' }],
+        daMao: 3,
+      },
+      ctx,
+    );
+    expect(linha).toContain('Bot 1');
+    expect(linha).toContain('Espada Curta');
+    expect(linha).toContain('3 cartas da mão');
+    // A regra de sigilo: a frase pode dizer QUANTAS cartas da mão foram
+    // perdidas, nunca QUAIS. Não há como testar "não lista as cartas" por
+    // conteúdo (o evento não carrega as cartas da mão), mas a contagem exata
+    // aparece e nenhum nome de carta de Porta aparece aqui.
+  });
+
+  it('evacuou SEU (primeira pessoa) e com as TRÊS listas vazias', () => {
+    // Evacuar já sem nada é um caso real (spec §5.2): o jogador ainda foi
+    // evacuado, mesmo não perdendo carta nenhuma.
+    expect(narrarEvento(
+      { tipo: 'evacuou', jogadorId: 'p1', doCorpo: [], daMochila: [], daMao: 0 },
+      ctx,
+    )).toBe('Você é evacuado — mas não tinha mais nada a perder.');
+  });
 });
 
 describe('narrarEvento — linhas com marcação', () => {

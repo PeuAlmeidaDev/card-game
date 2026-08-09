@@ -322,6 +322,12 @@ export type {
   // então o que não passar por aqui simplesmente não existe para o cliente.
   Slot,
   ItemCarta,
+  // O que o ITEM declara (`SlotDeItem`), gêmeo de `Slot` (o que o CORPO tem) e
+  // travado pelo mesmo `_CoberturaSlotDeItem`. Faltava aqui — importado só
+  // para o guard desde a `empunhadura dupla`, nunca reexportado — porque
+  // nenhum consumidor de `web` tinha precisado dele até a Task 7 desta fatia
+  // nomear o encaixe que o Bad Stuff mira.
+  SlotDeItem,
   // Mesma jogada, para o eixo de especialização.
   Afinidade,
   EixoDeAfinidade,

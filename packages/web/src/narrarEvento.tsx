@@ -2,7 +2,21 @@ import type { ReactNode } from 'react';
 import { narrarCombate } from './narrarCombate';
 import { narrarPorta } from './narrarPorta';
 import { descreverCarta } from './descreverCarta';
-import type { EventoDaMesa } from '@card-dungeon/shared';
+import type { EventoDaMesa, SlotDeItem } from '@card-dungeon/shared';
+
+/**
+ * O rótulo do encaixe em duas formas — nomeado (`"o capacete"`) e com a
+ * preposição já contraída (`"do capacete"`) — porque as duas frases do Bad
+ * Stuff (mira/arranca) precisam de gramática diferente e `SlotDeItem` é união
+ * FECHADA, não dado de catálogo: a tabela é local, não injetada, ao contrário
+ * de `nomeDaRaca`/`nomeDoItem`.
+ */
+const ENCAIXE: Record<SlotDeItem, { readonly nomeado: string; readonly comDe: string }> = {
+  capacete: { nomeado: 'o capacete', comDe: 'do capacete' },
+  armadura: { nomeado: 'a armadura', comDe: 'da armadura' },
+  mao: { nomeado: 'a mão', comDe: 'da mão' },
+  pes: { nomeado: 'os pés', comDe: 'dos pés' },
+};
 
 /** O que o narrador precisa saber além do evento: quem é você e como nomear as coisas. */
 export interface ContextoDeNarracao {
@@ -161,6 +175,49 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
     // dizer o quê foi comprado. Mesma regra do `achado` e do `loot`.
     case 'saqueou':
       return `${evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId)} saqueia a porta fechada e leva uma carta.`;
+    // O encaixe é ZONA ABERTA (o corpo equipado viaja inteiro na projeção), e o
+    // evento é emitido MESMO quando o Bad Stuff não tira nada (`cartas: []`,
+    // encaixe já livre). Sem a frase do caso vazio, "o monstro mirou o
+    // capacete e você não usa capacete" fica indistinguível de silêncio — e o
+    // jogador nunca aprende qual encaixe aquele monstro persegue.
+    case 'perdeuEquipamento': {
+      const quem = evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId);
+      const quemMinusculo = quem === 'Você' ? 'você' : quem;
+      const encaixe = ENCAIXE[evento.slot];
+      if (evento.cartas.length === 0) {
+        return `O Bad Stuff mira ${encaixe.nomeado} de ${quemMinusculo}, mas não havia nada equipado ali.`;
+      }
+      const itens = evento.cartas
+        .map((carta) => descreverCarta(carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem, ctx.nomeDaClasse))
+        .join(' e ');
+      return `O Bad Stuff arranca ${itens} ${encaixe.comDe} de ${quemMinusculo}.`;
+    }
+    // A evacuação total: corpo e mochila são zonas ABERTAS e a narração pode
+    // nomear as cartas; a mão é OCULTA (mesma regra do `achado`/`loot`/
+    // `saqueou`) e o evento nem carrega as cartas dela — só `daMao: number`,
+    // que a frase pode contar, nunca listar. Emitida também com as três
+    // listas vazias (evacuar já sem nada), então o caso vazio precisa de
+    // frase própria — senão a evacuação em si passa em silêncio.
+    case 'evacuou': {
+      const quem = evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId);
+      const partes: string[] = [];
+      if (evento.doCorpo.length > 0) {
+        partes.push(`do corpo: ${evento.doCorpo
+          .map((carta) => descreverCarta(carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem, ctx.nomeDaClasse))
+          .join(', ')}`);
+      }
+      if (evento.daMochila.length > 0) {
+        partes.push(`da mochila: ${evento.daMochila
+          .map((carta) => descreverCarta(carta, ctx.nomeDaRaca, ctx.nomeDoMonstro, ctx.nomeDoItem, ctx.nomeDaClasse))
+          .join(', ')}`);
+      }
+      if (evento.daMao > 0) {
+        partes.push(`${String(evento.daMao)} ${evento.daMao === 1 ? 'carta' : 'cartas'} da mão`);
+      }
+      return partes.length > 0
+        ? `${quem} é evacuado e perde tudo: ${partes.join('; ')}.`
+        : `${quem} é evacuado — mas não tinha mais nada a perder.`;
+    }
     default: {
       const naoTratado: never = evento;
       void naoTratado;
