@@ -38,9 +38,9 @@ função / de teste sempre que possível.
 - **`partida`** · `bot.ts`, o reset `melhorMao = ocupante === null ? undefined : mao` — o ramo
   estreito (um candidato **de mão** vence primeiro e um de **slot fixo** ultrapassa depois) precisa
   de fixture própria. Inofensivo hoje: o campo é ignorado para slot não-mão.
-- **`[2a]`** · **`web`** · `narrarEvento.tsx` — o ramo **singular** de `evacuou`
-  (`daMao === 1 ? 'carta' : 'cartas'`) **não é exercitado por teste**: só `daMao: 3` e `daMao: 0`
-  aparecem. Só concordância.
+- **`[2a]`** · ✅ **CORRIGIDO em 2026-08-09** (leva de correção). **`web`** · `narrarEvento.tsx` — o
+  ramo **singular** de `evacuou` (`daMao === 1 ? 'carta' : 'cartas'`) não era exercitado por teste: só
+  `daMao: 3` e `daMao: 0` apareciam. `narrarEvento.test.tsx` ganhou o caso `daMao: 1`.
 - **`[2a]`** · 🔴 **Nenhum monstro de PRODUÇÃO percorre o laço de `aplicarBadStuff`** — todas as
   listas de `badStuff` têm tamanho **1** (#120). A mutação `efeitos.slice(0, 1)` só reprova por causa
   do **dublê de dois efeitos**, que existe e morde. ⚠️ **Não é dívida a pagar; é um ramo cujo único
@@ -92,16 +92,19 @@ função / de teste sempre que possível.
   da fatia 2"* — o comentário diz *"os outros 6 stats"* e a contagem **não bate em leitura nenhuma**
   (são 7 campos, ou 5 se só os numéricos). 🔑 **PRÉ-EXISTENTE** (já dizia 6 quando só `tesouros` era
   novo); a fatia **tocou a linha sem corrigir**.
-- **`[2a]`** · **`partida`** · `mesa.ts`, docstring de `fecharCombate` — descreve a função **só em
-  termos do vencedor** (*"larga o loot na mão do vencedor… decide o fim"*), sem mencionar que ela
-  agora **também aplica o Bad Stuff ao perdedor**. **Não é falso — é SILÊNCIO sobre metade nova.**
-- **`[2a]`** · **`partida`** · `mesa.ts`, o docstring novo do guard de esgotamento — diz que espelha
-  `sacarTesouros` **"LOGO ABAIXO"**, e `sacarTesouros` está **~1.264 linhas depois**. Conteúdo certo,
-  **promessa de posição enganosa**. Trocar por *"mais adiante neste arquivo"*. 🔑 É o vício nº 1 em
-  miniatura **dentro do comentário que explica o fix de um bug achado por soak**.
-- **`[2a]`** · **`web`** · `TelaMesa.tsx`, painel de combate — *"· Se ele vencer:"* **capitaliza**
-  depois do separador `·`, e **todas** as ocorrências pré-existentes de `{' · '}` no arquivo estão em
-  minúscula (*"força…"*, *"sua vez de atacar"*). `Se` → `se`. Só leitura visual.
+- **`[2a]`** · ✅ **CORRIGIDO em 2026-08-09** (leva de correção). **`partida`** · `mesa.ts`, docstring
+  de `fecharCombate` — descrevia a função **só em termos do vencedor** (*"larga o loot na mão do
+  vencedor… decide o fim"*), sem mencionar que ela também aplica o Bad Stuff ao perdedor. **Não era
+  falso — era SILÊNCIO sobre metade nova.** Docstring reescrito nomeando os dois ramos.
+- **`[2a]`** · ✅ **CORRIGIDO em 2026-08-09** (leva de correção). **`partida`** · `mesa.ts`, o
+  docstring do guard de esgotamento dizia que espelha `sacarTesouros` **"LOGO ABAIXO"**, e
+  `sacarTesouros` está ~1.264 linhas depois. Conteúdo certo, promessa de posição enganosa — trocado
+  por *"mais adiante neste arquivo"*. 🔑 Era o vício nº 1 em miniatura **dentro do comentário que
+  explica o fix de um bug achado por soak**.
+- **`[2a]`** · ✅ **CORRIGIDO em 2026-08-09** (leva de correção). **`web`** · `TelaMesa.tsx`, painel de
+  combate — *"· Se ele vencer:"* capitalizava depois do separador `·`, e todas as ocorrências
+  pré-existentes de `{' · '}` no arquivo estão em minúscula (*"força…"*, *"sua vez de atacar"*).
+  `Se` → `se`.
 - **`[2a]`** · **`web`** · `rotuloDeBadStuff.ts` — a frase de **dois efeitos** repete o verbo
   (*"arranca seu capacete e arranca suas botas"*). Funciona, e o peso da `evacuacao` está certo, mas
   soa mecânico. ⚠️ **A string exata foi cravada pelo TESTE DO BRIEF** — é escolha do controlador, não
@@ -158,7 +161,8 @@ função / de teste sempre que possível.
   a decisão **#27** fechou para o item deslocado. Saídas candidatas: **(a)** renderizar o contador do
   cemitério (barato, paga duas ocorrências de uma vez) · **(b)** um evento `saiuDeJogo` com a carta ·
   **(c)** aceitar. **A leitura é do Pedro.**
-- **`[2a]`** · 🔴 **O log diz *"foi evacuado"* em TODA derrota, e agora isso engana.** O evento
+- **`[2a]`** · ✅ **CORRIGIDO em 2026-08-09** (leva de correção da própria fatia, saída (a) abaixo).
+  🔴 **O log dizia *"foi evacuado"* em TODA derrota, e isso enganava.** O evento
   `derrota` — emitido em **toda** derrota, desde muito antes desta fatia — é narrado como
   `"<nome> foi evacuado."` (`narrarEvento.tsx`). A palavra era **sabor**; a fatia 2a fez de
   *"evacuação"* uma **mecânica específica que só o Ogro dispara**.
