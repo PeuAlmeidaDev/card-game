@@ -175,7 +175,7 @@ describe('mesa', () => {
       // carta de raça — `vasculhar` não chamava `rolar` e o teste não provava
       // nada. Precisa ser monstro no monte para o combate acionar o dado.
       embaralhar: monstroNoMonte,
-      monstros: [{ id: 'goblin', nome: 'Goblin', forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1, tesouros: 1 }],
+      monstros: [{ id: 'goblin', nome: 'Goblin', forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1, tesouros: 1, badStuff: [] }],
     });
     const naFase2 = await passar(app, await criar(app));
 
@@ -501,7 +501,7 @@ describe('mesa', () => {
     // (base 10 + guerreiro +5 = 15 - 3 = 12). A classe virou carta do baralho e
     // ninguém a jogou aqui, então ele é APRENDIZ — a linha BASE crua, vida 10, que
     // cai para 7. O Anão não entra nesta conta: ele dá passiva, não stat.
-    const monstros = [{ id: 'goblin', nome: 'Goblin', forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1, tesouros: 1 }];
+    const monstros = [{ id: 'goblin', nome: 'Goblin', forca: 5, vida: 100, habilidade: 12, agilidade: 12, level: 1, tesouros: 1, badStuff: [] }];
     const app = buildApp({ rolar: filaDeDados([1, 12]), embaralhar: racasNoTopo, monstros });
 
     // A carta é jogada na fase 1 (`recompor`) e a porta abre na fase 2: `passar`
