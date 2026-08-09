@@ -50,6 +50,7 @@ mora na 2c/2d (maldição) e na **2a-bis** (pilhagem do cadáver, decisão **#11
 | **Maldição** (as duas rotas) | 2c e 2d (#110) | Máquina de efeito de carta de Portas, mira, concorrência |
 | **Consumíveis** (`instantâneo`) | 2b (#110) | O **outro** caminho de volta — junto, nenhum número diria qual consertou |
 | **Fugir do combate** | — | O §10 diz *"perder combate → Bad Stuff"*, sem escapatória, e o motor resolve até `vida ≤ 0`. Verbo de fuga é decisão nova |
+| 🆕 **Carta que CANCELA o Bad Stuff** (#118) | fatia futura | Decisão do Pedro em 2026-08-09: *"você sempre toma a badStuff a não ser que ele tenha alguma carta que diga o contrário"*. **Fora do escopo por construção** — nenhuma carta do jogo cancela nada hoje, e o primeiro consumível só nasce na **2b**. ⚠️ Ela é a razão de o variante `{ tipo: 'nenhum' }` estar recusado (§8) |
 | **Bad Stuff além dos dois verbos** | fatia futura | Decidido pelo Pedro: *"vamos pensar em mais bad stuffs depois, no início vamos só com a"* |
 
 ---
@@ -99,6 +100,22 @@ Isso é **informação, não falha** — ela entrega o caminho de volta e **mede
 ⚠️ Os ~15 são **derivados, não medidos** (taxa de derrota de 8,7%–11,5% do soak do 4b, patente-alvo
 10, ~1–2 derrotas por jogador por partida).
 
+🔴 **E a derivação é ENVIESADA PARA BAIXO — a direção precisa viajar com o número** (achado da
+revisão de 2026-08-09). Ela sai de `~1,5 derrotas × 1/5 (a fatia do Ogro no baralho) ≈ 0,3`, o que
+assume **taxa de derrota UNIFORME entre os cinco monstros**. Ela não é: o Ogro é o monstro de **3
+tesouros**, o mais duro da mesa, e a derrota **concentra nele**. Logo `P(Ogro | derrota) > 1/5`,
+provavelmente bem acima.
+
+➡️ **Três consequências, e a segunda enfraquece uma conclusão deste spec:**
+1. as evacuações são **mais** frequentes que ~0,3 por jogador;
+2. os ~15 Tesouros estão **subestimados** ⇒ o *"provavelmente NÃO conserta a economia sozinha"*
+   acima fica **menos firme do que está escrito**;
+3. simetricamente, os `perdeSlot` (~1,2) estão **superestimados**, porque a fatia deles na derrota é
+   menor que 4/5.
+
+⚠️ **Isto não muda o desenho — muda o rótulo.** E é o tipo de correção que a medição faz sozinha:
+a rodada de soak devolve o número real e este parágrafo morre.
+
 ### 3.3 Em `partida` — `packages/partida/src/badStuff.ts`
 
 ```ts
@@ -115,8 +132,36 @@ roteia é o `mesa.ts`, chamando o `descartarNoBaralhoCerto` que já existe e já
 podem ser código dentro de `cartas` porque só tocam o `Combatente`, que é um **valor**. O Bad Stuff
 toca **mão, mochila e slots**, que são zonas de `partida`; e a direção de dependência é
 `cartas ← personagem ← partida`, então uma função dentro de `cartas` **não enxerga** as zonas.
-✅ De quebra, `MonstroCarta` continua **dado puro**, atravessa o JSON do `/catalogo` inteira e
-dispensa projeção `Resumo` (§4).
+✅ `MonstroCarta` continua **dado puro** — nenhuma função dentro dele.
+
+### 3.4 🔴 Como o Bad Stuff atravessa até o reducer — achado da revisão de 2026-08-09
+
+✏️ **CORREÇÃO MARCADA.** Este §3.3 dizia *"✅ De quebra, `MonstroCarta` continua dado puro,
+**atravessa o JSON do `/catalogo` inteira e dispensa projeção `Resumo`**"*. A frase **tranquiliza
+sobre a coisa errada**: a pureza do `MonstroCarta` nunca esteve em risco, e o acoplamento é o outro
+— 🔴 **o `partida` NUNCA vê `MonstroCarta`.**
+
+O que ele tem é `CatalogoDaMesa.monstro(id) → InfoMonstro`, e o `InfoMonstro` de hoje
+(`partida/src/tipos.ts`) é `{ forca, vida, habilidade, agilidade, level, tesouros }`. O docstring do
+`CatalogoDaMesa` diz por escrito: *"O pacote de regras continua cego — ele não sabe quais raças ou
+monstros existem, só sabe perguntar. As cartas do pacote `cartas` satisfazem estes retornos
+**estruturalmente**, e é isso que dispensa qualquer import de `cartas` aqui."*
+
+➡️ **Três consequências, e nenhuma era gratuita:**
+
+1. **`InfoMonstro` ganha `badStuff`.** É a janela por onde o reducer enxerga.
+2. 🔴 **`BadStuff` vira a QUARTA união gêmea do repo** (ao lado de `Slot`, `SlotDeItem` e
+   `EixoDeAfinidade`): declarada em `cartas`, redeclarada em `partida`. **Exige
+   `_CoberturaBadStuff` em `shared`**, tupla e **mútuo**, como os outros três — sem ele, acrescentar
+   um verbo em `cartas` e esquecer o `partida` deixa o `pnpm typecheck` **7/7 limpo**, que é
+   literalmente a dívida viva do `ModificadoresDeStat` sendo criada de novo.
+3. **O caminho da DERROTA passa a consultar o catálogo, e hoje não consulta.**
+   `deps.catalogo.monstro(monstroId)` só é chamado **dentro do `if (venceu)`**. O ramo novo repete a
+   mesma cadeia: id desconhecido é invariante NOSSA ⇒ `Error` cru ⇒ 500, nunca `AcaoInvalida`.
+
+✅ **A parede fica de pé, e foi decisão consciente** (Pedro, 2026-08-09): manter o `partida` cego
+para `cartas`, com o guard pagando a duplicação. A alternativa — o `partida` importar de `cartas` —
+seria a primeira quebra dessa cegueira no repo e deixaria o docstring do `CatalogoDaMesa` mentindo.
 
 **Por que módulo próprio e não dentro do `mesa.ts`:** é a convenção da base — `equipar.ts`
 (`colocarNoSlot`, `destinoDoDesequipado`), `corpo.ts` (`afinidadeCom`), `fase.ts` (`acaoEhLegal`).
@@ -167,16 +212,44 @@ Uma interação a menos com a #59.
 
 ```
 combate → derrota → fecharCombate(venceu: false)
-   ├── derrotas + 1                                  (já existe)
-   ├── lê monstro.badStuff                           (novo)
-   ├── aplicarBadStuff(jogador, efeito)              (novo, puro)
-   ├── roteia as perdidas → descartarNoBaralhoCerto  (já existe)
-   ├── emite o evento                                (novo)
-   └── fase: 'jogar'                                 (já existe)
+   ├── derrotas + 1                                     (já existe)
+   ├── deps.catalogo.monstro(id).badStuff                (novo — o ramo da
+   │     └── undefined ⇒ Error cru ⇒ 500                  derrota não consulta
+   │                                                      o catálogo hoje)
+   ├── aplicarBadStuff(jogador, efeito)                  (novo, puro)
+   ├── roteia as perdidas → descartarNoBaralhoCerto      (já existe)
+   ├── emite o evento                                    (novo)
+   └── 🔴 RE-LÊ o jogador do estado NOVO e passa os DOIS
+         a entrarOuPular(estado, jogador, 'jogar', …)    (⚠️ ver 5.0)
 ```
 
 **Um ponto só**, dentro do fechamento de combate que já existe. **Sem fase nova, sem verbo novo, sem
 pendência nova.** O `motor` **não muda** — o Bad Stuff é da mesa, não do combate.
+
+### 5.0 🔴 A armadilha do Plano 4a está AQUI TAMBÉM — achado da revisão de 2026-08-09
+
+✏️ **CORREÇÃO MARCADA.** O passo final do fluxo estava escrito como *"fase: 'jogar' (já existe)"*, e
+**não é "já existe"**. O `fecharCombate` termina assim:
+
+```ts
+const jogadorAtual = comLoot.jogadores.find((j) => j.id === jogadorId);
+return entrarOuPular(comLoot, jogadorAtual, 'jogar', eventos);
+```
+
+O comentário que já está ali **avisa exatamente disto**: *"Perguntando sobre o `anterior`, o vencedor
+seria pulado por cima do próprio saque."*
+
+🔴 **É o MESMO bug do Plano 4a que o §6.2 deste spec já cita** — e o §6.2 o aplica só ao *recomeço*,
+**perdendo que a armadilha existe na MESMA função, poucas linhas acima, no site da evacuação**. Se o
+Bad Stuff entrar sem trocar as duas coisas:
+
+| O que fica velho | O que acontece |
+|---|---|
+| o **estado** (`comLoot` em vez do pós-Bad Stuff) | 🔴 a evacuação é **descartada inteira** — o jogador perde nada |
+| o **jogador** (`jogadorAtual` lido antes) | `faseSeAutoPula('jogar', …)` responde *"tenho equipamento"* sobre uma mão que **não existe mais** ⇒ o jogador fica **parado em `jogar`** sem nada. Num assento de **bot**, `escolherAcao` tenta equipar carta que sumiu ⇒ `AcaoInvalida` sobe por `avancarBots` (que não tem `try`) ⇒ **400 na jogada do humano** |
+
+➡️ **Vira mutação obrigatória** (§7.3), não comentário. É a terceira vez que esta família aparece
+neste arquivo, e as três vezes com o mesmo desfecho: **o estado novo e a leitura nova andam juntos.**
 
 ### 5.1 O que a evacuação leva, e o que NÃO leva
 
@@ -306,6 +379,9 @@ a **ordem** do recomeço.
 | calcular a fase **antes** de comprar | o teste da ordem do recomeço |
 | `badStuff` opcional em vez de obrigatório | o `pnpm typecheck` |
 | não emitir o evento quando nada saiu | o teste do encaixe vazio |
+| 🔴 `entrarOuPular` recebendo o **estado** de antes do Bad Stuff (§5.0) | o teste da evacuação (o jogador sai com tudo) |
+| 🔴 `entrarOuPular` recebendo o **jogador** de antes do Bad Stuff (§5.0) | um teste novo: quem evacuou **não fica parado** em `jogar` |
+| acrescentar um verbo em `cartas` sem tocar o `partida` (§3.4) | o `pnpm typecheck`, **via `_CoberturaBadStuff`** |
 
 ### 7.4 A tabela de pares finos do `aplicarAcao`
 
@@ -325,8 +401,47 @@ comparar contra soak antigo **não está licenciado** sem controle de instrument
 substituto sobrevive ao exame** (a fatia mexe em derrota, mochila e mão de quem volta, que é a
 jusante de quase tudo).
 
-➡️ **A saída é a que a `afinidade` usou na medida (a): mesmo build, mesma sessão, Bad Stuff
-DESLIGADO × LIGADO.** É a única medida desta fatia que vai valer.
+✏️ **CORREÇÃO MARCADA (2026-08-09).** Esta linha dizia: *"a saída é a que a `afinidade` usou na
+medida (a): mesmo build, mesma sessão, Bad Stuff **DESLIGADO × LIGADO**. É a única medida desta
+fatia que vai valer."*
+
+🔴 **Ela não era construtível.** O §3.1 faz `badStuff` **obrigatório** e a união tem **dois** verbos,
+**os dois com efeito** — **não existe "desligado"**. O controle da `afinidade` funcionava porque
+`montarComposicaoTesouros` já recebia a lista de ids, um parâmetro de produção real; aqui não há
+equivalente. O harness pode injetar roster por `OpcoesApp.monstros`, mas **não havia para o que
+trocar**. ⚠️ **Descobrir isso na execução custaria uma task inteira**, e o §8 declarava esta como a
+única medida que ia valer.
+
+✅ **A DECISÃO DO PEDRO (2026-08-09) fechou isto pelo lado do JOGO, não pelo da medição:**
+*"badStuff é se você morrer, você sempre toma a badStuff **a não ser que ele tenha alguma carta que
+diga o contrário**"* (decisão **#118**). ➡️ A escapatória vem de **CARTA**, nunca de um monstro sem
+punição — então o variante `{ tipo: 'nenhum' }` **está recusado por desenho**, e com ele o ON/OFF
+total.
+
+### 8.1 ✅ O controle que VALE: o Ogro em duas versões
+
+**Mesmo build, mesma sessão, roster injetado por `OpcoesApp.monstros`, UMA variável:**
+
+| Braço | O Ogro faz |
+|---|---|
+| **A** | `perdeSlot('armadura')` — punição leve, como os outros quatro |
+| **B** | `evacuacao` — o que a fatia entrega |
+
+Tudo o mais **idêntico**: mesmos cinco monstros, mesmos stats, mesmos `tesouros`, mesma composição
+de baralho, mesmo bot. **Só o `badStuff` do Ogro muda.**
+
+🔑 **O que ele mede, dito com precisão:** *quanto a **evacuação** devolve ao baralho a mais que uma
+punição leve* — **não** o valor do Bad Stuff inteiro contra zero. ⚠️ **Não escreva "a fatia devolveu
+X"**: o braço A **também** devolve carta, então o delta é a **margem da evacuação**, e o valor
+absoluto da fatia fica **não medido** e declarado como tal.
+
+✅ **É a pergunta que a fatia precisa responder** — a evacuação é o *"maior caminho de volta do jogo"*
+da #46, e é o único eixo cuja escala é dial (#114: só o de 3 tesouros evacua). Se o delta for
+pequeno, o dial *"quantos monstros evacuam"* é o que se gira, e o número para girá-lo sai daqui.
+
+📌 **Ganho de método, de graça:** este controle é **imune** à ressalva-mãe que a `empunhadura dupla`
+não conseguiu contornar — os dois braços saem da mesma sessão e do mesmo build, então **não há
+comparação entre fatias para licenciar**.
 
 Também instrumentado: evacuações por partida (previsão derivada **~0,3 por jogador**) · quantos
 `perdeSlot` acertam encaixe **vazio** · `AcaoInvalida`, `Error` cru, teto de ações e **censo de
