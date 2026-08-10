@@ -1,12 +1,17 @@
 import type { Combatente } from '@card-dungeon/motor';
+// ⚠️ Mesma origem que `tipos.ts` já usa para `ModificadoresDeStat` — confira o
+// import de lá e use o MESMO, não uma segunda origem (aviso gêmeo em `instantaneo.ts`).
+import type { ModificadoresDeStat } from '@card-dungeon/personagem';
 import type {
-  AcaoDaMesa, CartaEquipamento, CatalogoDaMesa, JogadorPublico, MaoSlot, Slot, VistaDaPartida, ZonaEmJogo,
+  AcaoDaMesa, AlvoDeInstantaneo, CartaEquipamento, CatalogoDaMesa, EfeitoInstantaneo, JogadorPublico, MaoSlot, Slot,
+  VistaDaPartida, ZonaEmJogo,
 } from './tipos';
 // O par de mãos vem do MESMO lugar que `colocarNoSlot` usa: o custo que o bot
 // calcula tem que ser o custo que o reducer vai cobrar, e duas listas escritas à
 // mão divergem em silêncio (o slot que nascer não entra na cópia).
 import { MAOS } from './equipar';
 import { afinidadeCom, contribuicaoDe } from './corpo';
+import { instantaneoTemEfeito } from './instantaneo';
 
 /**
  * Política do bot desta fatia: burro por definição na maior parte — executa a
@@ -81,10 +86,15 @@ export function escolherAcao(vista: VistaDaPartida, jogadorId: string, catalogo:
       return vista.espiada !== null
         ? { tipo: 'manterCarta', jogadorId }
         : { tipo: 'vasculhar', jogadorId };
-    case 'combate':
+    case 'combate': {
+      if (eu !== undefined) {
+        const consumivel = talvezUsarInstantaneo(vista, jogadorId, eu, catalogo);
+        if (consumivel !== null) return consumivel;
+      }
       return vista.combate?.proximaDecisao === 'esquiva'
         ? { tipo: 'esquivar', jogadorId }
         : { tipo: 'atacar', jogadorId };
+    }
     case 'jogar': {
       if (eu === undefined) return { tipo: 'passar', jogadorId };
       return vestirOuGuardar(vista, jogadorId, eu, catalogo);
@@ -111,6 +121,88 @@ export function escolherAcao(vista: VistaDaPartida, jogadorId: string, catalogo:
 // lançar: o bot é uma POLÍTICA, e sempre existe a alternativa de não fazer
 // nada. Lançar aqui derrubaria a mesa por um `find` que o guard do reducer já
 // cobre.
+
+/**
+ * 🎚️ Abaixo disto o bot bebe a poção. Dial de POLÍTICA, não de regra — e o soak
+ * mede "quanto circula sob esta política", nunca "quanto circularia".
+ */
+const LIMIAR_DE_CURA = 0.4;
+
+/**
+ * Os modificadores de UM efeito. `switch` fechado por `never` — mesma convenção
+ * de `aplicarInstantaneo` (`./instantaneo`): a união `EfeitoInstantaneo` carrega
+ * um membro `{ tipo: never }` só para travar o `_CoberturaEfeitoInstantaneo` de
+ * `shared` contra o catálogo de `cartas`, e é esse membro que impede
+ * `e.modificadores` de compilar direto num `.flatMap`/`.some` sobre a união.
+ */
+function modificadoresDe(efeito: EfeitoInstantaneo): ModificadoresDeStat {
+  switch (efeito.tipo) {
+    case 'stats':
+      return efeito.modificadores;
+    default: {
+      const naoTratado: never = efeito;
+      throw new Error(`modificadoresDe: efeito sem ramo: ${JSON.stringify(naoTratado)}`);
+    }
+  }
+}
+
+/**
+ * Soma dos 4 stats de um efeito. Campo a campo — não `Object.values` — pelo
+ * mesmo motivo de `valorEfetivoDe` mais abaixo: `ModificadoresDeStat` é uma
+ * interface sem index signature, e `Object.values` sobre ela cai no overload
+ * que devolve `any[]` (a mesma armadilha catalogada em
+ * `packages/personagem/CLAUDE.md` para este tipo).
+ */
+function somaModificadores(efeitos: readonly EfeitoInstantaneo[]): number {
+  return efeitos.reduce((total, efeito) => {
+    const { forca, vida, habilidade, agilidade } = modificadoresDe(efeito);
+    return total + (forca ?? 0) + (vida ?? 0) + (habilidade ?? 0) + (agilidade ?? 0);
+  }, 0);
+}
+
+/**
+ * O alvo natural de um efeito: modificador que só PIORA vai no monstro, o resto
+ * em si mesmo. É burro de propósito — a decisão fina (bufar o monstro como blefe)
+ * só faz sentido quando outro jogador puder jogar a carta, no bloco 5.
+ */
+function alvoNaturalDe(efeitos: readonly EfeitoInstantaneo[]): AlvoDeInstantaneo {
+  return somaModificadores(efeitos) < 0 ? 'monstro' : 'lutador';
+}
+
+/**
+ * O consumível a queimar AGORA, ou `null`. Duas janelas: os buffs entram no
+ * turno 0 (antes de o combate custar vida) e a cura entra quando ela já custou.
+ *
+ * 🔴 Só devolve uso que o reducer ACEITA (`instantaneoTemEfeito`): uma ação
+ * recusada sobe como `AcaoInvalida` por `avancarBots` e vira 400 na jogada do
+ * humano — o modo de falha que já derrubou a mesa uma vez.
+ */
+function talvezUsarInstantaneo(
+  vista: VistaDaPartida, jogadorId: string, eu: JogadorPublico, catalogo: CatalogoDaMesa,
+): AcaoDaMesa | null {
+  const combate = vista.combate;
+  if (combate === null) return null;
+
+  const candidatas = [...vista.suaMao, ...eu.mochila].filter((c) => c.tipo === 'instantaneo');
+  const feridoDemais = combate.estado.jogador.vida
+    <= combate.estado.vidaInicialJogador * LIMIAR_DE_CURA;
+
+  for (const carta of candidatas) {
+    const info = catalogo.instantaneo(carta.instantaneoId);
+    if (info === undefined) continue;
+    const alvo = alvoNaturalDe(info.efeitos);
+    const curativo = info.efeitos.some((e) => (modificadoresDe(e).vida ?? 0) > 0);
+    // A cura tem janela própria; todo o resto é de abertura.
+    if (curativo ? !feridoDemais : combate.estado.turno !== 0) continue;
+    const vidaInicialDoAlvo = alvo === 'lutador'
+      ? combate.estado.vidaInicialJogador
+      : catalogo.monstro(combate.monstroId)?.vida;
+    if (vidaInicialDoAlvo === undefined) continue;
+    if (!instantaneoTemEfeito(combate.estado, info.efeitos, alvo, vidaInicialDoAlvo)) continue;
+    return { tipo: 'usarInstantaneo', jogadorId, cartaId: carta.id, alvo };
+  }
+  return null;
+}
 
 /**
  * 🎚️ Quanto o bot exige de vantagem para topar a luta (decisão #63 do bible).
