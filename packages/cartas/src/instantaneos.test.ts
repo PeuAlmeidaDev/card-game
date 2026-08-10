@@ -24,7 +24,11 @@ describe('catálogo de instantâneos', () => {
   });
 
   it('todos os do catálogo são sacáveis hoje', () => {
-    expect(INSTANTANEOS_SACAVEIS).toHaveLength(4);
+    // `toEqual(INSTANTANEOS)`, e não `toHaveLength(4)`: contagem sem presença não
+    // prova o que o título afirma — trocar uma carta sacável por outra manteria o
+    // 4 e deixaria o teste verde. É a #54 por outra porta, o erro mais repetido
+    // deste pacote.
+    expect(INSTANTANEOS_SACAVEIS).toEqual(INSTANTANEOS);
   });
 
   it('devolve undefined para id desconhecido', () => {
