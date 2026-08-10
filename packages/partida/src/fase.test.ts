@@ -769,7 +769,7 @@ describe('acaoEhLegal — o gate com a pendência', () => {
     const TODAS = [
       'vasculhar', 'manterCarta', 'empurrarCarta', 'atacar', 'esquivar', 'jogarCarta',
       'entregarCarta', 'equiparCarta', 'guardarCarta', 'procurarEncrenca', 'saquear',
-      'passar', 'queimarCarta',
+      'passar', 'queimarCarta', 'usarInstantaneo',
     ] as const satisfies readonly AcaoDaMesa['tipo'][];
 
     // Guard de COMPILAÇÃO: a lista acima tem que cobrir a união inteira. Sem ele,

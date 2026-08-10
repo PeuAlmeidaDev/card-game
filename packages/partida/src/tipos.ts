@@ -47,10 +47,10 @@ export type EfeitoInstantaneo =
  * `carta de combate` do §4 do bible. Bufar o monstro (ou sabotar a si mesmo) é
  * jogada LEGAL: hoje irracional, no bloco 5 é a mecânica inteira.
  *
- * ⚠️ Nasce nesta fatia SEM consumidor: a ação que carrega o alvo (spec §4) ainda
- * não existe, então esta união ainda não tem twin em `shared` — nem `z.enum`, nem
- * guard. Quando a ação chegar, ela precisa do MESMO tratamento gêmeo que
- * `EfeitoInstantaneo` recebe abaixo.
+ * O consumidor é a ação `usarInstantaneo` (Task 4), que carrega este campo — e o
+ * twin em `shared` é `_CoberturaAlvo`, mesmo tratamento gêmeo que
+ * `EfeitoInstantaneo` recebe abaixo, um nível acima: trava o `z.enum` escrito à
+ * mão contra esta união.
  */
 export type AlvoDeInstantaneo = 'lutador' | 'monstro';
 
@@ -536,7 +536,19 @@ export type EventoDaMesa =
   | { readonly tipo: 'evacuou'; readonly jogadorId: string;
       readonly doCorpo: readonly CartaEquipamento[];
       readonly daMochila: readonly CartaTesouro[];
-      readonly daMao: number };
+      readonly daMao: number }
+  /**
+   * O consumível queimado. Carrega a CARTA mesmo saindo de zona oculta (a mão):
+   * o efeito é público — todo mundo vê o monstro enfraquecer —, então esconder o
+   * nome seria teatro. Mesma regra do `equipou`.
+   *
+   * `monstroId` viaja junto para a narração poder NOMEAR o adversário: o log é
+   * histórico e vai ser lido depois de o combate fechar, quando `estado.combate`
+   * já é `null`.
+   */
+  | { readonly tipo: 'usouInstantaneo'; readonly jogadorId: string;
+      readonly carta: CartaInstantaneo; readonly alvo: AlvoDeInstantaneo;
+      readonly monstroId: string };
 
 export type AcaoDaMesa =
   | { readonly tipo: 'vasculhar'; readonly jogadorId: string }
@@ -596,7 +608,14 @@ export type AcaoDaMesa =
    * se sai (o jogador com uma raça na mão travaria antes de vasculhar), que é
    * exatamente por que o Plano 2 as adiou. Fase parada e `passar` entram juntos.
    */
-  | { readonly tipo: 'passar'; readonly jogadorId: string };
+  | { readonly tipo: 'passar'; readonly jogadorId: string }
+  /**
+   * Queima um consumível. `cartaId` pode estar na MÃO ou na MOCHILA — as duas
+   * zonas são origem (decisão do Pedro, 2026-08-09), e é o reducer que procura
+   * nas duas.
+   */
+  | { readonly tipo: 'usarInstantaneo'; readonly jogadorId: string;
+      readonly cartaId: string; readonly alvo: AlvoDeInstantaneo };
 
 export interface CombateNaMesa {
   readonly estado: EstadoCombate;

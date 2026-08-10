@@ -11,10 +11,10 @@ const ctx: ContextoDeNarracao = {
   nomeDe: (id) => (id === 'p1' ? 'Você' : id === 'p2' ? 'Bot 1' : id),
   nomes: {
     raca: (id) => (id === 'orc' ? 'Orc' : id === 'elfo' ? 'Elfo' : id),
-    monstro: (id) => (id === 'goblin' ? 'Goblin' : id),
+    monstro: (id) => (id === 'goblin' ? 'Goblin' : id === 'ogro' ? 'Ogro' : id),
     item: (id) => (id === 'espada-curta' ? 'Espada Curta' : id === 'elmo-de-couro' ? 'Elmo de Couro' : id),
     classe: (id) => (id === 'guerreiro' ? 'Guerreiro' : id),
-    instantaneo: (id) => id,
+    instantaneo: (id) => (id === 'pocao-de-cura' ? 'Poção de Cura' : id === 'areia-nos-olhos' ? 'Areia nos Olhos' : id),
   },
 };
 
@@ -251,6 +251,22 @@ describe('narrarEvento — linhas de texto puro', () => {
       { tipo: 'evacuou', jogadorId: 'p1', doCorpo: [], daMochila: [], daMao: 0 },
       ctx,
     )).toBe('Você é evacuado — mas não tinha mais nada a perder.');
+  });
+
+  it('narra o instantâneo usado no próprio lutador', () => {
+    expect(narrarEvento({
+      tipo: 'usouInstantaneo', jogadorId: 'p1',
+      carta: { id: 't1', tipo: 'instantaneo', instantaneoId: 'pocao-de-cura' },
+      alvo: 'lutador', monstroId: 'ogro',
+    }, ctx)).toBe('Você usa Poção de Cura em si.');
+  });
+
+  it('narra o instantâneo usado contra o monstro, nomeando-o', () => {
+    expect(narrarEvento({
+      tipo: 'usouInstantaneo', jogadorId: 'p2',
+      carta: { id: 't2', tipo: 'instantaneo', instantaneoId: 'areia-nos-olhos' },
+      alvo: 'monstro', monstroId: 'ogro',
+    }, ctx)).toBe('Bot 1 usa Areia nos Olhos contra o Ogro.');
   });
 });
 

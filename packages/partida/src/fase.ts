@@ -37,7 +37,10 @@ const LEGAL: Record<Fase, ReadonlySet<AcaoDaMesa['tipo']>> = {
   // `equiparCarta` fica de FORA: o motor recebe um snapshot imutável dos stats na
   // abertura do combate, então remontar o corpo no meio da luta ou não teria
   // efeito nenhum (mentindo para quem clicou) ou furaria o snapshot.
-  combate: new Set<AcaoDaMesa['tipo']>(['atacar', 'esquivar']),
+  // `usarInstantaneo` ENTRA (fatia `consumíveis (instantâneo)`): a decisão #44
+  // previu isto — a mesa entrega ali um `Combatente` novo, sem furar o snapshot
+  // que o motor recebeu, porque nenhum passo do combate roda para trocá-lo.
+  combate: new Set<AcaoDaMesa['tipo']>(['atacar', 'esquivar', 'usarInstantaneo']),
   // FASE 4 (spec §6): a janela DEPOIS do encontro. É onde o loot recém-saqueado
   // vira corpo — sem ela, o tesouro que o monstro largou só poderia ser vestido no
   // turno seguinte, e a mão estouraria no caminho. `jogarCarta` fica de fora: a

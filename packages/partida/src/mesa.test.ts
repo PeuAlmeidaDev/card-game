@@ -16,6 +16,7 @@ import {
   catalogoDeTeste, comClasseDeTeste, ID_DA_CLASSE_DE_TESTE, CLASSE_DE_TESTE, MONSTRO_DE_TESTE, ID_DO_ITEM_EXCLUSIVO,
   ID_DA_RACA_OUTRA, ID_DA_RACA_DONA, ID_DO_ITEM_DE_TESTE, ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS, ID_DO_ITEM_EXCLUSIVO_PES,
   ID_DO_ITEM_EXCLUSIVO_DE_CLASSE, ID_DO_ITEM_DE_CAPACETE, ID_DO_ITEM_DUAS_MAOS,
+  ID_DO_MONSTRO_DE_TESTE, ID_DO_INSTANTANEO_DUPLO,
 } from './testes/catalogo';
 import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import { combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
@@ -408,6 +409,166 @@ describe('aplicarAcao — combate', () => {
       .toThrow(TypeError);
     expect(() => aplicarAcao(comCombate, { tipo: 'atacar', jogadorId: 'p1' }, depsQuebradas))
       .not.toThrow(AcaoInvalida);
+  });
+});
+
+describe('aplicarAcao — usarInstantaneo', () => {
+  const soMonstro = { ...config, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] };
+
+  /**
+   * Abre o combate contra o `MONSTRO_DE_TESTE` com mão/mochila injetadas ANTES de
+   * vasculhar. `vidaDoJogador`, quando dado, sobrescreve a vida do `EstadoCombate`
+   * DEPOIS de aberto — mesmo idioma de `combate()` em `instantaneo.test.ts`
+   * (`{ ...LUTADOR, vida: 8 }`): um lutador ferido é estado plenamente alcançável
+   * em jogo (é o que qualquer troca de golpes produz); só pedimos ao domínio para
+   * chegar lá direto em vez de simular os golpes.
+   */
+  const estadoEmCombate = (opcoes: {
+    readonly mao?: readonly Carta[];
+    readonly mochila?: readonly CartaTesouro[];
+    readonly vidaDoJogador?: number;
+  }): EstadoPartida => {
+    const p0 = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const comZonas: EstadoPartida = {
+      ...p0,
+      jogadores: p0.jogadores.map((j) => (j.id === 'p1' ? {
+        ...j,
+        mao: opcoes.mao ?? j.mao,
+        mochila: opcoes.mochila ?? j.mochila,
+      } : j)),
+    };
+    // agilidade do jogador (5) > a do monstro (1) => a abertura não gasta dado.
+    const aberto = aplicarAcao(comZonas, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
+    if (opcoes.vidaDoJogador === undefined || aberto.combate === null) return aberto;
+    return {
+      ...aberto,
+      combate: {
+        ...aberto.combate,
+        estado: {
+          ...aberto.combate.estado,
+          jogador: { ...aberto.combate.estado.jogador, vida: opcoes.vidaDoJogador },
+        },
+      },
+    };
+  };
+
+  it('aplica o efeito no lutador, consome a carta da mão e manda ao cemitério', () => {
+    const estado = estadoEmCombate({ mao: [instantaneo('t1')], vidaDoJogador: 3 });
+
+    const r = aplicarAcao(
+      estado, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't1', alvo: 'lutador' }, deps([]),
+    );
+
+    expect(r.estado.combate?.estado.jogador.vida).toBe(7); // 3 + 4
+    expect(r.estado.jogadores[0]?.mao).toHaveLength(0);
+    expect(r.estado.tesouros.cemiterio.map((c) => c.id)).toContain('t1');
+  });
+
+  it('aplica o efeito a partir da MOCHILA', () => {
+    const estado = estadoEmCombate({ mochila: [instantaneo('t2')], vidaDoJogador: 3 });
+
+    const r = aplicarAcao(
+      estado, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't2', alvo: 'lutador' }, deps([]),
+    );
+
+    expect(r.estado.combate?.estado.jogador.vida).toBe(7);
+    expect(jogadorDe(r.estado, 'p1').mochila).toHaveLength(0);
+  });
+
+  // 🔑 O TESTE DO MEIO. Na fatia 2a, apagar o repasse dos eventos no reducer
+  // deixava 732/732 verdes com a punição mais dura do jogo acontecendo em
+  // silêncio. Provar que a função pura devolve e que a tela sabe narrar NÃO prova
+  // o fio entre os dois — é `registrar` de fato recebendo o evento que prova.
+  it('publica o evento `usouInstantaneo` no log', () => {
+    const estado = estadoEmCombate({ mao: [instantaneo('t3')], vidaDoJogador: 3 });
+
+    const r = aplicarAcao(
+      estado, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't3', alvo: 'lutador' }, deps([]),
+    );
+
+    expect(r.eventos).toContainEqual({
+      tipo: 'usouInstantaneo', jogadorId: 'p1',
+      carta: instantaneo('t3'), alvo: 'lutador', monstroId: ID_DO_MONSTRO_DE_TESTE,
+    });
+  });
+
+  it('NÃO avança o combate: a decisão pendente e o turno ficam onde estavam', () => {
+    const estado = estadoEmCombate({ mao: [instantaneo('t4')], vidaDoJogador: 3 });
+    const antes = estado.combate;
+
+    const r = aplicarAcao(
+      estado, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't4', alvo: 'lutador' }, deps([]),
+    );
+
+    expect(r.estado.combate?.proximaDecisao).toBe(antes?.proximaDecisao);
+    expect(r.estado.combate?.estado.turno).toBe(antes?.estado.turno);
+  });
+
+  it('recusa quando o efeito não muda nada (cura com a vida cheia)', () => {
+    // Sem `vidaDoJogador`: o lutador abre o combate com a vida cheia (teto 20), e
+    // a cura de 4 do `ID_DO_INSTANTANEO_DE_TESTE` clampa sem mudar nada.
+    const estado = estadoEmCombate({ mao: [instantaneo('t5')] });
+
+    expect(() => aplicarAcao(
+      estado, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't5', alvo: 'lutador' }, deps([]),
+    )).toThrow(AcaoInvalida);
+  });
+
+  it('recusa carta que não é instantâneo', () => {
+    const estado = estadoEmCombate({ mao: [equipamento('t6')] });
+
+    expect(() => aplicarAcao(
+      estado, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't6', alvo: 'lutador' }, deps([]),
+    )).toThrow(AcaoInvalida);
+  });
+
+  it('recusa fora da fase `combate`', () => {
+    // Caminho REAL, não fase forjada: vence o combate (mesmo orçamento de dados
+    // de `venceOCombate`, no topo do arquivo) com um instantâneo intocado na mão
+    // e chega em `jogar` de verdade — o mesmo cenário do describe de combate,
+    // acima ("vencer o combate sobe a patente e abre a fase `jogar`").
+    const p0 = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const comInstantaneo: EstadoPartida = {
+      ...p0,
+      jogadores: p0.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao: [instantaneo('t7')] } : j)),
+    };
+    const aberto = aplicarAcao(comInstantaneo, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
+    const vencido = venceOCombate(aberto);
+    expect(vencido.fase).toBe('jogar');
+
+    expect(() => aplicarAcao(
+      vencido, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't7', alvo: 'lutador' }, deps([]),
+    )).toThrow('aplicarAcao: usarInstantaneo não é legal na fase jogar');
+  });
+
+  it('o buff PERSISTE até o fim do combate e SOME no combate seguinte', () => {
+    // A ausência de código de expiração é o desenho (spec §5.2): o próximo
+    // combate remonta os stats por `combatenteDe`. Este teste é o que prende a
+    // metade "persiste durante ESTE combate" — depois de um `atacar` de verdade,
+    // o buff continua no snapshot.
+    const estado = estadoEmCombate({ mao: [instantaneo('t8', ID_DO_INSTANTANEO_DUPLO)] });
+    const comBuff = aplicarAcao(
+      estado, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't8', alvo: 'lutador' }, deps([]),
+    );
+    const forcaBuffada = comBuff.estado.combate?.estado.jogador.forca;
+    expect(forcaBuffada).toBe(5); // 3 (base) + 2 (o instantâneo duplo)
+
+    const depoisDeAtacar = aplicarAcao(comBuff.estado, { tipo: 'atacar', jogadorId: 'p1' }, deps([4, 12, 12]));
+    expect(depoisDeAtacar.estado.combate?.estado.jogador.forca).toBe(forcaBuffada);
+  });
+
+  it('o teto do alvo MONSTRO vem da CARTA no catálogo, nunca de `vidaInicialJogador`', () => {
+    // Mutação do Step 10: passar `combate.estado.vidaInicialJogador` (20, o teto
+    // do JOGADOR) também para o alvo `monstro` deixaria a cura de 4 "caber" acima
+    // da vida cheia do `MONSTRO_DE_TESTE` (10) e o guard de desperdício sumiria.
+    // Task 3 (`instantaneo.test.ts`) cobre o `aplicarInstantaneo` puro; este é o
+    // cenário de INTEGRAÇÃO — o reducer lendo o teto certo do catálogo.
+    const estado = estadoEmCombate({ mao: [instantaneo('t9')] });
+    expect(estado.combate?.estado.monstro.vida).toBe(MONSTRO_DE_TESTE.vida);
+
+    expect(() => aplicarAcao(
+      estado, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't9', alvo: 'monstro' }, deps([]),
+    )).toThrow(AcaoInvalida);
   });
 });
 

@@ -227,6 +227,17 @@ export function narrarEvento(evento: EventoDaMesa, ctx: ContextoDeNarracao): Rea
         ? `${quem} é evacuado e perde tudo: ${partes.join('; ')}.`
         : `${quem} é evacuado — mas não tinha mais nada a perder.`;
     }
+    // O consumível é público — todo mundo vê o efeito acontecer —, então o
+    // evento carrega a carta e a narração pode nomeá-la, mesma regra do
+    // `equipou`. NOMEIA o monstro pelo `monstroId` do evento (não por
+    // `estado.combate`, que já pode ser `null` quando o log é lido).
+    case 'usouInstantaneo': {
+      const quem = evento.jogadorId === ctx.voce ? 'Você' : ctx.nomeDe(evento.jogadorId);
+      const carta = descreverCarta(evento.carta, ctx.nomes);
+      return evento.alvo === 'lutador'
+        ? `${quem} usa ${carta} em si.`
+        : `${quem} usa ${carta} contra o ${ctx.nomes.monstro(evento.monstroId)}.`;
+    }
     default: {
       const naoTratado: never = evento;
       void naoTratado;

@@ -10,6 +10,7 @@ import type {
 import type {
   AcaoDaMesa,
   Afinidade,
+  AlvoDeInstantaneo,
   BadStuff,
   Carta,
   CartaEquipamento,
@@ -105,6 +106,16 @@ export const acaoDaMesaSchema = z.discriminatedUnion('tipo', [
   // `cartaId` é refletido verbatim no 400 e no log do server. O cliente aponta a
   // carta, nunca o destino — o destino é sempre o cemitério de Tesouros.
   z.object({ tipo: z.literal('queimarCarta'), cartaId: z.string().min(1).max(64) }),
+  // Mesmo teto de 64 e pelo mesmo motivo dos outros verbos que apontam carta da
+  // mão OU da mochila (fatia `consumíveis (instantâneo)`): o `cartaId` é
+  // refletido verbatim no 400 e no log do server. O `alvo` viaja porque é
+  // escolha real do jogador — bufar o monstro ou a si mesmo são as duas jogadas
+  // legais (spec §4).
+  z.object({
+    tipo: z.literal('usarInstantaneo'),
+    cartaId: z.string().min(1).max(64),
+    alvo: z.enum(['lutador', 'monstro']),
+  }),
 ]) satisfies z.ZodType<{ tipo: AcaoDaMesa['tipo'] }>;
 
 /** A intenção validada. A rota completa com o `jogadorId` da sessão. */
@@ -144,6 +155,22 @@ type _CoberturaMao =
   [MaoSlot] extends [MaoNoFio] ? ([MaoNoFio] extends [MaoSlot] ? true : never) : never;
 const _coberturaMao: _CoberturaMao = true;
 void _coberturaMao;
+
+/**
+ * Trava o `alvo` DENTRO do `usarInstantaneo`. O `z.enum` é escrito à mão e, por
+ * covariância, um enum mais ESTREITO que `AlvoDeInstantaneo` passa limpo — um
+ * alvo novo no domínio ficaria inalcançável pelo fio, sem nada acusando. É
+ * exatamente o que aconteceria no bloco 5, quando o alvo ganhar "outro jogador".
+ *
+ * Mesma tupla e mesmo preço do `_CoberturaMao`, acima.
+ *
+ * ⚠️ Guard de COMPILAÇÃO. Quem acusa é o `pnpm typecheck`, nunca a suíte.
+ */
+type AlvoNoFio = Extract<AcaoNoFio, { tipo: 'usarInstantaneo' }>['alvo'];
+type _CoberturaAlvo =
+  [AlvoDeInstantaneo] extends [AlvoNoFio] ? ([AlvoNoFio] extends [AlvoDeInstantaneo] ? true : never) : never;
+const _coberturaAlvo: _CoberturaAlvo = true;
+void _coberturaAlvo;
 
 /**
  * Trava as duas uniões `Slot` — a de `partida` (a REGRA: o corpo tem 5 encaixes)

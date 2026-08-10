@@ -11,12 +11,16 @@ import { destinoDaCaridade } from './caridade';
 import { aplicarBadStuff } from './badStuff';
 import { afinidadeCom, combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
 import { colocarNoSlot, destinoDoDesequipado, precisaEscolherMao } from './equipar';
+import { aplicarInstantaneo } from './instantaneo';
 import { classificar } from './classificacao';
 import { AcaoInvalida } from './erros';
 import { acaoEhLegal, faseDoTurnoDe, faseSeAutoPula } from './fase';
 
 /** As ações que só fazem sentido com um combate aberto. */
 type AcaoDeCombate = Extract<AcaoDaMesa, { readonly tipo: 'atacar' | 'esquivar' }>;
+
+/** A ação que queima um consumível no combate aberto. */
+type AcaoDeInstantaneo = Extract<AcaoDaMesa, { readonly tipo: 'usarInstantaneo' }>;
 
 export interface DepsMesa {
   readonly rolar: RolarD12;
@@ -317,8 +321,8 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // entrar na tabela, e o `Record<Fase, …>` cobra.
   //
   // ⚠️ O QUE A TABELA NÃO RESPONDE. Passar aqui não garante que a ação será
-  // aceita: a elegibilidade FINA continua em cada função, e hoje são DEZOITO
-  // pares em VINTE E UMA linhas — cada par precisa de gêmeo na tela, porque o
+  // aceita: a elegibilidade FINA continua em cada função, e hoje são VINTE
+  // pares em VINTE E TRÊS linhas — cada par precisa de gêmeo na tela, porque o
   // `legal()` da `TelaMesa` lê ESTA tabela e não sabe deles. As três linhas que
   // não são par estão marcadas na própria tabela e explicadas logo abaixo dela.
   //
@@ -352,8 +356,10 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   //   jogar                guardarCarta   mochila cheia                `guardarCarta`
   //   combate              atacar         `proximaDecisao`             o motor (`AcaoIlegal`)
   //   combate              esquivar       `proximaDecisao`             o motor (`AcaoIlegal`)
+  //   combate              usarInstantaneo  a carta é instantâneo, na mão OU mochila  `usarInstantaneo`
+  //   combate              usarInstantaneo  o efeito muda alguma coisa (o `mudou` de `aplicarInstantaneo`) `usarInstantaneo`
   //   encrenca             procurarEncrenca  a carta é do tipo monstro `procurarEncrenca`
-  //   ↑ DEZOITO pares. As três linhas abaixo NÃO são par — estão aqui para provar
+  //   ↑ VINTE pares. As três linhas abaixo NÃO são par — estão aqui para provar
   //     que a recontagem chegou até estes verbos:
   //   encrenca             saquear        — (nenhum guard fino; #62)   — (ausência)
   //   encrenca             procurarEncrenca  a carta está na sua mão   (gêmeo ESTRUTURAL)
@@ -456,11 +462,19 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // `equiparCarta` é legal nas duas fases paradas. Recontagem a partir do
   // reducer, `AcaoInvalida` por `AcaoInvalida`.
   //
-  // A fatia `consumíveis (instantâneo)` manteve DEZOITO pares em VINTE E UMA
-  // linhas: `guardarCarta` ALARGOU o guard existente (`carta.tipo` passa a
+  // A Task 2 da fatia `consumíveis (instantâneo)` manteve DEZOITO pares em VINTE
+  // E UMA linhas: `guardarCarta` ALARGOU o guard existente (`carta.tipo` passa a
   // aceitar 'equipamento' OU 'instantaneo'), não ganhou um `AcaoInvalida` novo —
   // mesma jogada que `jogarCarta` fez na Task 7 do Plano B, a linha do par é a
   // mesma, só o texto da condição mudou.
+  //
+  // A Task 4 da mesma fatia levou DEZOITO a VINTE pares, VINTE E UMA a VINTE E
+  // TRÊS linhas: `usarInstantaneo` é verbo NOVO, com DOIS `AcaoInvalida` próprios
+  // — "a carta não é um instantâneo da mão/mochila" e "o efeito não muda nada"
+  // (o guard de desperdício, spec §5.5) — e as duas são UMA linha cada, porque a
+  // ação só é legal numa fase (`combate`), sem a duplicação que `equiparCarta` e
+  // `afinidadeCom` pagam por serem legais nas duas paradas. Recontagem a partir
+  // do reducer, `AcaoInvalida` por `AcaoInvalida`.
   if (!acaoEhLegal(estado.fase, estado.queima !== null, acao.tipo)) {
     throw new AcaoInvalida(
       estado.queima === null
@@ -508,6 +522,10 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
     return agirNoCombate(estado, acao, deps);
   }
 
+  if (acao.tipo === 'usarInstantaneo') {
+    return usarInstantaneo(estado, acao, deps);
+  }
+
   if (acao.tipo === 'saquear') {
     return saquear(estado, acao.jogadorId, deps);
   }
@@ -521,7 +539,7 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   }
 
   // Exaustividade: a cadeia de `if` acima cobre TODO `AcaoDaMesa['tipo']` de hoje
-  // (`queimarCarta` foi o último a ganhar ramo). Mesma proteção dos
+  // (`usarInstantaneo` foi o último a ganhar ramo). Mesma proteção dos
   // `naoTratada: never` dos `switch` deste arquivo (`resolverCarta`,
   // `descartarNoBaralhoCerto`): um tipo novo em `AcaoDaMesa` sem `if` próprio
   // quebra a COMPILAÇÃO aqui, não em produção — é a lição do Plano 4b Task 1,
@@ -1373,6 +1391,72 @@ function agirNoCombate(estado: EstadoPartida, acao: AcaoDeCombate, deps: DepsMes
   // adversário que diz quanto o cadáver vale.
   return fecharCombate(
     estado, acao.jogadorId, passo.estado.desfecho === 'vitoriaJogador', eventos, combate.monstroId, deps,
+  );
+}
+
+/**
+ * Queima um consumível no combate aberto. NÃO é um passo do combate: nenhum dado
+ * é rolado, o turno não avança e `proximaDecisao` fica onde estava — o que muda é
+ * o snapshot que o motor vai receber no próximo `atacar`/`esquivar` (decisão #44).
+ */
+function usarInstantaneo(estado: EstadoPartida, acao: AcaoDeInstantaneo, deps: DepsMesa): ResultadoAcao {
+  const combate = estado.combate;
+  if (combate === null) {
+    // Inalcançável pela tabela (só a fase `combate` deixa passar). Invariante
+    // NOSSA quebrada => Error cru => 500, não culpa do cliente.
+    throw new Error('usarInstantaneo: fase `combate` sem combate aberto');
+  }
+  const jogador = estado.jogadores.find((j) => j.id === acao.jogadorId);
+  if (jogador === undefined) throw new Error(`usarInstantaneo: jogador ${acao.jogadorId} não está na mesa`);
+
+  // As DUAS zonas de origem, na mesma busca: a carta é a mesma e o destino é o
+  // mesmo (cemitério); o que muda é de onde ela sai.
+  const naMao = jogador.mao.find((c) => c.id === acao.cartaId);
+  const naMochila = jogador.mochila.find((c) => c.id === acao.cartaId);
+  const carta = naMao ?? naMochila;
+  if (carta === undefined || carta.tipo !== 'instantaneo') {
+    throw new AcaoInvalida('usarInstantaneo: carta não é um instantâneo da sua mão ou mochila');
+  }
+
+  const info = deps.catalogo.instantaneo(carta.instantaneoId);
+  if (info === undefined) throw new Error(`usarInstantaneo: instantâneo desconhecido: ${carta.instantaneoId}`);
+
+  // O teto da vida do ALVO. O do lutador o motor guarda; o do monstro vem da
+  // CARTA — é a saída que evitou abrir campo novo em `EstadoCombate` (spec §4).
+  let vidaInicialDoAlvo: number;
+  if (acao.alvo === 'lutador') {
+    vidaInicialDoAlvo = combate.estado.vidaInicialJogador;
+  } else {
+    const monstro = deps.catalogo.monstro(combate.monstroId);
+    if (monstro === undefined) throw new Error(`usarInstantaneo: monstro desconhecido: ${combate.monstroId}`);
+    vidaInicialDoAlvo = monstro.vida;
+  }
+
+  const r = aplicarInstantaneo(combate.estado, info.efeitos, acao.alvo, vidaInicialDoAlvo);
+  if (!r.mudou) {
+    // O guard de desperdício (spec §5.5). Sem ele existe a jogada "queimo a carta
+    // sem efeito", que devolveria carta ao cemitério sem a mecânica ter
+    // funcionado — poluindo o número que esta fatia veio medir.
+    throw new AcaoInvalida('usarInstantaneo: esta carta não faria efeito neste alvo');
+  }
+
+  const semACarta: JogadorNaMesa = {
+    ...jogador,
+    mao: jogador.mao.filter((c) => c.id !== acao.cartaId),
+    mochila: jogador.mochila.filter((c) => c.id !== acao.cartaId),
+  };
+
+  const comDescarte = descartarNoBaralhoCerto(
+    { ...estado, jogadores: estado.jogadores.map((j) => (j.id === jogador.id ? semACarta : j)) },
+    carta,
+  );
+
+  return registrar(
+    { ...comDescarte, combate: { ...combate, estado: r.estado } },
+    [{
+      tipo: 'usouInstantaneo', jogadorId: jogador.id, carta,
+      alvo: acao.alvo, monstroId: combate.monstroId,
+    }],
   );
 }
 

@@ -45,6 +45,7 @@ Vários tipos são **gêmeos** entre pacotes. Sem guard, acrescentar um membro a
 |---|---|
 | `_CoberturaAcao` | a união de ações do domínio ⊆ a do fio |
 | `_CoberturaMao` | o `z.enum` da mão × `MaoSlot` |
+| `_CoberturaAlvo` | o `z.enum` do `alvo` de `usarInstantaneo` × `AlvoDeInstantaneo` |
 | `_CoberturaSlot` | `Slot` de `partida` (o corpo) × `Slot` de `cartas` (o dado) |
 | `_CoberturaSlotDeItem` | `SlotDeItem`, o mesmo par |
 | `_CoberturaEixo` | `EixoDeAfinidade`, o mesmo par |
