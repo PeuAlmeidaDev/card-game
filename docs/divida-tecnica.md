@@ -157,11 +157,32 @@ função / de teste sempre que possível.
 
 ## 🛡️ Degradação silenciosa (a tela e o domínio discordam sobre o mesmo estado)
 
-- **`[2b]`** · **`web`** · `TelaMesa.tsx` — o teto de vida do **monstro** degrada com `?? 0` na tela,
-  enquanto o reducer **levanta 500** no mesmo estado. 🔴 **Inalcançável hoje** (nenhuma carta da
-  calibragem mexe na vida do monstro), e é por isso que é dívida e não bug. ⚠️ **Quem criar o
-  primeiro efeito que mexa na vida do monstro tem que decidir qual dos dois lados está certo** — não
-  os dois.
+- **`[2b]`** · **`web`** · `TelaMesa.tsx` — o teto de vida do **monstro** degrada com `?? 0` em
+  `tetoDoInstantaneo`, e o modo de falha é **o INVERSO do que esta entrada dizia até 2026-08-10**.
+  🔴 **A versão antiga (*"a tela degrada e o reducer levanta 500", "inalcançável hoje porque nenhuma
+  carta da calibragem mexe na vida do monstro"*) estava errada nas duas metades.** A Poção de Cura
+  **é** carta da calibragem (`{ vida: 5 }`) **e** é ofertável no alvo `monstro` —
+  `botoesDeInstantaneo` desenha os dois alvos para **toda** carta.
+
+  **O que acontece de verdade, no cenário que o `?? 0` existe para sobreviver (skew de versão: bundle
+  antigo, monstro que ele não conhece):**
+
+  | Lado | Conta | Resultado |
+  |---|---|---|
+  | tela | `tetoDoInstantaneo('monstro')` = **0** ⇒ `comVida(20, +5, 0)` = `max(1, min(25, 0))` = **1** ≠ 20 ⇒ `mudou = true` | 🔴 **botão ACESO** |
+  | servidor | o catálogo dele **tem** o monstro (o combate nasceu dele), teto = 20 ⇒ `comVida(20, +5, 20)` = 20 ⇒ `mudou = false` | 🔴 **`AcaoInvalida` ⇒ 400 na cara do jogador** |
+
+  ➡️ **A tela é PERMISSIVA, não conservadora**, e o reducer responde **400**, não 500. O ramo do
+  `Error` cru (`mesa.ts`, *"monstro desconhecido"*) é **inalcançável neste cenário** justamente
+  porque o monstro do combate aberto existe no catálogo do **servidor** por construção.
+
+  ⚠️ **A direção contrária também existe, e é mais estreita:** com o monstro **já em vida 1**, a
+  tela calcula `comVida(1, +5, 0)` = 1 ⇒ `mudou = false` e **APAGA** um botão que o domínio
+  **aceitaria** (`comVida(1, +5, 20)` = 6). As duas direções saem do mesmo `?? 0`.
+
+  ⚠️ **Só o TEXTO foi corrigido nesta leva.** O conserto de código — `tetoDoInstantaneo` devolver
+  `null` no skew e o botão **apagar** em vez de acender — **fica como dívida**, com a decisão de qual
+  lado manda ainda em aberto.
 
 ## 🧩 Duplicação candidata a extração
 
