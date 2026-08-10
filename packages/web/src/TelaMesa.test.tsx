@@ -72,6 +72,18 @@ const CLASSES_PADRAO: Catalogo['classes'] = [
   { id: 'guerreiro', nome: 'Guerreiro', texto: '…' },
 ];
 
+// Mesma ideia, para os consumíveis (Task 7): sem o catálogo o nome cairia no
+// fallback `?? id`. ⚠️ NÃO é o default de `abrirMesa` (ao contrário das quatro
+// famílias acima) — o describe "a mochila" já tem um teste que depende do
+// fallback (`pocao-de-cura` cru, sem catálogo) para achar a linha; virar
+// default global trocaria o texto que esse teste procura. Quem precisa dos
+// nomes reais passa este fixture explicitamente.
+const INSTANTANEOS_PADRAO: Catalogo['instantaneos'] = [
+  { id: 'pocao-de-cura', nome: 'Poção de Cura', efeitos: [{ tipo: 'stats', modificadores: { vida: 5 } }] },
+  { id: 'elixir-de-forca', nome: 'Elixir de Força', efeitos: [{ tipo: 'stats', modificadores: { forca: 3 } }] },
+  { id: 'areia-nos-olhos', nome: 'Areia nos Olhos', efeitos: [{ tipo: 'stats', modificadores: { forca: -2 } }] },
+];
+
 /** Uma carta de Tesouro na mão (ou já no corpo). */
 const tesouro = (id: string, itemId = 'espada-curta') =>
   ({ id, tipo: 'equipamento' as const, itemId });
@@ -142,9 +154,11 @@ const abrirMesa = async (
   monstros: Catalogo['monstros'] = MONSTROS_PADRAO,
   itens: Catalogo['itens'] = ITENS_PADRAO,
   classes: Catalogo['classes'] = CLASSES_PADRAO,
+  // Default `[]`, e NÃO `INSTANTANEOS_PADRAO`: ver o comentário do fixture.
+  instantaneos: Catalogo['instantaneos'] = [],
 ) => {
   vi.spyOn(api, 'criarPartida').mockResolvedValue({ status: 200, body: vista } as never);
-  render(<TelaMesa racas={racas} monstros={monstros} itens={itens} classes={classes} />);
+  render(<TelaMesa racas={racas} monstros={monstros} itens={itens} classes={classes} instantaneos={instantaneos} />);
   await userEvent.click(screen.getByRole('button', { name: /nova partida/i }));
 };
 
@@ -1733,5 +1747,193 @@ describe('TelaMesa — atacar e esquivar', () => {
 
     expect(screen.getByRole('button', { name: 'Esquivar' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Atacar' })).toBeDisabled();
+  });
+});
+
+describe('TelaMesa — instantâneos no combate', () => {
+  const MONSTROS_COMBATE: Catalogo['monstros'] = [
+    { id: 'goblin', nome: 'Goblin', forca: 4, vida: 20, habilidade: 2, agilidade: 4, level: 1, tesouros: 1, badStuff: [] },
+  ];
+
+  /**
+   * Combate em curso com a mão/mochila de p1 sob controle do teste. A vida do
+   * jogador e o teto (`vidaInicialJogador`) são os dois números que decidem se
+   * "Poção de Cura" tem efeito — o resto do `EstadoCombate` é só o mínimo para a
+   * vista ficar coerente (mesmo molde do `emCombateContra` dos describes acima).
+   */
+  const emCombateComCartas = (opts: {
+    readonly suaMao?: readonly CartaNaMao[];
+    readonly mochila?: readonly CartaTesouro[];
+    readonly vidaDoJogador?: number;
+    readonly vidaInicialJogador?: number;
+    readonly forcaDoJogador?: number;
+  }, overrides: Partial<Pick<VistaDaPartida, 'vezDe'>> = {}): VistaDaPartida => {
+    const suaMao = opts.suaMao ?? [];
+    const mochila = opts.mochila ?? [];
+    return {
+      ...vistaBase,
+      fase: 'combate',
+      suaMao,
+      jogadores: vistaBase.jogadores.map((j) => (
+        j.id === 'p1' ? { ...j, cartasNaMao: suaMao.length, mochila } : j
+      )),
+      ...overrides,
+      combate: {
+        monstroId: 'goblin',
+        proximaDecisao: 'ataque',
+        estado: {
+          jogador: {
+            ...combatente,
+            vida: opts.vidaDoJogador ?? combatente.vida,
+            forca: opts.forcaDoJogador ?? combatente.forca,
+          },
+          monstro: { forca: 4, vida: 23, habilidade: 2, agilidade: 4, level: 5 },
+          vez: 'jogador',
+          turno: 3,
+          ataqueDoMonstro: null,
+          desfecho: 'emAndamento',
+          vidaInicialJogador: opts.vidaInicialJogador ?? combatente.vida,
+          passivas: [],
+        },
+      },
+    };
+  };
+
+  it('mostra um botão por instantâneo usável, da mão E da mochila', async () => {
+    // Mutação que este teste morde: esquecer a mochila na lista de usáveis — só
+    // a poção (da mão) apareceria, e o elixir (da mochila) nunca teria botão.
+    await abrirMesa(
+      emCombateComCartas({
+        suaMao: [{ id: 't1', tipo: 'instantaneo', instantaneoId: 'pocao-de-cura' }],
+        mochila: [{ id: 't2', tipo: 'instantaneo', instantaneoId: 'elixir-de-forca' }],
+        vidaDoJogador: 4,
+      }),
+      undefined, MONSTROS_COMBATE, undefined, undefined, INSTANTANEOS_PADRAO,
+    );
+
+    expect(await screen.findByRole('button', { name: /Poção de Cura.*em si/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /Elixir de Força.*em si/i })).toBeEnabled();
+  });
+
+  it('oferece os DOIS alvos — em si e no monstro', async () => {
+    await abrirMesa(
+      emCombateComCartas({
+        suaMao: [{ id: 't1', tipo: 'instantaneo', instantaneoId: 'areia-nos-olhos' }],
+      }),
+      undefined, MONSTROS_COMBATE, undefined, undefined, INSTANTANEOS_PADRAO,
+    );
+
+    expect(await screen.findByRole('button', { name: /Areia nos Olhos.*em si/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Areia nos Olhos.*no monstro/i })).toBeEnabled();
+  });
+
+  // #26: o botão APAGA, não some — e a regra vem do domínio (`instantaneoTemEfeito`),
+  // nunca de uma cópia local. Mutação que este teste morde: `disabled={false}` fixo.
+  it('APAGA o botão da poção quando a vida está cheia — o guard de desperdício', async () => {
+    await abrirMesa(
+      emCombateComCartas({
+        suaMao: [{ id: 't1', tipo: 'instantaneo', instantaneoId: 'pocao-de-cura' }],
+        vidaDoJogador: 10,
+        vidaInicialJogador: 10,
+      }),
+      undefined, MONSTROS_COMBATE, undefined, undefined, INSTANTANEOS_PADRAO,
+    );
+
+    const botao = await screen.findByRole('button', { name: /Poção de Cura.*em si/i });
+    expect(botao).toBeDisabled();
+    // #26: continua no DOM, só apagado — não some.
+    expect(botao).toBeInTheDocument();
+  });
+
+  // Mutação que este teste morde: gate de existência escrito só com
+  // `instantaneosDoJogador.length > 0` (esquecendo `combate !== null`) — o botão
+  // apareceria em QUALQUER fase, sem alvo nenhum para calcular.
+  it('não mostra botão de instantâneo sem combate aberto', async () => {
+    // `vasculhar` (o default de `vistaBase`) nunca se auto-pula (`faseSeAutoPula`),
+    // então uma mão só com o instantâneo é uma vista que o domínio produz sem
+    // ajuste nenhum — ao contrário de `jogar`/`recompor`, que exigiriam checar o
+    // guard antes de montar o fixture. `combate: null` é o default de `vistaBase`.
+    await abrirMesa(
+      comMao(vistaBase, [{ id: 't1', tipo: 'instantaneo', instantaneoId: 'pocao-de-cura' }]),
+      undefined, MONSTROS_COMBATE, undefined, undefined, INSTANTANEOS_PADRAO,
+    );
+
+    await screen.findByRole('button', { name: /vasculhar local/i });
+    expect(screen.queryByRole('button', { name: /Poção de Cura/i })).not.toBeInTheDocument();
+  });
+
+  // Mutação que este teste morde: `disabled` escrito sem `!legal('usarInstantaneo')`
+  // — o botão ficaria clicável para quem só está ASSISTINDO o combate alheio.
+  it('APAGA (não some) quando não é a sua vez — combate alheio à vista, convenção #26', async () => {
+    // `vista.combate` é a projeção do combate ATIVO na mesa, não "o seu combate":
+    // um espectador com uma poção na mão também vê `combate !== null` sem que
+    // seja a vez dele de agir (`vezDe: 'p2'`). Sem o gêmeo de `legal()` no
+    // `disabled`, o clique mandaria `usarInstantaneo` fora de vez e o domínio
+    // recusaria com um 400 — o mesmo modo de falha que "Atacar"/"Esquivar" já
+    // evitam apagando, nunca sumindo.
+    await abrirMesa(
+      emCombateComCartas({
+        suaMao: [{ id: 't1', tipo: 'instantaneo', instantaneoId: 'pocao-de-cura' }],
+        vidaDoJogador: 4,
+      }, { vezDe: 'p2' }),
+      undefined, MONSTROS_COMBATE, undefined, undefined, INSTANTANEOS_PADRAO,
+    );
+
+    const botao = await screen.findByRole('button', { name: /Poção de Cura.*em si/i });
+    expect(botao).toBeDisabled();
+    expect(botao).toBeInTheDocument();
+  });
+
+  it('clicar em "em si" manda usarInstantaneo com o alvo lutador e o id DAQUELA carta', async () => {
+    const agir = vi.spyOn(api, 'agir').mockResolvedValue({ status: 200, body: vistaBase } as never);
+    await abrirMesa(
+      emCombateComCartas({
+        suaMao: [{ id: 't1', tipo: 'instantaneo', instantaneoId: 'pocao-de-cura' }],
+        vidaDoJogador: 4,
+      }),
+      undefined, MONSTROS_COMBATE, undefined, undefined, INSTANTANEOS_PADRAO,
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: /Poção de Cura.*em si/i }));
+
+    expect(agir).toHaveBeenCalledWith({
+      params: { id: 'm1' },
+      body: { acao: { tipo: 'usarInstantaneo', cartaId: 't1', alvo: 'lutador' }, versao: 1 },
+    });
+  });
+
+  it('clicar em "no monstro" manda o alvo monstro, não lutador — o gêmeo do teste acima', async () => {
+    // Simétrico ao de cima: sem ele, trocar `alvo: 'monstro'` por `'lutador'` no
+    // segundo botão passaria a suíte inteira verde.
+    const agir = vi.spyOn(api, 'agir').mockResolvedValue({ status: 200, body: vistaBase } as never);
+    await abrirMesa(
+      emCombateComCartas({
+        suaMao: [{ id: 't1', tipo: 'instantaneo', instantaneoId: 'areia-nos-olhos' }],
+      }),
+      undefined, MONSTROS_COMBATE, undefined, undefined, INSTANTANEOS_PADRAO,
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: /Areia nos Olhos.*no monstro/i }));
+
+    expect(agir).toHaveBeenCalledWith({
+      params: { id: 'm1' },
+      body: { acao: { tipo: 'usarInstantaneo', cartaId: 't1', alvo: 'monstro' }, versao: 1 },
+    });
+  });
+
+  it('o painel de combate mostra os stats EFETIVOS, não o corpo montado (`jogadores[].combatente`)', async () => {
+    // O jogador chega ao painel com a força já bufada (6, três acima da força
+    // MONTADA — `combatente.forca` é 3 na `vistaBase`): se a tela lesse do corpo
+    // montado em vez de `combate.estado.jogador`, o número aqui seria 3, e quem
+    // acabou de queimar o Elixir não veria o efeito em lugar nenhum da tela.
+    await abrirMesa(
+      emCombateComCartas({ forcaDoJogador: 6 }),
+      undefined, MONSTROS_COMBATE,
+    );
+
+    const painel = (await screen.findByText(/Goblin:/)).closest('p');
+    if (painel === null) throw new Error('painel de combate não encontrado no DOM');
+    expect(within(painel).getByText(/força 6/)).toBeInTheDocument();
+    expect(within(painel).queryByText(/força 3/)).not.toBeInTheDocument();
   });
 });

@@ -288,6 +288,12 @@ export { afinidadeCom, contribuicaoDe } from '@card-dungeon/partida';
 // velho de botões no dia em que a regra mudar — e isso é 400 na cara do jogador.
 export { precisaEscolherMao } from '@card-dungeon/partida';
 
+// Valor, mesmo motivo dos três acima: "esta carta faria efeito neste alvo?" é o
+// MESMO guard de desperdício que `usarInstantaneo` (`mesa.ts`) cobra antes de
+// aplicar o efeito (spec §5.5). A `TelaMesa` chama esta função para decidir o
+// `disabled` do botão "Usar" — nunca reimplementa a conta de piso/teto aqui.
+export { instantaneoTemEfeito } from '@card-dungeon/partida';
+
 const c = initContract();
 
 /**
