@@ -356,8 +356,8 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   //   jogar                guardarCarta   mochila cheia                `guardarCarta`
   //   combate              atacar         `proximaDecisao`             o motor (`AcaoIlegal`)
   //   combate              esquivar       `proximaDecisao`             o motor (`AcaoIlegal`)
-  //   combate              usarInstantaneo  a carta é instantâneo, na mão OU mochila  `usarInstantaneo`
-  //   combate              usarInstantaneo  o efeito muda alguma coisa (o `mudou` de `aplicarInstantaneo`) `usarInstantaneo`
+  //   combate              usarInstantaneo  a carta é instantâneo, na mão OU mochila  `usarInstantaneo` (gêmeo DEVIDO na Task 7 — nenhum botão "Usar" existe ainda)
+  //   combate              usarInstantaneo  o efeito muda alguma coisa (o `mudou` de `aplicarInstantaneo`) `usarInstantaneo` (gêmeo DEVIDO na Task 7, idem)
   //   encrenca             procurarEncrenca  a carta é do tipo monstro `procurarEncrenca`
   //   ↑ VINTE pares. As três linhas abaixo NÃO são par — estão aqui para provar
   //     que a recontagem chegou até estes verbos:
@@ -421,7 +421,7 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   // jogador nunca aprende que existe.
   //
   // HISTÓRICO da contagem, que é a lição do parágrafo acima — os números abaixo
-  // são de planos passados, NÃO a contagem de hoje (que é DEZOITO, como dizem o
+  // são de planos passados, NÃO a contagem de hoje (que é VINTE, como dizem o
   // preâmbulo lá em cima e a última entrada deste histórico):
   // no Plano 3b a lista subiu de sete para oito, e ao conferir descobriu-se que a
   // contagem anterior também mentia — as linhas `vasculhar/descartar` escondiam

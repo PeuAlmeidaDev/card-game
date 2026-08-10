@@ -89,9 +89,16 @@ export function aplicarInstantaneo(
 
 /**
  * "Jogar esta carta neste alvo faz alguma coisa?" — a pergunta do guard de
- * desperdício (spec §5.5), respondida em UM lugar e consumida por DOIS: o reducer
- * (que recusa com `AcaoInvalida`) e a `TelaMesa` (que apaga o botão, convenção
- * #26). Republicada por `shared` para que a tela LEIA a regra em vez de copiá-la.
+ * desperdício (spec §5.5). A REGRA é o `mudou` que `aplicarInstantaneo` já
+ * devolve; esta função é o ATALHO para quem só quer a pergunta, sem o estado —
+ * hoje, ninguém. `usarInstantaneo` (`./mesa`, Task 4) reusa o `mudou` da MESMA
+ * chamada de `aplicarInstantaneo` que já precisa fazer para aplicar o efeito
+ * (chamar esta função ali RODARIA o interpretador duas vezes à toa). A `TelaMesa`
+ * — que vai chamar esta função de verdade, para apagar o botão "Usar" sem
+ * aplicar nada (convenção #26) — só nasce na Task 7.
+ *
+ * Zero chamadores de produção HOJE. Republicada por `shared` desde já para que,
+ * quando a Task 7 chegar, a tela LEIA a regra em vez de copiá-la.
  *
  * 🔑 Por que ela é geral e não "cura com vida cheia": um Areia nos Olhos contra um
  * monstro já no piso de força também não faz nada, e um guard escrito só para a

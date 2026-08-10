@@ -16,7 +16,7 @@ import {
   catalogoDeTeste, comClasseDeTeste, ID_DA_CLASSE_DE_TESTE, CLASSE_DE_TESTE, MONSTRO_DE_TESTE, ID_DO_ITEM_EXCLUSIVO,
   ID_DA_RACA_OUTRA, ID_DA_RACA_DONA, ID_DO_ITEM_DE_TESTE, ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS, ID_DO_ITEM_EXCLUSIVO_PES,
   ID_DO_ITEM_EXCLUSIVO_DE_CLASSE, ID_DO_ITEM_DE_CAPACETE, ID_DO_ITEM_DUAS_MAOS,
-  ID_DO_MONSTRO_DE_TESTE, ID_DO_INSTANTANEO_DUPLO,
+  ID_DO_MONSTRO_DE_TESTE, ID_DO_INSTANTANEO_DUPLO, ID_DO_INSTANTANEO_NEGATIVO,
 } from './testes/catalogo';
 import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import { combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
@@ -507,11 +507,16 @@ describe('aplicarAcao — usarInstantaneo', () => {
   it('recusa quando o efeito não muda nada (cura com a vida cheia)', () => {
     // Sem `vidaDoJogador`: o lutador abre o combate com a vida cheia (teto 20), e
     // a cura de 4 do `ID_DO_INSTANTANEO_DE_TESTE` clampa sem mudar nada.
+    //
+    // Mensagem ESPECÍFICA, não só `AcaoInvalida`: `usarInstantaneo` tem DOIS
+    // guards que lançam a mesma classe, e o teste que só confere o tipo passa
+    // mesmo se o guard ERRADO for o que recusou (a segunda pergunta da lição —
+    // "reprova pelo motivo certo?").
     const estado = estadoEmCombate({ mao: [instantaneo('t5')] });
 
     expect(() => aplicarAcao(
       estado, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't5', alvo: 'lutador' }, deps([]),
-    )).toThrow(AcaoInvalida);
+    )).toThrow('esta carta não faria efeito neste alvo');
   });
 
   it('recusa carta que não é instantâneo', () => {
@@ -519,7 +524,7 @@ describe('aplicarAcao — usarInstantaneo', () => {
 
     expect(() => aplicarAcao(
       estado, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't6', alvo: 'lutador' }, deps([]),
-    )).toThrow(AcaoInvalida);
+    )).toThrow('carta não é um instantâneo da sua mão ou mochila');
   });
 
   it('recusa fora da fase `combate`', () => {
@@ -563,12 +568,74 @@ describe('aplicarAcao — usarInstantaneo', () => {
     // da vida cheia do `MONSTRO_DE_TESTE` (10) e o guard de desperdício sumiria.
     // Task 3 (`instantaneo.test.ts`) cobre o `aplicarInstantaneo` puro; este é o
     // cenário de INTEGRAÇÃO — o reducer lendo o teto certo do catálogo.
+    //
+    // Mensagem ESPECÍFICA (fix round 1): este teste depende do MESMO guard do
+    // "recusa quando o efeito não muda nada" — `toThrow(AcaoInvalida)` sozinho
+    // não prova que foi ESTE guard que recusou, e não o de "carta não é
+    // instantâneo" por engano de fixture.
     const estado = estadoEmCombate({ mao: [instantaneo('t9')] });
     expect(estado.combate?.estado.monstro.vida).toBe(MONSTRO_DE_TESTE.vida);
 
     expect(() => aplicarAcao(
       estado, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't9', alvo: 'monstro' }, deps([]),
-    )).toThrow(AcaoInvalida);
+    )).toThrow('esta carta não faria efeito neste alvo');
+  });
+
+  it('aplica o efeito no MONSTRO — o caminho feliz do alvo `monstro`, provado por mutação', () => {
+    // Important 1 da revisão (fix round 1): sem este teste, substituir o RAMO
+    // INTEIRO do alvo `monstro` por um `throw new AcaoInvalida` incondicional
+    // deixava 407/407 VERDES — a metade da ação que enfraquece o adversário podia
+    // ser deletada em silêncio. `instantaneo.test.ts` prova a função pura e
+    // `narrarEvento.test.tsx` prova o texto; este é o FIO entre os dois, no
+    // reducer — exatamente o que a fatia anterior provou que ninguém prendia.
+    const estado = estadoEmCombate({ mao: [instantaneo('t10', ID_DO_INSTANTANEO_NEGATIVO)] });
+    expect(estado.combate?.estado.monstro.forca).toBe(MONSTRO_DE_TESTE.forca);
+
+    const r = aplicarAcao(
+      estado, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't10', alvo: 'monstro' }, deps([]),
+    );
+
+    // Piso 1: força 2 (do `MONSTRO_DE_TESTE`) menos 99 clampa em 1 — mas o que
+    // importa aqui é que MUDOU (2 → 1), não o valor exato.
+    expect(r.estado.combate?.estado.monstro.forca).toBeLessThan(MONSTRO_DE_TESTE.forca);
+    expect(r.estado.tesouros.cemiterio.map((c) => c.id)).toContain('t10');
+    expect(r.eventos).toContainEqual({
+      tipo: 'usouInstantaneo', jogadorId: 'p1',
+      carta: instantaneo('t10', ID_DO_INSTANTANEO_NEGATIVO),
+      alvo: 'monstro', monstroId: ID_DO_MONSTRO_DE_TESTE,
+    });
+  });
+
+  it('instantâneo fora do catálogo é Error cru, nunca AcaoInvalida', () => {
+    // Minor 5 da revisão: mesmo padrão de "monstro fora do catálogo na hora do
+    // loot é Error cru" (describe `vencer larga tesouro na mão`, mais abaixo) —
+    // id órfão é invariante NOSSA quebrada (a carta só chega à mesa pela
+    // composição que a borda montou do próprio catálogo), não pedido inválido.
+    const estado = estadoEmCombate({ mao: [instantaneo('t11', 'instantaneo-fantasma')] });
+
+    expect(() => aplicarAcao(
+      estado, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't11', alvo: 'lutador' }, deps([]),
+    )).toThrow(/instantaneo-fantasma/);
+    expect(() => aplicarAcao(
+      estado, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't11', alvo: 'lutador' }, deps([]),
+    )).not.toThrow(AcaoInvalida);
+  });
+
+  it('monstro fora do catálogo no alvo `monstro` é Error cru, nunca AcaoInvalida', () => {
+    // Gêmeo do teste acima, para o SEGUNDO `Error` cru da função — só alcançável
+    // com `alvo: 'monstro'`, porque é aí que `usarInstantaneo` relê o catálogo de
+    // monstros para saber o teto de vida do adversário.
+    const estado = estadoEmCombate({ mao: [instantaneo('t12', ID_DO_INSTANTANEO_NEGATIVO)] });
+    const comCombate = estado.combate;
+    expect(comCombate).not.toBeNull();
+    const orfao: EstadoPartida = { ...estado, combate: { ...comCombate!, monstroId: 'quimera-fantasma' } };
+
+    expect(() => aplicarAcao(
+      orfao, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't12', alvo: 'monstro' }, deps([]),
+    )).toThrow(/quimera-fantasma/);
+    expect(() => aplicarAcao(
+      orfao, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't12', alvo: 'monstro' }, deps([]),
+    )).not.toThrow(AcaoInvalida);
   });
 });
 

@@ -34,7 +34,7 @@ não mantém cópia da regra.
 - ⚠️ **`encrenca` NÃO é fase parada e nunca se auto-pula** (#62) — ela usa `registrar`, não
   `entrarOuPular`, e tem **duas opções sempre** porque o baralho de Portas nunca acaba.
 
-## 🔢 A tabela de pares finos — **DEZOITO pares em VINTE E UMA linhas**
+## 🔢 A tabela de pares finos — **VINTE pares em VINTE E TRÊS linhas**
 
 Vive no comentário do `aplicarAcao` (`src/mesa.ts`). É a peça de manutenção mais delicada do repo.
 
@@ -59,8 +59,15 @@ na tela**, porque o `legal()` da `TelaMesa` lê só a tabela de fases. **Botão 
    consequência do reducer dentro de `fecharCombate`, não passa por `acaoEhLegal`, e **não há botão
    na tela para ter gêmeo**. Regra geral: **efeito disparado pelo domínio não gera par fino; só ação
    que o cliente pede gera.**
+   ✅ **Recontado de novo em 2026-08-09** (Task 4 da fatia `consumíveis (instantâneo)`),
+   `AcaoInvalida` por `AcaoInvalida`: **18 → 20 pares, 21 → 23 linhas**. `usarInstantaneo` é verbo
+   NOVO com DOIS `AcaoInvalida` próprios ("carta não é instantâneo da mão/mochila" e "o efeito não
+   muda nada" — o guard de desperdício, spec §5.5), uma linha cada, porque a ação só é legal numa
+   fase (`combate`) — sem a duplicação que `equiparCarta`/`afinidadeCom` pagam por serem legais nas
+   duas paradas. **Os dois pares ainda NÃO têm gêmeo na `TelaMesa`** — o botão "Usar" nasce na
+   Task 7 — e por isso as duas linhas da tabela dizem isso em texto, não silenciosamente.
 
-⚠️ **Três das 21 linhas NÃO são par, e estão lá de propósito:**
+⚠️ **Três das 23 linhas NÃO são par, e estão lá de propósito:**
 
 - **`saquear`** não tem guard fino nenhum (#62: o baralho de Portas nunca acaba). A linha prova que
   **a recontagem CHEGOU até `saquear`**.
