@@ -1983,5 +1983,13 @@ describe('TelaMesa — instantâneos no combate', () => {
     if (painel === null) throw new Error('painel de combate não encontrado no DOM');
     expect(within(painel).getByText(/força 6/)).toBeInTheDocument();
     expect(within(painel).queryByText(/força 3/)).not.toBeInTheDocument();
+    // O lado do MONSTRO, que entrou sem asserção nenhuma na Task 7 — e é ELE que
+    // torna a Areia nos Olhos visível (o item 3 do gate ocular manda ver "a força
+    // do monstro cair no painel"). Ancorado no rótulo do monstro, e não num
+    // `/força 4/` solto: o painel é um `<p>` só, então os dois lados vivem na
+    // mesma string e um número solto não diz de quem é.
+    expect(
+      within(painel).getByText(/Goblin: 23 de vida · força 4 · habilidade 2 · agilidade 4/),
+    ).toBeInTheDocument();
   });
 });
