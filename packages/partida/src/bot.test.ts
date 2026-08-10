@@ -1043,4 +1043,67 @@ describe('escolherAcao — o bot queima consumível em combate (Task 5)', () => 
       tipo: 'usarInstantaneo', jogadorId: 'j1', cartaId: 't6', alvo: 'lutador',
     });
   });
+
+  // 🔴 Fix round 1 (achado do revisor): a terminação do laço de buffs do turno 0
+  // era garantida só por CONSTRUÇÃO — `usarInstantaneo` remove a carta da mão E
+  // da mochila (`mesa.ts`), então `candidatas` encolhe a cada volta —, mas
+  // nenhum teste prendia isso. Mesmo perfil da armadilha do `>` estrito de
+  // `vestirOuGuardar` (`packages/partida/CLAUDE.md`): "óbvio por construção" e
+  // sem um teste mordendo até o soak medir o contrário. Aqui o risco concreto é
+  // a Task 9: centenas de partidas simuladas onde um laço que não termina não
+  // dá um teste vermelho, dá um soak pendurado.
+  //
+  // Cenário montado por um caminho REAL, não por campos cravados: `vasculhar`
+  // de verdade revela o monstro do monte, `avancarBots` de verdade dirige o
+  // bot (não um laço manual imitando ele), e as cartas nascem nas zonas onde o
+  // jogo as põe — DUAS na mão, UMA na mochila, cobrindo as duas origens que
+  // `talvezUsarInstantaneo` lê. O monstro é fraco de propósito (vida 1): não é
+  // para provar nada do COMBATE, é só o jeito mais curto de deixar a luta
+  // terminar depois que os buffs acabam, sem inflar o teste com dezenas de
+  // rodadas.
+  it('esgota os buffs do turno 0 e passa a atacar — avancarBots termina', () => {
+    const monstroFraco = { forca: 0, vida: 1, habilidade: 1, agilidade: 0, level: 1, tesouros: 0, badStuff: [] };
+    const catalogoFraco = catalogoDeTeste({ monstro: () => monstroFraco });
+
+    const p = criarPartida('c-fix1', entradasDeCombate, soMonstro, { embaralhar: semEmbaralhar });
+    const comVariosBuffs: EstadoPartida = {
+      ...p,
+      vezDe: 'j2',
+      fase: 'vasculhar',
+      jogadores: p.jogadores.map((j) => (
+        j.id === 'j2'
+          ? {
+              ...j,
+              mao: [instantaneo('b1', ID_DO_INSTANTANEO_DUPLO), instantaneo('b2', ID_DO_INSTANTANEO_DUPLO)],
+              mochila: [instantaneo('b3', ID_DO_INSTANTANEO_DUPLO)],
+            }
+          : j
+      )),
+    };
+
+    // Ataque acerta (1 ≤ habilidade), esquiva do monstro falha (12 > 1): um
+    // golpe só (dano 1+3=4 contra vida 1) fecha o combate. Sobra de dados de
+    // propósito — o ponto do teste é a terminação, não economizar rolagem.
+    const r = avancarBots(comVariosBuffs, {
+      rolar: filaDeDados([1, 12, 12, 12, 12, 12]),
+      embaralhar: semEmbaralhar,
+      catalogo: catalogoFraco,
+    });
+
+    // (a) TERMINOU: `avancarBots` devolveu em vez de lançar "teto de ações
+    // automáticas atingido", e a vez voltou ao humano.
+    expect(r.estado.vezDe).toBe('j1');
+
+    // (b) as TRÊS cartas saíram das duas zonas de origem.
+    const j2Final = r.estado.jogadores.find((j) => j.id === 'j2')!;
+    expect(j2Final.mao.some((c) => ['b1', 'b2', 'b3'].includes(c.id))).toBe(false);
+    expect(j2Final.mochila.some((c) => ['b1', 'b2', 'b3'].includes(c.id))).toBe(false);
+
+    const usos = r.estado.log.filter((e) => e.tipo === 'usouInstantaneo' && e.jogadorId === 'j2');
+    expect(usos).toHaveLength(3); // as TRÊS, nem uma a menos — a janela não fechou cedo demais
+
+    // (c) a política SAIU da janela de buff: o combate foi resolvido por um
+    // ataque de verdade, não ficou girando em `usarInstantaneo` para sempre.
+    expect(r.estado.combate).toBeNull();
+  });
 });
