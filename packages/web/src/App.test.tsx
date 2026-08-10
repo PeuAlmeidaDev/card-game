@@ -16,6 +16,7 @@ const catalogo: Catalogo = {
   monstros: [{ id: 'goblin', nome: 'Goblin', forca: 4, vida: 20, habilidade: 2, agilidade: 4, level: 1, tesouros: 1, badStuff: [] }],
   classes: [{ id: 'guerreiro', nome: 'Guerreiro', texto: 'Impacto: quando ele ataca, o empate não salva ninguém.' }],
   itens: [{ id: 'espada-curta', nome: 'Espada Curta', slot: 'mao', duasMaos: false, modificadores: { forca: 2 }, exclusivo: null }],
+  instantaneos: [],
 };
 
 function json(data: unknown): Response {

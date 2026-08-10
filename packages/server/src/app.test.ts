@@ -3,7 +3,7 @@ import type { RolarD12 } from '@card-dungeon/motor';
 import type { Catalogo, VistaDaPartida } from '@card-dungeon/shared';
 import type { Embaralhar } from '@card-dungeon/partida';
 import { MAO_INICIAL_PADRAO, MAO_INICIAL_TESOUROS } from '@card-dungeon/partida';
-import { obterMonstro, ITENS_SACAVEIS, CLASSES_SACAVEIS } from '@card-dungeon/cartas';
+import { obterMonstro, ITENS_SACAVEIS, INSTANTANEOS_SACAVEIS, CLASSES_SACAVEIS } from '@card-dungeon/cartas';
 import { buildApp } from './app';
 
 function filaDeDados(rolagens: readonly number[]): RolarD12 {
@@ -35,6 +35,18 @@ describe('GET /catalogo', () => {
     expect(body.racas.find((r) => r.id === 'orc')).toBeTruthy();
     expect(body.racas[0]).toHaveProperty('texto');
     expect(body.racas[0]).not.toHaveProperty('modificadores');
+    await app.close();
+  });
+
+  it('o catálogo publica os instantâneos, com nome e efeitos', async () => {
+    // Sem isto a tela recebe um `instantaneoId` na mão/mochila e não sabe nem o
+    // nome da carta (spec §7 da fatia `consumíveis (instantâneo)`, Task 6).
+    const app = buildApp();
+    const res = await app.inject({ method: 'GET', url: '/api/catalogo' });
+    const body = res.json<Catalogo>();
+    expect(body.instantaneos.map((i) => i.id)).toContain('pocao-de-cura');
+    expect(body.instantaneos[0]).toHaveProperty('nome');
+    expect(body.instantaneos[0]).toHaveProperty('efeitos');
     await app.close();
   });
 });
@@ -295,22 +307,26 @@ describe('mesa', () => {
     await app.close();
   });
 
-  it('a mesa de 4 nasce com 32 Tesouros no monte — 48 no baralho menos as 16 da mão inicial', async () => {
-    // O baralho de produção é DERIVADO do catálogo (`app.ts`, via `ITENS_SACAVEIS`), então ele
-    // muda de tamanho toda vez que um item entra. Sem esta asserção, a mudança acontece calada.
-    //   12 itens × 4 jogadores = 48 no baralho
+  it('a mesa de 4 nasce com 48 Tesouros no monte — 64 no baralho (25% consumível) menos as 16 da mão inicial', async () => {
+    // O baralho de produção é a RECEITA DECLARADA desde a fatia `consumíveis
+    // (instantâneo)` (decisão #40): 12 equipamentos + 4 instantâneos por
+    // jogador = 16/jogador, 64 na mesa de 4. Sem esta asserção, a mudança
+    // acontece calada.
+    //   (12 itens + 4 instantâneos) × 4 jogadores = 64 no baralho
     //   MAO_INICIAL_TESOUROS (4) × 4 jogadores = 16 distribuídas
-    //   48 − 16 = 32 no monte
+    //   64 − 16 = 48 no monte
     // ⚠️ Números DERIVADOS das constantes, não cravados: o dia em que o dial girar, este teste
     // acompanha em vez de mentir.
     const app = buildApp({ embaralhar: semEmbaralhar });
     const vista = await criar(app);
 
-    const esperado = ITENS_SACAVEIS.length * 4 - MAO_INICIAL_TESOUROS * 4;
+    const totalNoBaralho = (ITENS_SACAVEIS.length + INSTANTANEOS_SACAVEIS.length) * 4;
+    const esperado = totalNoBaralho - MAO_INICIAL_TESOUROS * 4;
     expect(vista.tesourosNoMonte).toBe(esperado);
     // E o valor de HOJE, cravado de propósito ao lado: se alguém mexer nas constantes sem querer,
-    // a linha acima acompanha em silêncio e esta acusa.
-    expect(esperado).toBe(32);
+    // a linha acima acompanha em silêncio e esta acusa. 25% consumível: 16/64.
+    expect(totalNoBaralho).toBe(64);
+    expect(esperado).toBe(48);
     await app.close();
   });
 

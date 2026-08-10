@@ -7,7 +7,10 @@ export type {
   JogadorPublico, ZonaEmJogo, PosicaoFinal, EventoDaMesa, AcaoDaMesa, CombateNaMesa, EspiadaPendente, QueimaPendente,
   EstadoPartida, VistaDaPartida, ConfigPartida, EntradaJogador, Baralho, Fase,
 } from './tipos';
-export { montarComposicao, montarComposicaoTesouros, tirarDoTopo, type ReceitaDeBaralho } from './baralho';
+export {
+  montarComposicao, montarComposicaoTesouros, tirarDoTopo,
+  type ReceitaDeBaralho, type ReceitaDeTesouros,
+} from './baralho';
 export { combatenteDe, itensEquipados, afinidadeCom, contribuicaoDe, SLOTS_VAZIOS, type GrauDeAfinidade } from './corpo';
 // Valor: o par fino "as duas mãos ocupadas => `mao` obrigatória" tem dois
 // leitores, o reducer e a tela. Ver o docstring em `./equipar`.

@@ -4,8 +4,8 @@ import type { RolarD12 } from '@card-dungeon/motor';
 import { contrato } from '@card-dungeon/shared';
 import { CATALOGO } from '@card-dungeon/personagem';
 import {
-  MONSTROS_SACAVEIS, RACAS_SACAVEIS, CLASSES_SACAVEIS, ITENS_SACAVEIS, obterRaca, obterClasse, obterItem,
-  obterInstantaneo,
+  MONSTROS_SACAVEIS, RACAS_SACAVEIS, CLASSES_SACAVEIS, ITENS_SACAVEIS, INSTANTANEOS_SACAVEIS,
+  obterRaca, obterClasse, obterItem, obterInstantaneo,
   type MonstroCarta,
 } from '@card-dungeon/cartas';
 import {
@@ -93,14 +93,20 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
   });
 
   /**
-   * Baralho de Tesouros de produção: **uma carta para cada item do catálogo**,
-   * por jogador. ⚠️ Desde a decisão #52 esta regra NÃO é mais a mesma que Portas
-   * usa: Portas declara `copiasPorMonstro`/`copiasPorRaca` na borda (a #36
-   * proíbe derivar a proporção do catálogo); Tesouros ainda deriva a contagem do
-   * catálogo porque `montarComposicaoTesouros` não tem um dial de cópia — não há
-   * proporção para assinar quando existe uma família só (`equipamento`).
+   * 🎚️ Baralho de Tesouros de produção — RECEITA DECLARADA desde a fatia 2b
+   * (decisão #40): 1 cópia por item do catálogo (12) + 1 por instantâneo (4) =
+   * **16 por jogador, 64 na mesa de 4**, com **25% de consumível**.
+   *
+   * Por que 25% e não os ≥50% da #40: a receita-alvo do §11 põe o `instantâneo`
+   * em 4/jogador e a outra metade do consumível na `carta de combate`, que é do
+   * bloco 5. Esta é a dose FIEL ao alvo, não uma dose tímida.
    */
-  const composicaoTesourosDeProducao = montarComposicaoTesouros(ITENS_SACAVEIS.map((i) => i.id));
+  const composicaoTesourosDeProducao = montarComposicaoTesouros({
+    itemIds: ITENS_SACAVEIS.map((i) => i.id),
+    copiasPorItem: 1,
+    instantaneoIds: INSTANTANEOS_SACAVEIS.map((i) => i.id),
+    copiasPorInstantaneo: 1,
+  });
 
   // O server RESOLVE (pergunta à carta), nunca DECIDE (`racaId === 'elfo'` seria
   // regra de jogo na borda). As cartas do pacote `cartas` satisfazem
@@ -111,10 +117,9 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
     monstro: acharMonstro,
     classe: obterClasse,
     item: obterItem,
-    // Resolvedor exigido pelo tipo (fatia `consumíveis (instantâneo)`) — a mesa
-    // de PRODUÇÃO ainda não sabe sacar um instantaneo: `composicaoTesourosDeProducao`,
-    // acima, continua derivada só de `ITENS_SACAVEIS`. Sem receita nenhuma no
-    // baralho, este resolvedor não tem id para resolver ainda.
+    // O quinto resolvedor (fatia `consumíveis (instantâneo)`). Desde a Task 6,
+    // `composicaoTesourosDeProducao` (acima) inclui `INSTANTANEOS_SACAVEIS`, então
+    // este resolvedor já tem id de produção para resolver.
     instantaneo: obterInstantaneo,
   };
   const deps = { rolar, embaralhar, catalogo };

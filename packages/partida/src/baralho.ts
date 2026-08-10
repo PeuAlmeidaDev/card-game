@@ -56,21 +56,36 @@ export function montarComposicao(receita: ReceitaDeBaralho): ReceitaPorta[] {
 }
 
 /**
- * Composição do baralho de Tesouros: uma carta para cada id de item recebido.
- * Mais simples que a de Portas porque a família Itens só tem `equipamento` **em
- * código**.
+ * Receita do baralho de Tesouros: quais cartas e **quantas cópias de cada**.
  *
- * ⚠️ Os outros dois tipos de Item — `instantâneo` e `carta de combate` (decisões
- * #29 e #43 do game bible) — entram aqui quando existirem. **Maldição e classe
- * NÃO**: são cartas de PORTA (§4), e o comentário que dizia o contrário aqui
- * estava errado desde a fatia 8.
+ * 🔑 Objeto, e a proporção DITA em voz alta na borda, pelo mesmo motivo do
+ * `ReceitaDeBaralho` de Portas (decisão #36): derivar a proporção do tamanho do
+ * catálogo faz "quantos itens o jogo tem" decidir sozinho "qual a chance de vir
+ * consumível". Até a fatia 2b não havia proporção para assinar — existia uma
+ * família só, e o comentário desta função dizia isso. **Agora há**, e é a #40
+ * cobrando.
  *
- * Função própria e não um parâmetro a mais em `montarComposicao`: as duas
- * assinaturas divergem e juntá-las produziria uma função com metade dos
- * parâmetros ignorados por chamada.
+ * ⚠️ A `carta de combate` (decisão #43 do game bible) entra aqui quando
+ * existir. **Maldição e classe NÃO**: são cartas de PORTA (§4).
+ *
+ * Interface própria e não um parâmetro a mais em `ReceitaDeBaralho`: as duas
+ * assinaturas divergem e juntá-las produziria um objeto com metade dos campos
+ * ignorados por chamada.
  */
-export function montarComposicaoTesouros(itemIds: readonly string[]): ReceitaTesouro[] {
-  return itemIds.map((itemId): ReceitaTesouro => ({ tipo: 'equipamento', itemId }));
+export interface ReceitaDeTesouros {
+  readonly itemIds: readonly string[];
+  readonly copiasPorItem: number;
+  readonly instantaneoIds: readonly string[];
+  readonly copiasPorInstantaneo: number;
+}
+
+export function montarComposicaoTesouros(receita: ReceitaDeTesouros): ReceitaTesouro[] {
+  return [
+    ...receita.itemIds.flatMap((itemId): ReceitaTesouro[] =>
+      Array.from({ length: receita.copiasPorItem }, (): ReceitaTesouro => ({ tipo: 'equipamento', itemId }))),
+    ...receita.instantaneoIds.flatMap((instantaneoId): ReceitaTesouro[] =>
+      Array.from({ length: receita.copiasPorInstantaneo }, (): ReceitaTesouro => ({ tipo: 'instantaneo', instantaneoId }))),
+  ];
 }
 
 /**

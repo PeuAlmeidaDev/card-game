@@ -3508,7 +3508,10 @@ describe('encerrarTurno — quem evacuou recompra 4+4 quando a vez volta (Task 5
       classeIds: [],
       copiasPorClasse: 0,
     }),
-    composicaoTesouros: montarComposicaoTesouros(Array.from({ length: 10 }, () => 'i-teste')),
+    composicaoTesouros: montarComposicaoTesouros({
+      itemIds: Array.from({ length: 10 }, () => 'i-teste'), copiasPorItem: 1,
+      instantaneoIds: [], copiasPorInstantaneo: 0,
+    }),
   };
 
   const monstroForteComEvacuacao: InfoMonstro = {
@@ -3619,7 +3622,10 @@ describe('encerrarTurno — quem evacuou recompra 4+4 quando a vez volta (Task 5
       classeIds: [],
       copiasPorClasse: 0,
     }),
-    composicaoTesouros: montarComposicaoTesouros(Array.from({ length: 10 }, () => 'i-teste')),
+    composicaoTesouros: montarComposicaoTesouros({
+      itemIds: Array.from({ length: 10 }, () => 'i-teste'), copiasPorItem: 1,
+      instantaneoIds: [], copiasPorInstantaneo: 0,
+    }),
   };
 
   it('🔒 quem RECEBE a vez em `encerrarTurno` NUNCA está evacuado — é isto que sustenta "não liga duas vezes seguidas"', () => {
@@ -3810,7 +3816,10 @@ describe('a composição BASELINE não pode nascer travada', () => {
   // Baralho de Tesouros PRÓPRIO (6 por jogador) em vez do baseline de 2: desde
   // que a mão inicial tem duas correntes (4 Portas + 4 Tesouros), 2 tesouros por
   // jogador não financiam nem a abertura, e `criarPartida` recusaria a mesa.
-  const tesourosDaMesa = montarComposicaoTesouros(Array.from({ length: 6 }, () => 'i-teste'));
+  const tesourosDaMesa = montarComposicaoTesouros({
+    itemIds: Array.from({ length: 6 }, () => 'i-teste'), copiasPorItem: 1,
+    instantaneoIds: [], copiasPorInstantaneo: 0,
+  });
   const producao = {
     patenteAlvo: 10,
     composicaoPorJogador: COMPOSICAO_DE_TESTE,

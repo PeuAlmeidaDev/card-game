@@ -1,4 +1,4 @@
-import type { RacaResumo, ClasseResumo, MonstroCarta, ItemCarta } from '@card-dungeon/cartas';
+import type { RacaResumo, ClasseResumo, MonstroCarta, ItemCarta, InstantaneoCarta } from '@card-dungeon/cartas';
 
 /** Modificadores parciais dos 4 stats de combate. `level` nunca é modificado. */
 export interface ModificadoresDeStat {
@@ -45,4 +45,11 @@ export interface Catalogo {
    * atravessa o JSON inteira.
    */
   readonly itens: readonly ItemCarta[];
+  /**
+   * O baralho de consumíveis (`instantâneo`) como catálogo. Gêmeo de `itens`
+   * pelo mesmo motivo: dado puro, atravessa o JSON inteiro. Nasceu na fatia
+   * `consumíveis (instantâneo)` (decisão #40) — sem isto a tela recebe um
+   * `instantaneoId` na mão/mochila e não sabe nem o nome da carta.
+   */
+  readonly instantaneos: readonly InstantaneoCarta[];
 }

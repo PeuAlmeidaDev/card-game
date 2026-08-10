@@ -644,7 +644,10 @@ describe('a evacuação produz `recompor` com a mão estourada — e o predicado
       classeIds: [],
       copiasPorClasse: 0,
     }),
-    composicaoTesouros: montarComposicaoTesouros(Array.from({ length: 10 }, () => 'i-teste')),
+    composicaoTesouros: montarComposicaoTesouros({
+      itemIds: Array.from({ length: 10 }, () => 'i-teste'), copiasPorItem: 1,
+      instantaneoIds: [], copiasPorInstantaneo: 0,
+    }),
   };
 
   /** Mesmo monstro forte de `mesa.test.ts` (describe "Bad Stuff na derrota"). */

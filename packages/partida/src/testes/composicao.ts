@@ -42,11 +42,22 @@ export const COMPOSICAO_DE_TESTE: readonly ReceitaPorta[] = montarComposicao({
 });
 
 /**
- * Baralho de Tesouros baseline dos testes: 2 itens por jogador. `'i-teste'`
- * funciona porque é o único id que o `catalogoDeTeste()` conhece.
+ * Baralho de Tesouros baseline dos testes: 2 itens por jogador, ZERO
+ * instantâneo. `'i-teste'` funciona porque é o único id que o
+ * `catalogoDeTeste()` conhece.
+ *
+ * ⚠️ **O tamanho (2) é preservado de propósito**, mesmo motivo do
+ * `COMPOSICAO_DE_TESTE` acima: dezenas de cenários em `mesa.test.ts` usam este
+ * baralho como o baseline de "2 por jogador" (ver, por exemplo, o comentário
+ * sobre baralho PRÓPRIO de "6 por jogador em vez do baseline de 2"). Somar
+ * instantâneo aqui mudaria esse número em silêncio. A assinatura NOVA
+ * (fatia `consumíveis (instantâneo)`, decisão #40) é a única coisa que muda —
+ * a receita continua zero-instantâneo.
  *
  * Mora aqui pelo mesmo motivo que `COMPOSICAO_DE_TESTE`: cópias que precisam
  * concordar são cópias que podem divergir em silêncio.
  */
-export const COMPOSICAO_TESOURO_DE_TESTE: readonly ReceitaTesouro[] =
-  montarComposicaoTesouros(['i-teste', 'i-teste']);
+export const COMPOSICAO_TESOURO_DE_TESTE: readonly ReceitaTesouro[] = montarComposicaoTesouros({
+  itemIds: ['i-teste', 'i-teste'], copiasPorItem: 1,
+  instantaneoIds: [], copiasPorInstantaneo: 0,
+});

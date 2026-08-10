@@ -32,7 +32,7 @@ import type {
   ZonaEmJogo,
 } from '@card-dungeon/partida';
 import type {
-  Slot as SlotDaCarta, SlotDeItem as SlotDeItemDaCarta, ItemCarta, EixoDeAfinidade as EixoDaCarta,
+  Slot as SlotDaCarta, SlotDeItem as SlotDeItemDaCarta, ItemCarta, InstantaneoCarta, EixoDeAfinidade as EixoDaCarta,
   BadStuff as BadStuffDaCarta, EfeitoInstantaneo as EfeitoDaCarta,
 } from '@card-dungeon/cartas';
 
@@ -377,6 +377,11 @@ export type {
   // então o que não passar por aqui simplesmente não existe para o cliente.
   Slot,
   ItemCarta,
+  // A carta consumível (`instantâneo`), gêmea de `ItemCarta` pelo mesmo
+  // motivo: dado puro do catálogo, e sem ela a tela receberia um
+  // `instantaneoId` na mão/mochila sem saber nem o nome da carta (fatia
+  // `consumíveis (instantâneo)`, Task 6).
+  InstantaneoCarta,
   // O que o ITEM declara (`SlotDeItem`), gêmeo de `Slot` (o que o CORPO tem) e
   // travado pelo mesmo `_CoberturaSlotDeItem`. Faltava aqui — importado só
   // para o guard desde a `empunhadura dupla`, nunca reexportado — porque
