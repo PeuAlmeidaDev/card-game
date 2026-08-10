@@ -19,7 +19,8 @@ const cura = (n: number): EfeitoInstantaneo[] => [{ tipo: 'stats', modificadores
 
 describe('aplicarInstantaneo', () => {
   it('cura o lutador até o teto da vida inicial, nunca acima', () => {
-    // Ferido em 4, cura de 5, teto 10 => 9, não 9? -> 4+5=9 <= 10. E de 8: 13 -> 10.
+    // Ferido em 8, cura de 5, teto 10: 8+5=13 seria acima do teto => 10.
+    // O caso que fica ABAIXO do teto é o teste seguinte (3+5=8).
     const ferido = combate({ jogador: { ...LUTADOR, vida: 8 } });
     const r = aplicarInstantaneo(ferido, cura(5), 'lutador', ferido.vidaInicialJogador);
     expect(r.estado.jogador.vida).toBe(10);
