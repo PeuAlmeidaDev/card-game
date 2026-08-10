@@ -622,4 +622,118 @@ describe('mesa', () => {
     expect(depois.log.some((e) => e.tipo === 'porta')).toBe(true);
     await app.close();
   });
+
+  // --- Task 8 da fatia `consumíveis (instantâneo)`: o e2e que prova o FIO
+  // inteiro pelo HTTP real, do `POST /api/partida` até `usarInstantaneo`, sem
+  // costurar nenhum estado à mão. ---
+
+  /**
+   * Detecta uma carta de TESOURO (`equipamento` ou `instantaneo`) — a mesma
+   * distinção que `montarComposicaoTesouros` usa. `criarPartida` chama
+   * `embaralhar` uma vez para o baralho de Portas e outra para o de Tesouros
+   * (`montagem.ts`), então cada chamada só enxerga cartas de UMA família por vez.
+   */
+  const ehTesouro = (x: unknown): boolean =>
+    typeof x === 'object' && x !== null &&
+    ((x as { tipo?: unknown }).tipo === 'equipamento' || (x as { tipo?: unknown }).tipo === 'instantaneo');
+
+  /**
+   * Embaralhamento DIRIGIDO gêmeo de `racasNoTopo`/`classesNoTopo`, para o
+   * instantâneo: sobe todas as cópias do id pedido para o topo do baralho de
+   * TESOUROS, então a mão inicial do humano (jogador0, que saca do topo — ver
+   * `criarPartida` em `montagem.ts`) sempre traz uma. Composto com
+   * `monstroNoMonte` para a chamada do baralho de PORTAS, para que o primeiro
+   * `vasculhar` resolva monstro e abra combate — sem isso não haveria
+   * `fase === 'combate'` para o e2e exercitar.
+   */
+  const comInstantaneoNoTopo = (instantaneoId: string): Embaralhar => (itens) => {
+    if (itens.length > 0 && ehTesouro(itens[0])) {
+      const ehAlvo = (i: unknown): boolean =>
+        typeof i === 'object' && i !== null && (i as { instantaneoId?: unknown }).instantaneoId === instantaneoId;
+      return [...itens.filter(ehAlvo), ...itens.filter((i) => !ehAlvo(i))];
+    }
+    return monstroNoMonte(itens);
+  };
+
+  it('usa um instantâneo da MÃO pelo HTTP real: efeito aplicado, carta some da mão, log registra', async () => {
+    // Areia nos Olhos (forca -2) contra o alvo `monstro`: ao contrário da Poção
+    // de Cura, ela nunca esbarra no guard de desperdício aqui — nenhum monstro do
+    // catálogo nasce com força no piso (mínimo 3, `cartas/src/monstros.ts`), então
+    // o efeito SEMPRE muda alguma coisa e não há 400 de "não faria efeito".
+    const app = buildApp({ rolar: criarDadoCiclico([4, 12]), embaralhar: comInstantaneoNoTopo('areia-nos-olhos') });
+    const naFase2 = await passar(app, await criar(app));
+
+    const carta = naFase2.suaMao.find((c) => c.tipo === 'instantaneo' && c.instantaneoId === 'areia-nos-olhos');
+    if (carta === undefined) throw new Error('a mão inicial não trouxe a Areia nos Olhos');
+
+    const abrePorta = await app.inject({
+      method: 'POST', url: `/api/partida/${naFase2.id}/acao`,
+      payload: { acao: { tipo: 'vasculhar' }, versao: naFase2.versao },
+    });
+    const emCombate = abrePorta.json<VistaDaPartida>();
+    expect(emCombate.fase).toBe('combate');
+    expect(emCombate.combate).not.toBeNull();
+    const forcaMonstroAntes = emCombate.combate?.estado.monstro.forca;
+    const vidaJogadorAntes = emCombate.combate?.estado.jogador.vida;
+
+    const res = await app.inject({
+      method: 'POST', url: `/api/partida/${naFase2.id}/acao`,
+      payload: { acao: { tipo: 'usarInstantaneo', cartaId: carta.id, alvo: 'monstro' }, versao: emCombate.versao },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const depois = res.json<VistaDaPartida>();
+    expect(depois.combate?.estado.monstro.forca).toBe(forcaMonstroAntes! - 2);
+    expect(depois.combate?.estado.jogador.vida).toBe(vidaJogadorAntes); // o outro lado intacto
+    expect(depois.suaMao.some((c) => c.id === carta.id)).toBe(false);
+    expect(depois.log.some((e) => e.tipo === 'usouInstantaneo')).toBe(true);
+    await app.close();
+  });
+
+  it('usa um instantâneo da MOCHILA pelo HTTP real: efeito aplicado, carta some da mochila, log registra', async () => {
+    // Gêmeo do teste acima para a OUTRA zona que `usarInstantaneo` aceita
+    // (`mesa.ts`, o `naMao ?? naMochila` de `usarInstantaneo`): a carta pode sair
+    // da mão OU da mochila. Elixir de Força (forca +3) no `lutador`: guardado na
+    // mochila AINDA na fase `recompor` (parada, aceita `guardarCarta`) pelo
+    // caminho real do jogador, antes de a porta abrir — nunca costurando a zona.
+    const app = buildApp({ rolar: criarDadoCiclico([4, 12]), embaralhar: comInstantaneoNoTopo('elixir-de-forca') });
+    const naRecompor = await criar(app);
+    expect(naRecompor.fase).toBe('recompor');
+
+    const carta = naRecompor.suaMao.find((c) => c.tipo === 'instantaneo' && c.instantaneoId === 'elixir-de-forca');
+    if (carta === undefined) throw new Error('a mão inicial não trouxe o Elixir de Força');
+
+    const guardou = await app.inject({
+      method: 'POST', url: `/api/partida/${naRecompor.id}/acao`,
+      payload: { acao: { tipo: 'guardarCarta', cartaId: carta.id }, versao: naRecompor.versao },
+    });
+    expect(guardou.statusCode).toBe(200);
+    const naMochila = guardou.json<VistaDaPartida>();
+    expect(naMochila.suaMao.some((c) => c.id === carta.id)).toBe(false);
+    expect(naMochila.jogadores.find((j) => j.id === naMochila.voce)?.mochila.some((c) => c.id === carta.id)).toBe(true);
+
+    const naFase2 = await passar(app, naMochila);
+    const abrePorta = await app.inject({
+      method: 'POST', url: `/api/partida/${naFase2.id}/acao`,
+      payload: { acao: { tipo: 'vasculhar' }, versao: naFase2.versao },
+    });
+    const emCombate = abrePorta.json<VistaDaPartida>();
+    expect(emCombate.fase).toBe('combate');
+    expect(emCombate.combate).not.toBeNull();
+    const forcaJogadorAntes = emCombate.combate?.estado.jogador.forca;
+    const forcaMonstroAntes = emCombate.combate?.estado.monstro.forca;
+
+    const res = await app.inject({
+      method: 'POST', url: `/api/partida/${naFase2.id}/acao`,
+      payload: { acao: { tipo: 'usarInstantaneo', cartaId: carta.id, alvo: 'lutador' }, versao: emCombate.versao },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const depois = res.json<VistaDaPartida>();
+    expect(depois.combate?.estado.jogador.forca).toBe(forcaJogadorAntes! + 3);
+    expect(depois.combate?.estado.monstro.forca).toBe(forcaMonstroAntes); // o outro lado intacto
+    expect(depois.jogadores.find((j) => j.id === depois.voce)?.mochila.some((c) => c.id === carta.id)).toBe(false);
+    expect(depois.log.some((e) => e.tipo === 'usouInstantaneo')).toBe(true);
+    await app.close();
+  });
 });
