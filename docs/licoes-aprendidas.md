@@ -1,8 +1,9 @@
 # Lições aprendidas — os vícios que este projeto já pagou
 
 Catálogo dos defeitos **recorrentes**, com a contagem de ocorrências e o mecanismo de cada um.
-Consolidado em **2026-08-09** a partir das 10 sessões do `CLAUDE.md` raiz, e atualizado no mesmo dia
-com a fatia `Bad Stuff e evacuação` (§15 é dela).
+Consolidado em **2026-08-09** a partir das 10 sessões do `CLAUDE.md` raiz, atualizado no mesmo dia
+com a fatia `Bad Stuff e evacuação` (§15 é dela) e em **2026-08-10** com a fatia
+`consumíveis (instantâneo)` (§16 e §17 são dela).
 
 📌 **Isto é um índice, não a fonte.** O relato original de cada ocorrência está **verbatim** em
 [`historico/`](historico/README.md) — nada foi deletado para escrever este arquivo. Aqui está o
@@ -15,7 +16,7 @@ seguinte.
 
 ---
 
-## 1. 🕰️ Comentário que afirma um presente errado — **17 ocorrências**
+## 1. 🕰️ Comentário que afirma um presente errado — **30 ocorrências**
 
 **O vício nº 1 deste projeto.** Um comentário, docstring, título de teste ou linha de doc afirma
 uma regra que **já não é verdade** — normalmente porque descreve o presente *de antes do diff em
@@ -37,11 +38,53 @@ o jogo não tem (o docstring de `partida/src/tipos.ts` afirmando que maldição 
 | **Docstring que NASCE falso afirmando *"invariante testada"*** | O teste **não existia**. Pego em revisão, e o conserto foi **escrever o teste**, não apagar a frase |
 | **Promessa de POSIÇÃO, não de conteúdo** | *"espelha `sacarTesouros`, **LOGO ABAIXO**"* — e ele está **~1.264 linhas depois**. O conteúdo estava certo; o leitor é que não acha |
 | 🔴 **Palavra que ganha significado NOVO e deixa um texto antigo mentindo** | *"foi evacuado"* era **sabor** para qualquer derrota; a fatia 2a fez de *"evacuação"* uma **mecânica que só o Ogro dispara**. Nenhuma linha mudou, e a frase pré-existente virou enganosa em 4/5 das derrotas. ➡️ **Este não tem diff nenhum — nem no arquivo, nem no arquivo vizinho** |
+| 🔴 **FALSO POR OMISSÃO** — a variante nova (2026-08-10) | O texto é **verdadeiro no que afirma e falso no que implica**. Um docstring creditava a `TelaMesa` como chamador de produção de `instantaneoTemEfeito`; o `bot.ts` **já a chamava desde a task anterior**. Cada palavra estava certa; a lista estava incompleta, e quem lesse concluiria *"há um chamador"*. ➡️ **Nenhuma revisão de diff pega, porque o que desmente o texto NÃO ESTÁ no diff** |
+| ⚠️ **O texto afirma algo que NUNCA foi verdade** | Não é presente que envelheceu: é presente que **nunca existiu**. O brief **e** o docstring da própria função diziam que ela era reexportada por `shared`; **ela não era**. O conserto foi **fazer virar verdade**, não apagar a frase |
 
 ➡️ **A regra:** comentário afirma o **presente**. Intenção futura vai para o spec ou para um teste
 que falha quando a hora chegar. E a regra de ler o bible antes de escrever regra **vale também para
 o texto que ensina a regra** — o parágrafo do `CLAUDE.md` que existe para catalogar este vício
 **cometeu este vício**, duas vezes.
+
+### 🔴 O texto escrito para CORRIGIR o vício comete o vício — **três vezes só na fatia 2b**
+
+Não é ironia; é **o padrão**, e ele já apareceu em três materiais diferentes: no parágrafo do
+`CLAUDE.md` que cataloga o vício, num comentário da leva que consertava três ocorrências dele, e
+agora **três vezes dentro de uma fatia só**:
+
+1. **O docstring reescrito para consertar o vício omitiu um chamador** (a variante *falso por
+   omissão* acima). Pego pelo **re-revisor conferindo por grep**, não pelo relatório.
+2. **O rascunho de um fix de relatório inverteu uma desigualdade** (*"48 está abaixo de 46,85"*).
+   Pego **pelo próprio implementador antes de publicar**.
+3. **Três auto-certificações de completude saíram falsas** — ver **§16**.
+
+🔑 **O que separa "pego" de "publicado" nos três casos é sempre o mesmo:** alguém **mediu de novo**
+(grep, recontagem, script), em vez de reler. ➡️ **Reler o texto não encontra o defeito do texto.**
+
+### 📋 As treze ocorrências da fatia 2b — regra de contagem declarada
+
+**Uma linha por achado registrado no ledger** (um achado que nomeia três textos conta como **um**):
+
+| # | Onde | O que afirmava |
+|---|---|---|
+| 1 | `cartas/src/instantaneos.ts` | que o guard `_CoberturaEfeitoInstantaneo` **existia** — ele nascia na task seguinte |
+| 2 | `partida/src/testes/catalogo.ts` | os 3 dublês descreviam código que só nasceria na task seguinte |
+| 3 | comentário do bloco 5 | contradizia o que a Task 4 iria construir |
+| 4 | `partida/src/instantaneo.ts` | citava consumidores (`usarInstantaneo`, `TelaMesa`) que ainda não existiam |
+| 5 | preâmbulo do `aplicarAcao` | dizia **DEZOITO** oito linhas acima do bloco que já dizia **vinte** |
+| 6 | `partida/CLAUDE.md` | a contagem velha de pares finos |
+| 7 | docstring de `instantaneoTemEfeito` | descrevia chamadores quando havia **zero** |
+| 8 | **três** textos que a Task 7 tornou falsos | *"zero chamadores HOJE"*, *"gêmeo DEVIDO na Task 7"*, e a seção da tabela |
+| 9 | `web/src/TelaMesa.tsx` | creditava à Task 7 a publicação do catálogo, que foi a Task 6 |
+| 10 | o docstring **reescrito para corrigir o nº 7** | omitia o `bot.ts` — **falso por omissão** |
+| 11 | rascunho de fix do relatório de soak | desigualdade invertida (**não publicado**) |
+| 12 | **três** auto-certificações de completude | ver §16 |
+| 13 | `partida/src/fase.ts` (**pré-existente**) | *"a família Tesouros é **equipamento-only POR DESENHO**"* — a fatia **matou a premissa** |
+
+🔑 **O nº 13 é o único desta base com final feliz, e vale saber por quê:** a decisão **#29 do bible**,
+escrita em **2026-07-29**, dizia por escrito que aquele comentário estava *"certo hoje e errado no
+dia em que o primeiro instantâneo existir"*. **O dia chegou e o texto foi trocado na Task 2, antes de
+mentir.** ➡️ **Comentário com data de validade escrita no bible é o único que ninguém esquece.**
 
 ⚠️ **Uma causa raiz é ESTRUTURAL, não desatenção:** alargar um **par fino** do reducer é alargar
 **DOIS lados**. Editar só o lado do domínio deixa o comentário da tela mentindo, e a tabela que
@@ -53,9 +96,9 @@ que nenhum grep, teste ou typecheck alcançava.
 
 ---
 
-## 2. 🧪 Mutação verde = o dublê não produz o cenário — **12 ocorrências**
+## 2. 🧪 Mutação verde = o dublê não produz o cenário — **13 ocorrências**
 
-Você quebra o código de produção de propósito e **a suíte continua verde**. Em **nenhuma** das 12
+Você quebra o código de produção de propósito e **a suíte continua verde**. Em **nenhuma** das 13
 vezes a causa foi guard redundante. A causa foi sempre a mesma: **o fixture não consegue produzir o
 cenário**, então a regra era *inexercitável*, não só desprotegida.
 
@@ -78,6 +121,14 @@ Casos que valem por si:
   **pelo caminho errado, com o resultado certo**. ➡️ **O dublê produzia um estado adjacente**, não o
   estado da regra — e a asserção não tinha como notar. Conserto: `comRacaEmJogo` no fixture; a
   mutação passou a reprovar com `'descartar' != 'recompor'`.
+
+- 🔑 **A 13ª (2026-08-10) é a mais desconfortável, porque o teste que não mordia era o que o PRÓPRIO
+  PLANO prescrevia.** O plano da fatia 2b mandava provar o guard de desperdício do bot com um caso de
+  *"efeito nulo"*; **a janela de cura já filtrava aquele caso antes**, então remover o guard deixava
+  a suíte verde. **O implementador rodou a mutação, viu o verde, e escreveu um teste dedicado**
+  (modificador negativo contra um stat já no piso) que morde. Confirmado por mutação independente do
+  revisor. ➡️ **Um teste prescrito por plano não vem com garantia de morder** — é a §10 (*o texto do
+  plano é a fonte mais provável de achado*) encontrando esta família.
 
 🔑 **A pergunta certa nunca é "o teste existe?", é "a mutação reprova?"**
 ⚠️ **E a pergunta seguinte é *"a mutação reprova PELO MOTIVO CERTO?"*** — duas ocorrências já
@@ -102,7 +153,7 @@ construtor que voltasse como grupo de `<radio>` passaria pelas quatro.
 
 ---
 
-## 4. 👻 Publicado e nunca renderizado — **6 ocorrências, e a 7ª foi BARRADA**
+## 4. 👻 Publicado e nunca renderizado — **6 ocorrências, e DUAS barradas antes do merge**
 
 Um campo viaja na projeção, o cliente o recebe, e **nenhum pixel o mostra**. Compila, tipa, passa
 nos testes, e o jogador não vê.
@@ -127,8 +178,22 @@ com ele uma **task própria** só para as duas superfícies. **Sem essa task, ni
 
 ➡️ **A lição transferível:** este padrão não se evita perguntando *"alguém renderiza?"* na revisão —
 se evita **transformando a renderização em item de escopo** no spec, com teste por superfície. As
-seis ocorrências anteriores foram todas descobertas **depois**; esta foi a única em que o spec
+seis ocorrências anteriores foram todas descobertas **depois**; esta foi a primeira em que o spec
 chegou primeiro.
+
+### ⚠️ A 2ª barrada (2026-08-10) foi pega DENTRO da fatia, e o teste que a cobria não mordia
+
+`GET /api/catalogo` passou a publicar `instantaneos` numa task, e **`App.tsx` nunca repassou o campo
+à `TelaMesa`** — o botão sairia mudo. O implementador da task seguinte achou e ligou o fio.
+
+🔴 **E a revisão achou o resto do buraco, que é a parte instrutiva:** deletar **a única linha de
+fiação de produção** deixava a suíte **VERDE**, porque a fixture do teste passava `instantaneos: []`
+e isso **produz o mesmo DOM que a prop ausente**. ➡️ **Um teste que exercita o componente com a
+fixture vazia não distingue "ligado" de "desligado".** O conserto foi um teste que sobe a árvore
+inteira (fetch → `App` → `TelaMesa`) e morde o **nome real** da carta.
+
+🔑 **É a mesma família da §9** (*as duas pontas provadas, o fio não*) atravessando a fronteira
+servidor→cliente.
 
 ---
 
@@ -350,8 +415,29 @@ uniões **nas duas direções**.
 ⚠️ E a lista escrita à mão tem o mesmo problema: `SLOTS_DE_ITEM` só passou a morder quando virou
 `Record<SlotDeItem, true>` — antes, acrescentar `'cinto'` à união deixava o `tsc` limpo.
 
-📌 **As uniões gêmeas de hoje são QUATRO**, e todas têm guard: `Slot`, `SlotDeItem`,
-`EixoDeAfinidade` e **`BadStuff`** (`_CoberturaBadStuff`, desde 2026-08-09).
+📌 **As uniões gêmeas de hoje são CINCO**, e todas têm guard: `Slot`, `SlotDeItem`,
+`EixoDeAfinidade`, **`BadStuff`** (`_CoberturaBadStuff`, desde 2026-08-09) e
+**`EfeitoInstantaneo`** (`_CoberturaEfeitoInstantaneo`, desde 2026-08-09).
+
+### 🔴 União de UM VERBO SÓ não fecha por `never` — e a saída tem custo
+
+**Achado de 2026-08-09, e ele contradizia o plano da fatia que o encontrou.** O padrão
+`const naoTratado: never = efeito` no `default` do `switch` **não compila** numa união de **um**
+membro: o TypeScript só trata como união **discriminada** a partir de dois, então o valor chega ao
+`default` com o tipo cheio, nunca `never`. **O `BadStuff` nunca sofreu disso porque nasceu com dois
+verbos.**
+
+➡️ **A saída é um membro FANTASMA** — `| { readonly tipo: never }`, inabitável, que liga a checagem
+de exaustividade sem existir em runtime. **Medido:** com ele, membro novo quebra o typecheck
+apontando o interpretador; sem ele, **nem o baseline compila**.
+
+💰 **E o custo é real, pago duas vezes na mesma fatia:** o fantasma **bloqueia acesso direto ao
+campo** (`efeito.modificadores` fora de um `switch`), o que obrigou a escrever um helper
+`modificadoresDe` fechado por `never` — **um segundo `switch` sobre a mesma união**, que é
+exatamente o que a união fechada existe para evitar. ⚠️ **Quando o segundo verbo real chegar, apague
+o fantasma.** Convenção completa em
+[`packages/cartas/CLAUDE.md`](../packages/cartas/CLAUDE.md) e
+[`packages/partida/CLAUDE.md`](../packages/partida/CLAUDE.md).
 
 ---
 
@@ -397,5 +483,83 @@ Duas partes, as duas obrigatórias:
 2. **Contagem positiva via `aplicarAcao` real**, pela razão acima.
 
 🔴 **Foi `emJogo.raca` que um script esqueceu**, e a **zona nova de cada fatia é sempre a candidata
-seguinte** (`emJogo.classe` na `classe como carta`, a `maoEsquerda` na `empunhadura dupla`).
-**Um zero de conservação sem esse gate não vale nada.**
+seguinte** (`emJogo.classe` na `classe como carta`, a `maoEsquerda` na `empunhadura dupla`,
+**a mochila com consumível na `2b`** — e nesta o smoke provou explicitamente que sabotar a mochila
+**acusa**). **Um zero de conservação sem esse gate não vale nada.**
+
+---
+
+## 16. 🔍 Uma varredura de completude tem que declarar o que ela NÃO alcança — **3 auto-certificações falsas**
+
+**Achado de 2026-08-10, e ele é sobre o INSTRUMENTO, não sobre atenção.** Numa fatia só, três frases
+de completude foram escritas e as três saíram **falsas**:
+
+| A afirmação | O que estava fora |
+|---|---|
+| *"toda linha que importa já foi transcrita"* | o contador `cartasNaoPagas` — **2.235 cartas de loot que a mesa não pagou**, o número que quantificava o dano |
+| *"a varredura não achou nenhum campo ausente"* | **sete** campos de um braço inteiro |
+| *"nenhuma comparação deste relatório cruza sessões"* | **duas** comparações cruzavam |
+
+🔑 **As três falharam pelo MESMO motivo, e não é desatenção: ESCOPO DO INSTRUMENTO.** A varredura era
+um script que percorria os campos numéricos de cada braço — **e não descia em objetos aninhados**.
+Os campos perdidos moravam dentro de `usosPorCarta` / `usosPorAlvo` / `usosPorAssento`, e **nenhum
+deles era inerte**: um dos sete quebrava a monotonicidade que valia em todos os outros braços.
+
+➡️ **As duas regras que saem daqui:**
+
+1. **A lista do que falta é GERADA POR DIFERENÇA, nunca escrita à mão** — um script varre a fonte,
+   compara com o texto, e **imprime o que sobra**. Escrever *"conferi tudo"* é uma asserção sobre
+   memória; a diferença é uma asserção sobre dados.
+2. 🔴 **A varredura declara o próprio alcance na saída.** *"Nenhum campo ausente"* significa
+   *"nenhum campo ausente **entre os que este instrumento enxerga**"* — e sem a segunda metade a
+   frase é mais forte do que a evidência.
+
+⚠️ **E há uma armadilha de segunda ordem, já vista:** depois de **colar** no relatório os 47 campos
+que faltavam, a mesma varredura passou a dar **zero**. **O zero é consequência da colagem, não
+propriedade independente** — e isso tem que estar escrito, senão o leitor seguinte lê o zero como
+prova.
+
+🔑 **Isto é irmão do §15:** *"censo zero"* e *"varredura zero"* são a mesma classe de afirmação —
+**um zero só vale com o alcance do instrumento declarado ao lado.**
+
+---
+
+## 17. 🧠 Suficiência não é exclusividade — o passo inválido que quase virou decisão de jogo
+
+**A lição mais transferível de 2026-08-10, e ela não é sobre código: é sobre a frase que se escreve
+depois de olhar a tabela.**
+
+Um soak de três braços mediu: **A** (baralho pequeno, sem consumível) esgota em 90,83% das partidas;
+**B** (grande, com consumível) e **C** (grande, **sem** consumível) esgotam em 0%. A conclusão
+publicada foi:
+
+> *"`B ≡ C` nesta medida, **logo** a fatia moveu o baralho, não a economia."*
+
+🔴 **A frase tem duas metades, e só a primeira é observação.**
+
+- ✅ ***"`B ≡ C`"*** — **observação**, e continua valendo.
+- 🔴 ***"…logo a fatia moveu o baralho, não a economia"*** — **inferência NÃO LICENCIADA.** O braço C
+  prova que o tamanho **BASTA** (*suficiência*); a frase afirma que **só** o tamanho agiu
+  (*exclusividade*). **O desenho nunca teve um braço que testasse a proporção sozinha** — a segunda
+  metade veio do **silêncio**.
+
+Um quarto braço, rodado depois, trocou 4 equipamentos por 4 consumíveis **dentro do baralho pequeno**
+e derrubou o esgotamento de **86,25% para 2,08%**: a proporção **sozinha** também bastava.
+
+➡️ **A regra: num sistema SOBREDETERMINADO — onde mais de uma alavanca produz o efeito sozinha —
+NENHUMA atribuição a uma alavanca é licenciada.** Duas causas suficientes e independentes não se
+disputam; elas coexistem, e o experimento que move as duas juntas não separa nenhuma.
+
+🔑 **Por que isto é pior que uma lacuna de desenho, e é assim que tem que ser catalogado:** uma
+lacuna se fecha rodando mais um braço. **Um passo inválido produz uma frase que parece medida** — e
+essa frase ia para o bible como *"o consumível era dispensável"*, virando premissa de dial. **O
+quarto braço não revelou uma lacuna: revelou um raciocínio.**
+
+⚠️ **O tell linguístico é o mesmo do §1:** o **"logo"**. Lá ele disfarça derivação de fato; aqui,
+inferência de observação. ➡️ **Toda vez que um "logo" aparecer entre um número e uma atribuição de
+causa, pergunte que braço existiria se a outra alavanca fosse a verdadeira.**
+
+📌 **E o corolário de escrita, que custou dois fix rounds:** *"a fatia moveu X"* **nunca** é a mesma
+afirmação que *"o mecanismo Y moveu X"*, mesmo quando a fatia é só o Y. **A fatia 2b mudou duas
+coisas** (a composição **e** o tamanho do baralho), e a manchete *"os consumíveis mataram o
+esgotamento"* é desmentida pelo próprio parágrafo abaixo dela.

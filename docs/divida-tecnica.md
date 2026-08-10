@@ -1,8 +1,9 @@
 # Dívida técnica — o balde "conserta depois"
 
 Consolidado em **2026-08-09** das duas listas de *Minors deferidos* que foram salvas dos ledgers
-gitignored, mais os débitos nomeados ao longo das fatias — e atualizado no mesmo dia com os Minors da
-fatia `Bad Stuff e evacuação` (marcados **`[2a]`**).
+gitignored, mais os débitos nomeados ao longo das fatias — atualizado no mesmo dia com os Minors da
+fatia `Bad Stuff e evacuação` (marcados **`[2a]`**) e em **2026-08-10** com os da fatia
+`consumíveis (instantâneo)` (marcados **`[2b]`**).
 
 🔴 **Nenhum item aqui é bug vivo.** Os "conserta antes do merge" já foram feitos nos fix rounds de
 cada fatia. Isto é trabalho real, medido, e deliberadamente adiado.
@@ -45,6 +46,17 @@ função / de teste sempre que possível.
   listas de `badStuff` têm tamanho **1** (#120). A mutação `efeitos.slice(0, 1)` só reprova por causa
   do **dublê de dois efeitos**, que existe e morde. ⚠️ **Não é dívida a pagar; é um ramo cujo único
   visitante é dublê**, e quem criar o primeiro monstro de dois efeitos precisa saber disso.
+- **`[2b]`** · 🔴 **A MESMA forma, agora em `aplicarInstantaneo`** — as quatro cartas de produção têm
+  `efeitos` de tamanho **1** (#127), e o laço só é percorrido **por dublê**. A mutação
+  `efeitos.slice(0, 1)` está escrita e morde **pelo dublê**. ⚠️ **É a segunda lista de um elemento só
+  do repo, e nenhuma das duas tem visitante de produção.**
+- **`[2b]`** · **`server`** · `app.test.ts`, o teste e2e do consumível **da MÃO** — o *"outro lado
+  intacto"* checa `jogador.vida`, e o stat que o efeito move é `forca`. 🔑 **Lacuna HERDADA DO
+  ESQUELETO DO BRIEF**, não desvio do implementador (é a §10 outra vez). **O teste da MOCHILA já é
+  simétrico** — o conserto é uma asserção.
+- **`[2b]`** · **`web`** · `TelaMesa.test.tsx` — os stats do **MONSTRO** no painel de combate
+  entraram **sem asserção**, e eles são exatamente o lado que torna a Areia nos Olhos visível. Os do
+  **lutador** têm asserção (eram requisito do brief).
 
 ## 🎯 Asserção fraca (não prova o que o nome diz)
 
@@ -64,6 +76,8 @@ função / de teste sempre que possível.
   depende de `criar` carimbar a classe e **nunca afirma isso**; a falha viria como *"filaDeDados
   esgotada"*, que não aponta a causa.
 - **`web`** · `TelaMesa.tsx` — `api.criarPartida({ body: {} })` sem asserção sobre o argumento.
+- **`[2b]`** · **`server`** · `app.test.ts` — dois `!` (non-null assertion) nos testes novos do
+  consumível, que uma `const` local depois do `not.toBeNull()` eliminaria.
 
 ## 🕰️ Comentário / título / doc envelhecido
 
@@ -113,6 +127,13 @@ função / de teste sempre que possível.
   VOCÊ"* / *"da mão DE VOCÊ"*, menos natural que *"o SEU capacete"*. ⚠️ **Débito HERDADO, não novo:**
   é a convenção que o `desequipou` já usava. **Se for consertar, conserte os dois juntos**, senão o
   arquivo fica com dois estilos.
+- **`[2b]`** · **`web`** · `TelaMesa.tsx` — o comentário da seção de instantâneos atribui a
+  **publicação do catálogo** à Task 7 da fatia; foi a **Task 6**. Uma linha, e é o vício nº 1 na
+  variante *"crédito de autoria"*.
+- **`[2b]`** · **`web`** · `narrarEvento.tsx` — `narrarPorta` continua com **três resolvedores
+  posicionais** `(id) => string`. 🔑 **O mesmo argumento que criou o `NomesDoCatalogo` vale aqui**:
+  três parâmetros do mesmo tipo, distinguidos só pela ordem. Ficou **fora do escopo** da fatia que
+  criou o contraste.
 
 ## 🧰 Guard de compilação que falta
 
@@ -134,6 +155,14 @@ função / de teste sempre que possível.
   `app.ts` e está **exatamente no limite**: se a mesa crescer segue correto, se **encolher** para 3,
   quebra. E há um `52` cravado onde o teste vizinho deriva das constantes.
 
+## 🛡️ Degradação silenciosa (a tela e o domínio discordam sobre o mesmo estado)
+
+- **`[2b]`** · **`web`** · `TelaMesa.tsx` — o teto de vida do **monstro** degrada com `?? 0` na tela,
+  enquanto o reducer **levanta 500** no mesmo estado. 🔴 **Inalcançável hoje** (nenhuma carta da
+  calibragem mexe na vida do monstro), e é por isso que é dívida e não bug. ⚠️ **Quem criar o
+  primeiro efeito que mexa na vida do monstro tem que decidir qual dos dois lados está certo** — não
+  os dois.
+
 ## 🧩 Duplicação candidata a extração
 
 - **`[2a]`** · **`partida`** · `mesa.ts` — o padrão *"catálogo/jogador não encontrado ⇒ `Error` cru"*
@@ -142,6 +171,18 @@ função / de teste sempre que possível.
   pontos. Candidato a extração, **sem urgência**.
 
 ## 🔴 Débitos nomeados (maiores que um Minor)
+
+- **`[2b]`** · 💰 **O MEMBRO FANTASMA `| { readonly tipo: never }` custa um `switch` a mais, e o
+  custo é para ser PAGO DE VOLTA, não carregado.** Ele existe porque `const naoTratado: never` **não
+  compila** numa união de um membro só; em troca, bloqueia acesso direto a `.modificadores` e obrigou
+  o `bot.ts` a ter um helper `modificadoresDe` fechado por `never` — **um segundo interpretador da
+  mesma união**, que é exatamente o que a união fechada existe para evitar. ➡️ **Quando o segundo
+  verbo real de `EfeitoInstantaneo` nascer (`re-rolar`, `fuga`), apague o fantasma nas DUAS gêmeas e
+  tente derrubar o helper.** ⚠️ **Rode a mutação depois:** membro novo numa gêmea só tem que
+  continuar quebrando o `_CoberturaEfeitoInstantaneo`.
+- **`[2b]`** · **`web`** · **`TelaMesa.tsx` foi a 716 linhas e `TelaMesa.test.tsx` a 1.939.** O
+  **painel de combate + a seção de instantâneos** já são um componente extraível com fronteira
+  óbvia. **Sem urgência**, e é a primeira vez que este arquivo aparece aqui por tamanho.
 
 - **`tirarDosSlots` em `mesa.ts`** — o comentário sobre o cast de `Object.keys(SLOTS_VAZIOS)` é a
   **ÚNICA guarda** de uma restrição: trocá-lo por uma lista escrita à mão passa **VERDE**, porque
@@ -180,8 +221,37 @@ função / de teste sempre que possível.
 
 ## 📐 Método do soak — para quem escrever o próximo harness
 
-🔴 **O `soak.ts` é gitignored e some a cada fatia.** O da fatia 2a foi o **sexto**; o próximo é o
-**sétimo**, escrito do zero como todos.
+🔴 **O `soak.ts` é gitignored e some a cada fatia.** O da fatia 2b foi o **sétimo**; o próximo é o
+**oitavo**, escrito do zero como todos.
+
+### 🔴 As DUAS medições que a 2b deixou desenhadas e NÃO rodou
+
+As duas são baratas, as duas fecham uma ressalva que hoje sustenta um número publicado:
+
+1. **A aderência POR ID dentro do braço de controle de tamanho.** O braço C precisa de 16 ids de
+   equipamento e o catálogo tem 12, então quatro entram como **segundas cópias** — e o efeito dessa
+   **concentração** sobre a aderência tem **direção INDETERMINADA** (uma cópia redundante pode ser
+   guardada, e o braço **gruda mais**; ou estourar a mochila e voltar ao cemitério, e ele **gruda
+   menos**). 🔴 **O gap B × C de circulação — as −6,00 cartas de retenção e a cauda mais fina —
+   repousa sobre esse artefato.** Fecha-se comparando a aderência dos **4 duplicados** contra a dos
+   **8 únicos**, dentro do próprio braço.
+2. **A dose de PRODUÇÃO (25%) num baralho de 48.** O braço que isolou a proporção roda **33,3%**;
+   ninguém mediu 25% no tamanho velho. ⚠️ **Ele valida a ALAVANCA, não o DIAL** — e é fácil escrever
+   *"25% num baralho de 48 basta"* por engano, porque a frase soa como o que foi medido.
+
+- 🔴 **Toda conclusão de soak passa pelo teste da §17 das lições:** *"a alavanca X basta"* **não**
+  licencia *"foi X que agiu"*. **Desenhe o braço que separaria as duas ANTES de escrever a manchete**
+  — ou escreva que ele não existe.
+- 🔴 **A lista do que NÃO foi transcrito é gerada por DIFERENÇA, por script, e o script declara o
+  próprio alcance** (§16 das lições). Três auto-certificações de completude já saíram falsas nesta
+  base, todas por **escopo do instrumento**: a varredura não descia em objetos aninhados.
+- ✅ **Registre a PREVISÃO em disco ANTES de rodar o braço.** A da 2b errou o mecanismo e **é o dado
+  mais valioso que aquela medição produziu** — foi ela que expôs que aderência não é constante por
+  família. **Previsão registrada depois não vale nada**, e *"eu previ isso"* sem lastro é a mesma
+  família das auto-certificações acima.
+- ⚠️ **Sessões oficiais convivem.** A 2b terminou com **duas** (A/B/C numa, o quarto braço noutra), e
+  **cada seção tem que dizer de qual sessão sai**. Onde o relatório cruza sessões de propósito (a
+  régua de ruído, o empilhado), isso é **declarado em linha**.
 
 - 🔴 **CONTAGEM POSITIVA, sempre, ao lado do censo.** *"Censo zero falhas"* **não distingue *"a
   feature nunca rodou"* de *"rodou e não fez nada"*** — com o efeito descartado, nada é movido nem

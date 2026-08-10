@@ -14,8 +14,8 @@ assuma que o código venceu desde então.
 
 Os relatórios de soak moram em `.superpowers/sdd/<fatia>/`, que é **gitignored**. Os harness
 (`soak.ts`) do Plano 4b, da `afinidade`, da `escolha do descarte`, da `classe como carta`, da
-`empunhadura dupla` e do `Bad Stuff e evacuação` **já sumiram ou vão sumir** — são **seis** escritos
-do zero. Para várias medições, **estes arquivos e o §19 do
+`empunhadura dupla`, do `Bad Stuff e evacuação` e dos `consumíveis (instantâneo)` **já sumiram ou vão
+sumir** — são **sete** escritos do zero. Para várias medições, **estes arquivos e o §19 do
 bible são a única cópia sobrevivente**. Quem for remedir qualquer linha escreve o harness dele.
 
 ## As sessões
@@ -34,6 +34,7 @@ bible são a única cópia sobrevivente**. Quem for remedir qualquer linha escre
 | [`2026-08-07-classe-como-carta-plano-b.md`](2026-08-07-classe-como-carta-plano-b.md) | `classe como carta` B | A classe vira carta; o topo da tela sai. #88–#97 |
 | [`2026-08-08-empunhadura-dupla.md`](2026-08-08-empunhadura-dupla.md) | `empunhadura dupla` | As duas mãos viram vagas equivalentes. #98–#104 |
 | [`2026-08-09-bad-stuff-e-evacuacao.md`](2026-08-09-bad-stuff-e-evacuacao.md) | `Bad Stuff e evacuação` (**2a**) | Perder um combate passa a custar. #121–#126. 🔴 **O soak achou 2 bugs reais** |
+| [`2026-08-09-consumiveis-instantaneo.md`](2026-08-09-consumiveis-instantaneo.md) | `consumíveis (instantâneo)` (**2b**) | A carta que CIRCULA. #127–#140. 🔑 **Um quarto braço de soak INVERTEU a manchete dos três primeiros** |
 
 ## 📊 Onde achar cada medição
 
@@ -42,10 +43,13 @@ linhas, e não colapse duas medidas que compartilham denominador.
 
 | Procurando… | Está em |
 |---|---|
-| Esgotamento do baralho de Tesouros (480/480 nos dois tamanhos) | `2026-08-02-afinidade.md` · **remedido com a evacuação em `2026-08-09-bad-stuff-e-evacuacao.md` (97,9% × 91,7% das partidas)** |
+| Esgotamento do baralho de Tesouros (480/480 nos dois tamanhos) | `2026-08-02-afinidade.md` · remedido com a evacuação em `2026-08-09-bad-stuff-e-evacuacao.md` (97,9% × 91,7%) · **🔑 RESOLVIDO e MEDIDO em `2026-08-09-consumiveis-instantaneo.md` (90,83% → 0%), com a atribuição SOBREDETERMINADA entre tamanho e proporção** |
+| **Aderência por família, e a escada da escassez** (equipamento 83,4→95,7% · instantâneo 35,4→59,3%) | `2026-08-09-consumiveis-instantaneo.md` (#137) |
+| **Uso de consumível, por carta / alvo / zona / assento** (3.260 usos, 75,6% da mochila) | `2026-08-09-consumiveis-instantaneo.md` (#138) |
+| **Capacidade de retenção da mesa** (46,85 × 52,85 com o MESMO tamanho — ⚠️ **não é constante**) | `2026-08-09-consumiveis-instantaneo.md` |
 | **Cartas devolvidas ao cemitério por derrota** (a margem da evacuação, **+13,57/partida**) | `2026-08-09-bad-stuff-e-evacuacao.md` (#123) |
 | **Evacuações e `perdeSlot` em encaixe vazio** (0,364/jogador · 32,6%–33,3%) | `2026-08-09-bad-stuff-e-evacuacao.md` (#124) |
-| Gradiente de vitória por assento | `2026-08-01-encrenca.md` (#68) · `2026-08-07-…-plano-b.md` (#97) · `2026-08-08-empunhadura-dupla.md` (#104) |
+| Gradiente de vitória por assento | `2026-08-01-encrenca.md` (#68) · `2026-08-07-…-plano-b.md` (#97) · `2026-08-08-empunhadura-dupla.md` (#104) · 🔑 **`2026-08-09-consumiveis-instantaneo.md` (#139) — DEZ braços, 2.400 partidas, monotônico em todos: deixa de ser ruído** |
 | Ritmo (mediana de ações do humano), por fatia | todas, a partir de `2026-07-25-a-28-…` |
 | Força final de bot | `2026-07-25-a-28-…` (5,71–6,16) · `2026-08-01` (5,98–6,34) · `2026-08-07` (6,82–7,00) · `2026-08-08` (6,86–7,08) |
 | Aberturas de queima, e por motivo | `2026-08-03-escolha-do-descarte.md` (#85/#86) · `2026-08-07` (#95) · `2026-08-08` |
