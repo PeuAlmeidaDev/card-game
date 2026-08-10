@@ -62,8 +62,9 @@ completo está em [`docs/licoes-aprendidas.md §1`](docs/licoes-aprendidas.md). 
 ## Estado atual (2026-08-10)
 
 **Sete pacotes** — `motor`, `personagem`, `cartas`, `partida`, `shared`, `server`, `web`.
-**806 testes verdes** (motor 56 · cartas 66 · personagem 12 · partida 420 · shared 23 · server 32 ·
-web 197), **typecheck 7/7**, lint limpo — recontados **do código** em 2026-08-10.
+**808 testes verdes** (motor 56 · cartas 66 · personagem 12 · partida 420 · shared 23 · server 32 ·
+web 199), **typecheck 7/7**, lint limpo — recontados **do código** em 2026-08-10, depois da leva de
+correção da revisão ampla do branch.
 
 **Fatias 1–8 completas, mais o bloco 2 pela metade.** A última fatia de código é a
 **`consumíveis (instantâneo)`** (a **2b**, decisões #127–#140): o baralho de Tesouros ganhou a
