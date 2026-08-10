@@ -609,7 +609,47 @@ obedecer ao texto.**
 
 ---
 
-## 🖐️ O roteiro do gate ocular — 🔴 **PENDENTE. Nenhum item conferido.**
+## 🖐️ O roteiro do gate ocular — 🟡 **RODADO EM 2026-08-10, PARCIAL: 1 de 5 conferido.**
+
+**O que o Pedro relatou, verbatim:** *"Consegui usar os itens, porém não consegui verificar
+perfeitamente seu funcionamento. não consegui testar também a badstuff, mas aparentemente tudo ok."*
+
+| Item | Estado | O que isso significa |
+|---|---|---|
+| **1** — a seção aparece no combate, com dois botões por carta | ✅ **CONFERIDO** | ele achou os botões e **usou** as cartas |
+| **2** — o efeito à vista no painel + o log pelo NOME | 🔴 **NÃO conferido** | *"não consegui verificar perfeitamente"* |
+| **3** — alvo `monstro`, o monstro enfraquece | 🔴 **NÃO conferido** | era **sonda**, não olho |
+| **4** — a Poção **apaga** com a vida cheia | 🔴 **NÃO conferido** | — |
+| **5** — usar da **mochila** | 🔴 **NÃO conferido** | cenário dirigido, exige clicar em "Guardar" antes |
+
+🔴 ***"Aparentemente tudo ok"* NÃO é um item conferido, e este documento não vai registrá-lo como
+se fosse.** É a mesma distinção que o projeto já escreveu sobre o e2e: *"o e2e passou"* e *"o Pedro
+conferiu"* são afirmações diferentes. A que vale aqui é a segunda, e ela cobriu **um** item.
+
+### 🔬 O que foi provado por OUTRO instrumento, e por que ele NÃO fecha o gate
+
+Com o servidor **vivo** (`pnpm dev`, porta 3000), dirigido pelo **HTTP real** — só ações que o
+jogador faria, nenhum estado costurado — em 2026-08-10:
+
+| Cenário | Resultado medido |
+|---|---|
+| Areia nos Olhos no `monstro` (Carniçal) | força do monstro **5 → 3** (−2 exato) · **o lado do jogador intacto** (vida 10, força 3) · carta saiu da mão · evento `usouInstantaneo` com `alvo: 'monstro'` e `monstroId: 'carnical'` |
+| Poção de Cura no `lutador` com **vida cheia** (10/10) | **HTTP 400** — `"usarInstantaneo: esta carta não faria efeito neste alvo"` |
+
+✅ **O DOMÍNIO está certo**, e a segunda linha é o guard de desperdício (#132) recusando em produção
+— o gêmeo exato do botão apagado do item 4.
+
+🔴 **E mesmo assim os itens 2, 3 e 4 continuam NÃO conferidos.** O gate ocular existe para checar
+**o que a tela mostra**, e nenhum instrumento que fala HTTP responde isso: os dois defeitos que este
+projeto pegou por gate ocular eram **código certo que não contava a ninguém**. Um deles foi achado
+nesta mesma fatia, pela revisão do branch (o log narrando pelo id cru) — o domínio estava perfeito.
+
+⚠️ **A hipótese que fica de pé, e é a única que sobrou:** se o comportamento está certo e o Pedro
+*"não conseguiu verificar"*, o candidato é **legibilidade da tela**, não lógica. ⬜ **Não
+investigado** — e a pergunta que separa as duas ("os números não mudaram" × "mudaram e foi difícil
+ver") **não foi respondida**.
+
+### O roteiro (para a rodada que fecha os quatro que faltam)
 
 🔴 **Item cuja frequência esperada não for quase certa numa sessão é declarado DE SONDA, NÃO DE OLHO,
 na própria linha** (#70/#84). **Um falso negativo num gate é PIOR que item ausente:** ele *acusa* um
