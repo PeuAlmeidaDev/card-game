@@ -16,7 +16,7 @@ seguinte.
 
 ---
 
-## 1. 🕰️ Comentário que afirma um presente errado — **30 ocorrências**
+## 1. 🕰️ Comentário que afirma um presente errado — **33 ocorrências**
 
 **O vício nº 1 deste projeto.** Um comentário, docstring, título de teste ou linha de doc afirma
 uma regra que **já não é verdade** — normalmente porque descreve o presente *de antes do diff em
@@ -46,22 +46,26 @@ que falha quando a hora chegar. E a regra de ler o bible antes de escrever regra
 o texto que ensina a regra** — o parágrafo do `CLAUDE.md` que existe para catalogar este vício
 **cometeu este vício**, duas vezes.
 
-### 🔴 O texto escrito para CORRIGIR o vício comete o vício — **três vezes só na fatia 2b**
+### 🔴 O texto escrito para CORRIGIR o vício comete o vício — **quatro vezes só na fatia 2b**
 
 Não é ironia; é **o padrão**, e ele já apareceu em três materiais diferentes: no parágrafo do
 `CLAUDE.md` que cataloga o vício, num comentário da leva que consertava três ocorrências dele, e
-agora **três vezes dentro de uma fatia só**:
+agora **quatro vezes dentro de uma fatia só**:
 
 1. **O docstring reescrito para consertar o vício omitiu um chamador** (a variante *falso por
    omissão* acima). Pego pelo **re-revisor conferindo por grep**, não pelo relatório.
 2. **O rascunho de um fix de relatório inverteu uma desigualdade** (*"48 está abaixo de 46,85"*).
    Pego **pelo próprio implementador antes de publicar**.
-3. **Três auto-certificações de completude saíram falsas** — ver **§16**.
+3. **Quatro auto-certificações de completude saíram falsas** — ver **§16**.
+4. 🔴 **A §4 DESTE ARQUIVO**, escrita para catalogar *"publicado e nunca renderizado"*, concluía que
+   *"o conserto foi um teste que sobe a árvore inteira (fetch → `App` → `TelaMesa`)"*. **A árvore não
+   terminava na `TelaMesa`** — o mesmo campo morria um nível abaixo, no `PainelLog`. **Falso por
+   omissão**, na seção que existe para ensinar a não cometer isso.
 
 🔑 **O que separa "pego" de "publicado" nos três casos é sempre o mesmo:** alguém **mediu de novo**
 (grep, recontagem, script), em vez de reler. ➡️ **Reler o texto não encontra o defeito do texto.**
 
-### 📋 As treze ocorrências da fatia 2b — regra de contagem declarada
+### 📋 As dezesseis ocorrências da fatia 2b — regra de contagem declarada
 
 **Uma linha por achado registrado no ledger** (um achado que nomeia três textos conta como **um**):
 
@@ -78,8 +82,11 @@ agora **três vezes dentro de uma fatia só**:
 | 9 | `web/src/TelaMesa.tsx` | creditava à Task 7 a publicação do catálogo, que foi a Task 6 |
 | 10 | o docstring **reescrito para corrigir o nº 7** | omitia o `bot.ts` — **falso por omissão** |
 | 11 | rascunho de fix do relatório de soak | desigualdade invertida (**não publicado**) |
-| 12 | **três** auto-certificações de completude | ver §16 |
+| 12 | **três** auto-certificações de completude (**quatro** com a do gate ocular, achada depois pela revisão do branch) | ver §16 |
 | 13 | `partida/src/fase.ts` (**pré-existente**) | *"a família Tesouros é **equipamento-only POR DESENHO**"* — a fatia **matou a premissa** |
+| 14 | `web/src/PainelLog.tsx` (**revisão do branch**) | justificava o resolvedor `(id) => id` com *"o `/api/catalogo` não publica instantâneos nesta fatia"* e *"nenhum evento de produção carrega um instantaneo"*. **As duas premissas morreram DENTRO da fatia** (Tasks 6 e 4). Variante *justifica uma AUSÊNCIA* ⇒ **sem linha para conferir** |
+| 15 | `docs/divida-tecnica.md` (**revisão do branch**) | a entrada do `?? 0` descrevia o **modo de falha invertido** e se justificava com *"inalcançável hoje"* — e a Poção de Cura **é** carta da calibragem **e** é ofertável no alvo `monstro` |
+| 16 | **dois** textos de teste (**revisão do branch**) | um comentário meio-editado (`partida/src/instantaneo.test.ts`, cenário que o teste não roda) e um título que a asserção não checava (`cartas/src/instantaneos.test.ts`, *"todos são sacáveis"* × `toHaveLength(4)`) |
 
 🔑 **O nº 13 é o único desta base com final feliz, e vale saber por quê:** a decisão **#29 do bible**,
 escrita em **2026-07-29**, dizia por escrito que aquele comentário estava *"certo hoje e errado no
@@ -153,13 +160,14 @@ construtor que voltasse como grupo de `<radio>` passaria pelas quatro.
 
 ---
 
-## 4. 👻 Publicado e nunca renderizado — **6 ocorrências, e DUAS barradas antes do merge**
+## 4. 👻 Publicado e nunca renderizado — **7 ocorrências, e DUAS barradas antes do merge**
 
 Um campo viaja na projeção, o cliente o recebe, e **nenhum pixel o mostra**. Compila, tipa, passa
 nos testes, e o jogador não vê.
 
 O elenco: `combatente` (3a) · `tesourosNoMonte` (**duas vezes** — e a segunda escondia a economia
-da mesa tendo secado) · `ehBot` · `mochila` · `cartasNoCemiterio`.
+da mesa tendo secado) · `ehBot` · `mochila` · `cartasNoCemiterio` · **`Catalogo.instantaneos` no
+log** (2b — publicado, e o log narrava **todo** consumível pelo id cru).
 
 ➡️ **O padrão já escondeu a tese de um plano três vezes.** Ao publicar um campo, o par é
 *publicar + renderizar*; ao **estreitar** um contrato, a pergunta é **quem RENDERIZAVA**, não quem
@@ -181,19 +189,40 @@ se evita **transformando a renderização em item de escopo** no spec, com teste
 seis ocorrências anteriores foram todas descobertas **depois**; esta foi a primeira em que o spec
 chegou primeiro.
 
-### ⚠️ A 2ª barrada (2026-08-10) foi pega DENTRO da fatia, e o teste que a cobria não mordia
+### 🔴 A fiação tem DOIS saltos, e o primeiro conserto pegou UM (2026-08-10)
 
-`GET /api/catalogo` passou a publicar `instantaneos` numa task, e **`App.tsx` nunca repassou o campo
-à `TelaMesa`** — o botão sairia mudo. O implementador da task seguinte achou e ligou o fio.
+`GET /api/catalogo` passou a publicar `instantaneos` numa task, e o campo tinha **dois** consumidores
+a alcançar. **Um foi barrado dentro da fatia; o outro viveu até a revisão ampla do branch.**
 
-🔴 **E a revisão achou o resto do buraco, que é a parte instrutiva:** deletar **a única linha de
-fiação de produção** deixava a suíte **VERDE**, porque a fixture do teste passava `instantaneos: []`
-e isso **produz o mesmo DOM que a prop ausente**. ➡️ **Um teste que exercita o componente com a
-fixture vazia não distingue "ligado" de "desligado".** O conserto foi um teste que sobe a árvore
-inteira (fetch → `App` → `TelaMesa`) e morde o **nome real** da carta.
+| Salto | O que acontecia | Como terminou |
+|---|---|---|
+| `App.tsx` → `TelaMesa` | a prop nunca era repassada; o botão "Usar" sairia mudo | ✅ **BARRADO** pelo implementador da task seguinte |
+| `TelaMesa` → `PainelLog` | o `PainelLog` montava o PRÓPRIO `NomesDoCatalogo` com `instantaneo: (id) => id`; o log narrava **todo** consumível pelo id cru | 🔴 **VIVO até a revisão do branch** — **13,58 usos por partida**, em **240/240** partidas do soak |
+
+🔴 **A parte instrutiva do salto barrado:** deletar **a única linha de fiação de produção** deixava a
+suíte **VERDE**, porque a fixture do teste passava `instantaneos: []` e isso **produz o mesmo DOM que
+a prop ausente**. ➡️ **Um teste que exercita o componente com a fixture vazia não distingue "ligado"
+de "desligado".** O conserto foi um teste que sobe a árvore (fetch → `App` → `TelaMesa`) e morde o
+**nome real** da carta.
+
+🔑 **E é aí que está a lição, porque o conserto escreveu a própria armadilha:** *"o conserto foi um
+teste que sobe a árvore inteira"* — **a árvore não terminava na `TelaMesa`**. O mesmo campo morria
+um nível abaixo, no componente que a `TelaMesa` renderiza. ➡️ ***"Subir a árvore inteira"* só vale
+se você souber onde a árvore termina; a pergunta que teria achado os dois é *"quem MAIS renderiza
+este campo?"*, não *"o teste chega até o componente?"*.**
+
+⚠️ **O segundo salto ainda tinha uma agravante das duas outras famílias deste arquivo:** ele estava
+protegido por um **comentário justificando a ausência** (§1 — *"nenhuma revisão de diff pega, porque
+não há diff"*), e as duas premissas dele **morreram dentro da mesma fatia** que o escreveu. E o
+comentário **imediatamente acima** explicava que a prop irmã era obrigatória *"porque um default
+silencioso faria todo item cair no id sem nada acusar"*. **A linha seguinte fazia exatamente isso.**
+
+➡️ **O conserto foi ESTRUTURAL, e é o que fecha a família:** havia **dois** objetos `NomesDoCatalogo`
+montados com os mesmos resolvedores, e é por isso que um resolvedor pôde se perder. Passou a existir
+**um só**, montado na `TelaMesa` e passado para baixo — resolvedor novo não tem mais onde se perder.
 
 🔑 **É a mesma família da §9** (*as duas pontas provadas, o fio não*) atravessando a fronteira
-servidor→cliente.
+servidor→cliente — e desta vez o fio tinha **duas emendas**.
 
 ---
 
@@ -489,21 +518,28 @@ seguinte** (`emJogo.classe` na `classe como carta`, a `maoEsquerda` na `empunhad
 
 ---
 
-## 16. 🔍 Uma varredura de completude tem que declarar o que ela NÃO alcança — **3 auto-certificações falsas**
+## 16. 🔍 Uma varredura de completude tem que declarar o que ela NÃO alcança — **4 auto-certificações falsas**
 
-**Achado de 2026-08-10, e ele é sobre o INSTRUMENTO, não sobre atenção.** Numa fatia só, três frases
-de completude foram escritas e as três saíram **falsas**:
+**Achado de 2026-08-10, e ele é sobre o INSTRUMENTO, não sobre atenção.** Numa fatia só, quatro
+frases de completude foram escritas e as quatro saíram **falsas**:
 
 | A afirmação | O que estava fora |
 |---|---|
 | *"toda linha que importa já foi transcrita"* | o contador `cartasNaoPagas` — **2.235 cartas de loot que a mesa não pagou**, o número que quantificava o dano |
 | *"a varredura não achou nenhum campo ausente"* | **sete** campos de um braço inteiro |
 | *"nenhuma comparação deste relatório cruza sessões"* | **duas** comparações cruzavam |
+| 🔴 *"cada item do gate foi conferido CONTRA O CÓDIGO DA TELA"* | o `PainelLog.tsx`. O item 2 exigia ver **"Você usa Elixir de Força em si."** no log, e o código **não conseguia produzir essa string** — a conferência olhou a `TelaMesa` e parou ali |
 
-🔑 **As três falharam pelo MESMO motivo, e não é desatenção: ESCOPO DO INSTRUMENTO.** A varredura era
-um script que percorria os campos numéricos de cada braço — **e não descia em objetos aninhados**.
-Os campos perdidos moravam dentro de `usosPorCarta` / `usosPorAlvo` / `usosPorAssento`, e **nenhum
-deles era inerte**: um dos sete quebrava a monotonicidade que valia em todos os outros braços.
+🔑 **As quatro falharam pelo MESMO motivo, e não é desatenção: ESCOPO DO INSTRUMENTO.** Nas três
+primeiras o instrumento era um script que percorria os campos numéricos de cada braço — **e não
+descia em objetos aninhados**. Os campos perdidos moravam dentro de `usosPorCarta` / `usosPorAlvo` /
+`usosPorAssento`, e **nenhum deles era inerte**: um dos sete quebrava a monotonicidade que valia em
+todos os outros braços. Na quarta o instrumento era um par de olhos lendo **um** arquivo
+(`TelaMesa.tsx`), e a frase dizia *"o código da tela"* — que é uma **pasta inteira**.
+
+✅ **Bom sinal para o gate, mau sinal para a certificação:** o item 2 **teria pego** o Critical da
+revisão do branch. Um gate que exige uma string impossível **acusa** o defeito — é a auto-certificação
+ao lado dele que estava mais forte que a evidência.
 
 ➡️ **As duas regras que saem daqui:**
 
