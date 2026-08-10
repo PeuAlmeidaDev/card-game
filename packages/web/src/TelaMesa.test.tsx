@@ -1921,6 +1921,54 @@ describe('TelaMesa — instantâneos no combate', () => {
     });
   });
 
+  it('o LOG nomeia o instantâneo pelo catálogo — a fiação desce até o `PainelLog`', async () => {
+    // 🔴 O achado da revisão ampla do branch: o `PainelLog` montava o PRÓPRIO
+    // `NomesDoCatalogo`, e o resolvedor de instantâneo dele era `(id) => id`. Toda
+    // queima de consumível (13,58 por partida no soak, em 240/240 partidas) saía no
+    // log como "Você usa pocao-de-cura em si." — a MESMA carta que a lista da mão,
+    // a da mochila e o botão "Usar" já nomeavam certo, no mesmo componente.
+    //
+    // O teste sobe a tela inteira porque é aí que a fiação existe: `instantaneos`
+    // (prop) → `nomeDoInstantaneo` → `nomesDoCatalogo` → `PainelLog` →
+    // `narrarEvento` → `descreverCarta`. Mutação que ele morde: trocar
+    // `instantaneo: nomeDoInstantaneo` por `(id) => id` em `nomesDoCatalogo`.
+    await abrirMesa(
+      {
+        ...vistaBase,
+        log: [{
+          tipo: 'usouInstantaneo', jogadorId: 'p1',
+          carta: { id: 't1', tipo: 'instantaneo', instantaneoId: 'pocao-de-cura' },
+          alvo: 'lutador', monstroId: 'goblin',
+        }],
+      },
+      undefined, MONSTROS_COMBATE, undefined, undefined, INSTANTANEOS_PADRAO,
+    );
+
+    expect(await screen.findByText('Você usa Poção de Cura em si.')).toBeInTheDocument();
+  });
+
+  it('a MOCHILA nomeia o instantâneo pelo catálogo, não pelo id', async () => {
+    // O gêmeo do teste acima do lado da carta parada. `nomesDoCatalogo` só era
+    // exercitado por asserções ancoradas no FALLBACK (`pocao-de-cura` cru, sem
+    // catálogo): mutar `instantaneo: nomeDoInstantaneo` para `(id) => id` deixava a
+    // suíte verde, porque o botão "Usar" chama `nomeDoInstantaneo` DIRETO e era só
+    // ele que os testes mordiam.
+    await abrirMesa(
+      emCombateComCartas({
+        mochila: [{ id: 't2', tipo: 'instantaneo', instantaneoId: 'elixir-de-forca' }],
+      }),
+      undefined, MONSTROS_COMBATE, undefined, undefined, INSTANTANEOS_PADRAO,
+    );
+
+    // Escopado à seção "Sua mochila": o resumo de mochila da linha do assento
+    // (zona ABERTA) também nomeia a carta, e um `findByText` sem escopo acharia
+    // dois nós.
+    const secaoMochila = (await screen.findByText(/Sua mochila — 1 de 6/)).closest('section');
+    if (secaoMochila === null) throw new Error('seção "Sua mochila" não encontrada');
+    expect(within(secaoMochila).getByText(/Elixir de Força/)).toBeInTheDocument();
+    expect(within(secaoMochila).queryByText(/elixir-de-forca/)).not.toBeInTheDocument();
+  });
+
   it('o painel de combate mostra os stats EFETIVOS, não o corpo montado (`jogadores[].combatente`)', async () => {
     // O jogador chega ao painel com a força já bufada (6, três acima da força
     // MONTADA — `combatente.forca` é 3 na `vistaBase`): se a tela lesse do corpo

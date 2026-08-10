@@ -721,14 +721,15 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [], 
         </ul>
       </section>
 
+      {/* `nomesDoCatalogo` desce PRONTO, e não as listas do catálogo: montar os
+          resolvedores lá dentro era ter dois objetos `NomesDoCatalogo` com os
+          mesmos campos, e foi assim que o `instantaneo` do log ficou preso no id
+          enquanto a mesma carta já saía nomeada aqui em cima. */}
       <PainelLog
         log={vista.log}
         jogadores={vista.jogadores}
         voce={vista.voce}
-        racas={racas}
-        monstros={monstros}
-        itens={itens}
-        classes={classes}
+        nomes={nomesDoCatalogo}
       />
 
       {erro !== null && <p role="alert">{erro}</p>}

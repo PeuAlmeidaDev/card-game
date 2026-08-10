@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { narrarEvento } from './narrarEvento';
 import { participantesDe } from './participantesDe';
 import type { NomesDoCatalogo } from './descreverCarta';
-import type { Catalogo, EventoDaMesa, JogadorPublico } from '@card-dungeon/shared';
+import type { EventoDaMesa, JogadorPublico } from '@card-dungeon/shared';
 
 /**
  * Uma cor por ASSENTO, na ordem de turno. Derivar do índice (e não de um hash do
@@ -28,34 +28,27 @@ export function corDoJogador(jogadores: readonly JogadorPublico[], jogadorId: st
  * `narrarEvento`, que tem exaustividade cobrada pelo compilador — quando estava
  * inline, era uma cadeia de `&&` e um evento novo renderizava `<li>` vazio em
  * silêncio (foi o que aconteceu com `racaEmJogo`, `entrega` e `descarte`).
+ *
+ * 🔴 `nomes` é UM objeto (`NomesDoCatalogo`), e não as quatro/cinco listas do
+ * catálogo: os resolvedores são montados NUMA VEZ SÓ, na `TelaMesa`, e descem
+ * prontos. Este componente já montou os seus, iguais aos dela — e foi assim que o
+ * SEXTO resolvedor (`instantaneo`) se perdeu: nasceu certo na `TelaMesa` e ficou
+ * como `(id) => id` aqui, então o log narrava `pocao-de-cura` enquanto a mesma
+ * carta aparecia como "Poção de Cura" dois centímetros acima. Com um objeto só,
+ * resolvedor novo não tem onde se perder.
+ *
+ * ⚠️ Prop OBRIGATÓRIA, e não com default: um default silencioso que caísse no id
+ * faria TODA carta do log cair no id sem nada acusar — o log diria "equipa
+ * espada-curta" e a suíte ficaria verde. O argumento era do `itens` e hoje vale
+ * para o objeto inteiro.
  */
-export function PainelLog({ log, jogadores, voce, racas, monstros, itens, classes }: {
+export function PainelLog({ log, jogadores, voce, nomes }: {
   readonly log: readonly EventoDaMesa[];
   readonly jogadores: readonly JogadorPublico[];
   readonly voce: string;
-  readonly racas: Catalogo['racas'];
-  readonly monstros: Catalogo['monstros'];
-  readonly itens: Catalogo['itens'];
-  readonly classes: Catalogo['classes'];
+  readonly nomes: NomesDoCatalogo;
 }) {
   const nomeDe = (id: string): string => jogadores.find((j) => j.id === id)?.nome ?? id;
-  // Cai no id quando a raça é desconhecida: skew de versão (bundle antigo, raça
-  // nova no server) tem que degradar para um texto feio, nunca para tela branca.
-  const nomeDaRaca = (id: string): string => racas.find((r) => r.id === id)?.nome ?? id;
-  const nomeDoMonstro = (id: string): string => monstros.find((m) => m.id === id)?.nome ?? id;
-  // `itens` é prop OBRIGATÓRIA, e não com default `[]`, pela mesma razão que
-  // `racas` e `monstros`: um default silencioso faria todo item cair no id sem
-  // nada acusar — o log diria "equipa espada-curta" e a suíte ficaria verde.
-  const nomeDoItem = (id: string): string => itens.find((i) => i.id === id)?.nome ?? id;
-  const nomeDaClasse = (id: string): string => classes.find((c) => c.id === id)?.nome ?? id;
-  // Sem prop de catálogo ainda: o `GET /api/catalogo` não publica instantâneos
-  // nesta fatia (`consumíveis (instantâneo)` — Task 2 só faz a família nascer no
-  // MODELO). Cai no id, mesma degradação defensiva dos outros quatro — e nenhum
-  // evento de produção carrega um instantaneo até a carta existir num baralho.
-  const nomeDoInstantaneo = (id: string): string => id;
-  const nomes: NomesDoCatalogo = {
-    raca: nomeDaRaca, monstro: nomeDoMonstro, item: nomeDoItem, classe: nomeDaClasse, instantaneo: nomeDoInstantaneo,
-  };
 
   // `null` = Todos. O filtro é estado LOCAL: é preferência de leitura, não estado
   // de jogo — subir isso para a TelaMesa (ou para o servidor) só acoplaria coisas.

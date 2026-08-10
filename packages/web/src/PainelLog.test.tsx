@@ -3,6 +3,7 @@ import { render, screen, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { PainelLog, corDoJogador } from './PainelLog';
 import { SLOTS_VAZIOS } from '@card-dungeon/shared';
+import type { NomesDoCatalogo } from './descreverCarta';
 import type { EventoDaMesa, JogadorPublico } from '@card-dungeon/shared';
 
 const combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
@@ -23,6 +24,27 @@ const itens = [
 const classes = [
   { id: 'guerreiro', nome: 'Guerreiro', texto: 'Impacto: quando ele ataca, o empate não salva ninguém.' },
 ];
+const instantaneos = [
+  { id: 'pocao-de-cura', nome: 'Poção de Cura', efeitos: [{ tipo: 'stats' as const, modificadores: { vida: 5 } }] },
+];
+
+/**
+ * Os resolvedores, como o `PainelLog` os recebe hoje: UM objeto, montado por quem
+ * o renderiza (em produção, a `TelaMesa`). A degradação `?? id` continua sendo o
+ * contrato de cada um — skew de versão (bundle antigo, carta nova no server) tem
+ * que virar um texto feio, nunca uma tela branca.
+ *
+ * ⚠️ Isto NÃO prova que a `TelaMesa` monta o objeto certo: essa fiação é dela, e
+ * quem a morde é o teste do log em `TelaMesa.test.tsx` ("o log nomeia o
+ * instantâneo pelo catálogo"), que sobe a tela inteira com o catálogo real.
+ */
+const nomes: NomesDoCatalogo = {
+  raca: (id) => racas.find((r) => r.id === id)?.nome ?? id,
+  monstro: (id) => monstros.find((m) => m.id === id)?.nome ?? id,
+  item: (id) => itens.find((i) => i.id === id)?.nome ?? id,
+  classe: (id) => classes.find((c) => c.id === id)?.nome ?? id,
+  instantaneo: (id) => instantaneos.find((i) => i.id === id)?.nome ?? id,
+};
 
 afterEach(cleanup);
 
@@ -45,7 +67,7 @@ describe('PainelLog', () => {
       { tipo: 'patente', jogadorId: 'p1', patente: 2 },
       { tipo: 'derrota', jogadorId: 'p2', derrotas: 1 },
     ];
-    render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} classes={classes} />);
+    render(<PainelLog log={log} jogadores={jogadores} voce="p1" nomes={nomes} />);
 
     expect(screen.getByText(/subiu para a patente 2/)).toHaveStyle({ color: corDoJogador(jogadores, 'p1') });
     expect(screen.getByText(/perdeu o combate/)).toHaveStyle({ color: corDoJogador(jogadores, 'p2') });
@@ -62,7 +84,7 @@ describe('PainelLog', () => {
         ],
       },
     ];
-    render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} classes={classes} />);
+    render(<PainelLog log={log} jogadores={jogadores} voce="p1" nomes={nomes} />);
 
     // combate alheio é narrado no nome do dono, não como "Você"
     expect(screen.getByText(/Bot 1 ataca: rolou 4 — acertou/)).toBeInTheDocument();
@@ -74,7 +96,7 @@ describe('PainelLog', () => {
       { tipo: 'porta', jogadorId: 'p1', carta: { id: 'p-0', tipo: 'monstro', monstroId: 'goblin' } },
       { tipo: 'porta', jogadorId: 'p2', carta: { id: 'p-1', tipo: 'raca', racaId: 'r-teste' } },
     ];
-    render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} classes={classes} />);
+    render(<PainelLog log={log} jogadores={jogadores} voce="p1" nomes={nomes} />);
 
     expect(screen.getByText(/Você dá de cara com um Goblin!/)).toBeInTheDocument();
     expect(screen.getByText(/Bot 1 encontra uma carta de r-teste\./)).toBeInTheDocument();
@@ -86,7 +108,7 @@ describe('PainelLog', () => {
     const log: readonly EventoDaMesa[] = [
       { tipo: 'porta', jogadorId: 'p2', carta: { id: 'p-2', tipo: 'monstro', monstroId: 'goblin' } },
     ];
-    render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} classes={classes} />);
+    render(<PainelLog log={log} jogadores={jogadores} voce="p1" nomes={nomes} />);
 
     const linha = screen.getByText(/dá de cara com um Goblin!/);
     expect(linha).toHaveTextContent('Bot 1');
@@ -95,7 +117,7 @@ describe('PainelLog', () => {
 
   it('mostra o evento de vez de forma discreta', () => {
     const log: readonly EventoDaMesa[] = [{ tipo: 'vez', jogadorId: 'p2' }];
-    render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} classes={classes} />);
+    render(<PainelLog log={log} jogadores={jogadores} voce="p1" nomes={nomes} />);
 
     // `vez` é ruído de ritmo: precisa existir para o jogador acompanhar, mas não
     // pode competir visualmente com o que aconteceu de fato.
@@ -107,8 +129,7 @@ describe('PainelLog', () => {
       log={[{ tipo: 'racaEmJogo', jogadorId: 'p2', carta: { id: 'r1', tipo: 'raca', racaId: 'orc' } }]}
       jogadores={jogadores}
       voce="p1"
-      racas={racas}
-      monstros={monstros} itens={itens} classes={classes}
+      nomes={nomes}
     />);
 
     expect(screen.getByText(/Bot 1 entra em campo como Orc/)).toBeInTheDocument();
@@ -121,8 +142,7 @@ describe('PainelLog', () => {
       log={[{ tipo: 'entrega', jogadorId: 'p1', paraJogadorId: 'p2', rolagem: null }]}
       jogadores={jogadores}
       voce="p1"
-      racas={racas}
-      monstros={monstros} itens={itens} classes={classes}
+      nomes={nomes}
     />);
 
     expect(screen.getByText(/Você entregou uma carta a Bot 1/)).toBeInTheDocument();
@@ -133,8 +153,7 @@ describe('PainelLog', () => {
       log={[{ tipo: 'entrega', jogadorId: 'p2', paraJogadorId: 'p1', rolagem: 7 }]}
       jogadores={jogadores}
       voce="p1"
-      racas={racas}
-      monstros={monstros} itens={itens} classes={classes}
+      nomes={nomes}
     />);
 
     expect(screen.getByText(/1d12: 7/)).toBeInTheDocument();
@@ -145,25 +164,24 @@ describe('PainelLog', () => {
       log={[{ tipo: 'descarte', jogadorId: 'p2', carta: { id: 'r1', tipo: 'raca', racaId: 'elfo' } }]}
       jogadores={jogadores}
       voce="p1"
-      racas={racas}
-      monstros={monstros} itens={itens} classes={classes}
+      nomes={nomes}
     />);
 
     expect(screen.getByText(/Bot 1 descartou uma carta de Elfo/)).toBeInTheDocument();
   });
 
-  it('narra o item equipado pelo NOME — o catálogo de itens chega até aqui', () => {
-    // Prova a fiação inteira: `itens` entra como prop, vira `nomeDoItem` no
-    // contexto e chega ao `descreverCarta`. Sem este teste, esquecer de passar a
-    // prop deixaria o log dizendo o id cru (`espada-curta`) sem nada acusar — o
-    // `nomeDoItem` degrada para o id de propósito, então ele não lança.
+  it('narra o item equipado pelo NOME — o resolvedor chega até aqui', () => {
+    // Prova o trecho de fiação que é DESTE componente: `nomes` entra como prop e
+    // chega ao `descreverCarta` via `narrarEvento`. Sem este teste, um `narrarEvento`
+    // chamado sem `nomes` (ou com o objeto errado) deixaria o log dizendo o id cru
+    // (`espada-curta`) sem nada acusar — cada resolvedor degrada para o id de
+    // propósito, então nenhum deles lança.
     render(<PainelLog
       log={[{ tipo: 'equipou', jogadorId: 'p2', slot: 'maoDireita',
         carta: { id: 't-1', tipo: 'equipamento', itemId: 'espada-curta' } }]}
       jogadores={jogadores}
       voce="p1"
-      racas={racas}
-      monstros={monstros} itens={itens} classes={classes}
+      nomes={nomes}
     />);
 
     expect(screen.getByText(/Bot 1 equipa Espada Curta/)).toBeInTheDocument();
@@ -178,7 +196,7 @@ describe('PainelLog — filtro e cauda', () => {
   ];
 
   it('começa mostrando todos os jogadores', () => {
-    render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} classes={classes} />);
+    render(<PainelLog log={log} jogadores={jogadores} voce="p1" nomes={nomes} />);
 
     expect(screen.getByText(/subiu para a patente 2/)).toBeInTheDocument();
     expect(screen.getByText(/perdeu o combate/)).toBeInTheDocument();
@@ -186,7 +204,7 @@ describe('PainelLog — filtro e cauda', () => {
   });
 
   it('filtrando por um jogador, esconde a história dos outros', async () => {
-    render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} classes={classes} />);
+    render(<PainelLog log={log} jogadores={jogadores} voce="p1" nomes={nomes} />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Bot 1' }));
 
@@ -197,7 +215,7 @@ describe('PainelLog — filtro e cauda', () => {
   it('eventos globais aparecem em qualquer filtro', async () => {
     // O `fim` não tem dono. Escondê-lo num filtro sumiria com o desfecho da
     // partida — o único evento que interessa a todo mundo.
-    render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} classes={classes} />);
+    render(<PainelLog log={log} jogadores={jogadores} voce="p1" nomes={nomes} />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Bot 1' }));
 
@@ -213,7 +231,7 @@ describe('PainelLog — filtro e cauda', () => {
     const comEntrega: readonly EventoDaMesa[] = [
       { tipo: 'entrega', jogadorId: 'p2', paraJogadorId: 'p1', rolagem: null },
     ];
-    render(<PainelLog log={comEntrega} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} classes={classes} />);
+    render(<PainelLog log={comEntrega} jogadores={jogadores} voce="p1" nomes={nomes} />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Você' }));
 
@@ -228,7 +246,7 @@ describe('PainelLog — filtro e cauda', () => {
     const comEntrega: readonly EventoDaMesa[] = [
       { tipo: 'entrega', jogadorId: 'p2', paraJogadorId: 'p1', rolagem: null },
     ];
-    render(<PainelLog log={comEntrega} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} classes={classes} />);
+    render(<PainelLog log={comEntrega} jogadores={jogadores} voce="p1" nomes={nomes} />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Bot 1' }));
 
@@ -241,7 +259,7 @@ describe('PainelLog — filtro e cauda', () => {
     // Você 1 · Bot 1 1), contra Todos 1 · Você 0 · Bot 1 1 antes. Degradar
     // multiplicando ruído por assento é degradar para pior.
     const desconhecido = { tipo: 'interferencia', jogadorId: 'p2' } as unknown as EventoDaMesa;
-    render(<PainelLog log={[desconhecido]} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} classes={classes} />);
+    render(<PainelLog log={[desconhecido]} jogadores={jogadores} voce="p1" nomes={nomes} />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Você' }));
     expect(screen.queryByText(/não sabe descrever/)).not.toBeInTheDocument();
@@ -251,7 +269,7 @@ describe('PainelLog — filtro e cauda', () => {
   });
 
   it('volta a mostrar tudo ao clicar em Todos', async () => {
-    render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} classes={classes} />);
+    render(<PainelLog log={log} jogadores={jogadores} voce="p1" nomes={nomes} />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Bot 1' }));
     await userEvent.click(screen.getByRole('button', { name: /todos/i }));
@@ -263,7 +281,7 @@ describe('PainelLog — filtro e cauda', () => {
     // A rodada dos bots despeja vários eventos de uma vez; sem auto-scroll o
     // jogador tem que arrastar a barra a cada turno para ver o que houve.
     const rolou = vi.spyOn(Element.prototype, 'scrollIntoView');
-    const { rerender } = render(<PainelLog log={log} jogadores={jogadores} voce="p1" racas={racas} monstros={monstros} itens={itens} classes={classes} />);
+    const { rerender } = render(<PainelLog log={log} jogadores={jogadores} voce="p1" nomes={nomes} />);
     rolou.mockClear();
 
     rerender(
@@ -271,8 +289,7 @@ describe('PainelLog — filtro e cauda', () => {
         log={[...log, { tipo: 'vez', jogadorId: 'p1' }]}
         jogadores={jogadores}
         voce="p1"
-        racas={racas}
-        monstros={monstros} itens={itens} classes={classes}
+        nomes={nomes}
       />,
     );
 
@@ -288,8 +305,7 @@ describe('PainelLog — filtro e cauda', () => {
         log={[...log, { tipo: 'vez', jogadorId: 'p1' }]}
         jogadores={jogadores}
         voce="p1"
-        racas={racas}
-        monstros={monstros} itens={itens} classes={classes}
+        nomes={nomes}
       />,
     );
 
