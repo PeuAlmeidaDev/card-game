@@ -91,14 +91,19 @@ export function aplicarInstantaneo(
  * "Jogar esta carta neste alvo faz alguma coisa?" — a pergunta do guard de
  * desperdício (spec §5.5). A REGRA é o `mudou` que `aplicarInstantaneo` já
  * devolve; esta função é o ATALHO para quem só quer a pergunta, sem o estado.
- * `usarInstantaneo` (`./mesa`, Task 4) reusa o `mudou` da MESMA chamada de
- * `aplicarInstantaneo` que já precisa fazer para aplicar o efeito (chamar esta
- * função ali RODARIA o interpretador duas vezes à toa) — o único chamador de
- * produção continua sendo esse. A `TelaMesa` (Task 7) chama esta função de
- * verdade, para apagar o botão "Usar" sem aplicar nada (convenção #26): é o
- * `disabled` de `botoesDeInstantaneo`, em `packages/web/src/TelaMesa.tsx`.
  *
- * Republicada por `shared` para que a tela LEIA a regra em vez de copiá-la.
+ * DOIS chamadores de produção hoje, mesmo guard, motivos diferentes:
+ * - `talvezUsarInstantaneo` (`./bot.ts`, Task 5) — decide SE o bot manda a
+ *   ação. Sem o guard, uma jogada recusada sobe como `AcaoInvalida` por
+ *   `avancarBots` e vira 400 na jogada do humano.
+ * - `botoesDeInstantaneo` (`packages/web/src/TelaMesa.tsx`, Task 7) — decide o
+ *   `disabled` do botão "Usar" (convenção #26: apaga, não some), pela função
+ *   republicada por `shared`, nunca copiada.
+ *
+ * `usarInstantaneo` (`./mesa`, Task 4) NÃO é um terceiro chamador desta função:
+ * ela chama `aplicarInstantaneo` diretamente e reusa o `mudou` da MESMA
+ * chamada que já precisa fazer para aplicar o efeito — chamar este atalho ali
+ * RODARIA o interpretador duas vezes à toa.
  *
  * 🔑 Por que ela é geral e não "cura com vida cheia": um Areia nos Olhos contra um
  * monstro já no piso de força também não faz nada, e um guard escrito só para a
