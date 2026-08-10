@@ -614,7 +614,21 @@ obedecer ao texto.**
 🔴 **Item cuja frequência esperada não for quase certa numa sessão é declarado DE SONDA, NÃO DE OLHO,
 na própria linha** (#70/#84). **Um falso negativo num gate é PIOR que item ausente:** ele *acusa* um
 defeito que não existe.
-🔴 **Cada item foi conferido CONTRA O CÓDIGO DA TELA antes de ser escrito.**
+🔴 **Cada item foi conferido contra `packages/web/src/TelaMesa.tsx` antes de ser escrito — e o
+alcance dessa conferência era ESSE arquivo, não *"o código da tela"*.** ⚠️ **A frase original dizia
+*"cada item foi conferido CONTRA O CÓDIGO DA TELA"*, e ela saiu falsa:** o item 2 exige ver
+*"Você usa Elixir de Força em si."* no **log**, e quem monta essa string é o `PainelLog.tsx` — que
+**não conseguia produzi-la**, porque narrava todo instantâneo pelo id cru. **A 4ª auto-certificação
+falsa desta fatia, e pelo mesmo mecanismo das outras três: ESCOPO DO INSTRUMENTO** (ver
+[`licoes-aprendidas.md §16`](../licoes-aprendidas.md)).
+
+✅ **O que isso diz do GATE é bom:** o item 2 **teria pego** o defeito na primeira vez que o Pedro
+usasse um consumível. Quem falhou foi a frase ao lado dele, não o roteiro.
+✅ **E o item 2 continua correto COMO ESTÁ ESCRITO** — conferido de novo em 2026-08-10, depois do
+conserto (`fix(web): o log narra o instantâneo pelo NOME`): o log resolve o nome pelo catálogo, e a
+frase sai *"Você usa `<nome>` em si."*. ⚠️ **A string prendida por teste em `TelaMesa.test.tsx` é a
+da Poção de Cura**, não a do Elixir — é a **mesma linha de código** (`narrarEvento`, ramo
+`usouInstantaneo`, alvo `lutador`), então o item 2 é produzível; mas o que está **medido** é a Poção.
 
 ⚠️ **A base de frequência de quase todos os itens é a política do BOT** (o soak roda `escolherAcao`
 nos quatro assentos). Jogando à mão, o Pedro pode forçar qualquer um deles — as frequências dizem
