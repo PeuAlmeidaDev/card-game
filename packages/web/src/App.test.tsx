@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
-import type { Catalogo } from '@card-dungeon/shared';
+import userEvent from '@testing-library/user-event';
+import type { Catalogo, VistaDaPartida } from '@card-dungeon/shared';
 import { App } from './App';
+import { api } from './api';
 
 afterEach(() => {
   cleanup();
@@ -51,5 +53,75 @@ describe('App', () => {
     expect(screen.queryByRole('button', { name: 'Duelar' })).not.toBeInTheDocument();
     expect(screen.queryByText(/Personagem:/)).not.toBeInTheDocument();
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+  });
+
+  it('propaga o catálogo de instantâneos até a tela — o nome real chega ao botão', async () => {
+    // Achado Important 2 da revisão da Task 7: `App.tsx` (`instantaneos={catalogo.instantaneos}`)
+    // era a ÚNICA linha de fiação de produção sem mutação que a reprovasse — os 8
+    // testes de `TelaMesa.test.tsx` passam o catálogo direto no `render`, então
+    // nenhum deles cobre o caminho real (fetch → App → TelaMesa). Este teste sobe
+    // a árvore INTEIRA: mocka `/api/catalogo` com um instantâneo de nome real e
+    // `api.criarPartida` com uma vista já em combate, com a carta na mão — se
+    // `App.tsx` parasse de repassar a prop, `nomeDoInstantaneo` cairia no
+    // fallback `?? id` e o botão apareceria como "pocao-de-cura", não como
+    // "Poção de Cura".
+    const catalogoComInstantaneo: Catalogo = {
+      ...catalogo,
+      instantaneos: [
+        { id: 'pocao-de-cura', nome: 'Poção de Cura', efeitos: [{ tipo: 'stats', modificadores: { vida: 5 } }] },
+      ],
+    };
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(json(catalogoComInstantaneo))));
+
+    const combatente = { forca: 3, vida: 20, habilidade: 8, agilidade: 5, level: 1 };
+    const vistaEmCombate: VistaDaPartida = {
+      id: 'm1',
+      voce: 'p1',
+      versao: 1,
+      jogadores: [
+        {
+          id: 'p1', nome: 'Você', ehBot: false, patente: 1, derrotas: 0, combatente,
+          emJogo: { raca: null, classe: null, slots: { capacete: null, armadura: null, maoDireita: null, maoEsquerda: null, pes: null } },
+          cartasNaMao: 1, limiteDeMao: 8, mochila: [], limiteDeMochila: 6,
+        },
+        {
+          id: 'p2', nome: 'Bot 1', ehBot: true, patente: 2, derrotas: 0, combatente,
+          emJogo: { raca: null, classe: null, slots: { capacete: null, armadura: null, maoDireita: null, maoEsquerda: null, pes: null } },
+          cartasNaMao: 0, limiteDeMao: 8, mochila: [], limiteDeMochila: 6,
+        },
+      ],
+      vezDe: 'p1',
+      patenteAlvo: 10,
+      cartasNoMonte: 16,
+      cartasNoCemiterio: 0,
+      tesourosNoMonte: 0,
+      combate: {
+        monstroId: 'goblin',
+        proximaDecisao: 'ataque',
+        estado: {
+          jogador: { ...combatente, vida: 4 },
+          monstro: { forca: 4, vida: 23, habilidade: 2, agilidade: 4, level: 5 },
+          vez: 'jogador',
+          turno: 3,
+          ataqueDoMonstro: null,
+          desfecho: 'emAndamento',
+          vidaInicialJogador: combatente.vida,
+          passivas: [],
+        },
+      },
+      espiada: null,
+      queima: null,
+      fase: 'combate',
+      desfecho: 'emAndamento',
+      classificacao: null,
+      log: [],
+      suaMao: [{ id: 't1', tipo: 'instantaneo', instantaneoId: 'pocao-de-cura' }],
+    };
+    vi.spyOn(api, 'criarPartida').mockResolvedValue({ status: 200, body: vistaEmCombate } as never);
+
+    render(<App />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Nova partida' }));
+
+    expect(await screen.findByRole('button', { name: /Poção de Cura.*em si/i })).toBeInTheDocument();
   });
 });

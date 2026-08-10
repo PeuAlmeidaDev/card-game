@@ -4,7 +4,7 @@ import { PainelLog } from './PainelLog';
 import { descreverCarta } from './descreverCarta';
 import type { NomesDoCatalogo } from './descreverCarta';
 import { acaoEhLegal, afinidadeCom, instantaneoTemEfeito, precisaEscolherMao } from '@card-dungeon/shared';
-import type { AcaoDaMesa, AcaoNoFio, Catalogo, Fase, ItemCarta, Slot, VistaDaPartida } from '@card-dungeon/shared';
+import type { AcaoDaMesa, AcaoNoFio, AlvoDeInstantaneo, Catalogo, Fase, ItemCarta, Slot, VistaDaPartida } from '@card-dungeon/shared';
 import { rotuloDeAfinidade } from './rotuloDeAfinidade';
 import { rotuloDeBadStuff } from './rotuloDeBadStuff';
 
@@ -47,6 +47,27 @@ const NOME_DA_FASE: Record<Fase, string> = {
   jogar: 'Jogar — vista o que encontrou',
   descartar: 'Descartar — sua mão está acima do limite',
 };
+
+/**
+ * O rótulo humano de cada alvo de `usarInstantaneo`, mesmo molde de
+ * `NOME_DO_SLOT`/`NOME_DA_FASE`: `Record<AlvoDeInstantaneo, string>` obriga o
+ * alvo novo a chegar com rótulo — faltar uma chave aqui é erro de COMPILAÇÃO
+ * (`pnpm typecheck`), não teste silenciosamente verde.
+ *
+ * Fix round 1 (Important 1 da revisão): antes deste Record, a união
+ * `'lutador' | 'monstro'` era reescrita À MÃO em três lugares (a assinatura de
+ * `tetoDoInstantaneo`, o array de alvos do botão, e o ternário do rótulo) — o
+ * dia em que o alvo ganhar "outro jogador" (bloco 5, comentário de
+ * `AlvoDeInstantaneo` em `shared`) deixaria `pnpm typecheck` 7/7 LIMPO com a
+ * tela continuando a oferecer só dois botões. `ALVOS_DE_INSTANTANEO` abaixo é
+ * derivado DESTE Record — as duas listas não podem divergir porque só existe
+ * uma.
+ */
+const ROTULO_DO_ALVO: Record<AlvoDeInstantaneo, string> = {
+  lutador: 'em si',
+  monstro: 'no monstro',
+};
+const ALVOS_DE_INSTANTANEO = Object.keys(ROTULO_DO_ALVO) as readonly AlvoDeInstantaneo[];
 
 export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [], instantaneos = [] }: {
   readonly racas?: Catalogo['racas'];
@@ -197,7 +218,7 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [], 
    * (`vidaInicialJogador`); do monstro não há campo em `EstadoCombate` (spec §4),
    * então vem do catálogo, pelo `monstroId` do combate aberto.
    */
-  const tetoDoInstantaneo = (alvo: 'lutador' | 'monstro'): number => (
+  const tetoDoInstantaneo = (alvo: AlvoDeInstantaneo): number => (
     alvo === 'lutador'
       ? (combate?.estado.vidaInicialJogador ?? 0)
       : (monstros.find((m) => m.id === combate?.monstroId)?.vida ?? 0)
@@ -225,7 +246,7 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [], 
    *   de `legal`).
    */
   const botoesDeInstantaneo = (carta: (typeof instantaneosDoJogador)[number]) => (
-    (['lutador', 'monstro'] as const).map((alvo) => (
+    ALVOS_DE_INSTANTANEO.map((alvo) => (
       <button
         key={`${carta.id}-${alvo}`}
         type="button"
@@ -236,7 +257,7 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [], 
         }
         onClick={() => void agir({ tipo: 'usarInstantaneo', cartaId: carta.id, alvo })}
       >
-        {nomeDoInstantaneo(carta.instantaneoId)} {alvo === 'lutador' ? 'em si' : 'no monstro'}
+        {nomeDoInstantaneo(carta.instantaneoId)} {ROTULO_DO_ALVO[alvo]}
       </button>
     ))
   );

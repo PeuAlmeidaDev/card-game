@@ -356,8 +356,8 @@ export function aplicarAcao(estado: EstadoPartida, acao: AcaoDaMesa, deps: DepsM
   //   jogar                guardarCarta   mochila cheia                `guardarCarta`
   //   combate              atacar         `proximaDecisao`             o motor (`AcaoIlegal`)
   //   combate              esquivar       `proximaDecisao`             o motor (`AcaoIlegal`)
-  //   combate              usarInstantaneo  a carta é instantâneo, na mão OU mochila  `usarInstantaneo` (gêmeo DEVIDO na Task 7 — nenhum botão "Usar" existe ainda)
-  //   combate              usarInstantaneo  o efeito muda alguma coisa (o `mudou` de `aplicarInstantaneo`) `usarInstantaneo` (gêmeo DEVIDO na Task 7, idem)
+  //   combate              usarInstantaneo  a carta é instantâneo, na mão OU mochila  `usarInstantaneo` (gêmeo ESTRUTURAL na `TelaMesa`, Task 7: `instantaneosDoJogador` só entra com cartas tipo 'instantaneo' da mão+mochila)
+  //   combate              usarInstantaneo  o efeito muda alguma coisa (o `mudou` de `aplicarInstantaneo`) `usarInstantaneo` (gêmeo no `disabled` do botão "Usar" — `TelaMesa.tsx`, Task 7 — via `instantaneoTemEfeito`)
   //   encrenca             procurarEncrenca  a carta é do tipo monstro `procurarEncrenca`
   //   ↑ VINTE pares. As três linhas abaixo NÃO são par — estão aqui para provar
   //     que a recontagem chegou até estes verbos:

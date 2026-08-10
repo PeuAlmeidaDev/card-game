@@ -64,8 +64,10 @@ na tela**, porque o `legal()` da `TelaMesa` lê só a tabela de fases. **Botão 
    NOVO com DOIS `AcaoInvalida` próprios ("carta não é instantâneo da mão/mochila" e "o efeito não
    muda nada" — o guard de desperdício, spec §5.5), uma linha cada, porque a ação só é legal numa
    fase (`combate`) — sem a duplicação que `equiparCarta`/`afinidadeCom` pagam por serem legais nas
-   duas paradas. **Os dois pares ainda NÃO têm gêmeo na `TelaMesa`** — o botão "Usar" nasce na
-   Task 7 — e por isso as duas linhas da tabela dizem isso em texto, não silenciosamente.
+   duas paradas. ✅ **Os dois pares GANHARAM gêmeo na `TelaMesa` na Task 7** — o botão "Usar" existe:
+   o primeiro é **estrutural** (`instantaneosDoJogador` só lista cartas tipo `'instantaneo'` da mão e
+   da mochila), o segundo mora no `disabled` de `botoesDeInstantaneo`, via `instantaneoTemEfeito`
+   (republicada por `shared`, nunca copiada).
 
 ⚠️ **Três das 23 linhas NÃO são par, e estão lá de propósito:**
 

@@ -388,6 +388,15 @@ export type {
   // `instantaneoId` na mão/mochila sem saber nem o nome da carta (fatia
   // `consumíveis (instantâneo)`, Task 6).
   InstantaneoCarta,
+  // O alvo de `usarInstantaneo` ('lutador' | 'monstro'), gêmeo do `z.enum` do
+  // fio pelo mesmo `_CoberturaAlvo` acima. Faltava aqui — importado só para o
+  // guard — e a `TelaMesa` (Task 7, fix round 1) reescrevia a união À MÃO em
+  // três lugares (`'lutador' | 'monstro'` duas vezes, mais o ternário do
+  // rótulo): no dia em que o alvo ganhar "outro jogador" (bloco 5), o
+  // `pnpm typecheck` ficava 7/7 limpo e a tela continuava oferecendo só dois
+  // botões. Reexportar o TIPO é o que deixa a tela derivar dele em vez de
+  // copiá-lo.
+  AlvoDeInstantaneo,
   // O que o ITEM declara (`SlotDeItem`), gêmeo de `Slot` (o que o CORPO tem) e
   // travado pelo mesmo `_CoberturaSlotDeItem`. Faltava aqui — importado só
   // para o guard desde a `empunhadura dupla`, nunca reexportado — porque
