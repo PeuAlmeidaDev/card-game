@@ -10,11 +10,13 @@ import type {
 import type {
   AcaoDaMesa,
   Afinidade,
+  AlvoDeInstantaneo,
   BadStuff,
   Carta,
   CartaEquipamento,
   CartaPorta,
   CartaTesouro,
+  EfeitoInstantaneo,
   EixoDeAfinidade,
   EspiadaPendente,
   EventoDaMesa,
@@ -30,8 +32,8 @@ import type {
   ZonaEmJogo,
 } from '@card-dungeon/partida';
 import type {
-  Slot as SlotDaCarta, SlotDeItem as SlotDeItemDaCarta, ItemCarta, EixoDeAfinidade as EixoDaCarta,
-  BadStuff as BadStuffDaCarta,
+  Slot as SlotDaCarta, SlotDeItem as SlotDeItemDaCarta, ItemCarta, InstantaneoCarta, EixoDeAfinidade as EixoDaCarta,
+  BadStuff as BadStuffDaCarta, EfeitoInstantaneo as EfeitoDaCarta,
 } from '@card-dungeon/cartas';
 
 /**
@@ -104,6 +106,16 @@ export const acaoDaMesaSchema = z.discriminatedUnion('tipo', [
   // `cartaId` é refletido verbatim no 400 e no log do server. O cliente aponta a
   // carta, nunca o destino — o destino é sempre o cemitério de Tesouros.
   z.object({ tipo: z.literal('queimarCarta'), cartaId: z.string().min(1).max(64) }),
+  // Mesmo teto de 64 e pelo mesmo motivo dos outros verbos que apontam carta da
+  // mão OU da mochila (fatia `consumíveis (instantâneo)`): o `cartaId` é
+  // refletido verbatim no 400 e no log do server. O `alvo` viaja porque é
+  // escolha real do jogador — bufar o monstro ou a si mesmo são as duas jogadas
+  // legais (spec §4).
+  z.object({
+    tipo: z.literal('usarInstantaneo'),
+    cartaId: z.string().min(1).max(64),
+    alvo: z.enum(['lutador', 'monstro']),
+  }),
 ]) satisfies z.ZodType<{ tipo: AcaoDaMesa['tipo'] }>;
 
 /** A intenção validada. A rota completa com o `jogadorId` da sessão. */
@@ -143,6 +155,22 @@ type _CoberturaMao =
   [MaoSlot] extends [MaoNoFio] ? ([MaoNoFio] extends [MaoSlot] ? true : never) : never;
 const _coberturaMao: _CoberturaMao = true;
 void _coberturaMao;
+
+/**
+ * Trava o `alvo` DENTRO do `usarInstantaneo`. O `z.enum` é escrito à mão e, por
+ * covariância, um enum mais ESTREITO que `AlvoDeInstantaneo` passa limpo — um
+ * alvo novo no domínio ficaria inalcançável pelo fio, sem nada acusando. É
+ * exatamente o que aconteceria no bloco 5, quando o alvo ganhar "outro jogador".
+ *
+ * Mesma tupla e mesmo preço do `_CoberturaMao`, acima.
+ *
+ * ⚠️ Guard de COMPILAÇÃO. Quem acusa é o `pnpm typecheck`, nunca a suíte.
+ */
+type AlvoNoFio = Extract<AcaoNoFio, { tipo: 'usarInstantaneo' }>['alvo'];
+type _CoberturaAlvo =
+  [AlvoDeInstantaneo] extends [AlvoNoFio] ? ([AlvoNoFio] extends [AlvoDeInstantaneo] ? true : never) : never;
+const _coberturaAlvo: _CoberturaAlvo = true;
+void _coberturaAlvo;
 
 /**
  * Trava as duas uniões `Slot` — a de `partida` (a REGRA: o corpo tem 5 encaixes)
@@ -202,6 +230,33 @@ const _coberturaBadStuff: _CoberturaBadStuff = true;
 void _coberturaBadStuff;
 
 /**
+ * Trava as duas uniões `EfeitoInstantaneo` — a de `partida` (a regra) e a de
+ * `cartas` (o dado). Mesma tupla e mesmo preço do `_CoberturaSlot`.
+ *
+ * 🔴 Sem ele, um verbo novo em `cartas` deixa `pnpm typecheck` 7/7 LIMPO com o
+ * interpretador do reducer nunca alcançando o verbo.
+ *
+ * 🔴 Fix round 1 (Minor 2 da revisão): a forma original comparava só
+ * `['tipo']` — mais fraca que a dos outros guards deste arquivo (e mais fraca
+ * do que o texto ACIMA já prometia: "mesma tupla e mesmo preço do
+ * `_CoberturaSlot`", que compara a união INTEIRA). Comparando a união inteira
+ * (`[EfeitoInstantaneo] extends [EfeitoDaCarta]`, não só o campo `tipo`), o
+ * guard passa a travar TRANSITIVAMENTE o `ModificadoresDeStat` de dentro do
+ * `modificadores` de cada membro — a dívida nomeada na tabela de guards
+ * (acima) e em `docs/divida-tecnica.md`. `ModificadoresDeStat` continua sem
+ * guard PRÓPRIO (a dívida não fecha para os outros consumidores dele), mas
+ * este caminho específico já não passa despercebido.
+ *
+ * ⚠️ Guard de COMPILAÇÃO. Quem acusa é o `pnpm typecheck`, nunca a suíte.
+ */
+type _CoberturaEfeitoInstantaneo =
+  [EfeitoInstantaneo] extends [EfeitoDaCarta]
+    ? ([EfeitoDaCarta] extends [EfeitoInstantaneo] ? true : never)
+    : never;
+const _coberturaEfeitoInstantaneo: _CoberturaEfeitoInstantaneo = true;
+void _coberturaEfeitoInstantaneo;
+
+/**
  * Corpo do POST /api/partida/:id/acao: a ação MAIS a versão do estado que o
  * cliente acredita estar vendo. O servidor recusa com 409 se não bater — é o que
  * impede que um duplo-clique ou um retry de rede role o dado duas vezes.
@@ -232,6 +287,12 @@ export { afinidadeCom, contribuicaoDe } from '@card-dungeon/partida';
 // botão "Equipar" ou um por mão. Copiado no cliente, a tela oferece o número
 // velho de botões no dia em que a regra mudar — e isso é 400 na cara do jogador.
 export { precisaEscolherMao } from '@card-dungeon/partida';
+
+// Valor, mesmo motivo dos três acima: "esta carta faria efeito neste alvo?" é o
+// MESMO guard de desperdício que `usarInstantaneo` (`mesa.ts`) cobra antes de
+// aplicar o efeito (spec §5.5). A `TelaMesa` chama esta função para decidir o
+// `disabled` do botão "Usar" — nunca reimplementa a conta de piso/teto aqui.
+export { instantaneoTemEfeito } from '@card-dungeon/partida';
 
 const c = initContract();
 
@@ -322,6 +383,20 @@ export type {
   // então o que não passar por aqui simplesmente não existe para o cliente.
   Slot,
   ItemCarta,
+  // A carta consumível (`instantâneo`), gêmea de `ItemCarta` pelo mesmo
+  // motivo: dado puro do catálogo, e sem ela a tela receberia um
+  // `instantaneoId` na mão/mochila sem saber nem o nome da carta (fatia
+  // `consumíveis (instantâneo)`, Task 6).
+  InstantaneoCarta,
+  // O alvo de `usarInstantaneo` ('lutador' | 'monstro'), gêmeo do `z.enum` do
+  // fio pelo mesmo `_CoberturaAlvo` acima. Faltava aqui — importado só para o
+  // guard — e a `TelaMesa` (Task 7, fix round 1) reescrevia a união À MÃO em
+  // três lugares (`'lutador' | 'monstro'` duas vezes, mais o ternário do
+  // rótulo): no dia em que o alvo ganhar "outro jogador" (bloco 5), o
+  // `pnpm typecheck` ficava 7/7 limpo e a tela continuava oferecendo só dois
+  // botões. Reexportar o TIPO é o que deixa a tela derivar dele em vez de
+  // copiá-lo.
+  AlvoDeInstantaneo,
   // O que o ITEM declara (`SlotDeItem`), gêmeo de `Slot` (o que o CORPO tem) e
   // travado pelo mesmo `_CoberturaSlotDeItem`. Faltava aqui — importado só
   // para o guard desde a `empunhadura dupla`, nunca reexportado — porque

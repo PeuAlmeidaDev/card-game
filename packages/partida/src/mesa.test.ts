@@ -11,18 +11,19 @@ import { faseDoTurnoDe } from './fase';
 import { projetarPara, versaoDe } from './projecao';
 import { AcaoInvalida } from './erros';
 import { filaDeDados, criarDadoCiclico } from './testes/dados';
-import { classe, monstro, monstros, raca, equipamento } from './testes/cartas';
+import { classe, monstro, monstros, raca, equipamento, instantaneo } from './testes/cartas';
 import {
   catalogoDeTeste, comClasseDeTeste, ID_DA_CLASSE_DE_TESTE, CLASSE_DE_TESTE, MONSTRO_DE_TESTE, ID_DO_ITEM_EXCLUSIVO,
   ID_DA_RACA_OUTRA, ID_DA_RACA_DONA, ID_DO_ITEM_DE_TESTE, ID_DO_ITEM_EXCLUSIVO_DUAS_MAOS, ID_DO_ITEM_EXCLUSIVO_PES,
   ID_DO_ITEM_EXCLUSIVO_DE_CLASSE, ID_DO_ITEM_DE_CAPACETE, ID_DO_ITEM_DUAS_MAOS,
+  ID_DO_MONSTRO_DE_TESTE, ID_DO_INSTANTANEO_DUPLO, ID_DO_INSTANTANEO_NEGATIVO,
 } from './testes/catalogo';
 import { COMPOSICAO_DE_TESTE, COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import { combatenteDe, itensEquipados, SLOTS_VAZIOS } from './corpo';
 import type { DepsMesa, ResultadoAcao } from './mesa';
 import type {
-  BadStuff, Carta, ConfigPartida, EntradaJogador, CartaPorta, CartaEquipamento, EstadoPartida, InfoMonstro,
-  JogadorNaMesa, ZonaEmJogo,
+  BadStuff, Carta, ConfigPartida, EntradaJogador, CartaPorta, CartaEquipamento, CartaTesouro, EstadoPartida,
+  InfoMonstro, JogadorNaMesa, ZonaEmJogo,
 } from './tipos';
 import type { PassivaCombate } from '@card-dungeon/motor';
 
@@ -408,6 +409,233 @@ describe('aplicarAcao — combate', () => {
       .toThrow(TypeError);
     expect(() => aplicarAcao(comCombate, { tipo: 'atacar', jogadorId: 'p1' }, depsQuebradas))
       .not.toThrow(AcaoInvalida);
+  });
+});
+
+describe('aplicarAcao — usarInstantaneo', () => {
+  const soMonstro = { ...config, composicaoPorJogador: [{ tipo: 'monstro' as const, monstroId: 'm-teste' }] };
+
+  /**
+   * Abre o combate contra o `MONSTRO_DE_TESTE` com mão/mochila injetadas ANTES de
+   * vasculhar. `vidaDoJogador`, quando dado, sobrescreve a vida do `EstadoCombate`
+   * DEPOIS de aberto — mesmo idioma de `combate()` em `instantaneo.test.ts`
+   * (`{ ...LUTADOR, vida: 8 }`): um lutador ferido é estado plenamente alcançável
+   * em jogo (é o que qualquer troca de golpes produz); só pedimos ao domínio para
+   * chegar lá direto em vez de simular os golpes.
+   */
+  const estadoEmCombate = (opcoes: {
+    readonly mao?: readonly Carta[];
+    readonly mochila?: readonly CartaTesouro[];
+    readonly vidaDoJogador?: number;
+  }): EstadoPartida => {
+    const p0 = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const comZonas: EstadoPartida = {
+      ...p0,
+      jogadores: p0.jogadores.map((j) => (j.id === 'p1' ? {
+        ...j,
+        mao: opcoes.mao ?? j.mao,
+        mochila: opcoes.mochila ?? j.mochila,
+      } : j)),
+    };
+    // agilidade do jogador (5) > a do monstro (1) => a abertura não gasta dado.
+    const aberto = aplicarAcao(comZonas, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
+    if (opcoes.vidaDoJogador === undefined || aberto.combate === null) return aberto;
+    return {
+      ...aberto,
+      combate: {
+        ...aberto.combate,
+        estado: {
+          ...aberto.combate.estado,
+          jogador: { ...aberto.combate.estado.jogador, vida: opcoes.vidaDoJogador },
+        },
+      },
+    };
+  };
+
+  it('aplica o efeito no lutador, consome a carta da mão e manda ao cemitério', () => {
+    const estado = estadoEmCombate({ mao: [instantaneo('t1')], vidaDoJogador: 3 });
+
+    const r = aplicarAcao(
+      estado, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't1', alvo: 'lutador' }, deps([]),
+    );
+
+    expect(r.estado.combate?.estado.jogador.vida).toBe(7); // 3 + 4
+    expect(r.estado.jogadores[0]?.mao).toHaveLength(0);
+    expect(r.estado.tesouros.cemiterio.map((c) => c.id)).toContain('t1');
+  });
+
+  it('aplica o efeito a partir da MOCHILA', () => {
+    const estado = estadoEmCombate({ mochila: [instantaneo('t2')], vidaDoJogador: 3 });
+
+    const r = aplicarAcao(
+      estado, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't2', alvo: 'lutador' }, deps([]),
+    );
+
+    expect(r.estado.combate?.estado.jogador.vida).toBe(7);
+    expect(jogadorDe(r.estado, 'p1').mochila).toHaveLength(0);
+  });
+
+  // 🔑 O TESTE DO MEIO. Na fatia 2a, apagar o repasse dos eventos no reducer
+  // deixava 732/732 verdes com a punição mais dura do jogo acontecendo em
+  // silêncio. Provar que a função pura devolve e que a tela sabe narrar NÃO prova
+  // o fio entre os dois — é `registrar` de fato recebendo o evento que prova.
+  it('publica o evento `usouInstantaneo` no log', () => {
+    const estado = estadoEmCombate({ mao: [instantaneo('t3')], vidaDoJogador: 3 });
+
+    const r = aplicarAcao(
+      estado, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't3', alvo: 'lutador' }, deps([]),
+    );
+
+    expect(r.eventos).toContainEqual({
+      tipo: 'usouInstantaneo', jogadorId: 'p1',
+      carta: instantaneo('t3'), alvo: 'lutador', monstroId: ID_DO_MONSTRO_DE_TESTE,
+    });
+  });
+
+  it('NÃO avança o combate: a decisão pendente e o turno ficam onde estavam', () => {
+    const estado = estadoEmCombate({ mao: [instantaneo('t4')], vidaDoJogador: 3 });
+    const antes = estado.combate;
+
+    const r = aplicarAcao(
+      estado, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't4', alvo: 'lutador' }, deps([]),
+    );
+
+    expect(r.estado.combate?.proximaDecisao).toBe(antes?.proximaDecisao);
+    expect(r.estado.combate?.estado.turno).toBe(antes?.estado.turno);
+  });
+
+  it('recusa quando o efeito não muda nada (cura com a vida cheia)', () => {
+    // Sem `vidaDoJogador`: o lutador abre o combate com a vida cheia (teto 20), e
+    // a cura de 4 do `ID_DO_INSTANTANEO_DE_TESTE` clampa sem mudar nada.
+    //
+    // Mensagem ESPECÍFICA, não só `AcaoInvalida`: `usarInstantaneo` tem DOIS
+    // guards que lançam a mesma classe, e o teste que só confere o tipo passa
+    // mesmo se o guard ERRADO for o que recusou (a segunda pergunta da lição —
+    // "reprova pelo motivo certo?").
+    const estado = estadoEmCombate({ mao: [instantaneo('t5')] });
+
+    expect(() => aplicarAcao(
+      estado, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't5', alvo: 'lutador' }, deps([]),
+    )).toThrow('esta carta não faria efeito neste alvo');
+  });
+
+  it('recusa carta que não é instantâneo', () => {
+    const estado = estadoEmCombate({ mao: [equipamento('t6')] });
+
+    expect(() => aplicarAcao(
+      estado, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't6', alvo: 'lutador' }, deps([]),
+    )).toThrow('carta não é um instantâneo da sua mão ou mochila');
+  });
+
+  it('recusa fora da fase `combate`', () => {
+    // Caminho REAL, não fase forjada: vence o combate (mesmo orçamento de dados
+    // de `venceOCombate`, no topo do arquivo) com um instantâneo intocado na mão
+    // e chega em `jogar` de verdade — o mesmo cenário do describe de combate,
+    // acima ("vencer o combate sobe a patente e abre a fase `jogar`").
+    const p0 = criar('m1', entradas, soMonstro, { embaralhar: semEmbaralhar });
+    const comInstantaneo: EstadoPartida = {
+      ...p0,
+      jogadores: p0.jogadores.map((j) => (j.id === 'p1' ? { ...j, mao: [instantaneo('t7')] } : j)),
+    };
+    const aberto = aplicarAcao(comInstantaneo, { tipo: 'vasculhar', jogadorId: 'p1' }, deps([])).estado;
+    const vencido = venceOCombate(aberto);
+    expect(vencido.fase).toBe('jogar');
+
+    expect(() => aplicarAcao(
+      vencido, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't7', alvo: 'lutador' }, deps([]),
+    )).toThrow('aplicarAcao: usarInstantaneo não é legal na fase jogar');
+  });
+
+  it('o buff PERSISTE até o fim do combate e SOME no combate seguinte', () => {
+    // A ausência de código de expiração é o desenho (spec §5.2): o próximo
+    // combate remonta os stats por `combatenteDe`. Este teste é o que prende a
+    // metade "persiste durante ESTE combate" — depois de um `atacar` de verdade,
+    // o buff continua no snapshot.
+    const estado = estadoEmCombate({ mao: [instantaneo('t8', ID_DO_INSTANTANEO_DUPLO)] });
+    const comBuff = aplicarAcao(
+      estado, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't8', alvo: 'lutador' }, deps([]),
+    );
+    const forcaBuffada = comBuff.estado.combate?.estado.jogador.forca;
+    expect(forcaBuffada).toBe(5); // 3 (base) + 2 (o instantâneo duplo)
+
+    const depoisDeAtacar = aplicarAcao(comBuff.estado, { tipo: 'atacar', jogadorId: 'p1' }, deps([4, 12, 12]));
+    expect(depoisDeAtacar.estado.combate?.estado.jogador.forca).toBe(forcaBuffada);
+  });
+
+  it('o teto do alvo MONSTRO vem da CARTA no catálogo, nunca de `vidaInicialJogador`', () => {
+    // Mutação do Step 10: passar `combate.estado.vidaInicialJogador` (20, o teto
+    // do JOGADOR) também para o alvo `monstro` deixaria a cura de 4 "caber" acima
+    // da vida cheia do `MONSTRO_DE_TESTE` (10) e o guard de desperdício sumiria.
+    // Task 3 (`instantaneo.test.ts`) cobre o `aplicarInstantaneo` puro; este é o
+    // cenário de INTEGRAÇÃO — o reducer lendo o teto certo do catálogo.
+    //
+    // Mensagem ESPECÍFICA (fix round 1): este teste depende do MESMO guard do
+    // "recusa quando o efeito não muda nada" — `toThrow(AcaoInvalida)` sozinho
+    // não prova que foi ESTE guard que recusou, e não o de "carta não é
+    // instantâneo" por engano de fixture.
+    const estado = estadoEmCombate({ mao: [instantaneo('t9')] });
+    expect(estado.combate?.estado.monstro.vida).toBe(MONSTRO_DE_TESTE.vida);
+
+    expect(() => aplicarAcao(
+      estado, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't9', alvo: 'monstro' }, deps([]),
+    )).toThrow('esta carta não faria efeito neste alvo');
+  });
+
+  it('aplica o efeito no MONSTRO — o caminho feliz do alvo `monstro`, provado por mutação', () => {
+    // Important 1 da revisão (fix round 1): sem este teste, substituir o RAMO
+    // INTEIRO do alvo `monstro` por um `throw new AcaoInvalida` incondicional
+    // deixava 407/407 VERDES — a metade da ação que enfraquece o adversário podia
+    // ser deletada em silêncio. `instantaneo.test.ts` prova a função pura e
+    // `narrarEvento.test.tsx` prova o texto; este é o FIO entre os dois, no
+    // reducer — exatamente o que a fatia anterior provou que ninguém prendia.
+    const estado = estadoEmCombate({ mao: [instantaneo('t10', ID_DO_INSTANTANEO_NEGATIVO)] });
+    expect(estado.combate?.estado.monstro.forca).toBe(MONSTRO_DE_TESTE.forca);
+
+    const r = aplicarAcao(
+      estado, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't10', alvo: 'monstro' }, deps([]),
+    );
+
+    // Piso 1: força 2 (do `MONSTRO_DE_TESTE`) menos 99 clampa em 1 — mas o que
+    // importa aqui é que MUDOU (2 → 1), não o valor exato.
+    expect(r.estado.combate?.estado.monstro.forca).toBeLessThan(MONSTRO_DE_TESTE.forca);
+    expect(r.estado.tesouros.cemiterio.map((c) => c.id)).toContain('t10');
+    expect(r.eventos).toContainEqual({
+      tipo: 'usouInstantaneo', jogadorId: 'p1',
+      carta: instantaneo('t10', ID_DO_INSTANTANEO_NEGATIVO),
+      alvo: 'monstro', monstroId: ID_DO_MONSTRO_DE_TESTE,
+    });
+  });
+
+  it('instantâneo fora do catálogo é Error cru, nunca AcaoInvalida', () => {
+    // Minor 5 da revisão: mesmo padrão de "monstro fora do catálogo na hora do
+    // loot é Error cru" (describe `vencer larga tesouro na mão`, mais abaixo) —
+    // id órfão é invariante NOSSA quebrada (a carta só chega à mesa pela
+    // composição que a borda montou do próprio catálogo), não pedido inválido.
+    const estado = estadoEmCombate({ mao: [instantaneo('t11', 'instantaneo-fantasma')] });
+
+    expect(() => aplicarAcao(
+      estado, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't11', alvo: 'lutador' }, deps([]),
+    )).toThrow(/instantaneo-fantasma/);
+    expect(() => aplicarAcao(
+      estado, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't11', alvo: 'lutador' }, deps([]),
+    )).not.toThrow(AcaoInvalida);
+  });
+
+  it('monstro fora do catálogo no alvo `monstro` é Error cru, nunca AcaoInvalida', () => {
+    // Gêmeo do teste acima, para o SEGUNDO `Error` cru da função — só alcançável
+    // com `alvo: 'monstro'`, porque é aí que `usarInstantaneo` relê o catálogo de
+    // monstros para saber o teto de vida do adversário.
+    const estado = estadoEmCombate({ mao: [instantaneo('t12', ID_DO_INSTANTANEO_NEGATIVO)] });
+    const comCombate = estado.combate;
+    expect(comCombate).not.toBeNull();
+    const orfao: EstadoPartida = { ...estado, combate: { ...comCombate!, monstroId: 'quimera-fantasma' } };
+
+    expect(() => aplicarAcao(
+      orfao, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't12', alvo: 'monstro' }, deps([]),
+    )).toThrow(/quimera-fantasma/);
+    expect(() => aplicarAcao(
+      orfao, { tipo: 'usarInstantaneo', jogadorId: 'p1', cartaId: 't12', alvo: 'monstro' }, deps([]),
+    )).not.toThrow(AcaoInvalida);
   });
 });
 
@@ -1772,6 +2000,49 @@ describe('jogar carta de CLASSE', () => {
     expect(jogadorDe(r.estado, 'p1').mochila.map((c) => c.id)).not.toContain('t-c5');
   });
 
+  it('a carta excedente pode ser um INSTANTÂNEO — o corte é pela ÚLTIMA da mochila, não pela família', () => {
+    // Achado da revisão (Important 2, Fix round 1): uma variante que escolhe
+    // "o ÚLTIMO EQUIPAMENTO da mochila" em vez do último ELEMENTO (qualquer
+    // família) passava os 384 testes de então — porque nenhum deles tinha uma
+    // mochila mista. Com um instantâneo no fundo, essa variante faz duas
+    // coisas erradas ao mesmo tempo: o `slice(0,-1)` (inalterado) ainda remove
+    // o ÚLTIMO elemento físico (o instantâneo) da mochila, mas `cartaExcedente`
+    // aponta para o último EQUIPAMENTO (`t-c4`) — que nunca saiu da mochila.
+    // Resultado: o instantâneo desaparece de toda zona (não está na mochila,
+    // não entra na fila, não vai a cemitério nenhum) e `t-c4` fica contado
+    // DUAS vezes (na mochila E na fila de queima). É a mesma classe de perda
+    // silenciosa de carta que o soak da fatia anterior mediu (decisão #121).
+    const cheiaComInstantaneoNoFundo: readonly CartaTesouro[] = [
+      ...Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-c${String(i)}`)),
+      instantaneo('t-c5'),
+    ];
+    const p0 = nascida();
+    const jogadores = p0.jogadores.map((j) => (j.id === 'p1'
+      ? {
+          ...j,
+          mao: [nova] as readonly Carta[],
+          mochila: cheiaComInstantaneoNoFundo,
+          emJogo: { ...j.emJogo, classe: null },
+        }
+      : j));
+    const p: EstadoPartida = { ...p0, jogadores, fase: faseDoTurnoDe(jogadorDe({ ...p0, jogadores }, 'p1')) };
+    expect(jogadorDe(p, 'p1').mochila).toHaveLength(LIMITE_BASE_DE_MOCHILA + 1);
+
+    const r = aplicarAcao(p, { tipo: 'jogarCarta', jogadorId: 'p1', cartaId: 'pc-nova' }, deps([]));
+
+    // A carta que vira pendência é a ÚLTIMA da mochila — o instantâneo — e não
+    // um equipamento escolhido por família.
+    expect(r.estado.queima?.deslocados.map((c) => c.id)).toEqual(['t-c5']);
+    expect(r.estado.queima?.deslocados[0]?.tipo).toBe('instantaneo');
+    expect(r.estado.queima?.motivo).toBe('mochilaEncolheu');
+    // As CINCO cartas de equipamento continuam intactas na mochila — nenhuma
+    // some, nenhuma duplica entre mochila e fila de queima.
+    const mochilaFinal = jogadorDe(r.estado, 'p1').mochila;
+    expect(mochilaFinal.map((c) => c.id)).toEqual(
+      Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => `t-c${String(i)}`),
+    );
+  });
+
   it('as DUAS causas na mesma jogada viajam na MESMA fila: o perdido por afinidade E o excedente', () => {
     // O ramo composto de `mesa.ts` (`[...perdidos, cartaExcedente]`) não tinha um
     // único visitante: `[cartaExcedente]` sozinho deixava a suíte inteira verde, e
@@ -2703,6 +2974,28 @@ describe('aplicarAcao — guardarCarta', () => {
     expect(r.eventos).toContainEqual({ tipo: 'guardou', jogadorId: 'p1', carta: equipamento('t-1') });
   });
 
+  it('guarda um instantâneo na mochila — a família deixou de ser equipamento-only', () => {
+    // Mesmo teste de cima, pelo SEGUNDO membro de `ReceitaTesouro`: o guard de
+    // `guardarCarta` deixou de perguntar "é equipamento?" e passou a perguntar
+    // "é Tesouro?" (fatia consumíveis, instantâneo).
+    //
+    // 🔴 Fix round 1: até esta correção, um instantâneo SOZINHO na mão não
+    // segurava `recompor` (`faseSeAutoPula` só perguntava por equipamento), e
+    // este teste precisava de um equipamento extra na mão só para a fase não se
+    // auto-pular por cima do cenário — cravando um workaround em vez de provar
+    // o caminho real. Com `podeGuardar` consertado em `fase.ts`, a mão SÓ com
+    // instantâneo já deriva `recompor` sozinha; `comMao` (abaixo) faz essa
+    // derivação de verdade via `faseDoTurnoDe`, não crava nada.
+    const p = comMao(nascida(), [instantaneo('t-9')]);
+    expect(p.fase).toBe('recompor');
+
+    const r = aplicarAcao(p, { tipo: 'guardarCarta', jogadorId: 'p1', cartaId: 't-9' }, deps([]));
+
+    expect(maoDe(r.estado, 'p1')).toEqual([]);
+    expect(jogadorDe(r.estado, 'p1').mochila).toEqual([instantaneo('t-9')]);
+    expect(r.eventos).toContainEqual({ tipo: 'guardou', jogadorId: 'p1', carta: instantaneo('t-9') });
+  });
+
   it('a mochila CHEIA recusa como AcaoInvalida, não como 500', () => {
     // Pedido do cliente que a regra não permite => 400. O cliente pode ter uma
     // vista de um instante atrás em que ainda havia vaga.
@@ -3215,7 +3508,10 @@ describe('encerrarTurno — quem evacuou recompra 4+4 quando a vez volta (Task 5
       classeIds: [],
       copiasPorClasse: 0,
     }),
-    composicaoTesouros: montarComposicaoTesouros(Array.from({ length: 10 }, () => 'i-teste')),
+    composicaoTesouros: montarComposicaoTesouros({
+      itemIds: Array.from({ length: 10 }, () => 'i-teste'), copiasPorItem: 1,
+      instantaneoIds: [], copiasPorInstantaneo: 0,
+    }),
   };
 
   const monstroForteComEvacuacao: InfoMonstro = {
@@ -3326,7 +3622,10 @@ describe('encerrarTurno — quem evacuou recompra 4+4 quando a vez volta (Task 5
       classeIds: [],
       copiasPorClasse: 0,
     }),
-    composicaoTesouros: montarComposicaoTesouros(Array.from({ length: 10 }, () => 'i-teste')),
+    composicaoTesouros: montarComposicaoTesouros({
+      itemIds: Array.from({ length: 10 }, () => 'i-teste'), copiasPorItem: 1,
+      instantaneoIds: [], copiasPorInstantaneo: 0,
+    }),
   };
 
   it('🔒 quem RECEBE a vez em `encerrarTurno` NUNCA está evacuado — é isto que sustenta "não liga duas vezes seguidas"', () => {
@@ -3517,7 +3816,10 @@ describe('a composição BASELINE não pode nascer travada', () => {
   // Baralho de Tesouros PRÓPRIO (6 por jogador) em vez do baseline de 2: desde
   // que a mão inicial tem duas correntes (4 Portas + 4 Tesouros), 2 tesouros por
   // jogador não financiam nem a abertura, e `criarPartida` recusaria a mesa.
-  const tesourosDaMesa = montarComposicaoTesouros(Array.from({ length: 6 }, () => 'i-teste'));
+  const tesourosDaMesa = montarComposicaoTesouros({
+    itemIds: Array.from({ length: 6 }, () => 'i-teste'), copiasPorItem: 1,
+    instantaneoIds: [], copiasPorInstantaneo: 0,
+  });
   const producao = {
     patenteAlvo: 10,
     composicaoPorJogador: COMPOSICAO_DE_TESTE,

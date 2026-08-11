@@ -37,7 +37,10 @@ const LEGAL: Record<Fase, ReadonlySet<AcaoDaMesa['tipo']>> = {
   // `equiparCarta` fica de FORA: o motor recebe um snapshot imutável dos stats na
   // abertura do combate, então remontar o corpo no meio da luta ou não teria
   // efeito nenhum (mentindo para quem clicou) ou furaria o snapshot.
-  combate: new Set<AcaoDaMesa['tipo']>(['atacar', 'esquivar']),
+  // `usarInstantaneo` ENTRA (fatia `consumíveis (instantâneo)`): a decisão #44
+  // previu isto — a mesa entrega ali um `Combatente` novo, sem furar o snapshot
+  // que o motor recebeu, porque nenhum passo do combate roda para trocá-lo.
+  combate: new Set<AcaoDaMesa['tipo']>(['atacar', 'esquivar', 'usarInstantaneo']),
   // FASE 4 (spec §6): a janela DEPOIS do encontro. É onde o loot recém-saqueado
   // vira corpo — sem ela, o tesouro que o monstro largou só poderia ser vestido no
   // turno seguinte, e a mão estouraria no caminho. `jogarCarta` fica de fora: a
@@ -97,20 +100,38 @@ export function faseSeAutoPula(fase: Fase, jogador: JogadorNaMesa): boolean {
   // As DUAS origens de `equiparCarta` (spec §6): mão e mochila. Enquanto a
   // mochila não existia, olhar só a mão era a mesma pergunta; desde que ela é
   // origem, um jogador de mão vazia e mochila cheia ainda tem o que vestir —
-  // pulá-lo esconderia a única ação disponível. `mochila.length > 0`, não
-  // `.some((c) => c.tipo === 'equipamento')`: a mochila é tipada
-  // `readonly CartaTesouro[]`, e essa família é equipamento-only POR DESENHO
-  // (ver o docstring de `ReceitaTesouro` em `./tipos`) — classe é carta de
-  // Portas e maldição nunca entra na mochila. `.length > 0` e o `.some` são a
-  // MESMA pergunta; o `.some` sugeriria uma distinção que o modelo não tem.
-  const temEquipamento = jogador.mao.some((c) => c.tipo === 'equipamento') || jogador.mochila.length > 0;
+  // pulá-lo esconderia a única ação disponível.
+  // 🔴 `mochila.some(…)` e NÃO `mochila.length > 0`: até a fatia `consumíveis
+  // (instantâneo)` a mochila era `readonly CartaTesouro[]` com uma família só, e
+  // as duas perguntas eram a mesma — o comentário anterior dizia, com todas as
+  // letras, que a família era "equipamento-only POR DESENHO". Com o
+  // `instantaneo` na mochila elas DIVERGEM: quem só tem poção guardada não tem
+  // nada para vestir, e um `length > 0` prenderia a fase cobrando um "Passar"
+  // que não decide nada.
+  const podeEquipar = jogador.mao.some((c) => c.tipo === 'equipamento')
+    || jogador.mochila.some((c) => c.tipo === 'equipamento');
+  // 🔴 Fix round 1 (achado da revisão): `guardarCarta` só lê a MÃO (mochila →
+  // mão não existe) e aceita as DUAS famílias de Tesouro desde esta fatia — um
+  // instantâneo sozinho na mão SEGURA a fase, porque "Guardar" é uma ação real
+  // disponível para ele (ao contrário de "Equipar", que só existe para
+  // equipamento). A primeira versão desta fatia só perguntava por equipamento
+  // aqui (`podeEquipar` sozinho), então uma mão só com poção era tratada como
+  // mão vazia e a fase se auto-pulava sobre o único botão que ela tinha —
+  // violando o contrato do docstring desta função ("`true` quando a ÚNICA ação
+  // legal é `passar`"), já que `guardarCarta` continuava legal na fase.
+  //
+  // Não checamos "a mochila tem vaga" aqui — mesma grosseria que `podeEquipar`
+  // já tinha (também não checa afinidade): o pior caso de um falso "não se
+  // pula" é UM clique extra em "Passar" quando a mochila estiver cheia demais
+  // para aceitar a carta, nunca uma ação ilegal.
+  const podeGuardar = jogador.mao.some((c) => c.tipo === 'equipamento' || c.tipo === 'instantaneo');
   switch (fase) {
     case 'recompor':
-      return !temEspecializacao && !temEquipamento;
+      return !temEspecializacao && !podeEquipar && !podeGuardar;
     case 'jogar':
       // SEM raça nem classe: as duas só entram em jogo na fase 1 (decisão #7).
       // Nenhuma das duas dá o que fazer aqui, então não seguram a fase.
-      return !temEquipamento;
+      return !podeEquipar && !podeGuardar;
     case 'vasculhar':
     case 'encrenca':
     case 'combate':

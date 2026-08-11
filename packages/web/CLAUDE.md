@@ -1,13 +1,13 @@
 # `@card-dungeon/web`
 
 **A tela: React + Vite.** Depende **só** de `shared` — nunca importe um pacote de domínio direto.
-Testes com vitest + Testing Library (**182 testes**).
+Testes com vitest + Testing Library (**199 testes**, recontados do código em 2026-08-10).
 
 ## Papel na arquitetura
 
 Renderiza a **vista projetada** e manda **intenções**. 🔴 **Zero regra de jogo.** Quando a tela
 precisa saber uma regra, ela **importa o valor** que `shared` re-exporta do domínio —
-`acaoEhLegal`, `precisaEscolherMao`, `afinidadeCom`, `SLOTS_VAZIOS`.
+`acaoEhLegal`, `precisaEscolherMao`, `afinidadeCom`, `instantaneoTemEfeito`, `SLOTS_VAZIOS`.
 
 ⚠️ **A tela já reescreveu um par fino inteiro caractere por caractere**, e cada lado ficou preso aos
 seus próprios testes com **nada prendendo um ao outro** — a receita para renderizar o número velho
@@ -22,6 +22,48 @@ de botões e cada clique virar 400. **Copiar a regra é o defeito; importá-la �
 | `participantesDe.ts` | **Quem um evento ENVOLVE** (`switch` fechado por `never`) |
 | `PainelLog.tsx` | O log, filtrado por participante |
 | `descreverCarta.ts` · `narrarPorta.ts` · `narrarCombate.ts` · `rotuloDeAfinidade.ts` · `rotuloDeBadStuff.ts` | Texto |
+
+## 🔤 `NomesDoCatalogo`: UM objeto, montado UMA vez
+
+`descreverCarta.ts` exporta a interface com os **cinco** resolvedores `(id) => string` — `raca`,
+`monstro`, `item`, `classe`, `instantaneo`. Ela nasceu na fatia `consumíveis (instantâneo)` porque o
+quinto ia virar o quinto **parâmetro posicional solto**, e cinco funções de assinatura idêntica em
+sequência fazem uma troca de ordem virar erro **compilável e errado**.
+
+🔴 **E existe UM objeto, montado na `TelaMesa` (`nomesDoCatalogo`) e passado para baixo.** O
+`PainelLog` recebe `nomes: NomesDoCatalogo` — **não** as listas do catálogo. Ele já montou os
+próprios resolvedores, iguais aos dela, e foi exatamente aí que o **sexto se perdeu**: o
+`instantaneo` nasceu certo na `TelaMesa` e ficou `(id) => id` no log, com um comentário explicando
+que o catálogo ainda não publicava instantâneos — **as duas premissas já eram falsas dentro da mesma
+fatia** (a Task 6 publicou, a Task 4 criou o evento). Resultado em produção: **13,58 queimas por
+partida** narradas como *"Você usa pocao-de-cura em si."*, com a mesma carta escrita **"Poção de
+Cura"** dois centímetros acima, no mesmo componente.
+
+⚠️ **A prop é OBRIGATÓRIA, sem default `[]`/`{}`** — o argumento era do `itens` e hoje vale para o
+objeto inteiro: um default silencioso faria **toda** carta do log cair no id **sem nada acusar**, e
+a suíte ficaria verde.
+
+## 🧪 A seção "Instantâneos" da tela
+
+Um bloco `<section aria-label="instantâneos usáveis">`, e dentro dele **um par de botões por carta**
+usável (`"<nome> em si"` / `"<nome> no monstro"`), somando **mão + mochila** — as mesmas duas zonas
+que `usarInstantaneo` aceita (`naMao ?? naMochila`). Esquecer a mochila aqui deixaria um consumível
+guardado **sem botão nenhum**, e ela é **75,6% dos usos medidos**.
+
+- **Gate de EXISTÊNCIA: só `combate !== null`.** Sem `EstadoCombate` não há alvo para calcular — é
+  pergunta **estrutural**, não de fase. Legalidade (é sua vez? o efeito muda algo?) fica no
+  `disabled`, pela #26.
+- 🔴 **`ROTULO_DO_ALVO: Record<AlvoDeInstantaneo, string>` é a convenção desta base para união
+  fechada na UI**, mesmo molde de `NOME_DO_SLOT` e `NOME_DA_FASE`: alvo novo **quebra a compilação**
+  aqui em vez de sair `undefined`. A lista `ALVOS_DE_INSTANTANEO` é **derivada** dele
+  (`Object.keys`), então as duas não podem divergir — antes disso a união era reescrita **à mão em
+  três lugares**, e o dia do terceiro alvo seria `pnpm typecheck` 7/7 limpo com a tela oferecendo o
+  número **velho** de botões.
+- **O guard de desperdício é `instantaneoTemEfeito`, importada de `shared`** — nunca reimplementada.
+  É o par fino que esta tela já reescreveu inteiro uma vez.
+- ⚠️ **O teto do alvo `monstro` sai do catálogo** (`monstros.find(...)?.vida ?? 0`), porque
+  `EstadoCombate` não guarda o máximo dele. O `?? 0` é **dívida viva** — ver
+  [`docs/divida-tecnica.md`](../../docs/divida-tecnica.md).
 
 ⚠️ **Os `rotuloDe*` são o molde desta base para *"dado de domínio → frase para humano"***: função
 pura, `switch` fechado por `never`, e tabela de nomes **local** quando a união é **fechada** (o
@@ -50,22 +92,44 @@ as respostas do contrato são `c.type<T>()` e o Zod está só na entrada.
 ⚠️ **O `never` é cobrado pelo `pnpm typecheck`, NUNCA pelo vitest** — o esbuild apaga `import type` e
 não checa tipos. Mudança só de tipo **passa verde no vitest e falha no typecheck**.
 
-## 🔴 Publicado e nunca renderizado — **6 ocorrências, e a 7ª foi BARRADA**
+## 🔴 Publicado e nunca renderizado — **7 ocorrências, e DUAS barradas**
 
 O elenco: `combatente` · `tesourosNoMonte` (**duas vezes** — e a segunda escondia a economia da mesa
 tendo secado) · `ehBot` · `mochila` · `cartasNoCemiterio` (**ainda vivo**: publicado, e em produção
-aparece uma única vez só para desabilitar um botão).
+aparece uma única vez só para desabilitar um botão) · **`Catalogo.instantaneos` no log**
+(2026-08-10, ver abaixo).
 
 ➡️ **O padrão já escondeu a tese de um plano três vezes.** Campo novo na projeção ⇒ o par é
 **publicar + renderizar**. E ao **estreitar** um contrato, pergunte **quem RENDERIZAVA**, não quem
 compilava — tirar `modificadores` de `Catalogo.classes` não deu erro de tipo (o fallback tinha a
 mesma forma) e o preview seguiu mostrando um número **errado**.
 
-✅ **A 7ª foi EVITADA em 2026-08-09** — a primeira vez nesta base. `MonstroCarta.badStuff` chega ao
+✅ **`MonstroCarta.badStuff` foi BARRADO em 2026-08-09** — a primeira vez nesta base. Ele chega ao
 cliente **de graça** (a carta inteira viaja no `/catalogo`, sem projeção `Resumo`), então era o
 candidato perfeito. 🔑 **O que fechou não foi vigilância na revisão: foi o requisito ter virado ITEM
 DE ESCOPO no spec** (#119), com **task própria** e teste **por superfície**. Sem ela, ninguém
 desenharia o campo.
+
+### 🔴 A 7ª: `Catalogo.instantaneos` — a fiação tinha DOIS saltos, e o primeiro conserto pegou UM
+
+**Ocorrência VIVA, não barrada**, e é a de aprender: o campo passou a ser publicado numa task, e
+tinha **dois** consumidores a alcançar.
+
+| Salto | O que acontecia | Como terminou |
+|---|---|---|
+| `App.tsx` → `TelaMesa` | a prop nunca era repassada; o botão "Usar" sairia mudo | ✅ **BARRADO dentro da fatia**, com teste que sobe a árvore (fetch → `App` → `TelaMesa`) e morde o nome real |
+| `TelaMesa` → `PainelLog` | o log narrava **todo** consumível pelo **id cru** | 🔴 **VIVEU até a revisão ampla do branch** |
+
+➡️ **A lição não é "suba a árvore inteira" — é *"quem MAIS renderiza este campo?"***. Quem consertou
+o primeiro salto escreveu, com razão, que o conserto era um teste que sobe a árvore; **a árvore não
+terminava na `TelaMesa`**. E o segundo salto tinha um **comentário justificando a ausência**, com
+duas premissas que já eram falsas na mesma fatia — a variante do vício nº 1 que **nenhuma revisão de
+diff pega**, porque não há linha para conferir.
+
+⚠️ **A ironia estava no arquivo:** o comentário imediatamente acima explicava que `itens` é prop
+obrigatória *"porque um default silencioso faria todo item cair no id sem nada acusar"*. A linha
+seguinte fazia exatamente isso. O conserto foi **estrutural** (um `NomesDoCatalogo` só, ver acima),
+não uma sexta prop.
 
 ## Convenções de UI decididas
 

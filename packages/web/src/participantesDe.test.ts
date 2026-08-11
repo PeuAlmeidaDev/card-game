@@ -80,6 +80,11 @@ describe('participantesDe', () => {
       { tipo: 'saqueou', jogadorId: 'p1' },
       { tipo: 'perdeuEquipamento', jogadorId: 'p1', slot: 'capacete', cartas: [] },
       { tipo: 'evacuou', jogadorId: 'p1', doCorpo: [], daMochila: [], daMao: 0 },
+      {
+        tipo: 'usouInstantaneo', jogadorId: 'p1',
+        carta: { id: 't1', tipo: 'instantaneo', instantaneoId: 'ins-teste' },
+        alvo: 'lutador', monstroId: 'm-teste',
+      },
     ];
 
     for (const evento of umDeCada) {

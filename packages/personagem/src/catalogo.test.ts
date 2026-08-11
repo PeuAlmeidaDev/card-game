@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CLASSES_PUBLICAS, ITENS, RACAS_PUBLICAS } from '@card-dungeon/cartas';
+import { CLASSES_PUBLICAS, ITENS, INSTANTANEOS, RACAS_PUBLICAS } from '@card-dungeon/cartas';
 import { CATALOGO } from './catalogo';
 
 describe('CATALOGO', () => {
@@ -36,5 +36,17 @@ describe('CATALOGO', () => {
     expect(CATALOGO.monstros.map((m) => m.id)).toContain('goblin');
     // Dado puro: o catálogo tem que sobreviver ao JSON do fio sem perder campo.
     expect(JSON.parse(JSON.stringify(CATALOGO.monstros))).toEqual(CATALOGO.monstros);
+  });
+
+  it('os instantâneos do catálogo SÃO as cartas consumíveis, com nome e efeitos', () => {
+    // Gêmeo do teste de itens acima: nasceu na fatia `consumíveis
+    // (instantâneo)` (decisão #40, Task 6) — sem isto a tela recebe um
+    // `instantaneoId` e não sabe nem o nome da carta.
+    expect(CATALOGO.instantaneos).toBe(INSTANTANEOS);
+    expect(CATALOGO.instantaneos.map((i) => i.id)).toContain('pocao-de-cura');
+    for (const instantaneo of CATALOGO.instantaneos) {
+      expect(typeof instantaneo.nome).toBe('string');
+      expect(instantaneo.efeitos.length).toBeGreaterThan(0);
+    }
   });
 });

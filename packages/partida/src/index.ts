@@ -1,11 +1,16 @@
 export type {
-  CartaPorta, CartaDeRaca, ReceitaPorta, ReceitaTesouro, CartaTesouro, CartaEquipamento, Carta, Slot, SlotDeItem, MaoSlot,
+  CartaPorta, CartaDeRaca, ReceitaPorta, ReceitaTesouro, CartaTesouro, CartaEquipamento, CartaInstantaneo,
+  Carta, Slot, SlotDeItem, MaoSlot,
   InfoItem, Afinidade, EixoDeAfinidade, BadStuff,
+  EfeitoInstantaneo, AlvoDeInstantaneo, InfoInstantaneo,
   Embaralhar, InfoRaca, InfoMonstro, CatalogoDaMesa, JogadorNaMesa,
   JogadorPublico, ZonaEmJogo, PosicaoFinal, EventoDaMesa, AcaoDaMesa, CombateNaMesa, EspiadaPendente, QueimaPendente,
   EstadoPartida, VistaDaPartida, ConfigPartida, EntradaJogador, Baralho, Fase,
 } from './tipos';
-export { montarComposicao, montarComposicaoTesouros, tirarDoTopo, type ReceitaDeBaralho } from './baralho';
+export {
+  montarComposicao, montarComposicaoTesouros, tirarDoTopo,
+  type ReceitaDeBaralho, type ReceitaDeTesouros,
+} from './baralho';
 export { combatenteDe, itensEquipados, afinidadeCom, contribuicaoDe, SLOTS_VAZIOS, type GrauDeAfinidade } from './corpo';
 // Valor: o par fino "as duas mãos ocupadas => `mao` obrigatória" tem dois
 // leitores, o reducer e a tela. Ver o docstring em `./equipar`.
@@ -22,3 +27,4 @@ export { AcaoInvalida } from './erros';
 export { classificar } from './classificacao';
 export { projetarPara, versaoDe } from './projecao';
 export { acaoEhLegal } from './fase';
+export { aplicarInstantaneo, instantaneoTemEfeito } from './instantaneo';

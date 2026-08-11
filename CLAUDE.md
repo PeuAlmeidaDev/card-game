@@ -24,7 +24,7 @@ autoral a definir**. Inspirado nas *mecânicas* do Munchkin; tema, nomes e arte 
 | **`docs/game-design/game-bible.md`** | **O JOGO** (mundo, formato da partida, turno, cartas, economia, roteiro de fatias). Documento vivo. **Ler antes de qualquer decisão de design.** |
 | `docs/superpowers/specs/` | Specs de implementação, um por fatia. |
 | `docs/superpowers/plans/` | Planos de execução (tasks TDD, um commit cada). |
-| **`docs/licoes-aprendidas.md`** | 🔑 **Os 15 vícios recorrentes, com contagem e mecanismo.** Ler antes de escrever teste, comentário ou item de gate ocular. |
+| **`docs/licoes-aprendidas.md`** | 🔑 **Os 17 vícios recorrentes, com contagem e mecanismo.** Ler antes de escrever teste, comentário, item de gate ocular **ou conclusão de soak**. |
 | **`docs/divida-tecnica.md`** | O balde "conserta depois", salvo dos ledgers gitignored. Nenhum é bug vivo. |
 | **`docs/historico/`** | Diário de bordo, uma sessão por arquivo. 🔴 **Para várias medições é a única cópia sobrevivente** (os relatórios de soak são gitignored). |
 | `packages/*/CLAUDE.md` | Convenções e armadilhas de cada pacote, ao lado do código. |
@@ -59,62 +59,67 @@ velho — foi o **código** que se afastou dele. Por isso a regra não é só "e
 completo está em [`docs/licoes-aprendidas.md §1`](docs/licoes-aprendidas.md). A pista transferível:
 **parêntese que começa com *"logo"* é dedução**, e é onde a derivação se disfarça de fato.
 
-## Estado atual (2026-08-09)
+## Estado atual (2026-08-10)
 
 **Sete pacotes** — `motor`, `personagem`, `cartas`, `partida`, `shared`, `server`, `web`.
-**737 testes verdes** (motor 56 · cartas 55 · personagem 11 · partida 381 · shared 23 · server 29 ·
-web 182), **typecheck 7/7**, lint limpo — rodados em 2026-08-09.
+**808 testes verdes** (motor 56 · cartas 66 · personagem 12 · partida 420 · shared 23 · server 32 ·
+web 199), **typecheck 7/7**, lint limpo — recontados **do código** em 2026-08-10, depois da leva de
+correção da revisão ampla do branch.
 
-**Fatias 1–8 completas, mais o bloco 2 começado.** A última fatia de código é a
-**`Bad Stuff e evacuação`** (a **2a**, decisões #112–#126), em que **perder um combate passou a
-custar**: o monstro declara o que faz com quem ele derrota, o Ogro **evacua** (mão + mochila + os
-cinco encaixes ao cemitério), e quem evacuou **recomeça no turno seguinte com 4+4 em `recompor`**.
-🔴 **Ela está na branch `feat/bad-stuff-e-evacuacao`, NÃO mergeada, e o gate ocular do Pedro está
-PENDENTE — nenhum item conferido.**
-Antes dela: `empunhadura dupla` (PR #36, `main` em `e787d63`), `classe como carta` (Planos A e B),
-`escolha do descarte`, `afinidade`, `encrenca`, corte da `salaVazia`. Detalhe de cada uma em
-[`docs/historico/`](docs/historico/README.md).
+**Fatias 1–8 completas, mais o bloco 2 pela metade.** A última fatia de código é a
+**`consumíveis (instantâneo)`** (a **2b**, decisões #127–#140): o baralho de Tesouros ganhou a
+**quarta família de Itens** — 4 cartas de delta de stats, **alvo escolhido na ação**, jogáveis da
+**mão ou da mochila** durante o combate, consumidas ao cemitério —, e a receita de Tesouros virou
+**declarada** (25% consumível).
+🔴 **Ela está na branch `feat/consumiveis-instantaneo`, NÃO mergeada.**
+Antes dela: `Bad Stuff e evacuação` (a **2a**, PR #37, `main` em `13b4b1b`), `empunhadura dupla`,
+`classe como carta` (Planos A e B), `escolha do descarte`, `afinidade`, `encrenca`, corte da
+`salaVazia`. Detalhe de cada uma em [`docs/historico/`](docs/historico/README.md).
 
-🔴 **O número que a 2a existia para mover, e o veredicto:** a evacuação devolve **+13,57 cartas por
-partida** aos cemitérios (controle interno, N=240 partidas por braço) — **e o baralho de Tesouros
-ainda esgota em 91,7% das partidas**. **Ela NÃO conserta a economia sozinha**, exatamente como o spec
-previu por escrito. A **#40** segue sendo a resposta **estrutural**.
+🔑 **O número que a 2b existia para mover, e o veredicto — que MUDOU no quarto braço do soak:** o
+baralho de Tesouros **esgotava em 90,83% das partidas** e passou a **ZERO** (N=240 por braço, #135).
+🔴 **Mas a atribuição é SOBREDETERMINADA:** um baralho de 64 **só de equipamento** apaga o
+esgotamento igualmente bem, **e** trocar 4 equipamentos por 4 consumíveis **dentro do baralho velho
+de 48** derruba de 86,25% para 2,08% (#136). ➡️ **As duas alavancas bastam sozinhas: a proporção move
+o DEGRAU, o tamanho compra a MARGEM.** ⚠️ **O braço que mediu a proporção roda a 33,3%, NÃO aos 25%
+da produção** — ele valida a **alavanca**, não o **dial**.
 
-🔑 **E o soak achou DOIS BUGS REAIS** que 730 testes e as revisões das **oito** tasks de código
-anteriores não pegaram — os dois em `comprarMaoInicial`, os dois nascidos na própria fatia: **perda
-silenciosa de carta** (35/240 partidas, 81 cartas, pego pelo **censo de conservação**) e **`Error`
-cru = 500** com Tesouros esgotado. Consertados e re-medidos em **zero**. Viraram as decisões **#121**
-e **#122**.
+🔑 **E o achado mais transferível não é o esgotamento, é a ADERÊNCIA (#137):** ela **não é constante
+por família** — sobe quando a oferta daquela família encolhe (instantâneo **35,44%** com 16-em-64 →
+**59,27%** com 16-em-48). ➡️ **Dobrar a dose NÃO dobra a circulação.** Ele nasceu de uma **previsão
+registrada em disco antes do braço rodar, que acertou a decisão e errou o mecanismo**.
 
-**Dials de produção de hoje** (verificados no código, não no texto — `partida/src/mao.ts`):
+**Dials de produção de hoje** (verificados no código, não no texto):
 
 | Dial | Valor | Onde |
 |---|---|---|
-| `LIMITE_BASE_DE_MAO` | **7**, **+1** para quem está sem raça em jogo (o Humano ⇒ 8) | `limiteDeMao(jogador)` |
-| `LIMITE_BASE_DE_MOCHILA` | **5**, **+1** para quem está sem classe (o Aprendiz ⇒ 6) | `limiteDeMochila(jogador)` |
+| `LIMITE_BASE_DE_MAO` | **7**, **+1** para quem está sem raça em jogo (o Humano ⇒ 8) | `partida/src/mao.ts`, `limiteDeMao(jogador)` |
+| `LIMITE_BASE_DE_MOCHILA` | **5**, **+1** para quem está sem classe (o Aprendiz ⇒ 6) | `partida/src/mao.ts`, `limiteDeMochila(jogador)` |
 | Mão inicial | **4 Portas + 4 Tesouros** | `MAO_INICIAL_PADRAO` / `MAO_INICIAL_TESOUROS` |
-| Baralhos na mesa de 4 | **68 Portas** (`2× monstro + 1× raça + 1× classe` por jogador) · **48 Tesouros** | `montarComposicao*` |
+| Baralhos na mesa de 4 | **68 Portas** (`2× monstro + 1× raça + 1× classe` por jogador) · **64 Tesouros** (`12 equipamentos + 4 instantâneos` por jogador) = **132 cartas** | `montarComposicao*`, receita declarada em `server/src/app.ts` |
+| Dose de consumível | **25%** do baralho de Itens (4 de 16 por jogador) | `copiasPorInstantaneo: 1` |
+| `LIMIAR_DE_CURA` | **0,4** — o bot só cura abaixo de 40% da vida | privada de `bot.ts` |
 | `MARGEM_DE_ENCRENCA` | **1,2** — 🎚️ a calibrar (pergunta 18 do §18) | privada de `bot.ts` |
 
 ⚠️ Os dois tetos são **separados de propósito**: a mochila fica **fora** do limite de mão, e é essa
-isenção que dá preço a ela.
+isenção que dá preço a ela — **e é a mesma isenção que faz o consumível guardado sair de graça**
+(#131).
 
-### 🔜 Próxima fatia: `2b` — consumíveis (`instantâneo`)
+### 🔜 Próxima fatia: `2c` — maldição no `vasculhar`
 
 **Bloco 2 do §3.1 e do §17**, 🧩 **decomposto em QUATRO pela #110:**
-~~**2a** Bad Stuff + evacuação~~ ✅ **CONSTRUÍDA em 2026-08-09** → **2b** consumíveis
-(`instantâneo`) → **2c** maldição no `vasculhar` → **2d** maldição na mão (mira + concorrência).
+~~**2a** Bad Stuff + evacuação~~ ✅ **CONSTRUÍDA em 2026-08-09** →
+~~**2b** consumíveis (`instantâneo`)~~ ✅ **CONSTRUÍDA em 2026-08-09/10** → **2c** maldição no
+`vasculhar` → **2d** maldição na mão (mira + concorrência).
 ⬜ E a **2a-bis** (pilhagem do cadáver, #117) é **candidata a trocar de lugar** com a 2c/2d.
 
-- 💡 **A 2b é construível AGORA** — a #44 declara custo de ritmo **zero** e o código confirma
-  (`proximoPasso` já para duas vezes por round esperando o lutador). Só a `carta de combate` depende
-  do bloco 5. **Nenhum spec escrito.**
-- 🔑 **E ela acabou de ganhar o argumento dela POR MEDIÇÃO.** A #114 escreveu o teste antecipadamente:
-  *"se a evacuação sozinha consertasse a economia, o 2b ficaria sem trabalho"*. **Ela não consertou**
-  (#125) — os consumíveis são a metade que falta da **#40**, e continuam sem uma linha de código.
-- 🔴 **O 2d está BLOQUEADO** pela pergunta 16 do §18.
+- 🔴 **O 2d está BLOQUEADO** pela pergunta 16 do §18. **Nenhum spec escrito para a 2c nem para a 2d.**
 - ⬜ **A 2a-bis já nasce com uma pergunta que o Pedro não respondeu:** e se **dois** jogadores
   morrerem antes de os despojos acabarem? Duas pilhas ao mesmo tempo?
+- ⬜ **A carta que CANCELA o Bad Stuff (#118) continua decidida e sem desenho.** Ela é do eixo dos
+  consumíveis e **não entrou na 2b**: o escopo da 2b foi fechado em **delta de stats**, e cancelar
+  Bad Stuff é verbo novo na união. Quem a desenhar responde: cancela a lista **inteira** ou **um**
+  efeito? antes do combate ou **na hora** da derrota?
 
 ✅ **A esquiva continua SOZINHA e na gaveta (decisão #109):** as #105/#106/#107 estão **decididas, não
 construídas**, e **desacopladas** — o `grill-me` que as produziu foi **interrompido com três
@@ -124,23 +129,23 @@ perguntas na mesa**. 💰 **Custo:** a esquiva segue ignorando o defensor.
 
 Consolidada das listas "O que fica ABERTO" que viviam por sessão. Cada item aponta para o detalhe.
 
-**🔴 Pendente NESTA fatia (`Bad Stuff e evacuação`, não mergeada):**
+**🔴 Pendente NESTA fatia (`consumíveis (instantâneo)`, não mergeada):**
 
 | Item | Onde |
 |---|---|
-| 🔴 **O gate ocular do Pedro — ZERO itens conferidos.** Roteiro de 6 itens com a frequência esperada em cada linha; **dois deles são de SONDA, não de olho** (a evacuação é 0,364 por jogador por partida) | [`historico/2026-08-09-…`](docs/historico/2026-08-09-bad-stuff-e-evacuacao.md) |
-| 🔴 **A revisão ampla do BRANCH (`MERGE_BASE..HEAD`) não está registrada no ledger** — as 9 tasks foram revisadas contra o **próprio diff**. Em **três fatias seguidas** foi a do branch que achou o que a de task não podia | idem, com os alvos nomeados |
-| 🔴 **O log diz *"foi evacuado"* em TODA derrota** — a palavra ganhou significado específico e a frase pré-existente virou enganosa em 4/5 das derrotas, e duplicada na 5ª. **Não é bug, é texto** | [`divida-tecnica.md`](docs/divida-tecnica.md) |
+| 🔴 **O GATE OCULAR DA 2b RODOU em 2026-08-10 — e ACHOU.** 1 de 5 conferido, e os **itens 2 e 3 REPROVARAM na prática**: o Pedro queimou a Areia e o Óleo e **não conseguiu perceber o efeito**. ✅ O domínio está certo (provado por HTTP no servidor vivo); o que falha é **comunicação** — o painel é uma linha com **11 números** e o **Óleo é imperceptível por construção** (`habilidade +2` não tem consequência num clique). ➡️ **pergunta 25 do §18.** 🔑 **Terceira vez que o gate acha *"o código faz certo e não conta a ninguém"*** — e a primeira em que não é render faltando, é legibilidade do que já é renderizado. O gate da **2a** segue em **0 de 6** | [`historico/2026-08-09-consumiveis-instantaneo.md`](docs/historico/2026-08-09-consumiveis-instantaneo.md) e [`…-bad-stuff-e-evacuacao.md`](docs/historico/2026-08-09-bad-stuff-e-evacuacao.md) |
+| 🔴 **A revisão ampla do BRANCH (`MERGE_BASE..HEAD`) NÃO rodou nesta fatia** — as 10 tasks foram revisadas contra o **próprio diff**. Em **três fatias seguidas** foi a do branch que achou o que a de task não podia (um ramo sem visitante, um fio sem meio) | [`historico/2026-08-09-consumiveis-instantaneo.md`](docs/historico/2026-08-09-consumiveis-instantaneo.md), com os alvos nomeados |
+| ⬜ **A dose de 25% NÃO foi medida contra alternativas.** O braço que mexeu na proporção roda **33,3%**, e ninguém mediu 25% num baralho de 48. Girar o dial é uma linha na borda | pergunta **11** do §18, e o §11 do bible |
 
 **Decisões esperando o Pedro:**
 
 | Item | Onde |
 |---|---|
 | 🔴 As **3 perguntas do `grill-me` interrompido**: 21(a) só teto × teto+modificador · 21(b) teto da agilidade 9 ou 7 · 23 o Impacto do Guerreiro sem significado | §18 do bible, e a tabela de Combate abaixo |
-| 🔴 **Carta proibida presa na mochila** (~8 por mesa de 4, ≈40% da capacidade). **Não é bug** — é buraco de política do bot + mochila→mão não existir | pergunta **19** do §18 |
+| 🔴 **Carta parada na mochila — agora com DUAS fontes de famílias diferentes.** A velha: exclusivo proibido (~8 por mesa de 4, ≈40% da capacidade), preso **para sempre**. A nova: consumível estocado (**1,98 por partida**, 12,4% da tiragem), preso **até o combate seguinte** — ele tem verbo, e 75,6% dos usos saem de lá. **Nenhuma é bug** | pergunta **19** do §18 |
 | 🎚️ **O Montante ficou DOMINADO** — duas Espadas Curtas dão a mesma força +4 sem o −1 de agilidade. Dominância **aritmética** | pergunta **20** do §18 |
-| 🎚️ **A `MARGEM_DE_ENCRENCA` (1,2)** ficou **mais** frouxa com duas passivas por combatente — e a fatia 2a **agrava de novo**: `rodadasParaMatar` estima **quanto custa vencer** e **nada** nela sabe que perder para o Ogro agora é **perder tudo**. Deduzido do código, **não medido** | pergunta **18** do §18 |
-| 🔴 **O gradiente de assento** — remedido 3 vezes, **sem causa e sem decisão**. Escreva *"o último assento vence menos"*, **não** a escada | pergunta **17** do §18 |
+| 🎚️ **A `MARGEM_DE_ENCRENCA` (1,2)** tem agora **TRÊS** desatualizações empilhadas, e a nova puxa para o lado **oposto**: duas passivas por combatente e o preço da derrota (a 2a) a deixam **frouxa**; o consumível na mochila, que `rodadasParaMatar` **não vê**, deixa o bot **subestimar** a própria chance. Deduzido do código, **não medido** | pergunta **18** do §18 |
+| 🔴 **O gradiente de assento MUDOU DE ESTADO: virou efeito REAL, causa NÃO isolada** (#139) — monotônico nos **DEZ** braços, **2.400 partidas**, contra ruído de ~5–9pp por assento. O confundidor está nomeado (o #0 age primeiro) e **não** está isolado. Continua **sem decisão do Pedro**. ⚠️ Escreva *"o último assento vence menos"*, **nunca** a escada — e **não confunda com *usos* por assento, que são ruidosos** | pergunta **17** do §18 |
 | ⬜ **A troca de classe/raça é invisível** do lado da carta que sai. Três saídas candidatas | [`divida-tecnica.md`](docs/divida-tecnica.md) |
 | ⬜ Se a convenção da **#26** (*"botão apaga, não some"*) vale para o "Procurar encrenca" na carta de raça | — |
 
@@ -150,14 +155,15 @@ mordem, asserções fracas, o guard que falta em `ModificadoresDeStat`, o débit
 
 **Aberto por construção:**
 
-- ⬜ **A economia (pergunta 11) segue aberta na CONSTRUÇÃO da resposta — agora com METADE construída
-  e medida.** A resposta é **estrutural** (#40: consumíveis ≥ ~50% da receita de Itens, **mais** a
-  evacuação do §10) — ⚠️ **não é dial**, e a #40 recusa esse enquadramento por escrito.
-  ✅ **A evacuação existe desde 2026-08-09 e devolve +13,57 cartas/partida** (#123).
-  🔴 **E o baralho ainda esgota em 91,7% das partidas** (#125). **Nenhum consumível existe em
-  código**; eles nascem na **2b**. 🔑 **Dois experimentos já deram a mesma resposta:** dobrar o
-  baralho (32→48) moveu o **QUANDO**, e a evacuação **aliviou sem consertar** — o que trava a carta é
-  ela **nunca circular**. É evidência **a favor** da #40, não contra.
+- ✅ **A economia (pergunta 11) teve a resposta CONSTRUÍDA e MEDIDA — e o que segue aberto agora é
+  outra coisa.** As duas metades estruturais da #40 existem: a **evacuação** (#123, +13,57
+  cartas/partida) e o **consumível** (#135–#137). 📊 **O esgotamento foi de 90,83% a ZERO em 240
+  partidas.** 🔴 **O que fica aberto é a ATRIBUIÇÃO e o DIAL, não a existência da resposta:** o efeito
+  é **sobredeterminado** (tamanho **e** proporção bastam sozinhos), a dose de produção (25%) nunca foi
+  medida contra alternativas, **onde o degrau cai não foi medido**, e a **carta de combate** — a outra
+  metade dos `≥50%` da #40 — segue sem existir, no bloco 5.
+  ⚠️ **E o *"aumentar o baralho só trata o sintoma"* ganhou fronteira:** valia de 32→48, **não** vale
+  de 48→64.
 - 🔴 **O eixo `classe` da afinidade não tem NENHUM item** (#74). É ele que torna a fila ≥2 por
   `mochilaEncolheu` um **zero ESTRUTURAL** — quem criar o primeiro exclusivo por classe **abre esse
   caminho** e tem que testá-lo.
@@ -167,12 +173,16 @@ mordem, asserções fracas, o guard que falta em `ModificadoresDeStat`, o débit
 - ⬜ **Mais verbos de Bad Stuff** — adiado por decisão. A união fechada por `never` garante que o
   próximo quebre a compilação em **três** lugares: o interpretador em `partida`, o rótulo em `web`, e
   o `_CoberturaBadStuff` em `shared` se a gêmea não acompanhar.
-- ⬜ **Monstro com MAIS DE UM efeito** (#120): a lista existe e **nenhuma carta de produção a
-  percorre** — o dublê e a mutação já estão escritos, mas até lá o laço é exercitado **só por dublê**.
-- ⬜ **A carta que CANCELA o Bad Stuff** (#118) — decidida, **sem desenho**. É do eixo dos
-  consumíveis (**2b**), e terá que responder: cancela a lista **inteira** ou **um** efeito? é jogada
-  **antes** do combate ou **na hora** da derrota?
+- ⬜ **Lista de um elemento só, DUAS vezes agora:** `MonstroCarta.badStuff` (#120) e
+  `InstantaneoCarta.efeitos` (#127). Nos dois casos a lista existe, **nenhuma carta de produção a
+  percorre**, e o laço é exercitado **só por dublê** — com a mutação `efeitos.slice(0, 1)` escrita
+  nos dois.
+- ⬜ **`EfeitoInstantaneo` é união de UM VERBO SÓ, e o segundo (`re-rolar`, `fuga`) não existe.** O
+  `never` do `switch` só fecha por causa do **membro fantasma** `| { readonly tipo: never }` — a
+  convenção está documentada, com o custo, em `packages/{cartas,partida}/CLAUDE.md`.
 - 🎚️ **Qual encaixe cada monstro arranca é dial, e NÃO foi medido.**
+- ⬜ **Nenhum instantâneo é exclusivo por raça ou classe** — o eixo `classe` da afinidade continua com
+  **zero** itens (#74), e a família nova **não** o abriu.
 
 ## Stack (alvo)
 
@@ -272,15 +282,23 @@ ainda abertas (ver §18 do game bible).
 **Antes de escrever teste, comentário ou item de gate ocular, ler
 [`docs/licoes-aprendidas.md`](docs/licoes-aprendidas.md).** Os três atalhos que mais custaram caro:
 
-- **A pergunta certa nunca é "o teste existe?", é "a mutação reprova?"** (12 ocorrências) — e a
+- **A pergunta certa nunca é "o teste existe?", é "a mutação reprova?"** (13 ocorrências) — e a
   seguinte é *"reprova pelo MOTIVO certo?"*: duas já passaram por **coincidência aritmética**.
-- **Comentário afirma o presente** — e o presente muda dentro do diff em que ele está (17
-  ocorrências). ⚠️ **A variante mais difícil não tem diff nenhum:** uma palavra ganha significado
-  novo **em outro arquivo** e deixa um texto antigo mentindo.
+  ⚠️ **E a 13ª é a mais desconfortável: o teste que não mordia era o que o PRÓPRIO PLANO prescrevia.**
+- **Comentário afirma o presente** — e o presente muda dentro do diff em que ele está (**30**
+  ocorrências; **treze** só na fatia 2b). ⚠️ **Duas variantes que nenhuma revisão de diff pega:** o
+  texto vira mentira **sem diff nenhum** (uma palavra ganha significado novo em outro arquivo), e o
+  texto é **falso por OMISSÃO** — verdadeiro no que afirma, falso no que implica.
 - **Item de gate ocular declara a frequência esperada do evento**; se não for quase certa numa
   sessão, é **sonda, não olho** (#70/#84).
 - **Censo de conservação zero NÃO prova que a feature rodou** — ele não distingue *"nunca rodou"* de
   *"rodou e não fez nada"*. Todo soak precisa de **contagem positiva** ao lado dele (§15).
+- 🔑 **Suficiência não é exclusividade** (§17). *"A alavanca X basta"* **não** licencia *"foi X que
+  agiu"* — num sistema **sobredeterminado** nenhuma atribuição é licenciada, e a fatia 2b publicou uma
+  conclusão por esse passo inválido antes de um quarto braço a inverter.
+- 🔑 **Varredura de completude declara o que ela NÃO alcança** (§16). Três auto-certificações desta
+  base saíram falsas, e as três por **escopo do instrumento** — a lista tem que ser **gerada por
+  diferença**, nunca escrita à mão.
 
 ### Mensagens de commit — em português (sobrescreve a preferência global)
 

@@ -10,7 +10,7 @@ import { montarComposicao, montarComposicaoTesouros } from './baralho';
 import { criarDadoCiclico, filaDeDados } from './testes/dados';
 import { CARTA_DE_CLASSE_DE_TESTE, catalogoDeTeste, comClasseDeTeste } from './testes/catalogo';
 import { COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
-import { classe, equipamento, monstro, monstros, raca } from './testes/cartas';
+import { classe, equipamento, instantaneo, monstro, monstros, raca } from './testes/cartas';
 import { SLOTS_VAZIOS } from './corpo';
 import type { DepsMesa } from './mesa';
 import type {
@@ -206,6 +206,40 @@ describe('faseSeAutoPula (spec §6.1)', () => {
   it('as duas se pulam com mão E mochila vazias', () => {
     expect(faseSeAutoPula('recompor', { ...comMao([]), mochila: [] })).toBe(true);
     expect(faseSeAutoPula('jogar', { ...comMao([]), mochila: [] })).toBe(true);
+  });
+
+  // 🔑 O achado desta fatia: a mochila deixou de ser equipamento-only. Um
+  // jogador cuja mochila só tem poção não tem NADA para vestir, e cobrar-lhe um
+  // "Passar" é um clique que não decide nada — o comentário de `temEquipamento`
+  // (`fase.ts`) afirmava a premissa contrária, e ela morreu quando a família
+  // `instantaneo` nasceu em `ReceitaTesouro`.
+  it('as duas se pulam com a mão vazia e SÓ um instantâneo na mochila', () => {
+    const soInstantaneo = { ...comMao([]), mochila: [instantaneo('t-1')] };
+    expect(faseSeAutoPula('recompor', soInstantaneo)).toBe(true);
+    expect(faseSeAutoPula('jogar', soInstantaneo)).toBe(true);
+  });
+
+  it('as duas NÃO se pulam com um equipamento na mochila, mesmo ao lado de um instantâneo', () => {
+    // Prova que o `.some` continua distinguindo a família dentro de uma mochila
+    // MISTA — não bastava trocar `.length > 0` por `.some`; a pergunta certa é
+    // "há EQUIPAMENTO aqui", não "há Tesouro aqui".
+    const mista = { ...comMao([]), mochila: [instantaneo('t-1'), equipamento('t-2')] };
+    expect(faseSeAutoPula('recompor', mista)).toBe(false);
+    expect(faseSeAutoPula('jogar', mista)).toBe(false);
+  });
+
+  // 🔴 Fix round 1 (achado da revisão): um instantâneo SOZINHO na MÃO (não na
+  // mochila) segura as duas fases — `guardarCarta` só lê a MÃO (mochila → mão
+  // não existe) e aceita as duas famílias de Tesouro desde esta fatia. A versão
+  // anterior só perguntava por EQUIPAMENTO na mão (`temEquipamento`), então uma
+  // mão só com poção era tratada como mão vazia — a fase se auto-pulava por
+  // cima do único botão real ("Guardar") que ela tinha, violando o próprio
+  // contrato do docstring desta função ("`true` quando a ÚNICA ação legal é
+  // `passar`"): `acaoEhLegalNaFase(fase, 'guardarCarta')` já era `true`.
+  it('`recompor` e `jogar` NÃO se pulam com um instantâneo SOZINHO na mão — "Guardar" é ação real para essa carta', () => {
+    const comInstantaneoNaMao = comMao([instantaneo('i-1')]);
+    expect(faseSeAutoPula('recompor', comInstantaneoNaMao)).toBe(false);
+    expect(faseSeAutoPula('jogar', comInstantaneoNaMao)).toBe(false);
   });
 
   it('com a mochila NO TETO, nenhuma das duas se pula — é o que torna o auto-pulo impossível com queima pendente', () => {
@@ -610,7 +644,10 @@ describe('a evacuação produz `recompor` com a mão estourada — e o predicado
       classeIds: [],
       copiasPorClasse: 0,
     }),
-    composicaoTesouros: montarComposicaoTesouros(Array.from({ length: 10 }, () => 'i-teste')),
+    composicaoTesouros: montarComposicaoTesouros({
+      itemIds: Array.from({ length: 10 }, () => 'i-teste'), copiasPorItem: 1,
+      instantaneoIds: [], copiasPorInstantaneo: 0,
+    }),
   };
 
   /** Mesmo monstro forte de `mesa.test.ts` (describe "Bad Stuff na derrota"). */
@@ -735,7 +772,7 @@ describe('acaoEhLegal — o gate com a pendência', () => {
     const TODAS = [
       'vasculhar', 'manterCarta', 'empurrarCarta', 'atacar', 'esquivar', 'jogarCarta',
       'entregarCarta', 'equiparCarta', 'guardarCarta', 'procurarEncrenca', 'saquear',
-      'passar', 'queimarCarta',
+      'passar', 'queimarCarta', 'usarInstantaneo',
     ] as const satisfies readonly AcaoDaMesa['tipo'][];
 
     // Guard de COMPILAÇÃO: a lista acima tem que cobrir a união inteira. Sem ele,

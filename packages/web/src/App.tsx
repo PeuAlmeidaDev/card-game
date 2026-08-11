@@ -25,6 +25,7 @@ export function App() {
         classes={catalogo.classes}
         monstros={catalogo.monstros}
         itens={catalogo.itens}
+        instantaneos={catalogo.instantaneos}
       />
     </main>
   );

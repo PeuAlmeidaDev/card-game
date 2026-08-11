@@ -141,7 +141,9 @@ describe('criarPartida', () => {
     // equipar — teria que esperar o primeiro abate para sair do zero.
     const p = criarPartida('m1', entradas, {
       ...config,
-      composicaoTesouros: montarComposicaoTesouros(['i-1', 'i-2', 'i-3']),
+      composicaoTesouros: montarComposicaoTesouros({
+        itemIds: ['i-1', 'i-2', 'i-3'], copiasPorItem: 1, instantaneoIds: [], copiasPorInstantaneo: 0,
+      }),
       maoInicial: 2,
       maoInicialTesouros: 2,
     }, { embaralhar: semEmbaralhar });
@@ -161,7 +163,13 @@ describe('criarPartida', () => {
     // zerado na abertura, o primeiro combate vencido chamaria `tirarDoTopo` sobre
     // um cemitério vazio — 500 numa mesa que a criação acabou de aprovar.
     expect(() => criarPartida('m1', entradas,
-      { ...config, composicaoTesouros: montarComposicaoTesouros(['i-1']), maoInicialTesouros: 1 },
+      {
+        ...config,
+        composicaoTesouros: montarComposicaoTesouros({
+          itemIds: ['i-1'], copiasPorItem: 1, instantaneoIds: [], copiasPorInstantaneo: 0,
+        }),
+        maoInicialTesouros: 1,
+      },
       { embaralhar: semEmbaralhar }))
       .toThrow('criarPartida: o baralho de Tesouros não tem cartas para a mão inicial');
   });
@@ -170,7 +178,9 @@ describe('criarPartida', () => {
     const estado = criarPartida('m1', entradas, {
       patenteAlvo: 4,
       composicaoPorJogador: COMPOSICAO_DE_TESTE,
-      composicaoTesouros: montarComposicaoTesouros(['i-teste', 'i-teste']),
+      composicaoTesouros: montarComposicaoTesouros({
+        itemIds: ['i-teste', 'i-teste'], copiasPorItem: 1, instantaneoIds: [], copiasPorInstantaneo: 0,
+      }),
     }, { embaralhar: semEmbaralhar });
 
     // 2 receitas × 2 assentos: a multiplicação por assento é a MESMA regra do
@@ -186,7 +196,9 @@ describe('criarPartida', () => {
     const estado = criarPartida('m1', entradas, {
       patenteAlvo: 4,
       composicaoPorJogador: COMPOSICAO_DE_TESTE,
-      composicaoTesouros: montarComposicaoTesouros(['i-teste']),
+      composicaoTesouros: montarComposicaoTesouros({
+        itemIds: ['i-teste'], copiasPorItem: 1, instantaneoIds: [], copiasPorInstantaneo: 0,
+      }),
     }, { embaralhar: semEmbaralhar });
 
     const idsDePorta = new Set(estado.portas.monte.map((c) => c.id));
@@ -239,7 +251,10 @@ describe('criarPartida — a fase inicial', () => {
       {
         ...config,
         // 4 por jogador: 1 na mão de cada um dos 2 assentos precisa sobrar monte.
-        composicaoTesouros: montarComposicaoTesouros(Array.from({ length: 4 }, () => 'i-teste')),
+        composicaoTesouros: montarComposicaoTesouros({
+          itemIds: Array.from({ length: 4 }, () => 'i-teste'), copiasPorItem: 1,
+          instantaneoIds: [], copiasPorInstantaneo: 0,
+        }),
         maoInicial: MAO_INICIAL_PADRAO,
         maoInicialTesouros: 1,
       },
@@ -263,7 +278,10 @@ describe('criarPartida — a fase inicial', () => {
       {
         ...config,
         // 6 por jogador: 4 na mão de cada um dos 2 assentos precisa sobrar monte.
-        composicaoTesouros: montarComposicaoTesouros(Array.from({ length: 6 }, () => 'i-teste')),
+        composicaoTesouros: montarComposicaoTesouros({
+          itemIds: Array.from({ length: 6 }, () => 'i-teste'), copiasPorItem: 1,
+          instantaneoIds: [], copiasPorInstantaneo: 0,
+        }),
         maoInicial: MAO_INICIAL_PADRAO,
         maoInicialTesouros: MAO_INICIAL_TESOUROS + 1,
       },

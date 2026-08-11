@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { api } from './api';
 import { PainelLog } from './PainelLog';
 import { descreverCarta } from './descreverCarta';
-import { acaoEhLegal, afinidadeCom, precisaEscolherMao } from '@card-dungeon/shared';
-import type { AcaoDaMesa, AcaoNoFio, Catalogo, Fase, ItemCarta, Slot, VistaDaPartida } from '@card-dungeon/shared';
+import type { NomesDoCatalogo } from './descreverCarta';
+import { acaoEhLegal, afinidadeCom, instantaneoTemEfeito, precisaEscolherMao } from '@card-dungeon/shared';
+import type { AcaoDaMesa, AcaoNoFio, AlvoDeInstantaneo, Catalogo, Fase, ItemCarta, Slot, VistaDaPartida } from '@card-dungeon/shared';
 import { rotuloDeAfinidade } from './rotuloDeAfinidade';
 import { rotuloDeBadStuff } from './rotuloDeBadStuff';
 
@@ -47,11 +48,33 @@ const NOME_DA_FASE: Record<Fase, string> = {
   descartar: 'Descartar — sua mão está acima do limite',
 };
 
-export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }: {
+/**
+ * O rótulo humano de cada alvo de `usarInstantaneo`, mesmo molde de
+ * `NOME_DO_SLOT`/`NOME_DA_FASE`: `Record<AlvoDeInstantaneo, string>` obriga o
+ * alvo novo a chegar com rótulo — faltar uma chave aqui é erro de COMPILAÇÃO
+ * (`pnpm typecheck`), não teste silenciosamente verde.
+ *
+ * Fix round 1 (Important 1 da revisão): antes deste Record, a união
+ * `'lutador' | 'monstro'` era reescrita À MÃO em três lugares (a assinatura de
+ * `tetoDoInstantaneo`, o array de alvos do botão, e o ternário do rótulo) — o
+ * dia em que o alvo ganhar "outro jogador" (bloco 5, comentário de
+ * `AlvoDeInstantaneo` em `shared`) deixaria `pnpm typecheck` 7/7 LIMPO com a
+ * tela continuando a oferecer só dois botões. `ALVOS_DE_INSTANTANEO` abaixo é
+ * derivado DESTE Record — as duas listas não podem divergir porque só existe
+ * uma.
+ */
+const ROTULO_DO_ALVO: Record<AlvoDeInstantaneo, string> = {
+  lutador: 'em si',
+  monstro: 'no monstro',
+};
+const ALVOS_DE_INSTANTANEO = Object.keys(ROTULO_DO_ALVO) as readonly AlvoDeInstantaneo[];
+
+export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [], instantaneos = [] }: {
   readonly racas?: Catalogo['racas'];
   readonly monstros?: Catalogo['monstros'];
   readonly itens?: Catalogo['itens'];
   readonly classes?: Catalogo['classes'];
+  readonly instantaneos?: Catalogo['instantaneos'];
 }) {
   const [vista, definirVista] = useState<VistaDaPartida | null>(null);
   const [erro, definirErro] = useState<string | null>(null);
@@ -101,7 +124,12 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
   }
 
   const minhaVez = vista.vezDe === vista.voce;
-  const decisao = vista.combate?.proximaDecisao ?? null;
+  // Capturado num `const` (e não `vista.combate` relido a cada uso): dentro de um
+  // `.map()`/callback o TS perde o narrowing de `!== null` feito sobre uma
+  // PROPRIEDADE — só sobre uma variável local. Sem isso, o bloco dos instantâneos
+  // abaixo teria que checar `!== null` de novo a cada leitura.
+  const combate = vista.combate;
+  const decisao = combate?.proximaDecisao ?? null;
   // Segredo do vidente: a projeção já entrega `espiada` SÓ para o dono dela.
   // A tela não precisa checar de quem é — se veio, é sua.
   const espiada = vista.espiada;
@@ -117,6 +145,12 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
   // apaga a mesa inteira por causa de um nome.
   const nomeDoItem = (id: string): string => itens.find((i) => i.id === id)?.nome ?? id;
   const nomeDaClasse = (id: string): string => classes.find((c) => c.id === id)?.nome ?? id;
+  // Desde a Task 7, `GET /api/catalogo` publica `instantaneos` de verdade — mesma
+  // degradação defensiva (`?? id`) das outras quatro, para o skew de versão.
+  const nomeDoInstantaneo = (id: string): string => instantaneos.find((i) => i.id === id)?.nome ?? id;
+  const nomesDoCatalogo: NomesDoCatalogo = {
+    raca: nomeDaRaca, monstro: nomeDoMonstro, item: nomeDoItem, classe: nomeDaClasse, instantaneo: nomeDoInstantaneo,
+  };
   // A vida máxima do jogador vem PRONTA da vista: `combatente` já é o total
   // calculado pelo domínio (classe + itens equipados), com a patente no `level`.
   // A patente muda o dano, não a vida. Do monstro só temos o valor corrente: a
@@ -169,6 +203,64 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
     const info = infoDoItem(itemId);
     return info !== undefined && minhaZona !== null && precisaEscolherMao(info, minhaZona);
   };
+
+  // Os efeitos de UM instantâneo, pelo catálogo — mesma degradação `?? []` das
+  // outras buscas: skew de versão (carta nova no server, bundle antigo) não pode
+  // derrubar a mesa, e uma lista vazia nunca faz efeito (`instantaneoTemEfeito`
+  // devolve `false`), então o botão simplesmente nasce apagado.
+  const efeitosDoInstantaneo = (instantaneoId: string) => (
+    instantaneos.find((i) => i.id === instantaneoId)?.efeitos ?? []
+  );
+
+  /**
+   * O teto do ALVO — a MESMA conta que `usarInstantaneo` (`mesa.ts`) faz antes de
+   * chamar `aplicarInstantaneo`: do lutador o motor já guarda
+   * (`vidaInicialJogador`); do monstro não há campo em `EstadoCombate` (spec §4),
+   * então vem do catálogo, pelo `monstroId` do combate aberto.
+   */
+  const tetoDoInstantaneo = (alvo: AlvoDeInstantaneo): number => (
+    alvo === 'lutador'
+      ? (combate?.estado.vidaInicialJogador ?? 0)
+      : (monstros.find((m) => m.id === combate?.monstroId)?.vida ?? 0)
+  );
+
+  // Os instantâneos que o jogador PODE usar agora: da MÃO ou da MOCHILA — as
+  // duas origens que `usarInstantaneo` aceita (`mesa.ts`: `naMao ?? naMochila`).
+  // Esquecer a mochila aqui deixaria um consumível guardado sem botão nenhum.
+  const instantaneosDoJogador = [...vista.suaMao, ...minhaMochila].flatMap((carta) => (
+    carta.tipo === 'instantaneo' ? [carta] : []
+  ));
+
+  /**
+   * O botão "Usar" — um por alvo possível ('lutador'/'monstro'). DOIS motivos no
+   * `disabled`, e os dois são gêmeos do domínio, nunca cópia:
+   * - `legal('usarInstantaneo')` — a MESMA tabela de fase que os outros botões
+   *   usam. É o que apaga o botão para quem está só ASSISTINDO o combate alheio
+   *   (`vista.combate` é público — projeção único por mesa, não por jogador —
+   *   então um espectador também vê `combate !== null` sem que seja a vez dele).
+   *   Convenção #26: apaga, não some — o mesmo tratamento que "Atacar"/"Esquivar"
+   *   já dão a "não é sua vez".
+   * - `instantaneoTemEfeito` — o guard de desperdício (spec §5.5), a MESMA
+   *   função que o reducer chama para recusar. Ela NUNCA é reimplementada aqui —
+   *   é o par fino que já reescreveu inteiro uma vez nesta tela (ver o docstring
+   *   de `legal`).
+   */
+  const botoesDeInstantaneo = (carta: (typeof instantaneosDoJogador)[number]) => (
+    ALVOS_DE_INSTANTANEO.map((alvo) => (
+      <button
+        key={`${carta.id}-${alvo}`}
+        type="button"
+        disabled={
+          combate === null
+          || !legal('usarInstantaneo')
+          || !instantaneoTemEfeito(combate.estado, efeitosDoInstantaneo(carta.instantaneoId), alvo, tetoDoInstantaneo(alvo))
+        }
+        onClick={() => void agir({ tipo: 'usarInstantaneo', cartaId: carta.id, alvo })}
+      >
+        {nomeDoInstantaneo(carta.instantaneoId)} {ROTULO_DO_ALVO[alvo]}
+      </button>
+    ))
+  );
 
   /**
    * O botão "Equipar" — um, ou dois (um por mão) quando `euPrecisoEscolherMao`
@@ -267,7 +359,7 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
                 quê para vestir depois. Sem botão aqui — só o dono equipa a sua,
                 pelo "Sua mochila" abaixo. */}
             {j.mochila.length > 0 && (
-              <> · mochila: {j.mochila.map((c) => nomeDoItem(c.itemId)).join(', ')}</>
+              <> · mochila: {j.mochila.map((c) => descreverCarta(c, nomesDoCatalogo)).join(', ')}</>
             )}
             {j.id === vista.vezDe && ' ← jogando'}
           </li>
@@ -281,22 +373,52 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
           nenhuma explicação na tela. */}
       <p>Cartas no monte: {vista.cartasNoMonte} · Tesouros no monte: {vista.tesourosNoMonte}</p>
 
-      {vista.combate !== null && (
+      {combate !== null && (
         <p>
-          <strong>Combate</strong> — Você: {vista.combate.estado.jogador.vida}
+          {/* Força/habilidade/agilidade lidos de `combate.estado`, NUNCA de
+              `vista.jogadores[].combatente` (o corpo montado, sem o buff): é o
+              snapshot que o motor está usando de verdade, e é o único lugar em
+              que um instantâneo aplicado no combate fica visível. A lista de
+              assentos acima continua mostrando o corpo montado de propósito —
+              ela é sobre equipamento permanente, não sobre o combate em curso. */}
+          <strong>Combate</strong> — Você: {combate.estado.jogador.vida}
           {vidaMaxima !== null && ` / ${vidaMaxima}`}
+          {' · força '}{combate.estado.jogador.forca}
+          {' · habilidade '}{combate.estado.jogador.habilidade}
+          {' · agilidade '}{combate.estado.jogador.agilidade}
           {' · '}
-          {nomeDoMonstro(vista.combate.monstroId)}: {vista.combate.estado.monstro.vida} de vida
+          {nomeDoMonstro(combate.monstroId)}: {combate.estado.monstro.vida} de vida
+          {' · força '}{combate.estado.monstro.forca}
+          {' · habilidade '}{combate.estado.monstro.habilidade}
+          {' · agilidade '}{combate.estado.monstro.agilidade}
           {' · '}
-          {vista.combate.proximaDecisao === 'esquiva'
-            ? `o ${nomeDoMonstro(vista.combate.monstroId)} acertou — esquive!`
+          {combate.proximaDecisao === 'esquiva'
+            ? `o ${nomeDoMonstro(combate.monstroId)} acertou — esquive!`
             : 'sua vez de atacar'}
           {/* #119: o painel fica à vista a luta INTEIRA — é aqui, não só na
               carta que abriu o combate, que o preço de perder precisa estar. */}
-          {badStuffDoMonstro(vista.combate.monstroId) !== '' && (
-            <> · se ele vencer: {badStuffDoMonstro(vista.combate.monstroId)}.</>
+          {badStuffDoMonstro(combate.monstroId) !== '' && (
+            <> · se ele vencer: {badStuffDoMonstro(combate.monstroId)}.</>
           )}
         </p>
+      )}
+
+      {/* Os instantâneos usáveis no combate — mão E mochila, um par de botões
+          por carta ('em si' / 'no monstro'). O gate de EXISTÊNCIA aqui é só
+          `combate !== null`: sem um `EstadoCombate` não há alvo nenhum para
+          calcular (nem "lutador" nem "monstro" existem fora de uma luta), e essa
+          pergunta é estrutural, não de fase — ao contrário da legalidade
+          (é a sua vez? o efeito muda algo?), que segue a #26 e mora no
+          `disabled` de cada botão (`botoesDeInstantaneo`), nunca aqui. */}
+      {combate !== null && instantaneosDoJogador.length > 0 && (
+        <section aria-label="instantâneos usáveis">
+          <h3>Instantâneos</h3>
+          <ul>
+            {instantaneosDoJogador.map((carta) => (
+              <li key={carta.id}>{botoesDeInstantaneo(carta)}</li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {vista.desfecho === 'terminada' ? (
@@ -317,7 +439,12 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
                 {/* O deslocado vem PRIMEIRO: é ele que abriu a pergunta, e é a
                     escolha que mantém a mochila como está. */}
                 <li>
-                  {nomeDoItem(vista.queima.deslocados[0].itemId)} (saiu do corpo){' '}
+                  {/* `descreverCarta`, não `nomeDoItem(…itemId)`: desde a fatia
+                      `consumíveis (instantâneo)` o deslocado por `mochilaEncolheu`
+                      pode ser um instantaneo (`QueimaPendente.deslocados` é
+                      `CartaTesouro`, não só `CartaEquipamento`), e ele não tem
+                      `itemId`. */}
+                  {descreverCarta(vista.queima.deslocados[0], nomesDoCatalogo)} (saiu do corpo){' '}
                   <button
                     type="button"
                     disabled={!legal('queimarCarta')}
@@ -331,7 +458,7 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
                 </li>
                 {minhaMochila.map((carta) => (
                   <li key={carta.id}>
-                    {nomeDoItem(carta.itemId)} (na mochila){' '}
+                    {descreverCarta(carta, nomesDoCatalogo)} (na mochila){' '}
                     <button
                       type="button"
                       disabled={!legal('queimarCarta')}
@@ -352,7 +479,7 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
           )}
 
           {espiada !== null && (
-            <p>Você pressente {descreverCarta(espiada.carta, nomeDaRaca, nomeDoMonstro, nomeDoItem, nomeDaClasse)} adiante.</p>
+            <p>Você pressente {descreverCarta(espiada.carta, nomesDoCatalogo)} adiante.</p>
           )}
 
           <div>
@@ -461,8 +588,19 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
         <ul>
           {minhaMochila.map((carta) => (
             <li key={carta.id}>
-              {nomeDoItem(carta.itemId)}{rotuloDe(carta.itemId)}{' '}
-              {botaoEquipar(carta.id, carta.itemId)}
+              {descreverCarta(carta, nomesDoCatalogo)}
+              {/* A afinidade e o "Equipar" só existem para EQUIPAMENTO — a
+                  família `instantaneo` (fatia `consumíveis (instantâneo)`) não
+                  tem slot nem afinidade, e a ação de jogá-la ainda não existe
+                  (chega na Task 4). Um instantaneo na mochila hoje só aparece
+                  nomeado, sem botão nenhum — o mesmo tratamento estrutural que
+                  "Sua mão" já dá às cartas de Porta logo abaixo. */}
+              {carta.tipo === 'equipamento' && (
+                <>
+                  {rotuloDe(carta.itemId)}{' '}
+                  {botaoEquipar(carta.id, carta.itemId)}
+                </>
+              )}
             </li>
           ))}
         </ul>
@@ -500,7 +638,7 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
         <ul>
           {vista.suaMao.map((carta) => (
             <li key={carta.id}>
-              {descreverCarta(carta, nomeDaRaca, nomeDoMonstro, nomeDoItem, nomeDaClasse)}
+              {descreverCarta(carta, nomesDoCatalogo)}
               {carta.tipo === 'equipamento' && rotuloDe(carta.itemId)}{' '}
               {/* Gêmeo fiel do reducer: `jogarCarta` aceita raça OU classe desde a
                   Task 7 (`mesa.ts`). */}
@@ -545,10 +683,13 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
               {carta.tipo === 'equipamento' && botaoEquipar(carta.id, carta.itemId)}
               {/* Os pares finos de `guardarCarta` (ver a tabela no `aplicarAcao`).
                   UM gate de existência e o resto em `disabled`:
-                  - `carta.tipo === 'equipamento'` → EXISTÊNCIA, mesmo tratamento
-                    que `equiparCarta` dá ao seu par de tipo logo acima. Uma carta
-                    de Porta nunca vai poder ser guardada, em fase nenhuma: o botão
-                    não descreve um estado, descreve a carta errada.
+                  - `carta.tipo === 'equipamento' || carta.tipo === 'instantaneo'`
+                    → EXISTÊNCIA, mesmo tratamento que `equiparCarta` dá ao seu
+                    par de tipo logo acima — mas pela FAMÍLIA (carta de Tesouro),
+                    não pelo membro único, desde que `guardarCarta` alargou na
+                    fatia `consumíveis (instantâneo)`. Uma carta de Porta nunca vai
+                    poder ser guardada, em fase nenhuma: o botão não descreve um
+                    estado, descreve a carta errada.
                   - `legal('guardarCarta')` → DISABLED, como o resto desta lista.
                     Já foi gate de existência, com o argumento de que um botão
                     apagado "prometeria" uma fuga do teto de mão que `descartar`
@@ -559,7 +700,7 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
                     #26 do game bible.
                   - teto da mochila → DISABLED, e por outro motivo: cheia é
                     reversível esvaziando pela equipagem, fase errada não é. */}
-              {carta.tipo === 'equipamento' && (
+              {(carta.tipo === 'equipamento' || carta.tipo === 'instantaneo') && (
                 <button
                   type="button"
                   disabled={!legal('guardarCarta') || minhaMochila.length >= (eu?.limiteDeMochila ?? 0)}
@@ -580,14 +721,15 @@ export function TelaMesa({ racas = [], monstros = [], itens = [], classes = [] }
         </ul>
       </section>
 
+      {/* `nomesDoCatalogo` desce PRONTO, e não as listas do catálogo: montar os
+          resolvedores lá dentro era ter dois objetos `NomesDoCatalogo` com os
+          mesmos campos, e foi assim que o `instantaneo` do log ficou preso no id
+          enquanto a mesma carta já saía nomeada aqui em cima. */}
       <PainelLog
         log={vista.log}
         jogadores={vista.jogadores}
         voce={vista.voce}
-        racas={racas}
-        monstros={monstros}
-        itens={itens}
-        classes={classes}
+        nomes={nomesDoCatalogo}
       />
 
       {erro !== null && <p role="alert">{erro}</p>}

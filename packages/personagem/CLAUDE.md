@@ -11,7 +11,7 @@ O menor pacote do repo — 3 módulos de produção. Existe para haver **um** lu
 | Export | O quê |
 |---|---|
 | `montarCombatente` | base ± modificadores → `Combatente`, com **piso** |
-| `CATALOGO` | o catálogo montado (raças/classes públicas + equipamentos) |
+| `CATALOGO` | o catálogo montado (raças/classes públicas + monstros + equipamentos + instantâneos) |
 | tipos | `ModificadoresDeStat`, `Classe`, `Equipamento`, `Catalogo` |
 
 ## 🔑 O `PISO = 1` (`src/montar.ts`)

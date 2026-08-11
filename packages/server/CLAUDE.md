@@ -31,9 +31,10 @@ propósito** (#62): faltar Porta não é pedido inválido, é o jogo estar quebr
 | `copiasPorMonstro: 2` · `copiasPorRaca: 1` · `copiasPorClasse: 1` | 🔴 **literais inline no `buildApp`, NÃO exportados** |
 
 ⚠️ **É o único lugar do repo onde um dial pode driftar em silêncio.** Quem escrever um harness de
-soak **põe um tripwire**: abortar na carga se a mesa não montar o total esperado (hoje **116
-cartas** — 68 Portas + 48 Tesouros). Um `soak.ts` que copia esses três números e não confere mede
-uma mesa que não é a de produção.
+soak **põe um tripwire**: abortar na carga se a mesa não montar o total esperado (hoje **132
+cartas** — 68 Portas + 64 Tesouros). Tesouros é, desde a fatia `consumíveis (instantâneo)` (decisão
+#40): 12 equipamentos + 4 instantâneos por jogador = 16/jogador, 64 na mesa de 4, **25% consumível**.
+Um `soak.ts` que copia esses três números e não confere mede uma mesa que não é a de produção.
 
 ## Invariantes da borda
 

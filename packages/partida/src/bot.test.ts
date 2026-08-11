@@ -1,21 +1,23 @@
 import { describe, it, expect } from 'vitest';
+import type { Combatente, DecisaoPendente } from '@card-dungeon/motor';
 import { escolherAcao } from './bot';
 import { aplicarAcao } from './mesa';
 import { avancarBots } from './automacao';
 import { criarPartida } from './montagem';
 import { projetarPara } from './projecao';
 import { filaDeDados } from './testes/dados';
-import { classe, equipamento, monstro as cartaMonstro, monstros, raca } from './testes/cartas';
+import { classe, equipamento, instantaneo, monstro as cartaMonstro, monstros, raca } from './testes/cartas';
 import { LIMITE_BASE_DE_MAO, LIMITE_BASE_DE_MOCHILA } from './mao';
 import {
   CARTA_DE_CLASSE_DE_TESTE, catalogoDeTeste, comClasseDeTeste, ID_DA_CLASSE_DE_TESTE, ID_DA_RACA_DONA,
-  ID_DA_RACA_OUTRA, ID_DO_ITEM_DE_CAPACETE, ID_DO_ITEM_DUAS_MAOS, ID_DO_ITEM_EXCLUSIVO, ID_DO_ITEM_FORTE,
-  ID_DO_ITEM_FRACO, ID_DO_ITEM_LASTRO, ID_DO_ITEM_POTENTE, ID_DO_MONSTRO_FORTE,
+  ID_DA_RACA_OUTRA, ID_DO_INSTANTANEO_DE_TESTE, ID_DO_INSTANTANEO_DUPLO, ID_DO_INSTANTANEO_NEGATIVO,
+  ID_DO_ITEM_DE_CAPACETE, ID_DO_ITEM_DUAS_MAOS, ID_DO_ITEM_EXCLUSIVO, ID_DO_ITEM_FORTE, ID_DO_ITEM_FRACO,
+  ID_DO_ITEM_LASTRO, ID_DO_ITEM_POTENTE, ID_DO_MONSTRO_DE_TESTE, ID_DO_MONSTRO_FORTE,
 } from './testes/catalogo';
 import { COMPOSICAO_TESOURO_DE_TESTE } from './testes/composicao';
 import type {
-  Carta, CartaDeRaca, CartaDeClasse, CartaEquipamento, CartaTesouro, EntradaJogador, EstadoPartida, Fase, Slot,
-  VistaDaPartida,
+  Carta, CartaDeRaca, CartaDeClasse, CartaEquipamento, CartaTesouro, CombateNaMesa, EntradaJogador, EstadoPartida,
+  Fase, Slot, VistaDaPartida,
 } from './tipos';
 
 /** A projeção calcula `combatente`, então precisa do catálogo. Um só para o arquivo. */
@@ -741,6 +743,41 @@ describe('escolherAcao', () => {
       .toEqual({ tipo: 'guardarCarta', jogadorId: 'p1', cartaId: 't-fraco' });
   });
 
+  // 🔴 Fix round 1 (achado da revisão, item a): com `faseSeAutoPula` consertado
+  // (`fase.ts`), uma mão SÓ com instantâneo já não se auto-pula — o bot
+  // precisa saber responder essa fase sem tentar `equiparCarta` num consumível
+  // (que viraria `AcaoInvalida` dentro de `avancarBots`, 400 na jogada do
+  // humano). `candidatosQueEuPossoVestir` já filtra instantâneo fora do que
+  // pode vestir; este teste prova a OUTRA ponta — que ele ainda assim guarda a
+  // carta, em vez de travar em `passar` com uma ação real disponível.
+  it('guarda um instantâneo sozinho na mão, quando não há nada a equipar', () => {
+    const vista = vistaEm('recompor', {
+      suaMao: [instantaneo('i-1')],
+      mochila: [],
+    });
+
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste()))
+      .toEqual({ tipo: 'guardarCarta', jogadorId: 'p1', cartaId: 'i-1' });
+  });
+
+  it('com a mochila CHEIA, passa em vez de tentar guardar o instantâneo — gêmeo do teste de equipamento', () => {
+    // As DUAS mãos ocupadas por itens FORTES são load-bearing pelo mesmo
+    // motivo do teste gêmeo (linha ~710): sem isso, o `ITEM_DE_TESTE` que
+    // enche a mochila abaixo pareceria uma melhora (slot livre = ganho
+    // positivo) e o bot tentaria EQUIPAR em vez de chegar ao ramo que este
+    // teste prova.
+    const vista = vistaEm('recompor', {
+      suaMao: [instantaneo('i-1')],
+      slots: {
+        maoDireita: equipamento('t-forte-d', ID_DO_ITEM_FORTE),
+        maoEsquerda: equipamento('t-forte-e', ID_DO_ITEM_FORTE),
+      },
+      mochila: Array.from({ length: LIMITE_BASE_DE_MOCHILA }, (_, i) => equipamento(`t-c${String(i)}`)),
+    });
+
+    expect(escolherAcao(vista, 'p1', catalogoDeTeste())).toEqual({ tipo: 'passar', jogadorId: 'p1' });
+  });
+
   it('em `jogar`, veste o loot que acabou de cair', () => {
     const vista = vistaEm('jogar', { suaMao: [equipamento('t-1')] });
 
@@ -852,5 +889,221 @@ describe('escolherAcao — a queima pendente', () => {
 
     expect(escolherAcao(vista, 'p1', catalogoPadrao))
       .toEqual({ tipo: 'queimarCarta', jogadorId: 'p1', cartaId: 't-a' });
+  });
+});
+
+describe('escolherAcao — o bot queima consumível em combate (Task 5)', () => {
+  /** Assentos próprios deste describe — os testes chamam `escolherAcao` com `'j1'`, não `'p1'`. */
+  const entradasDeCombate: readonly EntradaJogador[] = [
+    { id: 'j1', nome: 'Você', ehBot: false },
+    { id: 'j2', nome: 'Bot 1', ehBot: true },
+  ];
+
+  const JOGADOR_PADRAO: Combatente = { forca: 3, vida: 10, habilidade: 6, agilidade: 5, level: 1 };
+  /** MESMOS stats de `MONSTRO_DE_TESTE` — é o id que `ID_DO_MONSTRO_DE_TESTE` aponta no catálogo. */
+  const MONSTRO_PADRAO: Combatente = { forca: 2, vida: 10, habilidade: 6, agilidade: 1, level: 1 };
+
+  /**
+   * Vista com um COMBATE aberto, para os testes de `talvezUsarInstantaneo`.
+   * Segue a MESMA convenção de `vistaEm`/`comQueimaEm` (topo do arquivo): forja
+   * o campo direto no `EstadoPartida` (`combate`, e `mao`/`mochila` de 'j1') e
+   * deixa `projetarPara` fazer a projeção de verdade — `combate` sai na vista
+   * exatamente do que foi montado aqui, porque `projetarPara` o repassa sem
+   * transformar (é informação já pública).
+   *
+   * 🔑 `MONSTRO_PADRAO` tem que ser numericamente igual a `MONSTRO_DE_TESTE`:
+   * `talvezUsarInstantaneo` lê o teto do alvo `'monstro'` em
+   * `catalogo.monstro(monstroId)?.vida`, e `monstroId` aqui é sempre
+   * `ID_DO_MONSTRO_DE_TESTE` — um monstro em combate DIFERENTE do que o
+   * catálogo descreve para esse id deixaria a mira no monstro inexercitável
+   * (o guard de `vidaInicialDoAlvo === undefined` NÃO dispara, mas o `teto`
+   * lido não seria o do combatente que está de fato na luta).
+   */
+  function vistaEmCombate(opts: {
+    readonly turno: number;
+    readonly proximaDecisao: DecisaoPendente;
+    readonly suaMao?: readonly Carta[];
+    readonly mochila?: readonly CartaTesouro[];
+    readonly vidaDoJogador?: number;
+    readonly vidaInicialJogador?: number;
+    readonly monstro?: Combatente;
+  }): VistaDaPartida {
+    const vidaInicialJogador = opts.vidaInicialJogador ?? JOGADOR_PADRAO.vida;
+    const combate: CombateNaMesa = {
+      estado: {
+        jogador: { ...JOGADOR_PADRAO, vida: opts.vidaDoJogador ?? vidaInicialJogador },
+        monstro: opts.monstro ?? MONSTRO_PADRAO,
+        vez: 'jogador',
+        turno: opts.turno,
+        // Só significativo quando a decisão pendente é 'esquiva' (o motor exige
+        // a rolagem do atacante para resolver a esquiva); o valor em si não
+        // importa para a política do bot, que só lê `proximaDecisao`.
+        ataqueDoMonstro: opts.proximaDecisao === 'esquiva' ? { rolagem: 6 } : null,
+        desfecho: 'emAndamento',
+        vidaInicialJogador,
+        passivas: [],
+      },
+      proximaDecisao: opts.proximaDecisao,
+      monstroId: ID_DO_MONSTRO_DE_TESTE,
+    };
+    const p = criarPartida('c1', entradasDeCombate, soMonstro, { embaralhar: semEmbaralhar });
+    const forjado: EstadoPartida = {
+      ...p,
+      fase: 'combate',
+      combate,
+      jogadores: p.jogadores.map((j) => (
+        j.id === 'j1' ? { ...j, mao: opts.suaMao ?? j.mao, mochila: opts.mochila ?? j.mochila } : j
+      )),
+    };
+    return projetarPara('j1', forjado, catalogoPadrao);
+  }
+
+  it('usa o buff no turno 0, antes de atacar', () => {
+    const vista = vistaEmCombate({
+      turno: 0, proximaDecisao: 'ataque',
+      suaMao: [instantaneo('t1', ID_DO_INSTANTANEO_DUPLO)],
+    });
+    expect(escolherAcao(vista, 'j1', catalogoDeTeste())).toEqual({
+      tipo: 'usarInstantaneo', jogadorId: 'j1', cartaId: 't1', alvo: 'lutador',
+    });
+  });
+
+  it('depois do turno 0 ele ATACA em vez de queimar buff', () => {
+    const vista = vistaEmCombate({
+      turno: 3, proximaDecisao: 'ataque',
+      suaMao: [instantaneo('t1', ID_DO_INSTANTANEO_DUPLO)],
+    });
+    expect(escolherAcao(vista, 'j1', catalogoDeTeste())).toEqual({ tipo: 'atacar', jogadorId: 'j1' });
+  });
+
+  it('cura quando a vida cai a 40% ou menos, em qualquer turno', () => {
+    const vista = vistaEmCombate({
+      turno: 5, proximaDecisao: 'esquiva', vidaDoJogador: 4, vidaInicialJogador: 10,
+      suaMao: [instantaneo('t2', ID_DO_INSTANTANEO_DE_TESTE)],
+    });
+    expect(escolherAcao(vista, 'j1', catalogoDeTeste())).toEqual({
+      tipo: 'usarInstantaneo', jogadorId: 'j1', cartaId: 't2', alvo: 'lutador',
+    });
+  });
+
+  it('NÃO cura acima de 40% da vida — esquiva', () => {
+    const vista = vistaEmCombate({
+      turno: 5, proximaDecisao: 'esquiva', vidaDoJogador: 9, vidaInicialJogador: 10,
+      suaMao: [instantaneo('t2', ID_DO_INSTANTANEO_DE_TESTE)],
+    });
+    expect(escolherAcao(vista, 'j1', catalogoDeTeste())).toEqual({ tipo: 'esquivar', jogadorId: 'j1' });
+  });
+
+  // 🔴 Um bot que pede o que o reducer recusa vira `AcaoInvalida` dentro de
+  // `avancarBots` => 400 NA JOGADA DO HUMANO. É o modo de falha catalogado.
+  it('nunca pede um uso que o reducer recusaria (efeito nulo)', () => {
+    const vista = vistaEmCombate({
+      turno: 0, proximaDecisao: 'ataque', vidaDoJogador: 10, vidaInicialJogador: 10,
+      suaMao: [instantaneo('t3', ID_DO_INSTANTANEO_DE_TESTE)],
+    });
+    expect(escolherAcao(vista, 'j1', catalogoDeTeste())).toEqual({ tipo: 'atacar', jogadorId: 'j1' });
+  });
+
+  it('joga o modificador NEGATIVO no monstro, não em si', () => {
+    const vista = vistaEmCombate({
+      turno: 0, proximaDecisao: 'ataque',
+      suaMao: [instantaneo('t4', ID_DO_INSTANTANEO_NEGATIVO)],
+    });
+    expect(escolherAcao(vista, 'j1', catalogoDeTeste())).toEqual({
+      tipo: 'usarInstantaneo', jogadorId: 'j1', cartaId: 't4', alvo: 'monstro',
+    });
+  });
+
+  // 🔑 Achado ao provar a MUTAÇÃO do Step 5 (ver `task-5-report.md`): nenhum
+  // dos seis testes acima morde o guard `if (!instantaneoTemEfeito(…)) continue`.
+  // Para a CURA o guard é redundante com a janela (`feridoDemais` só é `true`
+  // enquanto ainda há teto pra subir, então uma cura que passa a janela nunca
+  // chega vazia no guard); um BUFF positivo não tem teto pra saturar. O único
+  // jeito real de um candidato passar a janela e ainda assim não ter efeito é
+  // um modificador NEGATIVO contra um stat já no PISO — exatamente o exemplo
+  // do docstring de `instantaneoTemEfeito` ("Areia nos Olhos contra um monstro
+  // já no piso de força também não faz nada"). Sem este teste, remover o guard
+  // deixa a suíte inteira verde.
+  it('NÃO usa o negativo quando o monstro já está no piso — o efeito seria nulo', () => {
+    const vista = vistaEmCombate({
+      turno: 0, proximaDecisao: 'ataque',
+      suaMao: [instantaneo('t5', ID_DO_INSTANTANEO_NEGATIVO)],
+      monstro: { ...MONSTRO_PADRAO, forca: 1 },
+    });
+    expect(escolherAcao(vista, 'j1', catalogoDeTeste())).toEqual({ tipo: 'atacar', jogadorId: 'j1' });
+  });
+
+  it('usa o consumível guardado na MOCHILA quando a mão não tem nenhum', () => {
+    const vista = vistaEmCombate({
+      turno: 0, proximaDecisao: 'ataque',
+      suaMao: [],
+      mochila: [instantaneo('t6', ID_DO_INSTANTANEO_DUPLO)],
+    });
+    expect(escolherAcao(vista, 'j1', catalogoDeTeste())).toEqual({
+      tipo: 'usarInstantaneo', jogadorId: 'j1', cartaId: 't6', alvo: 'lutador',
+    });
+  });
+
+  // 🔴 Fix round 1 (achado do revisor): a terminação do laço de buffs do turno 0
+  // era garantida só por CONSTRUÇÃO — `usarInstantaneo` remove a carta da mão E
+  // da mochila (`mesa.ts`), então `candidatas` encolhe a cada volta —, mas
+  // nenhum teste prendia isso. Mesmo perfil da armadilha do `>` estrito de
+  // `vestirOuGuardar` (`packages/partida/CLAUDE.md`): "óbvio por construção" e
+  // sem um teste mordendo até o soak medir o contrário. Aqui o risco concreto é
+  // a Task 9: centenas de partidas simuladas onde um laço que não termina não
+  // dá um teste vermelho, dá um soak pendurado.
+  //
+  // Cenário montado por um caminho REAL, não por campos cravados: `vasculhar`
+  // de verdade revela o monstro do monte, `avancarBots` de verdade dirige o
+  // bot (não um laço manual imitando ele), e as cartas nascem nas zonas onde o
+  // jogo as põe — DUAS na mão, UMA na mochila, cobrindo as duas origens que
+  // `talvezUsarInstantaneo` lê. O monstro é fraco de propósito (vida 1): não é
+  // para provar nada do COMBATE, é só o jeito mais curto de deixar a luta
+  // terminar depois que os buffs acabam, sem inflar o teste com dezenas de
+  // rodadas.
+  it('esgota os buffs do turno 0 e passa a atacar — avancarBots termina', () => {
+    const monstroFraco = { forca: 0, vida: 1, habilidade: 1, agilidade: 0, level: 1, tesouros: 0, badStuff: [] };
+    const catalogoFraco = catalogoDeTeste({ monstro: () => monstroFraco });
+
+    const p = criarPartida('c-fix1', entradasDeCombate, soMonstro, { embaralhar: semEmbaralhar });
+    const comVariosBuffs: EstadoPartida = {
+      ...p,
+      vezDe: 'j2',
+      fase: 'vasculhar',
+      jogadores: p.jogadores.map((j) => (
+        j.id === 'j2'
+          ? {
+              ...j,
+              mao: [instantaneo('b1', ID_DO_INSTANTANEO_DUPLO), instantaneo('b2', ID_DO_INSTANTANEO_DUPLO)],
+              mochila: [instantaneo('b3', ID_DO_INSTANTANEO_DUPLO)],
+            }
+          : j
+      )),
+    };
+
+    // Ataque acerta (1 ≤ habilidade), esquiva do monstro falha (12 > 1): um
+    // golpe só (dano 1+3=4 contra vida 1) fecha o combate. Sobra de dados de
+    // propósito — o ponto do teste é a terminação, não economizar rolagem.
+    const r = avancarBots(comVariosBuffs, {
+      rolar: filaDeDados([1, 12, 12, 12, 12, 12]),
+      embaralhar: semEmbaralhar,
+      catalogo: catalogoFraco,
+    });
+
+    // (a) TERMINOU: `avancarBots` devolveu em vez de lançar "teto de ações
+    // automáticas atingido", e a vez voltou ao humano.
+    expect(r.estado.vezDe).toBe('j1');
+
+    // (b) as TRÊS cartas saíram das duas zonas de origem.
+    const j2Final = r.estado.jogadores.find((j) => j.id === 'j2')!;
+    expect(j2Final.mao.some((c) => ['b1', 'b2', 'b3'].includes(c.id))).toBe(false);
+    expect(j2Final.mochila.some((c) => ['b1', 'b2', 'b3'].includes(c.id))).toBe(false);
+
+    const usos = r.estado.log.filter((e) => e.tipo === 'usouInstantaneo' && e.jogadorId === 'j2');
+    expect(usos).toHaveLength(3); // as TRÊS, nem uma a menos — a janela não fechou cedo demais
+
+    // (c) a política SAIU da janela de buff: o combate foi resolvido por um
+    // ataque de verdade, não ficou girando em `usarInstantaneo` para sempre.
+    expect(r.estado.combate).toBeNull();
   });
 });

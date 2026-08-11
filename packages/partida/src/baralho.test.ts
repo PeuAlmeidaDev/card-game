@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Carta, CartaTesouro, InfoItem } from './tipos';
-import { montarComposicao, tirarDoTopo } from './baralho';
+import { montarComposicao, montarComposicaoTesouros, tirarDoTopo } from './baralho';
 import { monstro } from './testes/cartas';
 
 const idem = <T,>(itens: readonly T[]): T[] => [...itens];
@@ -95,6 +95,24 @@ describe('montarComposicao', () => {
       classeIds: [], copiasPorClasse: 0,
     });
     expect(c).toHaveLength(3);
+  });
+});
+
+describe('montarComposicaoTesouros', () => {
+  it('monta a composição de Tesouros com as duas famílias, nas cópias declaradas', () => {
+    // Assinatura NOVA (fatia `consumíveis (instantâneo)`, decisão #40): a receita
+    // é objeto e a proporção é dita em voz alta, como a de Portas já é — não é
+    // mais derivada do tamanho do catálogo.
+    const r = montarComposicaoTesouros({
+      itemIds: ['i1', 'i2'], copiasPorItem: 1,
+      instantaneoIds: ['ins1'], copiasPorInstantaneo: 2,
+    });
+    expect(r).toEqual([
+      { tipo: 'equipamento', itemId: 'i1' },
+      { tipo: 'equipamento', itemId: 'i2' },
+      { tipo: 'instantaneo', instantaneoId: 'ins1' },
+      { tipo: 'instantaneo', instantaneoId: 'ins1' },
+    ]);
   });
 });
 
