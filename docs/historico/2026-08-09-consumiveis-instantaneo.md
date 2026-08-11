@@ -617,8 +617,8 @@ perfeitamente seu funcionamento. não consegui testar também a badstuff, mas ap
 | Item | Estado | O que isso significa |
 |---|---|---|
 | **1** — a seção aparece no combate, com dois botões por carta | ✅ **CONFERIDO** | ele achou os botões e **usou** as cartas |
-| **2** — o efeito à vista no painel + o log pelo NOME | 🔴 **NÃO conferido** | *"não consegui verificar perfeitamente"* |
-| **3** — alvo `monstro`, o monstro enfraquece | 🔴 **NÃO conferido** | era **sonda**, não olho |
+| **2** — o efeito à vista no painel + o log pelo NOME | 🔴 **REPROVADO na prática** | ele **usou** cartas e *"não consegui reparar"* o efeito — ver o achado abaixo |
+| **3** — alvo `monstro`, o monstro enfraquece | 🔴 **REPROVADO na prática** | ele usou a **Areia**; a força do monstro caiu e ele **não viu** |
 | **4** — a Poção **apaga** com a vida cheia | 🔴 **NÃO conferido** | — |
 | **5** — usar da **mochila** | 🔴 **NÃO conferido** | cenário dirigido, exige clicar em "Guardar" antes |
 
@@ -644,10 +644,33 @@ jogador faria, nenhum estado costurado — em 2026-08-10:
 projeto pegou por gate ocular eram **código certo que não contava a ninguém**. Um deles foi achado
 nesta mesma fatia, pela revisão do branch (o log narrando pelo id cru) — o domínio estava perfeito.
 
-⚠️ **A hipótese que fica de pé, e é a única que sobrou:** se o comportamento está certo e o Pedro
-*"não conseguiu verificar"*, o candidato é **legibilidade da tela**, não lógica. ⬜ **Não
-investigado** — e a pergunta que separa as duas ("os números não mudaram" × "mudaram e foi difícil
-ver") **não foi respondida**.
+### 🔴 O ACHADO DO GATE — e ele é o terceiro *"o código faz certo e não conta a ninguém"*
+
+**O Pedro respondeu qual carta usou, e a resposta explica tudo: foi a Areia nos Olhos e o Óleo de
+Precisão — nenhuma das duas era a do item 2.** O roteiro pedia o **Elixir de Força** de propósito,
+porque força vira dano e se sente; ele pegou as duas piores para observar, por sorteio. E o que ele
+achou vale mais que o item que não conferiu:
+
+**(a) APRESENTAÇÃO.** O painel de combate é **uma linha corrida com ONZE números**
+(`Você: 10 / 10 · força 3 · habilidade 6 · agilidade 5 · Carniçal: 16 de vida · força 5 · …`), e um
+instantâneo muda **um dígito no meio dela**, sem nada marcar o que mudou. A Areia ainda muda o
+número do **monstro**, o sexto da frase.
+
+**(b) 🔑 O ÓLEO DE PRECISÃO É IMPERCEPTÍVEL POR CONSTRUÇÃO — e isso é DESIGN, não UI.**
+`habilidade +2` move a chance de acertar de **6/12 para 8/12** e **não tem consequência observável
+num clique**; só ao longo de muitas rolagens. Das quatro cartas ele é **a única assim**. ⚠️ **A
+calibragem congelada (#130) escolheu os quatro números para serem distintos entre si, e
+perceptibilidade nunca foi critério** — a pergunta *"o jogador SENTE esta carta?"* não foi feita.
+
+📊 **E não é evento raro cuja opacidade se perdoe: 3,40 usos por jogador por partida.**
+
+➡️ **Virou a pergunta 25 do §18**, com quatro saídas candidatas de camadas diferentes — uma delas
+mexe na calibragem congelada, então nenhuma foi tomada aqui.
+
+🔑 **O que isto prova sobre o PROCESSO:** é a **terceira** vez que o gate ocular acha *"o código faz
+certo e não conta a ninguém"* — e desta vez **não é um render faltando** (esse a revisão do branch
+pegou horas antes, no log narrando pelo id cru). É a **legibilidade do que já é renderizado**, e
+**nenhum instrumento automático alcança isso**. Um humano clicando por dois minutos alcançou.
 
 ### O roteiro (para a rodada que fecha os quatro que faltam)
 
